@@ -464,7 +464,13 @@ def moments_payload(base, moments, transcript):
             "n": n, "line": n, "start": round(start, 2), "end": round(max(start, _num(seg.get("end"), start)), 2),
             "ch": seg.get("ch") if seg.get("ch") in CHANNELS else "M",
         })
-    return {**base, "model": str((moments or {}).get("model") or "")[:80], "provider": "ollama",
+    provider = (moments or {}).get("provider") or "ollama"
+    provider = provider if provider in ("ollama", "anthropic", "skip") else "ollama"
+    extra = {}
+    if provider == "anthropic":   # Minerva записує в протокол згоди: текст оброблено в хмарі (галочка у вікні)
+        extra["cloud"] = {"provider": "anthropic", "model": str((moments or {}).get("model") or "")[:80],
+                          "at": str((moments or {}).get("created") or "")[:40]}
+    return {**base, **extra, "model": str((moments or {}).get("model") or "")[:80], "provider": provider,
             "lang": (moments or {}).get("lang") if (moments or {}).get("lang") in ("uk", "de", "en", "ru") else "uk",
             "summary": str((moments or {}).get("summary") or "").strip()[:SUMMARY_MAX], "items": items,
             "rejected": len((moments or {}).get("rejected") or [])}

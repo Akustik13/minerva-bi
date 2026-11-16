@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Вікно запису наради</title>
-<link rel="stylesheet" href="/static/bench.css?v=0.3.1">
-<script src="/static/bench.js?v=0.3.1" defer></script>
+<link rel="stylesheet" href="/static/bench.css?v=0.3.2">
+<script src="/static/bench.js?v=0.3.2" defer></script>
 </head>
 <body class="boot">
 <header class="top">
@@ -215,6 +215,17 @@
 
   <div id="mn-done" class="card mn-done" hidden>
     <div id="mn-done-text"></div>
+    <!-- після ⏹, поки йде розшифровка: чим шукати ключові моменти (link.set_moments_choice) -->
+    <div id="mn-moments" class="mn-moments" hidden>
+      <b>🧠 Чим шукати ключові моменти</b>
+      <div id="mn-moments-opts" class="mn-moments-opts" role="radiogroup" aria-label="Модель для ключових моментів"></div>
+      <label class="consent" id="mn-moments-consent-box" hidden><input type="checkbox" id="mn-moments-consent">
+        Усі учасники погодились, щоб текст розшифровки обробився в хмарі (Anthropic, США)</label>
+      <p class="muted" id="mn-moments-note" hidden>⚠️ Вголос учасникам обіцяли обробку на наших серверах — ставте
+        галочку, лише якщо вони погодились і на хмару. Це запишеться в протокол згоди в Minerva.</p>
+      <div class="row"><button type="button" id="mn-moments-save" class="primary">Зберегти вибір</button>
+        <span id="mn-moments-msg" class="hint" role="status"></span></div>
+    </div>
     <div id="mn-progress" class="hint ok" role="status"></div>
     <a id="mn-done-back" class="mn-back" hidden rel="noopener noreferrer">← Повернутися в Minerva</a>
   </div>

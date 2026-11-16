@@ -3,7 +3,7 @@
 {# Назва, розшифровка, цитати, імена й адреси — лише в translate="no". JS — meetings/static/meetings/meetings.js. #}
 {% load static %}
 {% block title %}{{ title }} | Minerva{% endblock %}
-{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=9">{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=10">{% endblock %}
 {% block breadcrumbs %}
 <div class="breadcrumbs">
   <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
@@ -240,6 +240,26 @@
     <h2>🧠 Ключові моменти{% if pending %} <span class="mt-chip mt-chip-warn"><span id="mt-pending-n">{{ pending|length }}</span> чекають ✓ / ✕</span>{% endif %}</h2>
     {% if moments_wait %}<div class="mt-line-warn">{{ moments_wait_text }}</div>{% endif %}
     {% if summary %}<div class="mt-summary" translate="no">{{ summary|linebreaksbr }}</div>{% endif %}
+    {% if ai_box %}
+    <details class="mt-ai" id="mt-ai"{% if ai_box.open or ai_box.state.state == "running" or moments_model == "skip" %} open{% endif %}>
+      <summary>🔄 Знайти ключові моменти ще раз — потужнішою моделлю{% if moments_model and moments_model != "skip" %} <span class="mt-muted">(зараз: <span translate="no">{{ moments_model }}</span>)</span>{% endif %}</summary>
+      {% if moments_model == "skip" %}<div class="mt-line-warn">На RAG-ПК ключові моменти не шукали — виберіть модель тут.</div>{% endif %}
+      {% if not ai_box.available %}
+        <div class="mt-line-warn">У Minerva немає ключа Anthropic — адміністратор додає його в «⚙️ Налаштування AI».</div>
+      {% else %}
+      <div class="mt-muted">Розшифровку аналізує Claude з ключем Minerva (витрати — у бюджеті AI). Пункти, що ще чекають ✓ / ✕, замінюються новими; прийняті, «Не те» й «💬 Лише обговорення» лишаються.</div>
+      <fieldset class="mt-ai-models"><legend>Модель</legend>
+        {% for code, label in ai_box.models %}<label class="mt-radio"><input type="radio" name="mt-ai-model" value="{{ code }}"{% if code == ai_box.default %} checked{% endif %}> {{ label }}</label>{% endfor %}
+      </fieldset>
+      <label class="mt-ai-consent"><input type="checkbox" id="mt-ai-consent"> {{ ai_box.consent_text }}</label>
+      <div class="mt-muted">⚠️ Вголос учасникам обіцяли обробку на наших серверах. Ставте галочку, лише якщо вони погодились і на хмару — це запишеться в протокол згоди.</div>
+      <div class="mt-actions">
+        <button type="button" class="button mt-primary" data-mt-ai-start data-url="{{ ai_box.url }}">🧠 Знайти ключові моменти</button>
+        <span class="mt-ai-state" id="mt-ai-state" role="status"{% if ai_box.state %} data-state="{{ ai_box.state.state }}"{% endif %}>{% if ai_box.state.state == "running" %}⏳ {{ ai_box.state.label }} шукає ключові моменти…{% elif ai_box.state.state == "done" %}✅ {{ ai_box.state.label }}: нових пунктів — {{ ai_box.state.added }}{% if ai_box.state.cost_usd %} · ${{ ai_box.state.cost_usd }}{% endif %}{% elif ai_box.state.state == "error" %}⚠️ {{ ai_box.state.error }}{% endif %}</span>
+      </div>
+      {% endif %}
+    </details>
+    {% endif %}
     {% if no_project_hint and pending %}<div class="mt-muted">Щоб додавати в проєкт, підключіть нараду до проєкту («📁» угорі). Без проєкту — ⏰ дедлайн у вашому календарі або 💬 лише обговорення.</div>{% endif %}
     <div id="mt-items">
       {% for r in pending %}{{ r.html }}{% endfor %}
@@ -256,7 +276,8 @@
       {% endif %}
     </div>
     {% if not items_total %}
-      {% if m.moments_at %}<div class="mt-muted">Ключових моментів не знайдено.</div>
+      {% if m.moments_at and moments_model == "skip" %}<div class="mt-muted">Ключові моменти на RAG-ПК не шукали — «🔄 Знайти ключові моменти ще раз» вище.</div>
+      {% elif m.moments_at %}<div class="mt-muted">Ключових моментів не знайдено.</div>
       {% elif not moments_wait %}<div class="mt-muted">З’являться тут після розшифровки.</div>{% endif %}
     {% endif %}
   </section>
@@ -353,5 +374,5 @@
   </dialog>
 </div>
 {{ config|json_script:"mt-config" }}
-<script src="{% static 'meetings/meetings.js' %}?v=7" defer></script>
+<script src="{% static 'meetings/meetings.js' %}?v=8" defer></script>
 {% endblock %}

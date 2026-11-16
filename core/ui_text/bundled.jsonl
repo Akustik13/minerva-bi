@@ -1126,11 +1126,14 @@
 {"uk": "Claude Haiku 5.5 — найдешевша й найшвидша · $0.10 / $0.50", "en": "Claude Haiku 5.5 — cheapest and fastest · $0.10 / $0.50", "de": "Claude Haiku 5.5 — am günstigsten und am schnellsten · $0.10 / $0.50"}
 {"uk": "Claude Haiku 5.5 — найдешевше · $0.10 / $0.50", "en": "Claude Haiku 5.5 — cheapest · $0.10 / $0.50", "de": "Claude Haiku 5.5 – am günstigsten · $0.10 / $0.50"}
 {"uk": "Claude Haiku 5.5 — найшвидше й найдешевше", "en": "Claude Haiku 5.5 — fastest and cheapest", "de": "Claude Haiku 5.5 – am schnellsten und günstigsten"}
+{"uk": "Claude Haiku 5.5 — швидко й дешево", "en": "Claude Haiku 5.5 — fast and cheap", "de": "Claude Haiku 5.5 — schnell und günstig"}
 {"uk": "Claude Haiku читає ваші листи проєкту, яких ще не читав (до 12 за раз), і пропонує важливі моменти й ризики — з цитатою з листа", "en": "Claude Haiku reads your project emails it has not read yet (up to 12 at a time) and suggests key moments and risks — with a quote from the email", "de": "Claude Haiku liest Ihre Projekt-E-Mails, die es noch nicht gelesen hat (bis zu 12 auf einmal), und schlägt wichtige Momente und Risiken vor — mit einem Zitat aus der E-Mail"}
 {"uk": "Claude Haiku: чернетка з фактів тижня; нічого не зберігає", "en": "Claude Haiku: a draft from the week's facts; saves nothing", "de": "Claude Haiku: Entwurf aus den Fakten der Woche; speichert nichts"}
 {"uk": "Claude Opus 5.5 — найкраща якість", "en": "Claude Opus 5.5 — best quality", "de": "Claude Opus 5.5 – beste Qualität"}
 {"uk": "Claude Opus 5.5 — найкраща якість · $4 / $20 за 1 млн токенів", "en": "Claude Opus 5.5 — best quality · $4 / $20 per 1M tokens", "de": "Claude Opus 5.5 — beste Qualität · $4 / $20 pro 1 Mio. Tokens"}
 {"uk": "Claude Opus 5.5 — найточніше · $4 / $20 за 1 млн токенів", "en": "Claude Opus 5.5 — most accurate · $4 / $20 per 1M tokens", "de": "Claude Opus 5.5 – am genauesten · $4 / $20 pro 1 Mio. Tokens"}
+{"uk": "Claude Opus 5.5 — найточніше, найдорожче", "en": "Claude Opus 5.5 — most accurate, most expensive", "de": "Claude Opus 5.5 — am genauesten, am teuersten"}
+{"uk": "Claude Sonnet 5.5 — рекомендовано", "en": "Claude Sonnet 5.5 — recommended", "de": "Claude Sonnet 5.5 — empfohlen"}
 {"uk": "Claude Sonnet 5.5 — швидко й якісно · $2 / $10", "en": "Claude Sonnet 5.5 — fast and high quality · $2 / $10", "de": "Claude Sonnet 5.5 – schnell und hochwertig · $2 / $10"}
 {"uk": "Claude Sonnet 5.5 — швидше й дешевше", "en": "Claude Sonnet 5.5 — faster and cheaper", "de": "Claude Sonnet 5.5 – schneller und günstiger"}
 {"uk": "Claude Sonnet аналізує проєкт — план, закупівлі, сторони, ваші листи, вже відомі ризики — і вашу підказку; пропонує ризики, ви вирішуєте ✓ /", "en": "Claude Sonnet analyses the project — plan, purchases, parties, your e-mails, known risks — and your hint; it suggests risks, you decide ✓ /", "de": "Claude Sonnet analysiert das Projekt — Plan, Einkauf, Beteiligte, Ihre E-Mails, bekannte Risiken — und Ihren Hinweis; es schlägt Risiken vor, Sie entscheiden ✓ /"}
@@ -2985,6 +2988,7 @@
 {"uk": "{0} міс {1}", "en": "{0} mo {1}", "de": "{0} Mon. {1}"}
 {"uk": "{0} на панелі", "en": "{0} on the panel", "de": "{0} im Panel"}
 {"uk": "{0} не в базі", "en": "{0} not in the database", "de": "{0} nicht in der Datenbank"}
+{"uk": "{0} не відповів або відповів не JSON. Спробуйте ще раз; якщо знову — перевірте ключ Anthropic («⚙️ Налаштування AI») і бюджет AI.", "en": "{0} did not answer or did not answer in JSON. Try again; if it happens again, check the Anthropic key (“⚙️ AI settings”) and the AI budget.", "de": "{0} hat nicht oder nicht im JSON-Format geantwortet. Erneut versuchen; passiert es wieder, den Anthropic-Schlüssel („⚙️ KI-Einstellungen“) und das KI-Budget prüfen."}
 {"uk": "{0} не заповнена", "en": "{0} is not filled in", "de": "{0} ist nicht ausgefüllt"}
 {"uk": "{0} не прив'язано", "en": "{0} not linked", "de": "{0} nicht verknüpft"}
 {"uk": "{0} не прийняв документи: {1}. Можна завантажити вручну {2}.", "en": "{0} did not accept the documents: {1}. You can upload them manually {2}.", "de": "{0} hat die Dokumente nicht angenommen: {1}. Sie können sie manuell hochladen {2}."}
@@ -4693,6 +4697,7 @@
 {"uk": "Ввести orderId вручну", "en": "Enter the orderId manually", "de": "orderId manuell eingeben"}
 {"uk": "Ввести будь-який номер DHL Express → статус, місцезнаходження, історія подій. Тільки Express (10+ цифр). DHL Paket — не підтримується.", "en": "Enter any DHL Express number → status, location, event history. Express only (10+ digits). DHL Paket is not supported.", "de": "Beliebige DHL-Express-Nummer eingeben → Status, Standort, Ereignisverlauf. Nur Express (10+ Ziffern). DHL Paket wird nicht unterstützt."}
 {"uk": "Ввести номер вручну", "en": "Enter the number manually", "de": "Nummer manuell eingeben"}
+{"uk": "Вголос учасникам обіцяли обробку на наших серверах. Ставте галочку, лише якщо вони погодились і на хмару — це запишеться в протокол згоди.", "en": "The participants were told aloud that processing stays on our servers. Tick this only if they also agreed to the cloud — it is written to the consent record.", "de": "Den Teilnehmenden wurde mündlich die Verarbeitung auf unseren Servern zugesagt. Nur ankreuzen, wenn sie auch der Cloud zugestimmt haben — das wird im Einwilligungsprotokoll vermerkt."}
 {"uk": "Веб-міст RAG", "en": "RAG web bridge", "de": "RAG-Web-Bridge"}
 {"uk": "Веб-міст RAG (адреса й ключ нижче або з private/minerva-config.php; лише з локальної мережі)", "en": "RAG web bridge (address and key below or from private/minerva-config.php; local network only)", "de": "RAG-Webbridge (Adresse und Schlüssel unten oder aus private/minerva-config.php; nur aus dem lokalen Netz)"}
 {"uk": "Веб-сайт", "en": "Website", "de": "Website"}
@@ -4767,6 +4772,7 @@
 {"uk": "Виберіть мову", "en": "Choose a language", "de": "Sprache wählen"}
 {"uk": "Виберіть мову документа", "en": "Choose the document language", "de": "Dokumentsprache wählen"}
 {"uk": "Виберіть мову листа", "en": "Choose the language of the e-mail", "de": "Sprache der E-Mail wählen"}
+{"uk": "Виберіть модель", "en": "Choose a model", "de": "Modell wählen"}
 {"uk": "Виберіть один або кілька днів тижня.", "en": "Select one or more days of the week.", "de": "Wählen Sie einen oder mehrere Wochentage."}
 {"uk": "Виберіть один запит — на його основі відкриється форма нового.", "en": "Select one request — a new request form based on it will open.", "de": "Wählen Sie eine Anfrage — das Formular einer neuen Anfrage auf ihrer Grundlage öffnet sich."}
 {"uk": "Виберіть один магазин для копіювання.", "en": "Select one shop to copy.", "de": "Wählen Sie einen Shop zum Kopieren aus."}
@@ -8321,6 +8327,8 @@
 {"uk": "Знайти замовлення і заповнити автоматично", "en": "Find an order and fill in automatically", "de": "Auftrag suchen und automatisch ausfüllen"}
 {"uk": "Знайти запити в уже отриманій пошті", "en": "Find requests in mail already received", "de": "Anfragen in bereits empfangenen E-Mails suchen"}
 {"uk": "Знайти запрошення в уже отриманих листах від", "en": "Find invitations in e-mails already received from", "de": "Einladungen in bereits empfangenen E-Mails ab"}
+{"uk": "Знайти ключові моменти", "en": "Find key points", "de": "Kernpunkte finden"}
+{"uk": "Знайти ключові моменти ще раз — потужнішою моделлю", "en": "Find key points again — with a stronger model", "de": "Kernpunkte erneut finden — mit einem stärkeren Modell"}
 {"uk": "Знайти контур візитки чи флаєра й вирівняти фото по ньому", "en": "Find the outline of the business card or flyer and straighten the photo along it", "de": "Umriss der Visitenkarte oder des Flyers finden und das Foto danach ausrichten"}
 {"uk": "Знайти моменти й ризики", "en": "Find moments and risks", "de": "Momente und Risiken finden"}
 {"uk": "Знайти пов'язане", "en": "Find related", "de": "Zugehöriges finden"}
@@ -8683,7 +8691,9 @@
 {"uk": "Ключові компоненти (простий BOM)", "en": "Key components (simple BOM)", "de": "Schlüsselkomponenten (einfache BOM)"}
 {"uk": "Ключові компоненти — товар має список компонентів (BOM); без BOM — простий товар", "en": "Key components — the product has a list of components (BOM); without BOM — a simple product", "de": "Schlüsselkomponenten — der Artikel hat eine Komponentenliste (BOM); ohne BOM — einfacher Artikel"}
 {"uk": "Ключові моменти", "en": "Key points", "de": "Kernpunkte"}
+{"uk": "Ключові моменти вже шукаються — зачекайте", "en": "Key points are already being searched — please wait", "de": "Kernpunkte werden bereits gesucht — bitte warten"}
 {"uk": "Ключові моменти знайти не вдалося — розшифровка є.", "en": "Key points could not be found — the transcript is there.", "de": "Kernpunkte konnten nicht gefunden werden — das Transkript ist vorhanden."}
+{"uk": "Ключові моменти на RAG-ПК не шукали — «🔄 Знайти ключові моменти ще раз» вище.", "en": "Key points were not searched on the RAG PC — “🔄 Find key points again” above.", "de": "Auf dem RAG-PC wurden keine Kernpunkte gesucht — „🔄 Kernpunkte erneut finden“ oben."}
 {"uk": "Ключові моменти нарад", "en": "Meeting key points", "de": "Kernpunkte der Besprechungen"}
 {"uk": "Ключові моменти отримано", "en": "Key points received", "de": "Kernpunkte erhalten"}
 {"uk": "Ключові цифри дня", "en": "Key figures of the day", "de": "Kennzahlen des Tages"}
@@ -10067,6 +10077,7 @@
 {"uk": "На DigiKey, дн", "en": "On DigiKey, days", "de": "Bei DigiKey, Tage"}
 {"uk": "На Jumingo акаунті не налаштовано метод оплати. Зайдіть на jumingo.com → Аккаунт → Zahlungsmethoden → додайте картку або SEPA. Поки що використовуйте «✅ Обрати» для ручної оплати.", "en": "No payment method is configured on the Jumingo account. Go to jumingo.com → Account → Zahlungsmethoden → add a card or SEPA. For now use “✅ Select” for manual payment.", "de": "Im Jumingo-Konto ist keine Zahlungsmethode eingerichtet. Gehen Sie zu jumingo.com → Account → Zahlungsmethoden → fügen Sie eine Karte oder SEPA hinzu. Verwenden Sie vorerst „✅ Auswählen“ für die manuelle Zahlung."}
 {"uk": "На RAG-ПК зараз іде інший запис — одночасно лише один. Спробуйте, коли він закінчиться.", "en": "Another recording is running on the RAG PC — only one at a time. Try again when it has finished.", "de": "Auf dem RAG-PC läuft gerade eine andere Aufnahme — nur eine gleichzeitig. Versuchen Sie es, wenn sie beendet ist."}
+{"uk": "На RAG-ПК ключові моменти не шукали — виберіть модель тут.", "en": "Key points were not searched on the RAG PC — choose a model here.", "de": "Auf dem RAG-PC wurden keine Kernpunkte gesucht — hier ein Modell wählen."}
 {"uk": "На Telegram ID з «Мої налаштування» (бот — «Налаштування → Сповіщення»).", "en": "To the Telegram ID from «My settings» (bot — «Settings → Notifications»).", "de": "An die Telegram-ID aus «Meine Einstellungen» (Bot — «Einstellungen → Benachrichtigungen»)."}
 {"uk": "На developer.dhl.com перевір статус API у своєму App: має бути Aktiviert, а не Pending.", "en": "On developer.dhl.com check the API status in your App: it must be Aktiviert, not Pending.", "de": "Prüfen Sie auf developer.dhl.com den API-Status in Ihrer App: Er muss Aktiviert lauten, nicht Pending."}
 {"uk": "На supplier.digikey.com не налаштовано жодного способу доставки.", "en": "No shipping method is set up on supplier.digikey.com.", "de": "Auf supplier.digikey.com ist keine Versandart eingerichtet."}
@@ -10177,6 +10188,7 @@
 {"uk": "Надсилати через, хв", "en": "Send after, min", "de": "Senden nach, Min."}
 {"uk": "Надсилаю {0} {1} · {2} (станом на {3}).", "en": "Sending {0} {1} · {2} (as of {3}).", "de": "Anbei {0} {1} · {2} (Stand {3})."}
 {"uk": "Надсилаю картки {0} товарів на DigiKey — DigiKey перевіряє зміни товару окремо (Products → Pending).", "en": "Sending the cards of {0} products to DigiKey — DigiKey reviews product changes separately (Products → Pending).", "de": "Die Karten von {0} Artikeln werden an DigiKey gesendet — DigiKey prüft Artikeländerungen separat (Products → Pending)."}
+{"uk": "Надсилаю розшифровку…", "en": "Sending the transcript…", "de": "Transkript wird gesendet…"}
 {"uk": "Надсилаю строки на DigiKey — хід нижче (ціни й залишок не змінюються).", "en": "Sending lead times to DigiKey — progress is shown below (prices and stock level are not changed).", "de": "Lieferzeiten werden an DigiKey gesendet — der Fortschritt wird unten angezeigt (Preise und Bestand ändern sich nicht)."}
 {"uk": "Надсилаю...", "en": "Sending...", "de": "Wird gesendet..."}
 {"uk": "Надсилаються нові повідомлення покупця й оператора DigiKey (ваші відповіді — ні): у Telegram — коротко, листом — повний текст, попередні повідомлення й посилання на відповідь у Minerva. Відповідати — у «💬 Messages Hub».", "en": "New messages from the buyer and the DigiKey operator are sent (your replies are not): briefly to Telegram, by e-mail with the full text, earlier messages and a link to reply in Minerva. Reply in \"💬 Messages Hub\".", "de": "Gesendet werden neue Nachrichten des Käufers und des DigiKey-Operators (Ihre Antworten nicht): kurz an Telegram, per E-Mail mit vollem Text, früheren Nachrichten und Link zum Antworten in Minerva. Antworten Sie im „💬 Messages Hub“."}
@@ -13414,6 +13426,7 @@
 {"uk": "Поставка", "en": "Delivery", "de": "Lieferung"}
 {"uk": "Поставка після дедлайну! Очікується", "en": "Delivery after the deadline! Expected", "de": "Lieferung nach der Frist! Erwartet"}
 {"uk": "Поставте галочку «Так, перевести» — нічого не змінено.", "en": "Tick “Yes, convert” — nothing was changed.", "de": "Setzen Sie das Häkchen „Ja, umrechnen“ — es wurde nichts geändert."}
+{"uk": "Поставте галочку згоди учасників на обробку в хмарі.", "en": "Tick the participants’ consent to processing in the cloud.", "de": "Einwilligung der Teilnehmenden zur Verarbeitung in der Cloud ankreuzen."}
 {"uk": "Поставте ✅ біля \"Надсилати email-сповіщення\" та збережіть", "en": "Tick ✅ next to \"Send email notifications\" and save", "de": "Setzen Sie ✅ bei \"E-Mail-Benachrichtigungen senden\" und speichern Sie"}
 {"uk": "Постачальник", "en": "Supplier", "de": "Lieferant"}
 {"uk": "Постачальник (склад)", "en": "Supplier (stock)", "de": "Lieferant (Lager)"}
@@ -13547,6 +13560,7 @@
 {"uk": "Пошук замовлення DigiKey за номером PO. Потребує підписки на", "en": "Search for a DigiKey order by PO number. Requires a subscription to", "de": "Suche nach einem DigiKey-Auftrag anhand der PO-Nummer. Erfordert ein Abonnement für"}
 {"uk": "Пошук запитів ({0}) запущено у фоні — хід видно в «Стан обробки» наживо.", "en": "Request search ({0}) started in the background — progress is shown live in “Processing status”.", "de": "Die Anfragensuche ({0}) wurde im Hintergrund gestartet — der Fortschritt ist live unter „Verarbeitungsstatus“ sichtbar."}
 {"uk": "Пошук запрошень — стан", "en": "Invitation search — status", "de": "Einladungssuche — Status"}
+{"uk": "Пошук зупинився (сервер перезапустили) — спробуйте ще раз.", "en": "The search stopped (the server was restarted) — try again.", "de": "Die Suche wurde unterbrochen (Server neu gestartet) — bitte erneut versuchen."}
 {"uk": "Пошук клієнта, міста, email…", "en": "Search customer, city, email…", "de": "Kunde, Stadt, E-Mail suchen…"}
 {"uk": "Пошук компонентів", "en": "Component search", "de": "Bauteilsuche"}
 {"uk": "Пошук компонентів, ціни, наявність, lead time", "en": "Component search, prices, availability, lead time", "de": "Bauteilsuche, Preise, Verfügbarkeit, Lead Time"}
@@ -14660,6 +14674,7 @@
 {"uk": "Розшифровки нарад", "en": "Meeting transcripts", "de": "Besprechungstranskripte"}
 {"uk": "Розшифровки ще немає або її вже видалено", "en": "No transcript yet or it has already been deleted", "de": "Noch kein Transkript oder es wurde bereits gelöscht"}
 {"uk": "Розшифровки ще немає — з’явиться тут, коли RAG-ПК її передасть.", "en": "No transcript yet — it appears here once the RAG PC sends it.", "de": "Noch kein Transkript — es erscheint hier, sobald der RAG-PC es sendet."}
+{"uk": "Розшифровку аналізує Claude з ключем Minerva (витрати — у бюджеті AI). Пункти, що ще чекають ✓ / ✕, замінюються новими; прийняті, «Не те» й «💬 Лише обговорення» лишаються.", "en": "Claude reads the transcript with Minerva’s key (costs count towards the AI budget). Points still waiting for ✓ / ✕ are replaced by new ones; accepted, “Not it” and “💬 Discussion only” stay.", "de": "Claude wertet das Transkript mit dem Minerva-Schlüssel aus (Kosten im KI-Budget). Punkte, die noch auf ✓ / ✕ warten, werden durch neue ersetzt; übernommene, „Nicht das“ und „💬 Nur Diskussion“ bleiben."}
 {"uk": "Розшифровку видалено", "en": "Transcript deleted", "de": "Transkript gelöscht"}
 {"uk": "Розшифровку видалено {0} — минув строк зберігання. Протокол згоди й прийняті пункти лишились.", "en": "Transcript deleted {0} — the retention period has passed. The consent record and accepted items remain.", "de": "Transkript gelöscht {0} — die Aufbewahrungsfrist ist abgelaufen. Einwilligungsprotokoll und übernommene Punkte bleiben."}
 {"uk": "Розшифровку додано у вашу базу знань: {0} {1} (бачите лише ви).", "en": "Transcript added to your knowledge base: {0} {1} (only you see it).", "de": "Transkript zu Ihrer Wissensdatenbank hinzugefügt: {0} {1} (nur Sie sehen es)."}
@@ -14667,6 +14682,7 @@
 {"uk": "Розшифровку отримано", "en": "Transcript received", "de": "Transkript erhalten"}
 {"uk": "Розшифровку цієї наради вже видалено — підготуйте нову нараду.", "en": "This meeting’s transcript has already been deleted — prepare a new meeting.", "de": "Das Transkript dieser Besprechung wurde bereits gelöscht — bereiten Sie eine neue Besprechung vor."}
 {"uk": "Розшифровку цієї наради вже отримано", "en": "This meeting’s transcript has already been received", "de": "Das Transkript dieser Besprechung wurde bereits empfangen"}
+{"uk": "Розшифровку ще не зібрано — зачекайте", "en": "The transcript is not assembled yet — please wait", "de": "Das Transkript ist noch nicht zusammengesetzt — bitte warten"}
 {"uk": "Розшифровку ще не зібрано — спробуйте трохи згодом", "en": "The transcript is not assembled yet — try a bit later", "de": "Das Transkript ist noch nicht zusammengesetzt — bitte etwas später erneut versuchen"}
 {"uk": "Розібрано", "en": "Parsed", "de": "Ausgewertet"}
 {"uk": "Розібрати з AI", "en": "Parse with AI", "de": "Mit KI erkennen"}
@@ -16519,6 +16535,7 @@
 {"uk": "У Minerva немає", "en": "Not in Minerva", "de": "Nicht in Minerva"}
 {"uk": "У Minerva немає вашої поштової скриньки — скопіюйте агенду текстом («📋 Копіювати текстом»)", "en": "You have no mailbox in Minerva — copy the agenda as text («📋 Copy as text»)", "de": "Sie haben kein Postfach in Minerva — Tagesordnung als Text kopieren («📋 Als Text kopieren»)"}
 {"uk": "У Minerva немає вашої поштової скриньки — файли можна завантажити й надіслати самому", "en": "You have no mailbox in Minerva — download the files and send them yourself", "de": "Sie haben in Minerva kein Postfach — laden Sie die Dateien herunter und senden Sie sie selbst"}
+{"uk": "У Minerva немає ключа Anthropic — адміністратор додає його в «⚙️ Налаштування AI».", "en": "Minerva has no Anthropic key — the administrator adds it in “⚙️ AI settings”.", "de": "Minerva hat keinen Anthropic-Schlüssel — der Administrator trägt ihn in „⚙️ KI-Einstellungen“ ein."}
 {"uk": "У Minerva створено проєкт {0} «{1}», зв'язаний з askDANTE.", "en": "Project {0} “{1}” created in Minerva, linked to askDANTE.", "de": "In Minerva wurde das Projekt {0} „{1}“ erstellt, verknüpft mit askDANTE."}
 {"uk": "У Minerva увімкнено, але на сайті кнопки немає: {0}.{1}", "en": "Enabled in Minerva, but the button is missing on the site: {0}.{1}", "de": "In Minerva aktiviert, aber die Schaltfläche fehlt auf der Website: {0}.{1}"}
 {"uk": "У Minerva: мають бути в індексі", "en": "In Minerva: should be in the index", "de": "In Minerva: sollen im Index sein"}
@@ -16618,6 +16635,7 @@
 {"uk": "У режимі", "en": "In the mode", "de": "Im Modus"}
 {"uk": "У режимі «за активністю»: якщо в Minerva за день немає дій — ставити стандартний час. Вимкнено — такий день пропускається.", "en": "In “by activity” mode: if there are no actions in Minerva for the day — use the standard time. If off — such a day is skipped.", "de": "Im Modus „Nach Aktivität“: Gibt es an dem Tag keine Aktionen in Minerva – Standardzeit setzen. Deaktiviert – ein solcher Tag wird übersprungen."}
 {"uk": "У розшифровці немає тексту", "en": "The transcript has no text", "de": "Das Transkript enthält keinen Text"}
+{"uk": "У розшифровці немає тексту.", "en": "The transcript has no text.", "de": "Das Transkript enthält keinen Text."}
 {"uk": "У системі", "en": "In the system", "de": "Im System"}
 {"uk": "У списку замовлень при наведенні на Артикул показує фото товару зі складу. Вимкніть якщо це сповільнює роботу.", "en": "In the order list, hovering over the SKU shows the product photo from stock. Turn off if it slows things down.", "de": "In der Auftragsliste zeigt das Darüberfahren über die Artikelnummer das Artikelfoto aus dem Lager. Deaktivieren, wenn es die Arbeit verlangsamt."}
 {"uk": "У списку замовлень при наведенні на значок 📄 показує маленький попередній перегляд PDF.", "en": "In the order list, hovering over the 📄 icon shows a small PDF preview.", "de": "In der Auftragsliste zeigt das Darüberfahren über das 📄-Symbol eine kleine PDF-Vorschau."}
@@ -16813,6 +16831,7 @@
 {"uk": "Усі сторінки розділу", "en": "All pages in this section", "de": "Alle Seiten des Bereichs"}
 {"uk": "Усі ступені", "en": "All tiers", "de": "Alle Staffeln"}
 {"uk": "Усі типи DigiKey", "en": "All DigiKey types", "de": "Alle DigiKey-Typen"}
+{"uk": "Усі учасники погодились, щоб текст розшифровки обробився в хмарі (Anthropic, США)", "en": "All participants agreed that the transcript text is processed in the cloud (Anthropic, USA)", "de": "Alle Teilnehmenden haben zugestimmt, dass der Transkripttext in der Cloud verarbeitet wird (Anthropic, USA)"}
 {"uk": "Усі фази завершено", "en": "All phases completed", "de": "Alle Phasen abgeschlossen"}
 {"uk": "Усі фази й кроки однією таблицею: назви, дати, тривалості, хто робить, «після №», стан, порядок", "en": "All phases and steps in one table: names, dates, durations, who does it, «after No.», status, order", "de": "Alle Phasen und Schritte in einer Tabelle: Namen, Daten, Dauern, wer es macht, «nach Nr.», Status, Reihenfolge"}
 {"uk": "Усі фази й кроки однією таблицею: назви, дати, тривалості, хто робить, «після №», стан, порядок — і 🧠 «Що змінити в плані»: AI пропонує виправлення", "en": "All phases and steps in one table: names, dates, durations, who does it, «after #», status, order — and 🧠 «What to change in the plan»: AI proposes corrections", "de": "Alle Phasen und Schritte in einer Tabelle: Namen, Daten, Dauer, wer es macht, «nach Nr.», Status, Reihenfolge — und 🧠 «Was im Plan ändern»: AI schlägt Korrekturen vor"}
@@ -19991,6 +20010,7 @@
 {"uk": "на DigiKey — до {0} ступенів, решту відкинуто", "en": "DigiKey allows up to {0} price breaks, the rest were dropped", "de": "auf DigiKey bis zu {0} Staffelpreise, der Rest wurde verworfen"}
 {"uk": "на DigiKey — усі кроки пройдено", "en": "on DigiKey — all steps completed", "de": "auf DigiKey — alle Schritte abgeschlossen"}
 {"uk": "на DigiKey — їхня копія фото; надіслати, лише якщо фото змінилось", "en": "on DigiKey it is their copy of the photo; send only if the photo has changed", "de": "auf DigiKey liegt deren Kopie des Fotos; nur senden, wenn sich das Foto geändert hat"}
+{"uk": "на RAG-ПК", "en": "on the RAG PC", "de": "auf dem RAG-PC"}
 {"uk": "на digikey.com", "en": "on digikey.com", "de": "auf digikey.com"}
 {"uk": "на fedex.com → «FedEx Electronic Trade Documents» (Dokumente hochladen)", "en": "on fedex.com → «FedEx Electronic Trade Documents» (upload documents)", "de": "auf fedex.com → «FedEx Electronic Trade Documents» (Dokumente hochladen)"}
 {"uk": "на mydhl.express.dhl → відправлення → «Dokumente hochladen»", "en": "on mydhl.express.dhl → shipment → «Upload documents»", "de": "auf mydhl.express.dhl → Sendung → «Dokumente hochladen»"}
@@ -22279,6 +22299,7 @@
 {"uk": "штрихкод", "en": "barcode", "de": "Barcode"}
 {"uk": "шукати в інтернеті", "en": "search the internet", "de": "im Internet suchen"}
 {"uk": "шукає за «Товарами проєкту» — додайте їх у полях нижче", "en": "searches by \"Project products\" — add them in the fields below", "de": "sucht nach „Projektartikeln“ — fügen Sie sie in den Feldern unten hinzu"}
+{"uk": "шукає ключові моменти… (зазвичай 1–3 хв; сторінку можна не тримати відкритою)", "en": "is looking for key points… (usually 1–3 min; you do not need to keep the page open)", "de": "sucht Kernpunkte… (meist 1–3 Min.; die Seite muss nicht offen bleiben)"}
 {"uk": "шукає інфо про компанію, вмикати рекомендовано для B2B.", "en": "looks up company information, recommended to enable for B2B.", "de": "sucht Informationen über das Unternehmen, für B2B empfohlen."}
 {"uk": "ще", "en": "still", "de": "noch"}
 {"uk": "ще {0}", "en": "{0} more", "de": "{0} weitere"}

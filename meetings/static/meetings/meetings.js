@@ -319,6 +319,51 @@
     });
   }
 
+  // ── 🔄 Ключові моменти ще раз — Claude у Minerva (meetings/ai_moments.py): запуск і хід (status/ → ai_moments) ──
+  var aiBox = document.getElementById('mt-ai');
+  if (aiBox) {
+    var aiState = document.getElementById('mt-ai-state');
+    var aiCfgEl = document.getElementById('mt-config'), aiCfg = null;
+    try { aiCfg = aiCfgEl ? JSON.parse(aiCfgEl.textContent) : null; } catch (err) { aiCfg = null; }
+    var aiPoll = function () {
+      if (!aiCfg || !aiCfg.status_url) return;
+      fetch(aiCfg.status_url, {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+        .then(function (r) { return r.json(); })
+        .then(function (s) {
+          var st = s && s.ai_moments;
+          if (!st || st.state === 'running') { setTimeout(aiPoll, 4000); return; }
+          if (st.state === 'done') { location.reload(); return; }
+          if (aiState) aiState.textContent = '⚠️ ' + (st.error || 'Не вдалося');
+          var b = aiBox.querySelector('[data-mt-ai-start]');
+          if (b) b.disabled = false;
+        }, function () { setTimeout(aiPoll, 8000); });
+    };
+    if (aiState && aiState.getAttribute('data-state') === 'running') setTimeout(aiPoll, 4000);
+    aiBox.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-mt-ai-start]');
+      if (!b) return;
+      var picked = aiBox.querySelector('input[name=mt-ai-model]:checked');
+      var consent = document.getElementById('mt-ai-consent');
+      if (!consent || !consent.checked) {
+        if (aiState) aiState.textContent = '⚠️ Поставте галочку згоди учасників на обробку в хмарі.';
+        if (consent) consent.focus();
+        return;
+      }
+      b.disabled = true;
+      if (aiState) aiState.textContent = '⏳ Надсилаю розшифровку…';
+      post(b.getAttribute('data-url'), {model: picked ? picked.value : '', consent: true}).then(function (res) {
+        if (!res || !res.ok) {
+          b.disabled = false;
+          if (aiState) aiState.textContent = '⚠️ ' + ((res && res.error) || 'Не вдалося');
+          return;
+        }
+        if (res.state && res.state.state === 'done') { location.reload(); return; }
+        if (aiState) aiState.textContent = '⏳ ' + ((res.state && res.state.label) || 'Claude') + ' шукає ключові моменти… (зазвичай 1–3 хв; сторінку можна не тримати відкритою)';
+        setTimeout(aiPoll, 4000);
+      });
+    });
+  }
+
   // ── розшифровка: пошук і #t=<секунда> ──
   var tr = document.getElementById('mt-tr');
   var q = document.getElementById('mt-tr-q');

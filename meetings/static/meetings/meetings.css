@@ -262,3 +262,12 @@ span.mt-ag-box { cursor: default; text-align: center; color: var(--text-muted); 
   .mt-ag-row { flex-wrap: wrap; }
   .mt-ag-sub { padding-left: 18px; }
 }
+
+/* 🔄 Ключові моменти ще раз — Claude у Minerva */
+.mt-ai { margin: 10px 0; padding: 8px 12px; border: 1px dashed var(--border-strong); border-radius: 8px; }
+.mt-ai > summary { cursor: pointer; font-weight: 600; }
+.mt-ai[open] > summary { margin-bottom: 8px; }
+.mt-ai-models { border: 0; padding: 0; margin: 8px 0; }
+.mt-ai-consent { display: block; margin: 8px 0 4px; padding: 6px 10px; border-radius: 6px; font-size: 13px;
+  background: color-mix(in srgb, var(--warn) 14%, transparent); }
+.mt-ai-state { font-size: 13px; }

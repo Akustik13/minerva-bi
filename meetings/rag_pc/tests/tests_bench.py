@@ -1474,7 +1474,7 @@ class LinkPipelineTests(LinkTestBase):
         self.assertEqual(sync["sessions"][0], {"meeting": 12, "uid": UID, "session": sid,
                                                "token_sha256": __import__("hashlib").sha256(PUSH.encode()).hexdigest(),
                                                "stage": "done", "progress": None, "queue_pos": 0, "audio_on_bench": False})
-        self.assertEqual(sync["bench"], {"version": "0.3.1", "live_busy": False, "queue": 0, "outbox": 0, "failed": 0,
+        self.assertEqual(sync["bench"], {"version": "0.3.2", "live_busy": False, "queue": 0, "outbox": 0, "failed": 0,
                                          "last_error": "", "retention_days": 30, "standalone": False})
 
     async def test_empty_transcript_and_audio_text(self):
@@ -2524,7 +2524,7 @@ class QuickStartPageTests(unittest.TestCase):
     def test_assets_carry_the_version(self):
         from bench import VERSION
 
-        self.assertEqual(VERSION, "0.3.1")
+        self.assertEqual(VERSION, "0.3.2")
         self.assertIn(f"/static/bench.js?v={VERSION}", self.html)
         self.assertIn(f"/static/bench.css?v={VERSION}", self.html)
 
@@ -2560,6 +2560,114 @@ class QuickStartPageTests(unittest.TestCase):
         self.assertIn("/admin/meetings/meeting/quick/?from=bench", self.js)
         self.assertIn("m.url.startsWith('https://')", self.js)
         self.assertIn("a.button.disabled", self.css)
+
+
+# ==== 0.3.2: after ⏹ the window picks what finds the key moments (local / Claude on the RAG PC / in Minerva) ===========
+class LinkMomentsChoiceTests(LinkTestBase):
+    async def transcribed(self, sid, folder):
+        await self.link.on_live_end(sid, {"duration": 1.0, "levels": {}, "silent": []})
+        store.write_json(folder / "transcript.json", TRANSCRIPT_MN)
+        await self.finish(sid, "transcribe")
+
+    async def test_default_is_local_and_options_are_offered(self):
+        sid, folder, token = await self.bound()
+        view = self.link.progress(token)
+        self.assertTrue(view["can_choose"])
+        self.assertEqual(view["choice"]["provider"], "ollama")
+        self.assertIn("локальна модель", view["choice_label"])
+        self.assertEqual(view["options"]["local"], self.cfg["llm_default"])
+        self.assertTrue(all(not c["ready"] for c in view["options"]["cloud"]))      # no Anthropic key yet
+
+    async def test_skip_sends_empty_moments_without_a_job(self):
+        sid, folder, token = await self.bound()
+        view, error = self.link.set_moments_choice(token, "skip")
+        self.assertEqual((error, view["choice"]["provider"]), ("", "skip"))
+        await self.transcribed(sid, folder)
+        for _ in range(3):
+            await self.link.tick()
+        self.assertEqual([k for _, k, _ in self.jobs.submitted], ["transcribe"])     # no moments job on the RAG PC
+        body = next(c[2] for c in self.fake.calls if c[0] == "moments")
+        self.assertEqual((body["provider"], body["model"], body["items"], body["summary"]), ("skip", "skip", [], ""))
+        self.assertNotIn("cloud", body)
+        later, error = self.link.set_moments_choice(token, "ollama")
+        self.assertIsNone(later)
+        self.assertIn("змінити не можна", error)
+
+    async def test_claude_needs_a_key_and_the_consent_tick(self):
+        from unittest.mock import patch
+
+        from bench import cloud
+        sid, folder, token = await self.bound()
+        view, error = self.link.set_moments_choice(token, "anthropic", "claude-sonnet-5-5", consent=True)
+        self.assertIsNone(view)
+        self.assertIn("ключ Anthropic", error)
+        with patch.object(cloud.keystore, "get", return_value="sk-ant-x"):
+            view, error = self.link.set_moments_choice(token, "anthropic", "claude-sonnet-5-5", consent=False)
+            self.assertIsNone(view)
+            self.assertIn("галочку", error)
+            view, error = self.link.set_moments_choice(token, "anthropic", "claude-nope", consent=True)
+            self.assertIsNone(view)
+            view, error = self.link.set_moments_choice(token, "anthropic", "claude-sonnet-5-5", consent=True)
+        self.assertEqual(error, "")
+        self.assertEqual((view["choice"]["provider"], view["choice"]["model"]), ("anthropic", "claude-sonnet-5-5"))
+        self.assertTrue(view["choice"]["consent_at"])
+        self.assertEqual(self.store.meta(sid)["cloud_consent"]["provider"], "anthropic")
+        await self.transcribed(sid, folder)
+        mparams = [p for _, k, p in self.jobs.submitted if k == "moments"][0]
+        self.assertEqual((mparams["provider"], mparams["model"], mparams["minerva"]), ("anthropic", "claude-sonnet-5-5", True))
+        # back to local: the consent mark goes too
+        self.assertIsNone(self.link.set_moments_choice(token, "ollama")[0])          # the job is queued: locked
+
+    async def test_cloud_moments_tell_minerva_for_the_consent_protocol(self):
+        sid, folder, token = await self.bound()
+        await self.transcribed(sid, folder)
+        store.write_json(folder / "moments.json", dict(MOMENTS_MN, provider="anthropic", model="claude-opus-5-5",
+                                                        created="2026-11-16 18:00:00"))
+        await self.finish(sid, "moments")
+        await self.link.tick()
+        body = next(c[2] for c in self.fake.calls if c[0] == "moments")
+        self.assertEqual(body["provider"], "anthropic")
+        self.assertEqual(body["cloud"], {"provider": "anthropic", "model": "claude-opus-5-5", "at": "2026-11-16 18:00:00"})
+
+
+class JobsMinervaCloudChoiceTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        from bench.jobs import Jobs
+
+        self.tmp = tempfile.TemporaryDirectory()
+        self.cfg = config.load(self.tmp.name)
+        self.store = store.Store(self.cfg)
+        self.jobs = Jobs(self.cfg, self.store, live_busy=lambda: False)
+        self.sid, self.folder, _ = self.store.create("live", "Нарада", mode="both", minerva={"meeting": 12})
+        store.write_json(self.folder / "transcript.json", TRANSCRIPT_MN)
+
+    async def asyncTearDown(self):
+        self.tmp.cleanup()
+
+    async def test_cloud_only_with_the_choice_from_the_window(self):
+        from unittest.mock import patch
+
+        from bench import cloud
+        from bench.jobs import JobError
+        params = {"provider": "anthropic", "model": "claude-sonnet-5-5", "minerva": True}
+        ok = {"model": "claude-sonnet-5-5", "provider": "anthropic", "summary": "", "items": [], "rejected": [],
+              "metrics": {}}
+        store.write_json(self.folder / "minerva.json", {"meeting": 12, "moments_choice": {
+            "provider": "anthropic", "model": "claude-opus-5-5", "consent_at": "2026-11-16T18:00:00+01:00"}})
+        self.store.update_meta(self.sid, cloud_consent={"provider": "anthropic"})
+        with patch.object(cloud, "extract", return_value=ok) as ext, self.assertRaises(JobError):
+            await self.jobs._moments(self.sid, params, {})                           # another model than chosen
+        ext.assert_not_called()
+        store.write_json(self.folder / "minerva.json", {"meeting": 12, "moments_choice": {
+            "provider": "anthropic", "model": "claude-sonnet-5-5", "consent_at": "2026-11-16T18:00:00+01:00"}})
+        with patch.object(cloud, "extract", return_value=ok) as ext:
+            await self.jobs._moments(self.sid, params, {})
+        ext.assert_called_once()
+        self.assertEqual(store.read_json(self.folder / "moments.json")["provider"], "anthropic")
+        self.store.update_meta(self.sid, cloud_consent=None)                         # the meta mark is checked too
+        with patch.object(cloud, "extract", return_value=ok) as ext, self.assertRaises(JobError):
+            await self.jobs._moments(self.sid, params, {})
+        ext.assert_not_called()
 
 
 if __name__ == "__main__":

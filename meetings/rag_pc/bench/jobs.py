@@ -216,7 +216,14 @@ class Jobs:
         model = params.get("model") or cfg["llm_default"]
         meta = self.store.meta(sid)
         title, lang = meta.get("title", ""), params.get("lang", "uk")
-        if meta.get("minerva") or params.get("minerva"):
+        if (meta.get("minerva") or params.get("minerva")) and provider == "anthropic":
+            # хмара для наради Minerva — лише з вибором і галочкою згоди у вікні після ⏹ (minerva.json moments_choice);
+            # перевіряється тут, просто перед тим, як текст піде з RAG-ПК
+            choice = (read_json(folder / "minerva.json") or {}).get("moments_choice") or {}
+            if choice.get("provider") != "anthropic" or not choice.get("consent_at") or choice.get("model") != model \
+                    or model not in ((cfg.get("llm_cloud_models") or {}).get("anthropic") or []):
+                raise JobError("Для наради Minerva хмарна модель — лише з галочкою згоди у вікні запису.")
+        elif meta.get("minerva") or params.get("minerva"):
             # the participants were told: nothing goes to the cloud. Checked here, right before the text is used.
             if provider != "ollama":
                 raise JobError("Для наради Minerva — лише локальна модель на RAG-ПК.")

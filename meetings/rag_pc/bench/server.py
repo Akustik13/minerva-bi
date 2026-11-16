@@ -779,6 +779,23 @@ async def minerva_progress(request):
     return web.json_response(view)
 
 
+async def minerva_moments_choice(request):
+    """Після ⏹: чим шукати ключові моменти — локально / Claude на RAG-ПК (з галочкою згоди) / не тут (у Minerva).
+    Лише за токеном ходу цього запису (як progress/), до початку пошуку."""
+    try:
+        data = await request.json()
+    except ValueError:
+        data = None
+    if not isinstance(data, dict):
+        return web.json_response({"error": "Неправильний запит"}, status=400)
+    view, error = _bench(request)["link"].set_moments_choice(
+        str(data.get("token") or ""), str(data.get("provider") or ""), str(data.get("model") or ""),
+        data.get("consent") is True)
+    if view is None:
+        return web.json_response({"error": error}, status=409 if "змінити не можна" in error else 400)
+    return web.json_response(view)
+
+
 # ---- app ----------------------------------------------------------------------------------------
 async def _housekeeping(app):
     ctx = app[APP_KEY]
@@ -822,6 +839,7 @@ def create_app(cfg, background=True):
     r.add_post("/api/minerva/redeem", minerva_redeem)
     r.add_get("/api/minerva/binding/{bid}", minerva_binding)
     r.add_get("/api/minerva/progress/{token}", minerva_progress)
+    r.add_post("/api/minerva/moments-choice", minerva_moments_choice)
     r.add_get("/api/sessions", sessions)
     r.add_get("/api/sessions/{sid}", session)
     r.add_get("/api/sessions/{sid}/audio", audio)

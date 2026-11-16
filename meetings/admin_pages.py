@@ -211,8 +211,10 @@ def progress_lines(m, now=None, settings=None) -> list:
 
 def status_json(m) -> dict:
     """Відповідь опитування: services.poll_state + готові рядки ходу запису (без розшифровки й назви)."""
+    from . import ai_moments
     out = services.poll_state(m)
     out["lines"] = progress_lines(m)
+    out["ai_moments"] = ai_moments.state(m)
     return out
 
 
@@ -510,6 +512,12 @@ def log_lines(m) -> list:
         elif kind == "edit":
             field = {"participants": "хто на нараді", "consent_note": "примітка"}.get(e.get("field"), "дані")
             text = f"✏️ Змінено: {field}"
+        elif kind == "cloud":
+            from . import ai_moments
+            where = "у Minerva" if e.get("where") == "minerva" else "на RAG-ПК"
+            model = ai_moments.SHORT.get(e.get("model"), e.get("model") or "Claude")
+            text = (f"☁️ Текст розшифровки оброблено в {model} (Anthropic, США) {where} — учасники погодились "
+                    f"(підтвердив той, хто записав)")
         else:
             continue
         out.append({"at": when, "text": text})
@@ -594,6 +602,18 @@ def projects_context(user, m, pj, tr=None) -> dict:
             "pj_spans": spans, "pj_suggest": suggestions}
 
 
+def ai_box(user, m) -> dict | None:
+    """«🔄 Знайти ключові моменти ще раз» потужнішою моделлю в Minerva (meetings/ai_moments.py): лише власнику з
+    правом змінювати, коли розшифровка є."""
+    from . import ai_moments
+    if not (m.has_transcript and m.transcript_at and can_change(user)):
+        return None
+    return {"models": list(ai_moments.MODELS.items()), "default": ai_moments.DEFAULT,
+            "available": ai_moments.available(), "consent_text": ai_moments.CONSENT_TEXT,
+            "state": ai_moments.state(m), "url": url("admin:meetings_meeting_moments", m.pk),
+            "open": (m.has_transcript and (not m.items.exists()))}
+
+
 def page_context(user, m, settings=None) -> dict:
     """Усе для page.html (лише власнику — перевірено до виклику)."""
     s = settings or services.settings_obj()
@@ -636,6 +656,7 @@ def page_context(user, m, settings=None) -> dict:
         "no_project_hint": not pj["links"], "transcript": transcript_rows(m, tr, pj) if tr else [],
         **projects_context(user, m, pj, tr),
         "transcript_model": tr.model if tr else "",
+        "moments_model": tr.moments_model if tr else "", "ai_box": ai_box(user, m),
         "kb": knowledge.parts_state(m, user) if m.approved_at else None, "kb_text": KB_TEXT,
         "agenda": agenda_context(user, m),
         "consent_lang_label": CONSENT_LANG_LABELS.get(m.consent_lang, ""), "log": log_lines(m),

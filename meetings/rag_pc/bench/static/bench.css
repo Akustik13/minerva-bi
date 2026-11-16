@@ -139,3 +139,6 @@ a.button { display: inline-block; text-decoration: none; border: 1px solid var(-
 a.button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 a.button.disabled { opacity: .5; pointer-events: none; }
 #q-consent-slot .mn-consent { margin: 10px 0; border-color: var(--warn); }
+.mn-moments { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.mn-moments-opts { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.mn-moments-opt { display: block; }

@@ -1191,6 +1191,73 @@ function afterRecording(text, warn = '') {
   pollProgress();
 }
 
+// ---- після ⏹: чим шукати ключові моменти (локально / Claude на RAG-ПК / у Minerva) -----------------------
+const MOM = {sig: '', dirty: false};
+function momValue(c) { return c.provider === 'anthropic' ? `anthropic:${c.model}` : c.provider || 'ollama'; }
+function momRender(p) {
+  const box = $('#mn-moments');
+  if (!box) return;
+  if (!p || !p.can_choose) {
+    box.hidden = !(p && p.choice && p.choice.provider && p.choice.provider !== 'ollama');
+    if (!box.hidden) {     // вибір зроблено, пошук почався: лише показати, чим
+      $('#mn-moments-opts').replaceChildren(el('div', {class: 'muted', text: `Вибрано: ${p.choice_label}.`}));
+      ['#mn-moments-consent-box', '#mn-moments-note'].forEach((s) => { $(s).hidden = true; });
+      $('#mn-moments-save').hidden = true;
+    }
+    return;
+  }
+  const opts = p.options || {};
+  const sig = JSON.stringify([opts, p.choice]);
+  box.hidden = false;
+  $('#mn-moments-save').hidden = false;
+  if (sig === MOM.sig || MOM.dirty) return;      // не перемальовувати вибір, який людина ще не зберегла
+  MOM.sig = sig;
+  const current = momValue(p.choice || {});
+  const rows = [{value: 'ollama', text: `🖥 Локально на RAG-ПК — безкоштовно${opts.local ? ` (${opts.local})` : ''}`}];
+  for (const c of opts.cloud || []) {
+    rows.push({value: `anthropic:${c.model}`, disabled: !c.ready,
+      text: `☁️ ${c.label} — на RAG-ПК, хмара Anthropic` +
+        (c.price_hour ? `, ≈ $${String(c.price_hour).replace('.', ',')} за годину наради` : '') +
+        (c.ready ? '' : ' (ключ Anthropic не збережено в «RAG — керування»)')});
+  }
+  rows.push({value: 'skip', text: '⏭ Не шукати тут — знайду в Minerva (Claude з ключем Minerva, на сторінці наради)'});
+  $('#mn-moments-opts').replaceChildren(...rows.map((r) => {
+    const input = el('input', {type: 'radio', name: 'mn-moments', value: r.value});
+    input.checked = r.value === current;
+    input.disabled = !!r.disabled;
+    return el('label', {class: 'mn-moments-opt'}, input, ' ', r.text);
+  }));
+  momConsentBox();
+}
+function momConsentBox() {
+  const v = (document.querySelector('input[name="mn-moments"]:checked') || {}).value || '';
+  const cloud = v.startsWith('anthropic:');
+  $('#mn-moments-consent-box').hidden = !cloud;
+  $('#mn-moments-note').hidden = !cloud;
+}
+async function momSave() {
+  const v = (document.querySelector('input[name="mn-moments"]:checked') || {}).value || 'ollama';
+  const [provider, model] = v.includes(':') ? v.split(':') : [v, ''];
+  const msg = $('#mn-moments-msg');
+  if (provider === 'anthropic' && !$('#mn-moments-consent').checked) {
+    msg.textContent = 'Поставте галочку згоди учасників на обробку в хмарі.';
+    msg.className = 'hint warn';
+    return;
+  }
+  const token = MN.progress || tabStore.get('bench-progress');
+  try {
+    const p = await api('/api/minerva/moments-choice', {json: {token, provider, model, consent: $('#mn-moments-consent').checked}});
+    MOM.dirty = false;
+    MOM.sig = '';
+    msg.textContent = `✅ Збережено: ${p.choice_label}.`;
+    msg.className = 'hint ok';
+    momRender(p);
+  } catch (e) {
+    msg.textContent = e.message;
+    msg.className = 'hint bad';
+  }
+}
+
 async function pollProgress() {
   clearTimeout(MN.pollTimer);
   const token = MN.progress || tabStore.get('bench-progress');
@@ -1200,6 +1267,7 @@ async function pollProgress() {
     const p = await api(`/api/minerva/progress/${encodeURIComponent(token)}`);
     box.textContent = p.text;
     box.className = `hint ${p.state === 'failed' ? 'bad' : 'ok'}`;
+    momRender(p);
     if (!p.done) MN.pollTimer = setTimeout(pollProgress, 5000);
   } catch (e) {
     box.textContent = e.message;
@@ -2136,6 +2204,9 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#mn-ok').addEventListener('click', () => { sendMark('consent_ok'); hint('✅ Позначено: згоду підтверджено вголос.', true); });
   $('#mn-discard').addEventListener('click', liveDiscard);
   $('#mn-silence-stop').addEventListener('click', () => liveStop(''));
+  $('#mn-moments-save').addEventListener('click', momSave);
+  $('#mn-moments-opts').addEventListener('change', () => { MOM.dirty = true; momConsentBox(); });
+  $('#mn-moments-consent').addEventListener('change', () => { MOM.dirty = true; });
   $('#mn-announced').addEventListener('change', updateStart);
   $('#mn-agreed').addEventListener('change', updateStart);
   $('#tr-on').addEventListener('change', trToggle);

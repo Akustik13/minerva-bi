@@ -29,6 +29,7 @@ from .store import read_json, valid_id, write_json
 log = logging.getLogger("bench.link")
 
 STATE = "minerva.json"
+MOMENTS_PROVIDERS = ("ollama", "anthropic", "skip")   # чим шукати ключові моменти наради (вибір у вікні після ⏹)
 BINDINGS = "minerva-bindings.json"
 NOTICES = "minerva-notices.json"
 LOOP_SECONDS = 5
@@ -965,7 +966,7 @@ class Link:
             return False
         st["steps"][f"starts_{kind}"] = int(st["steps"].get(f"starts_{kind}") or 0) + 1
         if kind == "moments":
-            self._status(sid, "finding_moments", save=False, detail="Шукаю ключові моменти (локальна модель на RAG-ПК).")
+            self._status(sid, "finding_moments", save=False, detail=f"Шукаю ключові моменти ({self._choice_label(st)}).")
         self._save(sid)
         return True
 
@@ -1048,7 +1049,18 @@ class Link:
                 return
             if float(st["retry_at"].get("moments") or 0) > now:
                 return
-            self._submit(sid, "moments", {"provider": "ollama", "model": "", "lang": "uk", "minerva": True})
+            choice = st.get("moments_choice") or {}
+            if choice.get("provider") == "skip":
+                # «⏭ Не шукати тут — знайду в Minerva»: порожні моменти, Minerva покаже «не шукали»
+                write_json(folder / "moments.json", {"model": "skip", "provider": "skip", "lang": "uk", "summary": "",
+                                                     "items": [], "rejected": [],
+                                                     "created": time.strftime("%Y-%m-%d %H:%M:%S")})
+                self.again.add(sid)              # одразу далі: передати «не шукали» в Minerva
+                return
+            params = {"provider": "ollama", "model": "", "lang": "uk", "minerva": True}
+            if choice.get("provider") == "anthropic" and choice.get("consent_at"):
+                params.update(provider="anthropic", model=choice.get("model") or "")
+            self._submit(sid, "moments", params)
             return
         if st["failed"].get("push"):
             # Minerva refused the transcript: the moments would wait for it forever; a retry from Minerva sends both
@@ -1207,14 +1219,66 @@ class Link:
             self._save_bindings()
 
     # ---- for the page and the RAG GUI ---------------------------------------------------------------------------
-    def progress(self, token):
-        """State of the recording for the window (never any text of the meeting); None when unknown."""
+    def _by_progress(self, token):
         if not isinstance(token, str) or not minerva.TOKEN_RE.match(token):
-            return None
+            return None, None
         sha = minerva.token_sha256(token)
         for sid, st in self.states.items():
             if st.get("progress_sha") == sha:
-                return self._view(sid, st)
+                return sid, st
+        return None, None
+
+    def moments_options(self):
+        """Що вікно пропонує після ⏹: локальна модель, Claude на RAG-ПК (ключ Anthropic збережено), «не шукати тут»."""
+        from . import cloud
+        offered = [c for c in cloud.choices(self.cfg, []) if c["cloud"] and c["provider"] == "anthropic"]
+        return {"local": self.cfg.get("llm_default") or "",
+                "cloud": [{"model": c["model"], "label": cloud.label(c["model"]), "ready": c["ready"],
+                           "price_hour": c.get("price_hour")} for c in offered]}
+
+    def _choosable(self, sid, st):
+        job = self.jobs.get(sid) or {}
+        if job.get("kind") == "moments" and job.get("state") in ("queued", "running"):
+            return False
+        return not (self.folder(sid) / "moments.json").exists() and not st["steps"].get("moments") \
+            and not st["steps"].get("done") and not any(st["failed"].get(k) for k in FAILED_KEYS)
+
+    def set_moments_choice(self, token, provider, model="", consent=False):
+        """Вікно після ⏹: чим шукати ключові моменти. → (вид, '') або (None, причина)."""
+        from . import cloud
+        sid, st = self._by_progress(token)
+        if sid is None:
+            return None, "Запис не знайдено — можливо, його вже видалено на RAG-ПК."
+        if not self._choosable(sid, st):
+            return None, "Ключові моменти вже шукаються або знайдені — змінити не можна. Ще раз — на сторінці наради в Minerva."
+        if provider not in MOMENTS_PROVIDERS:
+            return None, "Невідомий вибір."
+        now = minerva.now_iso()
+        choice = {"provider": provider, "model": "", "at": now}
+        if provider == "anthropic":
+            allowed = [c["model"] for c in self.moments_options()["cloud"] if c["ready"]]
+            if model not in allowed:
+                return None, "Цієї моделі немає або ключ Anthropic не збережено на RAG-ПК («RAG — керування» → «🎙 Наради»)."
+            if consent is not True:
+                return None, ("Поставте галочку: усі учасники погодились, щоб текст розшифровки обробився в хмарі "
+                              "(Anthropic, США).")
+            choice.update(model=model, consent_at=now)
+            self.store.update_meta(sid, cloud_consent={"provider": "anthropic", "at": now, "model": model})
+        else:
+            self.store.update_meta(sid, cloud_consent=None)
+        st["moments_choice"] = choice
+        self._save(sid)
+        log.info("minerva: %s moments by %s", sid, provider if provider != "anthropic" else cloud.label(model))
+        return self._view(sid, st), ""
+
+    def progress(self, token):
+        """State of the recording for the window (never any text of the meeting); None when unknown."""
+        sid, st = self._by_progress(token)
+        if sid is not None:
+            return self._view(sid, st)
+        if not isinstance(token, str) or not minerva.TOKEN_RE.match(token):
+            return None
+        sha = minerva.token_sha256(token)
         for n in self.notices:
             if n.get("progress_sha") == sha:
                 return {"state": n["state"], "progress": None, "done": True,
@@ -1229,7 +1293,7 @@ class Link:
             "recording": "🔴 Йде запис…",
             "queued": f"⏳ У черзі на розшифровку (попереду: {max(0, self.jobs.position(sid) - 1)})…",
             "transcribing": f"📝 Розшифровка… {pct or 0} %",
-            "finding_moments": "🧠 Шукаю ключові моменти (локальна модель на RAG-ПК)…",
+            "finding_moments": "🧠 Шукаю ключові моменти (" + self._choice_label(st) + ")…",
             "done": "✅ Готово — розшифровка вже на сторінці наради в Minerva.",
         }
         if st.get("blocked"):
@@ -1245,7 +1309,21 @@ class Link:
             text = f"⏳ Повторю спробу о {_hm(min(due))}." if due else "⏳ Обробка…"
         else:
             text = texts[stage]
-        return {"state": stage, "progress": pct, "text": text, "done": stage in ("done", "failed")}
+        out = {"state": stage, "progress": pct, "text": text, "done": stage in ("done", "failed"),
+               "choice": st.get("moments_choice") or {"provider": "ollama", "model": ""},
+               "choice_label": self._choice_label(st), "can_choose": self._choosable(sid, st)}
+        if out["can_choose"]:
+            out["options"] = self.moments_options()
+        return out
+
+    def _choice_label(self, st):
+        from . import cloud
+        choice = st.get("moments_choice") or {}
+        if choice.get("provider") == "anthropic":
+            return f"{cloud.label(choice.get('model'))} на RAG-ПК, хмара Anthropic"
+        if choice.get("provider") == "skip":
+            return "не на RAG-ПК — у Minerva"
+        return "локальна модель на RAG-ПК"
 
     def status(self):
         """The `minerva` block of /api/status (the RAG GUI shows it): counts and times, no titles, no keys."""

@@ -1360,6 +1360,13 @@ def add_moments(m, data, now=None) -> dict:
     before = m.status
     m.moments_at, m.moments_error, m.bench_detail = now, "", ""
     fields = {"moments_at", "moments_error", "bench_detail", "updated_at"}
+    cloud = data.get("cloud")
+    if isinstance(cloud, dict) and cloud.get("provider"):
+        # RAG-ПК шукав моменти хмарною моделлю (галочка згоди у вікні запису) — у протокол згоди
+        m.consent_log = list(m.consent_log or []) + [{
+            "at": _iso(_parse_dt(cloud.get("at")) or now), "kind": "cloud", "where": "rag_pc",
+            "provider": _str(cloud.get("provider"), 20), "model": _str(cloud.get("model"), 60)}]
+        fields.add("consent_log")
     if m.status in (Meeting.RECORDING, Meeting.PROCESSING, Meeting.FAILED):
         m.status = Meeting.REVIEW
         fields.add("status")
