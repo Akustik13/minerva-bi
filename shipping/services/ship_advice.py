@@ -397,8 +397,11 @@ def mail_state(order, user, shipment=None) -> dict:
     from django.urls import reverse
     sent = order.ship_notify_sent_at
     query = ''
-    if shipment is not None and shipment.lines.exists():
-        sent, query = shipment.customer_notified_at, f'?shipment={shipment.pk}'
+    if shipment is not None:
+        # лист про саме цю посилку: її трек-номер, перевізник, вміст і етикетка у вкладенні
+        query = f'?shipment={shipment.pk}'
+        if shipment.lines.exists() or shipment.customer_notified_at:
+            sent = shipment.customer_notified_at
     if not user.has_perm('sales.change_salesorder'):
         return {'sent': sent, 'blocked': 'немає права змінювати замовлення'}
     try:
@@ -413,6 +416,32 @@ def mail_state(order, user, shipment=None) -> dict:
     if not to:
         return {'sent': sent, 'blocked': 'у замовленні немає email клієнта'}
     return {'sent': sent, 'to': to, 'url': reverse('admin:sales_salesorder_notify_customer', args=[order.pk]) + query}
+
+
+LABEL_TYPES = {'.pdf': 'application/pdf', '.png': 'image/png', '.gif': 'image/gif', '.jpg': 'image/jpeg',
+               '.jpeg': 'image/jpeg', '.zpl': 'text/plain'}
+
+
+def label_file(shipment):
+    """Файл етикетки перевізника (label_url → MEDIA_ROOT) для вкладення в лист клієнту: (шлях, назва, тип) або None.
+    Лише файл усередині MEDIA_ROOT і відомого типу."""
+    import os
+
+    from django.conf import settings
+    url = (getattr(shipment, 'label_url', '') or '').strip()
+    if not url or url.startswith(('http://', 'https://')) and '/media/' not in url:
+        return None
+    i = url.find('/media/')
+    rel = url[i + 7:] if i >= 0 else url.lstrip('/')
+    root = os.path.realpath(settings.MEDIA_ROOT)
+    path = os.path.realpath(os.path.join(root, rel.split('?')[0]))
+    if not path.startswith(root + os.sep) or not os.path.isfile(path):
+        return None
+    ext = os.path.splitext(path)[1].lower()
+    if ext not in LABEL_TYPES:
+        return None
+    number = (shipment.tracking_number or str(shipment.pk)).strip()
+    return path, f'Label_{number}{ext}', LABEL_TYPES[ext]
 
 
 def after_booking(shipment, user) -> dict | None:

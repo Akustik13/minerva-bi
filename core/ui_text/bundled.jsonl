@@ -2859,6 +2859,7 @@
 {"uk": "{0} · резерв {1}", "en": "{0} · reserved {1}", "de": "{0} · reserviert {1}"}
 {"uk": "{0} · спершу збережіть зміни — перевіряються збережені налаштування.", "en": "{0} · save your changes first — the saved settings are checked.", "de": "{0} · speichern Sie zuerst die Änderungen – geprüft werden die gespeicherten Einstellungen."}
 {"uk": "{0} · створено {1} · {2}", "en": "{0} · created {1} · {2}", "de": "{0} · erstellt {1} · {2}"}
+{"uk": "{0} · трек-номер, що відправлено, етикетка у вкладенні", "en": "{0} · tracking number, what was shipped, label attached", "de": "{0} · Sendungsnummer, Inhalt der Sendung, Etikett im Anhang"}
 {"uk": "{0} · у Minerva записів: {1}", "en": "{0} · records in Minerva: {1}", "de": "{0} · Einträge in Minerva: {1}"}
 {"uk": "{0} · у запиті: {1} {2}", "en": "{0} · in the request: {1} {2}", "de": "{0} · in der Anfrage: {1} {2}"}
 {"uk": "{0} · фаз {1}, кроків {2}", "en": "{0} · {1} phases, {2} steps", "de": "{0} · {1} Phasen, {2} Schritte"}
@@ -9341,6 +9342,7 @@
 {"uk": "Лист клієнту {0}", "en": "Email to customer {0}", "de": "E-Mail an Kunden {0}"}
 {"uk": "Лист клієнту про відправку вимкнено в Налаштуваннях сповіщень.", "en": "The shipping e-mail to the customer is turned off in the notification settings.", "de": "Die Versand-E-Mail an den Kunden ist in den Benachrichtigungseinstellungen deaktiviert."}
 {"uk": "Лист клієнту про відправку саме цієї посилки (замовлення частинами: кожна посилка — свій лист зі своїм трек-номером і вмістом).", "en": "Shipping mail to the customer about this very parcel (order shipped in parts: each parcel gets its own mail with its tracking number and contents).", "de": "Versandmail an den Kunden zu genau diesem Paket (Teillieferung: jedes Paket eine eigene Mail mit eigener Sendungsnummer und Inhalt)."}
+{"uk": "Лист клієнту ще раз…", "en": "Email the customer again…", "de": "Kunden erneut anschreiben…"}
 {"uk": "Лист клієнту…", "en": "Email to customer…", "de": "E-Mail an Kunden…"}
 {"uk": "Лист на {0} підготовлено — людина перевірить і надішле", "en": "The e-mail to {0} is prepared — a person will review and send it", "de": "Die E-Mail an {0} ist vorbereitet – eine Person prüft und sendet sie"}
 {"uk": "Лист надіслано", "en": "E-mail sent", "de": "E-Mail gesendet"}
@@ -16758,6 +16760,7 @@
 {"uk": "Файл більший за {0} МБ", "en": "The file is larger than {0} MB", "de": "Die Datei ist größer als {0} MB"}
 {"uk": "Файл більший за {0} МБ.", "en": "The file is larger than {0} MB.", "de": "Die Datei ist größer als {0} MB."}
 {"uk": "Файл даташита в картці товару — прив'язаний до товару (посилання на сайт виробника не завантажуються).", "en": "The datasheet file on the product card — linked to the product (links to the manufacturer's website are not downloaded).", "de": "Datenblatt-Datei in der Artikelkarte – dem Artikel zugeordnet (Links zur Website des Herstellers werden nicht heruntergeladen)."}
+{"uk": "Файл етикетки не знайдено — зніміть галочку «Етикетка»", "en": "Label file not found — untick «Label»", "de": "Etikettendatei nicht gefunden — Haken bei «Etikett» entfernen"}
 {"uk": "Файл з ПК", "en": "File from PC", "de": "Datei vom PC"}
 {"uk": "Файл завантажиться з правильною кількістю (QTY з рядка замовлення).", "en": "The file downloads with the correct quantity (QTY from the order line).", "de": "Die Datei wird mit der richtigen Menge heruntergeladen (QTY aus der Auftragsposition)."}
 {"uk": "Файл ключа порожній.", "en": "The key file is empty.", "de": "Die Schlüsseldatei ist leer."}

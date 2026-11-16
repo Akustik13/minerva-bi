@@ -3161,6 +3161,23 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         has_dhl   = Carrier.objects.filter(carrier_type="dhl", is_active=True).exists()
         is_jumingo = bool(shipment.carrier and shipment.carrier.carrier_type == "jumingo")
         is_ups    = bool(shipment.carrier and shipment.carrier.carrier_type == "ups")
+        # «📡 DHL Трекінг» — лише для посилок DHL (раніше й для UPS / FedEx, якщо підключено хоч якийсь DHL)
+        is_dhl_parcel = bool(has_dhl and shipment.carrier and (
+            shipment.carrier.carrier_type == "dhl"
+            or (is_jumingo and "dhl" in (shipment.carrier_service or "").lower())))
+        # ✉️ Лист клієнту про відправку: трек-номер, що відправлено, етикетка у вкладенні (ship_advice.mail_state)
+        ship_mail = None
+        if order and shipment.direction != Shipment.IN and shipment.tracking_number:
+            try:
+                from .services.ship_advice import mail_state
+                ship_mail = mail_state(order, request.user, shipment)
+            except Exception:  # noqa: BLE001 — сторінка працює й без листа
+                logger.warning("mail_state failed for shipment %s", shipment.pk, exc_info=True)
+        mail_action = None
+        if ship_mail and ship_mail.get("url"):
+            mail_action = {"label": "✉️ Лист клієнту…" if not ship_mail.get("sent") else "✉️ Лист клієнту ще раз…",
+                           "mail": ship_mail["url"], "cls": "yellow",
+                           "title": f"{ship_mail['to']} · трек-номер, що відправлено, етикетка у вкладенні"}
         actions = []
         st = shipment.status
 
@@ -3210,10 +3227,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 actions.append({"label": "📄 Етикетка PDF",
                                  "url": shipment.label_url,
                                  "cls": "teal", "external": True})
-            if shipment.tracking_number and has_dhl:
+            if mail_action:
+                actions.append(mail_action)
+            if shipment.tracking_number and is_dhl_parcel:
                 actions.append({"label": "📡 DHL Трекінг",
                                  "url": reverse("admin:shipping_shipment_dhl_track", args=[shipment.pk]),
-                                 "cls": "yellow"})
+                                 "cls": "blue"})
 
         elif st == "delivered":
             if order and order.status != "delivered":
@@ -3232,10 +3251,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 actions.append({"label": "📄 Етикетка PDF",
                                  "url": shipment.label_url,
                                  "cls": "teal", "external": True})
-            if shipment.tracking_number and has_dhl:
+            if mail_action:
+                actions.append(mail_action)
+            if shipment.tracking_number and is_dhl_parcel:
                 actions.append({"label": "📡 DHL Трекінг",
                                  "url": reverse("admin:shipping_shipment_dhl_track", args=[shipment.pk]),
-                                 "cls": "yellow"})
+                                 "cls": "blue"})
 
         # UPS Pickup (Abholung) — для будь-якого статусу де є трекінг
         if is_ups and shipment.tracking_number and st not in ("draft", "cancelled", "error"):
@@ -3544,6 +3565,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "abd":                       self._ups_abd_context(request, shipment),
             "parcel":                    self._parcel_context(shipment, request),
             "agent_next":                agent_next,
+            "ship_mail":                 ship_mail,
             "incoming_info":             incoming_info,
             **(label_context() if agent_next else {}),
         })

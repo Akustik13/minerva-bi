@@ -63,6 +63,10 @@
                       background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);font-size:13px;
                       font-family:monospace;resize:vertical;box-sizing:border-box"></textarea>
       </div>
+      <label id="nc-label-row" style="display:none;margin-bottom:14px;font-size:13px;color:var(--text,#c9d8e4);cursor:pointer">
+        <input type="checkbox" id="nc-label" checked> 📎 {% trans "Етикетка посилки у вкладенні" %}
+        <span id="nc-label-name" translate="no" style="font-size:11px;color:var(--text-muted,#607d8b)"></span>
+      </label>
       <div style="display:flex;gap:10px;align-items:center">
         <button id="nc-send-btn" onclick="ncSend()"
                 style="padding:9px 24px;border-radius:7px;background:linear-gradient(135deg,#00695c,#00897b);
@@ -100,6 +104,7 @@ function ncSetTemplate(which) {
 window.ncSetTemplate = ncSetTemplate;
 
 function ncOpen(url) {
+  NC_URL = url || NC_URL;      /* надсилаємо туди ж, звідки взяли лист (?shipment= — про цю посилку) */
   var m = document.getElementById('nc-modal');
   m.style.display = 'flex';
   document.getElementById('nc-loading').style.display = 'block';
@@ -127,6 +132,10 @@ function ncOpen(url) {
       document.getElementById('nc-subject').value = d.subject || '';
       document.getElementById('nc-from').textContent = d.from || '—';
       document.getElementById('nc-from-note').textContent = d.from_note ? '(' + d.from_note + ')' : '';
+      var lr = document.getElementById('nc-label-row');
+      lr.style.display = d.label ? 'block' : 'none';
+      document.getElementById('nc-label').checked = !!d.label;
+      document.getElementById('nc-label-name').textContent = d.label ? '(' + d.label.name + ')' : '';
       document.getElementById('nc-form').style.display = 'block';
       if (d.auto){ ncSend(); }
     })
@@ -148,6 +157,8 @@ async function ncSend(){
         cc:document.getElementById('nc-cc').value.trim(),
         subject:document.getElementById('nc-subject').value.trim(),
         body:document.getElementById('nc-body').value,
+        attach_label:document.getElementById('nc-label-row').style.display !== 'none'
+                     && document.getElementById('nc-label').checked,
       }),
     });
     var d=await r.json();

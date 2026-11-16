@@ -165,15 +165,18 @@ def save(ns, post, user) -> list[str]:
     return refused
 
 
-def send(ns, kind: str, to: list, subject: str, text: str, html: str, cc=()) -> Sender:
-    """Надіслати лист клієнту з адреси, вибраної для цього виду. Помилка — виняток (SendError або SMTP Django)."""
+def send(ns, kind: str, to: list, subject: str, text: str, html: str, cc=(), attachments=()) -> Sender:
+    """Надіслати лист клієнту з адреси, вибраної для цього виду. Помилка — виняток (SendError або SMTP Django).
+    attachments — [{name, content (bytes), content_type}] (напр. етикетка посилки)."""
     s = sender(ns, kind)
     to, cc = [a for a in to if a], [a for a in cc if a]
+    attachments = list(attachments or [])
     if s.problem:
         logger.warning("Лист клієнту (%s): %s — надсилаю з SMTP сповіщень", kind, s.problem)
     if s.account is not None:
         from email_assistant.smtp_client import SMTPClient
-        result = SMTPClient(s.account).send(to, subject, text, html, cc_emails=cc, signature=False)
+        result = SMTPClient(s.account).send(to, subject, text, html, cc_emails=cc, signature=False,
+                                            attachments=attachments)
         if not result.get("ok"):
             raise SendError(result.get("error") or f"скринька {s.address} не надіслала лист")
         return s
@@ -183,6 +186,8 @@ def send(ns, kind: str, to: list, subject: str, text: str, html: str, cc=()) -> 
     msg = EmailMultiAlternatives(subject=subject, body=text, from_email=s.address, to=to, cc=cc,
                                  connection=notifications._smtp_connection(ns))
     msg.attach_alternative(html, "text/html")
+    for a in attachments:
+        msg.attach(a["name"], a["content"], a.get("content_type") or "application/octet-stream")
     msg.send()
     return s
 
