@@ -1,0 +1,122 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+{% block extrahead %}{{ block.super }}
+<style>
+.dk-wrap{max-width:820px;margin:24px auto;padding:0 16px;line-height:1.5}
+.dk-card{background:var(--bg-card,var(--darkened-bg));border:1px solid var(--border-color,var(--hairline-color));border-radius:12px;padding:16px 18px;margin:14px 0}
+.dk-card h2{font-size:16px;margin:0 0 8px}
+.dk-card ul{margin:6px 0 0 18px;padding:0}
+.dk-card li{margin:3px 0}
+.dk-btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.dk-btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:8px;border:1px solid var(--border-strong,var(--border-color));background:var(--bg-input,transparent);color:var(--body-fg);font-size:14px;font-weight:600;cursor:pointer;text-decoration:none}
+.dk-btn.main{background:var(--primary,#1a73e8);border-color:var(--primary,#1a73e8);color:#fff}
+.dk-btn:disabled{opacity:.6;cursor:default}
+.dk-muted{color:var(--text-muted);font-size:13px}
+.dk-code{display:none;margin-top:12px;padding:12px;border-radius:8px;border:1px dashed var(--border-strong,var(--border-color))}
+.dk-row{display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap}
+.dk-row b{min-width:110px}
+.dk-row code{padding:3px 8px;border-radius:6px;background:var(--bg-input,rgba(127,127,127,.12));font-size:13px;word-break:break-all;user-select:all}
+.dk-ok{display:none;margin-top:10px;padding:10px 12px;border-radius:8px;background:rgba(40,167,69,.15);border:1px solid rgba(40,167,69,.5)}
+.dk-steps{margin:6px 0 0 18px;padding:0}
+.dk-steps li{margin:4px 0}
+</style>
+{% endblock %}
+{% block content %}
+<div class="dk-wrap">
+  <p class="dk-muted" style="font-size:14px;margin:0 0 6px">{% trans "Окрема програма лише з поштою — та сама пошта Minerva, що й тут, у власному вікні" %}</p>
+
+  {% if in_app %}
+  <div class="dk-card">
+    <h2>✅ {% trans "Ви вже в програмі «Пошта Minerva»" %}</h2>
+    <p class="dk-muted">{% trans "Сервер і вхід змінюються в меню програми: значок у треї → «Змінити сервер» / «Вийти»." %}</p>
+    <div class="dk-btns"><a class="dk-btn" href="/email/">← {% trans "До пошти" %}</a></div>
+  </div>
+  {% else %}
+  <div class="dk-card">
+    <h2>{% trans "Що вміє програма" %}</h2>
+    <ul>
+      <li>{% trans "Та сама пошта, що в браузері: вигляд, AI, база знань, категорії, Angebote — оновлюється разом із Minerva" %}</li>
+      <li>{% trans "Значок у треї з лічильником непрочитаних і сповіщення Windows про нові листи" %}</li>
+      <li>{% trans "Посилання «mailto:» з інших програм — новий лист у Minerva (якщо зробити поштовою програмою за замовчуванням)" %}</li>
+      <li>{% trans "Запуск разом з Windows — за бажанням" %}</li>
+      <li>{% trans "Інші розділи Minerva (замовлення, CRM, склад) відкриваються у звичайному браузері" %}</li>
+    </ul>
+  </div>
+
+  <div class="dk-card">
+    <h2>1. ⬇ {% trans "Завантажити й встановити" %}</h2>
+    <div class="dk-btns">
+      <a class="dk-btn main" href="{{ download_url }}" rel="noopener">⬇ {% trans "Завантажити програму (.exe)" %}</a>
+      <a class="dk-btn" href="{{ release_url }}" target="_blank" rel="noopener">{% trans "Усі версії" %} ↗</a>
+    </div>
+    <p class="dk-muted" style="margin-top:10px">{% trans "Встановлюється лише для вас, без прав адміністратора. Програма ще не підписана сертифікатом, тож Windows може показати «Windows захистив ваш комп’ютер» — натисніть «Докладніше» → «Однаково запустити»." %}</p>
+  </div>
+
+  <div class="dk-card">
+    <h2>2. 🔗 {% trans "Підключити програму до вашого акаунта" %}</h2>
+    <p class="dk-muted">{% trans "Програма відкриється вже з адресою цієї Minerva й увійде у ваш акаунт без пароля. Або просто вкажіть адресу Minerva в програмі й увійдіть, як тут." %}</p>
+    <div class="dk-btns">
+      <button type="button" class="dk-btn main" id="dk-pair">🔗 {% trans "Підключити програму на цьому комп’ютері" %}</button>
+    </div>
+    <div class="dk-code" id="dk-code">
+      <div class="dk-muted" id="dk-hint">{% trans "Браузер спитає, чи відкрити «Пошта Minerva», — дозвольте. Програма не відкрилась? У програмі: «Підключити кодом» і вставте:" %}</div>
+      <div class="dk-row"><b>{% trans "Адреса" %}</b><code id="dk-url" translate="no"></code></div>
+      <div class="dk-row"><b>{% trans "Код" %}</b><code id="dk-c" translate="no"></code>
+        <button type="button" class="dk-btn" id="dk-copy" style="padding:4px 12px;font-size:12px">📋 {% trans "Копіювати" %}</button></div>
+      <div class="dk-muted">{% blocktrans with m=pair_ttl_min %}Код діє {{ m }} хв і лише один раз.{% endblocktrans %}</div>
+    </div>
+    <div class="dk-ok" id="dk-ok">✅ {% trans "Програму підключено — пошта відкрилась у програмі." %}</div>
+  </div>
+
+  <div class="dk-card">
+    <h2>{% trans "Як вийти чи змінити сервер" %}</h2>
+    <ul class="dk-steps">
+      <li>{% trans "Значок у треї (біля годинника) → «Вийти» — програма забуває вхід на цьому комп’ютері." %}</li>
+      <li>{% trans "«Змінити сервер…» — інша адреса Minerva." %}</li>
+      <li>{% trans "Змінили пароль у Minerva — програма попросить увійти знову." %}</li>
+    </ul>
+    <p class="dk-muted"><a href="/guide/mail/desktop-app/">📚 {% trans "Докладніше в гіді" %}</a></p>
+  </div>
+  {% endif %}
+</div>
+{% if not in_app %}
+<script>
+(function () {
+  var btn = document.getElementById('dk-pair'), box = document.getElementById('dk-code'), ok = document.getElementById('dk-ok');
+  var timer = null;
+  function csrf() { var m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/); return m ? decodeURIComponent(m[1]) : ''; }
+  function poll(key, until) {
+    clearTimeout(timer);
+    if (Date.now() > until) return;
+    timer = setTimeout(function () {
+      fetch('/email/app/pair/state/?key=' + encodeURIComponent(key), {credentials: 'same-origin'})
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d.paired) { ok.style.display = 'block'; box.style.display = 'none'; btn.disabled = false; return; }
+          if (!d.expired) poll(key, until);
+        }).catch(function () { poll(key, until); });
+    }, 2000);
+  }
+  btn.addEventListener('click', function () {
+    btn.disabled = true; ok.style.display = 'none';
+    fetch('/email/app/pair/new/', {method: 'POST', credentials: 'same-origin', headers: {'X-CSRFToken': csrf()}})
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        btn.disabled = false;
+        if (!d.ok) { alert(d.error || '{{ _("Не вдалося створити код")|escapejs }}'); return; }
+        document.getElementById('dk-url').textContent = d.url;
+        document.getElementById('dk-c').textContent = d.code;
+        box.style.display = 'block';
+        poll(d.key, Date.now() + d.expires_in * 1000);
+        window.location.href = d.link;   // відкриває програму (minerva-mail://pair?…)
+      }).catch(function () { btn.disabled = false; alert('{{ _("Немає зв’язку з Minerva")|escapejs }}'); });
+  });
+  document.getElementById('dk-copy').addEventListener('click', function () {
+    var t = document.getElementById('dk-c').textContent;
+    if (navigator.clipboard) navigator.clipboard.writeText(t);
+    this.textContent = '✓';
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,29 @@
+:root{--gold:#c9a84c;--gold-light:#e8d5a3;--bg:#080b0f;--bg2:#0d1117;--border:rgba(201,168,76,.25);--text:#f5edd1;--muted:rgba(245,237,209,.68);--err:#ff8a80;--accent:#00d4aa}
+*{box-sizing:border-box}
+html{height:100%}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif;font-size:14px}
+body{min-height:100%;display:flex;padding:18px;
+  background:radial-gradient(ellipse 70% 50% at 50% -10%,rgba(201,168,76,.14) 0%,transparent 70%),var(--bg)}
+.card{width:100%;max-width:500px;text-align:center;margin:auto}
+.logo{width:68px;height:68px;margin-bottom:6px}
+h1{margin:0;font-size:22px;font-weight:600;color:var(--gold-light)}
+.sub{margin:6px 0 16px;color:var(--muted);line-height:1.45}
+.tip{text-align:left;border:1px solid var(--border);background:rgba(201,168,76,.06);border-radius:12px;padding:12px 14px;margin-bottom:16px}
+.tip p{margin:6px 0 0;color:var(--muted);line-height:1.45}
+.tip b{color:var(--text)}
+form{text-align:left}
+label{display:block;margin:12px 0 5px;font-weight:600}
+.muted{color:var(--muted);font-weight:400}
+input[type=text]{width:100%;padding:10px 12px;border-radius:9px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:14px;outline:none}
+input[type=text]:focus{border-color:var(--gold)}
+.check{display:flex;gap:8px;align-items:flex-start;font-weight:400;color:var(--muted);line-height:1.4}
+.check input{margin-top:3px}
+.cert{margin-top:12px;border:1px solid rgba(255,193,7,.45);background:rgba(255,193,7,.08);border-radius:10px;padding:10px 12px;line-height:1.45;word-break:break-word}
+.err{margin-top:12px;color:var(--err);border:1px solid rgba(255,138,128,.45);background:rgba(255,138,128,.08);border-radius:10px;padding:10px 12px;line-height:1.45}
+.btns{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+.btn{padding:10px 20px;border-radius:9px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn.main{background:linear-gradient(135deg,#c9a84c,#8b6914);border-color:transparent;color:#11100b}
+.btn:disabled{opacity:.6;cursor:default}
+.btns.center{justify-content:center}
+a.btn{text-decoration:none;display:inline-block}
+.foot{margin-top:16px;color:var(--muted);font-size:12px}

@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views, views_categories, views_sort
+from . import views, views_categories, views_desktop, views_sort
 
 app_name = 'email_assistant'
 
@@ -103,4 +103,10 @@ urlpatterns = [
     path('messages/bulk/',                               views.bulk_action_view,        name='bulk_action'),
     # Translate arbitrary text (reply draft)
     path('translate-text/',                              views.translate_text_view,     name='translate_text'),
+    # 🖥 «Пошта Minerva» для Windows (desktop/mail_app; email_assistant/desktop.py)
+    path('app/',                                         views_desktop.desktop_page_view, name='desktop_app'),
+    path('app/hello/',                                   views_desktop.hello_view,      name='desktop_hello'),
+    path('app/pair/',                                    views_desktop.pair_view,       name='desktop_pair'),
+    path('app/pair/new/',                                views_desktop.pair_new_view,   name='desktop_pair_new'),
+    path('app/pair/state/',                              views_desktop.pair_state_view, name='desktop_pair_state'),
 ]

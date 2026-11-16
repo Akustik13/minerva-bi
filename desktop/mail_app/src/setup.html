@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'">
+<title>Пошта Minerva — підключення</title>
+<link rel="stylesheet" href="setup.css">
+</head>
+<body>
+<main class="card">
+  <img class="logo" src="../assets/icon.png" alt="">
+  <h1>Пошта Minerva</h1>
+  <p class="sub">Та сама пошта Minerva, що в браузері, — у власному вікні, зі значком у треї й сповіщеннями.</p>
+
+  <section class="tip">
+    <b>Найпростіше</b>
+    <p>У браузері відкрийте пошту Minerva → вкладка <b>⋯ Ще</b> → <b>🖥 Пошта для Windows</b> → <b>🔗 Підключити програму</b>.
+      Програма відкриється сама — без адреси й пароля.</p>
+  </section>
+
+  <form id="f" autocomplete="off">
+    <label for="server">Або вкажіть адресу Minerva</label>
+    <input id="server" type="text" placeholder="https://minerva.example.com" spellcheck="false" required>
+    <label for="code">Код підключення <span class="muted">— якщо є, з тієї ж сторінки; без коду — вхід паролем</span></label>
+    <input id="code" type="text" placeholder="необов’язково" spellcheck="false">
+    <div id="cert" class="cert" hidden>
+      <div id="cert-text"></div>
+      <label class="check"><input id="trust" type="checkbox"> Довіряти сертифікату цього сервера (лише якщо це ваш сервер Minerva, наприклад NAS у локальній мережі)</label>
+    </div>
+    <div id="err" class="err" role="alert" hidden></div>
+    <div class="btns">
+      <button type="button" id="cancel" class="btn" hidden>Скасувати</button>
+      <button type="submit" id="go" class="btn main">Підключити</button>
+    </div>
+  </form>
+  <p class="foot">Паролів програма не зберігає: вхід — як у браузері. <span id="ver"></span></p>
+</main>
+<script src="setup.js"></script>
+</body>
+</html>

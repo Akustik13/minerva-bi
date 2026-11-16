@@ -7,7 +7,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from email_assistant import sorting
+from email_assistant import desktop, sorting
 
 
 def _date(value):
@@ -80,5 +80,5 @@ def sort_view(request):
         'categories': list(MailCategory.objects.filter(is_active=True)),
         'decided': MailSortDecision.objects.filter(user=user).count(),
         'cats_url': '/admin/email_assistant/mailcategory/',
-        'is_nav_sidebar_enabled': True,
+        'is_nav_sidebar_enabled': not desktop.is_app(request),
     })

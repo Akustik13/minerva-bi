@@ -73,9 +73,13 @@ def _get_account(request):
 
 
 def _ctx(request, ctx: dict) -> dict:
-    """Inject is_nav_sidebar_enabled based on user's EmailSettings."""
+    """Inject is_nav_sidebar_enabled based on user's EmailSettings. У програмі «Пошта Minerva» для Windows
+    (email_assistant/desktop.py) — лише пошта: без бокового меню адмінки."""
+    from email_assistant import desktop
     from email_assistant.models import EmailSettings
-    ctx['is_nav_sidebar_enabled'] = EmailSettings.get_for_user(request.user).show_admin_sidebar
+    in_app = desktop.is_app(request)
+    ctx['mv_mail_app'] = in_app
+    ctx['is_nav_sidebar_enabled'] = False if in_app else EmailSettings.get_for_user(request.user).show_admin_sidebar
     ctx.update(_rag_flags(request.user))
     return ctx
 
@@ -2145,14 +2149,19 @@ def sync_all_folders_view(request):
 
 @staff_member_required
 def unread_count_view(request):
+    from email_assistant import desktop
+    desktop.keep_session(request)   # програма для Windows опитує лічильник — лишається підключеною
     account = _get_account(request)
     if not account:
         return JsonResponse({'count': 0, 'inbox': 0, 'starred': 0, 'spam': 0})
     unread = _unread_counts(account)   # Вхідні, Важливі, Спам — одним проходом (опитує кожна сторінка Minerva)
     inbox, starred, spam = unread['inbox'], unread['starred'], unread['spam']
     from email_assistant import drafts as _drafts
-    return JsonResponse({'count': inbox, 'inbox': inbox, 'starred': starred, 'spam': spam,
-                         'drafts': _drafts.count(account), 'latest': _latest_pk(account)})
+    data = {'count': inbox, 'inbox': inbox, 'starred': starred, 'spam': spam,
+            'drafts': _drafts.count(account), 'latest': _latest_pk(account)}
+    if str(request.GET.get('new_after', '')).isdigit():   # програма для Windows: від кого й тема нових листів
+        data['new'] = desktop.new_messages(account, int(request.GET['new_after']))
+    return JsonResponse(data)
 
 
 @staff_member_required

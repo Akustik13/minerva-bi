@@ -1,0 +1,62 @@
+{
+  "name": "minerva-mail",
+  "productName": "Minerva Mail",
+  "version": "1.0.0",
+  "description": "Пошта Minerva — окрема програма з поштою Minerva для Windows",
+  "main": "src/main.js",
+  "author": "Minerva BI",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/nav.test.js",
+    "icons": "python tools/make_icons.py",
+    "dist": "electron-builder --win nsis portable --x64 --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.11"
+  },
+  "devDependencies": {
+    "electron": "45.3.3",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "com.minerva.mail",
+    "productName": "Minerva Mail",
+    "copyright": "Minerva BI",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "executableName": "MinervaMail",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Пошта Minerva",
+      "uninstallDisplayName": "Пошта Minerva",
+      "artifactName": "Minerva-Mail-Setup.${ext}",
+      "include": "build/installer.nsh",
+      "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "Minerva-Mail-Portable.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://github.com/Akustik13/minerva-bi/releases/download/mail-desktop"
+      }
+    ]
+  }
+}

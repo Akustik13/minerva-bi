@@ -1474,6 +1474,7 @@
 {"uk": "GBP — Фунт", "en": "GBP — Pound", "de": "GBP — Pfund"}
 {"uk": "GET /offers — свіжі ціни всіх оферів", "en": "GET /offers — fresh prices of all offers", "de": "GET /offers — aktuelle Preise aller Offers"}
 {"uk": "GET /orders (список)", "en": "GET /orders (list)", "de": "GET /orders (Liste)"}
+{"uk": "GET або POST", "en": "GET or POST", "de": "GET oder POST"}
 {"uk": "GET і перевірки", "en": "GET and checks", "de": "GET und Prüfungen"}
 {"uk": "GIF-джерело недоступне для цієї відправки.", "en": "GIF source is not available for this shipment.", "de": "Die GIF-Quelle ist für diese Sendung nicht verfügbar."}
 {"uk": "GIF-джерело недоступне для цієї відправки. Ця функція працює для відправок, створених після оновлення системи.", "en": "GIF source is not available for this shipment. This function works for shipments created after the system update.", "de": "Die GIF-Quelle ist für diese Sendung nicht verfügbar. Diese Funktion funktioniert für Sendungen, die nach dem Systemupdate erstellt wurden."}
@@ -7867,6 +7868,7 @@
 {"uk": "Зараз на складі", "en": "In stock now", "de": "Jetzt auf Lager"}
 {"uk": "Зараз надсилати нічого: критичних товарів і прострочених замовлень немає.", "en": "Nothing to send right now: there are no critical products or overdue orders.", "de": "Derzeit gibt es nichts zu senden: Es gibt keine kritischen Artikel und keine überfälligen Aufträge."}
 {"uk": "Зараз недоступно.", "en": "Not available right now.", "de": "Derzeit nicht verfügbar."}
+{"uk": "Зараз у програмі увійдено як {0} — вхід буде замінено.", "en": "The app is currently signed in as {0} — this sign-in will be replaced.", "de": "Die App ist gerade als {0} angemeldet — diese Anmeldung wird ersetzt."}
 {"uk": "Зараз у роботі", "en": "In progress now", "de": "Gerade in Arbeit"}
 {"uk": "Зараз усіх коробок достатньо — повідомляти нема про що.", "en": "All boxes are sufficient right now — nothing to report.", "de": "Derzeit sind alle Kartons ausreichend — nichts zu melden."}
 {"uk": "Зараз: {0}", "en": "Now: {0}", "de": "Aktuell: {0}"}
@@ -8881,6 +8883,7 @@
 {"uk": "Код валюти з 3 літер, напр. EUR або USD", "en": "3-letter currency code, e.g. EUR or USD", "de": "Dreibuchstabiger Währungscode, z. B. EUR oder USD"}
 {"uk": "Код виробництва", "en": "Production code", "de": "Fertigungscode"}
 {"uk": "Код джерела з довідника «Джерела замовлень».", "en": "Source code from the “Order sources” list.", "de": "Quellcode aus der Liste „Auftragsquellen“."}
+{"uk": "Код діє {0} хв і лише один раз.", "en": "The code is valid for {0} min and only once.", "de": "Der Code gilt {0} Min. und nur einmal."}
 {"uk": "Код закупівлі, напр. PO-12", "en": "Purchase order code, e.g. PO-12", "de": "Bestellcode, z. B. PO-12"}
 {"uk": "Код категорії DigiKey (напр. \"29\" для RF Filters). Знайти в DigiKey Marketplace Portal → Product Catalog", "en": "DigiKey category code (e.g. \"29\" for RF Filters). Find it in the DigiKey Marketplace Portal → Product Catalog", "de": "DigiKey-Kategoriecode (z. B. \"29\" für RF Filters). Zu finden im DigiKey Marketplace Portal → Product Catalog"}
 {"uk": "Код країни", "en": "Country code", "de": "Ländercode"}
@@ -8895,6 +8898,7 @@
 {"uk": "Код помилки", "en": "Error code", "de": "Fehlercode"}
 {"uk": "Код проєкту P-РРРР-NNN (необов’язково)", "en": "Project code P-YYYY-NNN (optional)", "de": "Projektcode P-JJJJ-NNN (optional)"}
 {"uk": "Код проєкту або назва кроку…", "en": "Project code or step name…", "de": "Projektcode oder Schrittname…"}
+{"uk": "Код підключення недійсний, уже використаний або застарів — у браузері на сторінці «🖥 Пошта Minerva для Windows» натисніть «🔗 Підключити програму» ще раз.", "en": "The connection code is invalid, already used or expired — in the browser, on the page «🖥 Minerva Mail for Windows», click «🔗 Connect the app» again.", "de": "Der Verbindungscode ist ungültig, bereits verwendet oder abgelaufen — klicken Sie im Browser auf der Seite «🖥 Minerva Mail für Windows» erneut auf «🔗 App verbinden»."}
 {"uk": "Код підключення сайту", "en": "Site connection code", "de": "Verbindungscode der Website"}
 {"uk": "Код складської локації для нових транзакцій (наприклад: MAIN, WAREHOUSE-A).", "en": "Warehouse location code for new transactions (for example: MAIN, WAREHOUSE-A).", "de": "Code des Lagerorts für neue Transaktionen (zum Beispiel: MAIN, WAREHOUSE-A)."}
 {"uk": "Код — це «Джерело» в замовленнях, за ним фільтруються продажі; після перших замовлень його не змінюйте.", "en": "The code is the “Source” in orders and sales are filtered by it; do not change it after the first orders.", "de": "Der Code ist die „Quelle“ in den Aufträgen, danach werden die Verkäufe gefiltert; ändern Sie ihn nach den ersten Aufträgen nicht mehr."}
@@ -13601,6 +13605,7 @@
 {"uk": "Почніть вводити назву — підкажемо з бази.", "en": "Start typing the name — we will suggest from the database.", "de": "Namen eingeben — wir schlagen aus der Datenbank vor."}
 {"uk": "Почніть з короткого періоду (напр. 30 днів) і розширюйте після перевірки.", "en": "Start with a short period (e.g. 30 days) and extend it after checking.", "de": "Beginnen Sie mit einem kurzen Zeitraum (z. B. 30 Tage) und erweitern Sie ihn nach der Prüfung."}
 {"uk": "Пошта", "en": "Mail", "de": "E-Mail"}
+{"uk": "Пошта Minerva для Windows", "en": "Minerva Mail for Windows", "de": "Minerva Mail für Windows"}
 {"uk": "Пошта й 📅 календар — у вас немає скриньки в Minerva", "en": "Mail and 📅 calendar — you have no mailbox in Minerva", "de": "Post und 📅 Kalender — Sie haben kein Postfach in Minerva"}
 {"uk": "Пошта магазину", "en": "Shop mail", "de": "Shop-E-Mail"}
 {"uk": "Пошта сайтів", "en": "Site mail", "de": "E-Mail der Websites"}
@@ -14243,6 +14248,7 @@
 {"uk": "Підказки під полем пошуку на сайті. Будь-який збій — сайт шукає як звичайно; на сайті підказки можна вимкнути в /admin/ → «Магазин».", "en": "Suggestions under the search field on the site. In case of any failure, the site searches as usual; on the site the suggestions can be turned off in /admin/ → “Shop”.", "de": "Vorschläge unter dem Suchfeld auf der Website. Bei jeder Störung sucht die Website wie gewohnt; auf der Website können die Vorschläge unter /admin/ → „Shop“ deaktiviert werden."}
 {"uk": "Підказки — за словами з назв, клієнтів і артикулів проєктів, без AI. Нічого не змінюється, доки ви не натиснете «🏷 Позначити».", "en": "Hints come from words in project names, customers and item numbers, without AI. Nothing changes until you click “🏷 Mark”.", "de": "Hinweise aus Wörtern in Projektnamen, Kunden und Artikelnummern, ohne KI. Nichts ändert sich, bis Sie „🏷 Markieren“ klicken."}
 {"uk": "Підказок немає — додайте учасників нижче.", "en": "No suggestions — add participants below.", "de": "Keine Vorschläge — fügen Sie unten Teilnehmer hinzu."}
+{"uk": "Підключати програму можуть лише співробітники Minerva.", "en": "Only Minerva staff can connect the app.", "de": "Nur Minerva-Mitarbeiter können die App verbinden."}
 {"uk": "Підключений календар", "en": "Connected calendar", "de": "Verbundener Kalender"}
 {"uk": "Підключення", "en": "Connection", "de": "Verbindung"}
 {"uk": "Підключення DigiKey", "en": "DigiKey connection", "de": "DigiKey-Verbindung"}
@@ -17281,6 +17287,7 @@
 {"uk": "Це — доручення агентові в пошті", "en": "This is a rule for the agent in the mail", "de": "Das ist eine Regel für den Agenten im Postfach"}
 {"uk": "Цей Telegram уже прив'язаний до акаунту Minerva.", "en": "This Telegram is already linked to a Minerva account.", "de": "Dieses Telegram ist bereits mit einem Minerva-Konto verknüpft."}
 {"uk": "Цей Telegram ще не прив'язаний до акаунту Minerva.", "en": "This Telegram is not yet linked to a Minerva account.", "de": "Dieses Telegram ist noch nicht mit einem Minerva-Konto verknüpft."}
+{"uk": "Цей акаунт Minerva вимкнено або він не має доступу до пошти.", "en": "This Minerva account is disabled or has no access to mail.", "de": "Dieses Minerva-Konto ist deaktiviert oder hat keinen Zugriff auf die E-Mail."}
 {"uk": "Цей акаунт Minerva не може додавати візитки.", "en": "This Minerva account cannot add business cards.", "de": "Dieses Minerva-Konto kann keine Visitenkarten hinzufügen."}
 {"uk": "Цей браузер сам голос не розпізнає — виберіть RAG-ПК (правий клік на 🎤).", "en": "This browser cannot recognise speech itself — choose the RAG PC (right-click 🎤).", "de": "Dieser Browser kann Sprache nicht selbst erkennen — wählen Sie den RAG-PC (Rechtsklick auf 🎤)."}
 {"uk": "Цей календар уже підключено — оновлено.", "en": "This calendar is already connected — updated.", "de": "Dieser Kalender ist bereits verbunden — aktualisiert."}

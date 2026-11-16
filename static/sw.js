@@ -50,15 +50,23 @@ self.addEventListener('fetch', event => {
   event.respondWith(networkFirst(req, PAGE_CACHE));
 });
 
+// Кеш — лише допомога: збій Cache Storage (немає місця, пошкоджений профіль, задовгий шлях у Windows) не має
+// ховати справжню відповідь сервера за сторінкою «Minerva недоступна».
+function remember(req, res, cacheName) {
+  const copy = res.clone();
+  caches.open(cacheName).then(cache => cache.put(req, copy)).catch(() => {});
+}
+
+function fromCache(req) {
+  return caches.match(req).catch(() => undefined);
+}
+
 async function cacheFirst(req, cacheName) {
-  const cached = await caches.match(req);
+  const cached = await fromCache(req);
   if (cached) return cached;
   try {
     const res = await fetch(req);
-    if (res.ok) {
-      const cache = await caches.open(cacheName);
-      cache.put(req, res.clone());
-    }
+    if (res.ok) remember(req, res, cacheName);
     return res;
   } catch {
     return new Response('Офлайн', { status: 503 });
@@ -68,13 +76,10 @@ async function cacheFirst(req, cacheName) {
 async function networkFirst(req, cacheName) {
   try {
     const res = await fetch(req);
-    if (res.ok && res.status < 400) {
-      const cache = await caches.open(cacheName);
-      cache.put(req, res.clone());
-    }
+    if (res.ok && res.status < 400) remember(req, res, cacheName);
     return res;
   } catch {
-    const cached = await caches.match(req);
+    const cached = await fromCache(req);
     if (cached) return cached;
     return new Response(
       `<!DOCTYPE html><html lang="uk"><head><meta charset="utf-8">

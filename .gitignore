@@ -43,6 +43,9 @@ exports.py
 !api/schemas/**/*.json
 # Закріплена копія RAG-схем для контрактних тестів (rag_assistant/contract)
 !rag_assistant/contract/**/*.json
+# Програма «Пошта Minerva» для Windows (desktop/mail_app) — опис збирання npm
+!desktop/mail_app/package.json
+!desktop/mail_app/package-lock.json
 jumingo_rates_raw.json
 redmei.txt
 

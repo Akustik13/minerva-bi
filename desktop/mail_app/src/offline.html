@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'">
+<title>Пошта Minerva — немає зв'язку</title>
+<link rel="stylesheet" href="setup.css">
+</head>
+<body>
+<main class="card">
+  <img class="logo" src="../assets/icon.png" alt="">
+  <h1>Немає зв'язку з Minerva</h1>
+  <p class="sub" id="host"></p>
+  <div class="err" id="why"></div>
+  <p class="sub">Перевірте інтернет або VPN. Програма спробує знову сама, щойно Minerva відповість.</p>
+  <div class="btns center">
+    <a class="btn" href="minerva-mail://setup">Змінити сервер…</a>
+    <a class="btn main" id="retry" href="#">Спробувати ще</a>
+  </div>
+</main>
+<script src="offline.js"></script>
+</body>
+</html>
