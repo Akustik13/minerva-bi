@@ -3,7 +3,7 @@
 {# і уривків тут немає. «🗑 Видалити» — запит учасника за ст. 17 DSGVO (services.admin_delete + журнал аудиту). #}
 {% load static %}
 {% block title %}{{ title }} | Minerva{% endblock %}
-{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=3">{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=6">{% endblock %}
 {% block breadcrumbs %}
 <div class="breadcrumbs">
   <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
@@ -54,5 +54,5 @@
     {% if total >= max_rows %}<p class="mt-muted">Показано перші {{ max_rows }} — уточніть пошук.</p>{% endif %}
   </section>
 </div>
-<script src="{% static 'meetings/meetings.js' %}?v=1" defer></script>
+<script src="{% static 'meetings/meetings.js' %}?v=4" defer></script>
 {% endblock %}

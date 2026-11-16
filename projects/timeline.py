@@ -203,22 +203,33 @@ def _can_view_meetings(viewer) -> bool:
 
 def own_meetings(project, viewer, limit=MEETINGS_MAX) -> list:
     """🎙 Наради людини в цьому проєкті — новіші першими; лише її власні (і для адміністратора), без розшифровки й
-    протоколу (лише поля для списку) + pending — скільки пунктів чекають ✓ / ✕. Без застосунку нарад — []."""
+    протоколу (лише поля для списку) + pending — скільки пунктів чекають ✓ / ✕. Нарада про кілька проєктів
+    (meetings.MeetingProject) — у кожному з них; part_text / part_second — де в записі мова про цей проєкт
+    (🏷 частини, meetings/parts.py). Без застосунку нарад — []."""
     uid = getattr(viewer, "pk", None)
     if not uid or project is None or not getattr(project, "pk", None) or not _can_view_meetings(viewer):
         return []
     try:
         from django.db.models import Count, Q
         from django.db.models.functions import Coalesce
-        from meetings.models import Meeting, MeetingItem
+        from meetings.models import Meeting, MeetingItem, MeetingProject
     except ImportError:
         return []
-    qs = (Meeting.objects.filter(owner_id=uid, project_id=project.pk)
+    linked = MeetingProject.objects.filter(project_id=project.pk).values("meeting_id")
+    qs = (Meeting.objects.filter(owner_id=uid).filter(Q(project_id=project.pk) | Q(pk__in=linked))
           .only("pk", "title", "status", "started_at", "created_at", "duration_s", "approved_at",
                 "transcript_deleted_at", "owner_id", "project_id")
           .annotate(pending=Count("items", filter=Q(items__status=MeetingItem.PENDING)))
           .order_by(Coalesce("started_at", "created_at").desc(), "-pk"))
-    return list(qs[:limit]) if limit else list(qs)
+    out = list(qs[:limit]) if limit else list(qs)
+    try:
+        from meetings import parts as meeting_parts
+        for m in out:
+            m.part_text, m.part_second = meeting_parts.where(m, project.pk)
+            m.pending = meeting_parts.pending_for(m, project.pk, getattr(m, "pending", None))
+    except Exception:  # noqa: BLE001 — без позначок нарада однаково в проєкті
+        logger.warning("meeting parts for project %s failed", project.pk, exc_info=True)
+    return out
 
 
 def meeting_cls(m) -> str:
@@ -242,6 +253,8 @@ def meeting_line(m, pending=True) -> str:
         parts.append("📚 у базі знань")
     if m.transcript_deleted_at:
         parts.append("розшифровку видалено")
+    if getattr(m, "part_text", ""):
+        parts.append(m.part_text)
     return " · ".join(p for p in parts if p)
 
 
@@ -249,7 +262,7 @@ def _meeting_events(ev, project, viewer, meetings=None):
     """🎙 Наради на шкалі — лише ті, що записала людина, яка дивиться (чужих не видно нікому, і адміністратору)."""
     for m in (own_meetings(project, viewer) if meetings is None else meetings):
         ev("meetings", "point", m.started_at or m.created_at, f"🎙 {m.title}", f"🎙 {m.title}\n{meeting_line(m)}",
-           meeting_url(m.pk), meeting_cls(m))
+           meeting_url(m.pk, getattr(m, "part_second", None)), meeting_cls(m))
 
 
 def event_meetings(user, event_ids) -> dict:

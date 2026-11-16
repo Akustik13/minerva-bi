@@ -485,6 +485,7 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
     {% if rag_available %}<button class="em-pv-btn ai" onmousedown="event.preventDefault()" onclick="pvSelRag()">🔎 {% trans "Шукати виділене в RAG" %}</button>{% endif %}
     <button class="em-pv-btn" onmousedown="event.preventDefault()" onclick="pvSelAsk()">❓ {% trans "Запитати" %}</button>
     <button class="em-pv-btn" onmousedown="event.preventDefault()" onclick="pvSelMail()">🔍 {% trans "У пошті" %}</button>
+    {% if perms.shipping.add_shipment %}<button class="em-pv-btn" onmousedown="event.preventDefault()" onclick="pvSelShip()" title="{% trans "Нове відправлення на цю адресу: Minerva розкладе виділене по полях отримувача" %}">📦 {% trans "Відправлення" %}</button>{% endif %}
   </div>
 
   <!-- Messages (Gmail-style: collapsed except last) -->
@@ -1744,8 +1745,9 @@ window.pvReview = function(pk) {
   if (pk) _pvAskStart('/email/message/' + pk + '/ai-review/', {});
 };
 
-// Виділений у листі текст (і в iframe HTML-листа): плаваюча панель «🔎 Шукати виділене / ❓ Запитати / 🔍 У пошті»
-var _pvSel = '';
+// Виділений у листі текст (і в iframe HTML-листа): плаваюча панель «🔎 Шукати виділене / ❓ Запитати / 🔍 У пошті /
+// 📦 Відправлення» (_pvSelRaw — з переносами рядків: для адреси вони важливі)
+var _pvSel = '', _pvSelRaw = '';
 function _pvSelHide() { var bar = document.getElementById('pv-sel-bar'); if (bar) bar.style.display = 'none'; }
 function _pvSelCheck(doc, frame) {
   var bar = document.getElementById('pv-sel-bar');
@@ -1759,9 +1761,10 @@ function _pvSelCheck(doc, frame) {
   var r = sel.getRangeAt(0).getBoundingClientRect(), top = r.top, left = r.left;
   if (frame) { var f = frame.getBoundingClientRect(); top += f.top; left += f.left; }
   _pvSel = text;
+  _pvSelRaw = String(sel).replace(/\r/g, '').replace(/[ \t]+\n/g, '\n').trim();
   bar.style.display = 'flex';
   bar.style.top = Math.max(8, top - 42) + 'px';
-  bar.style.left = Math.max(8, Math.min(window.innerWidth - 420, left)) + 'px';
+  bar.style.left = Math.max(8, Math.min(window.innerWidth - (bar.offsetWidth || 420) - 8, left)) + 'px';
 }
 function _pvSelHook(doc, frame) {
   if (!doc || doc._pvSelHooked) return;
@@ -1814,6 +1817,19 @@ window.pvSelAsk = function() {
     q.focus();
   });
 };
+{% if perms.shipping.add_shipment %}
+// 📦 Нове відправлення на виділену адресу: текст — через localStorage (не в адресі сторінки), форма сама розбере
+// його (shipping/services/address_paste.py, з AI) і заповнить отримувача; лист — щоб знайти телефон і email
+window.pvSelShip = function() {
+  var pk = +(document.getElementById('pv-sel-bar') || {dataset: {}}).dataset.pk, text = _pvSelRaw || _pvSel;
+  try { document.getSelection().removeAllRanges(); } catch (e) {}
+  _pvSelHide();
+  if (!text) return;
+  try { localStorage.setItem('mv-ship-paste', JSON.stringify({text: text.slice(0, 3000), msg: pk || '', at: Date.now()})); }
+  catch (e) {}
+  window.open('/admin/shipping/shipment/create/blank/?paste=mail', '_blank');
+};
+{% endif %}
 window.pvSelMail = function() {
   var text = _pvSel;
   try { document.getSelection().removeAllRanges(); } catch (e) {}

@@ -1,4 +1,4 @@
-{# 🎙 Один ключовий момент наради: ✓ Прийняти ▾ (куди додати) / ✕ Не те / ↺ Повернути. Без <form> і <script> — #}
+{# 🎙 Один ключовий момент наради: ✓ Прийняти ▾ (куди додати) / 💬 Лише обговорення / ✕ Не те / ↺ Повернути. Без <form> і <script> — #}
 {# дії робить meetings.js (POST JSON на data-url, у відповідь — цей самий фрагмент заново, meetings/admin_pages.py). #}
 <div class="mt-item mt-item-{{ item.status }}" id="mt-item-{{ item.pk }}" data-url="{{ item_url }}" data-me="{{ me }}">
   <div class="mt-item-head">
@@ -7,6 +7,7 @@
     {% if speaker %}<span>{{ speaker }}</span>{% endif %}
     {% if item.who %}<span>👤 <span translate="no">{{ item.who }}</span></span>{% endif %}
     {% if item.due_text %}<span>⏰ <span translate="no">{{ item.due_text }}</span></span>{% endif %}
+    {% if pj_show and item.target != "deadline" %}{% if project %}<span class="mt-pj-chip {{ pj_cls }}" title="Проєкт пункту">📁 <span translate="no">{{ project.code }}</span></span>{% else %}<span class="mt-pj-chip mt-pj-gen">📁 без проєкту</span>{% endif %}{% endif %}
   </div>
   <div class="mt-item-title" translate="no">{{ item.title|default:"—" }}</div>
   {% if item.quote %}<div class="mt-q">«<span translate="no">{{ item.quote }}</span>»</div>{% endif %}
@@ -16,6 +17,7 @@
   {% elif item.status == "pending" %}
   <div class="mt-actions">
     <button type="button" class="button mt-primary" data-mt-toggle aria-expanded="false">✓ Прийняти ▾</button>
+    <button type="button" class="button" data-mt-act="note" title="{{ note_title }}">💬 Лише обговорення</button>
     <button type="button" class="button" data-mt-act="reject" title="Більше не пропонувати">✕ Не те</button>
     <span class="mt-err" role="alert"></span>
   </div>
@@ -30,6 +32,12 @@
       {% if t.reason %}<div class="mt-reason">{{ t.reason }}</div>{% endif %}
       {% endfor %}
     </fieldset>
+    {% if pj_choices %}
+    <label class="mt-f" data-for="moment risk step note">Проєкт
+      <select name="project" data-mt-item-project data-noplan-text="{{ no_plan_text }}">
+        {% for c in pj_choices %}<option value="{{ c.pk }}" translate="no"{% if c.selected %} selected{% endif %}{% if c.noplan %} data-noplan="1"{% endif %}>{{ c.code }} · {{ c.name }}</option>{% endfor %}
+      </select></label>
+    {% endif %}
     <label class="mt-f">Назва
       <input type="text" name="title" value="{{ item.title }}" maxlength="200"></label>
     <div data-for="moment">
@@ -59,6 +67,12 @@
       <button type="button" class="button mt-primary" data-mt-act="accept">✓ Додати</button>
       <button type="button" class="button" data-mt-toggle>Скасувати</button>
     </div>
+  </div>
+  {% elif item.status == "accepted" and item.target == "note" %}
+  <div class="mt-actions">
+    <span class="mt-note-done">💬 Лише обговорення — лишається в цій нараді</span>
+    {% if can_change %}<button type="button" class="button" data-mt-act="restore" title="Знову на розгляд">↺ Повернути</button>{% endif %}
+    <span class="mt-err" role="alert"></span>
   </div>
   {% elif item.status == "accepted" %}
   <div class="mt-done">✓ Додано: {{ result.label }}{% if result.url %} → <a href="{{ result.url }}">відкрити</a>{% else %} <span class="mt-muted">(запис уже видалено)</span>{% endif %}</div>

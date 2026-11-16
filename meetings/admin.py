@@ -3,6 +3,8 @@
 
 Адреси (MeetingAdmin.get_urls; жодна не закінчується на add / change / delete — Layer 4 ModuleAccessMiddleware):
   new/                       підготовка «🎙 Записати нараду» (GET форма, POST — services.create)
+  quick/                     «⚡ Швидкий запис» (GET сторінка, ?from=bench — з вікна запису; POST — services.quick_start
+                             + квиток → 302 на вікно запису)
   <pk>/page/                 сторінка наради (change_view веде сюди)
   <pk>/record/               POST → одноразове посилання → 302 на вікно запису (RAG-ПК) з #minerva=<квиток>
   <pk>/status/               GET JSON для опитування (без розшифровки)
@@ -12,9 +14,11 @@
   <pk>/retry/                POST «🔄 Спробувати ще раз»
   <pk>/continue/             GET підготовка продовження («… (продовження)»)
   <pk>/remove/               POST «🗑 Видалити нараду»
+  <pk>/projects/             POST JSON «📁 Проєкти наради» (add / remove / main — meetings/parts.py)
+  <pk>/part/                 POST JSON «🏷 Звідси — про проєкт …» (set / remove)
   protocols/                 «🧾 Протоколи згоди» — лише адміністратор Minerva, лише метадані
-Права (правило 16 CLAUDE.md): зміни — лише POST; item / save / kb / retry — ще й has_perm('meetings.change_meeting'),
-record / continue / new — services.can_record (право add + записування ввімкнено); remove — власнику завжди (прибрати
+Права (правило 16 CLAUDE.md): зміни — лише POST; item / save / kb / retry / projects / part — ще й has_perm('meetings.change_meeting'),
+record / continue / new / quick — services.can_record (право add + записування ввімкнено); remove — власнику завжди (прибрати
 свій запис і розшифровку людина може й тоді, коли їй лишили лише перегляд). Кнопок без права сторінка не показує.
 Логіка — meetings/services.py, що показати — meetings/admin_pages.py.
 """
@@ -23,6 +27,7 @@ import json
 
 from django import forms
 from django.contrib import admin, messages
+from django.db import transaction
 from django.db.models import Count, Q
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import redirect
@@ -32,7 +37,7 @@ from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.http import urlencode
 
-from . import admin_pages, consent, knowledge, services
+from . import admin_pages, consent, knowledge, parts, services
 from .models import Meeting, MeetingItem, MeetingSettings
 from .services import MeetingError
 
@@ -89,6 +94,7 @@ class MeetingAdmin(admin.ModelAdmin):
     # ── список: лише свої наради (і для суперкористувача) ──
     def get_queryset(self, request):
         return (super().get_queryset(request).filter(owner=request.user).select_related("project")
+                .prefetch_related("project_links__project")
                 .annotate(pending_n=Count("items", filter=Q(items__status=MeetingItem.PENDING))))
 
     def has_delete_permission(self, request, obj=None):
@@ -106,6 +112,8 @@ class MeetingAdmin(admin.ModelAdmin):
                  and request.user.has_perm("meetings.add_meeting") else "",
                  "is_admin": services._is_admin(request.user),
                  "protocols_url": reverse("admin:meetings_meeting_protocols")}
+        if extra["can_record"]:
+            extra["quick"] = admin_pages.quick_context(request.user)
         return super().changelist_view(request, {**(extra_context or {}), **extra})
 
     def add_view(self, request, form_url="", extra_context=None):
@@ -126,7 +134,9 @@ class MeetingAdmin(admin.ModelAdmin):
 
     @admin.display(description="Проєкт", ordering="project__code")
     def project_col(self, obj):
-        return format_html('<span translate="no">{}</span>', obj.project.code) if obj.project_id else "—"
+        codes = [obj.project.code] if obj.project_id else []
+        codes += [link.project.code for link in obj.project_links.all() if link.project_id != obj.project_id]
+        return format_html('<span translate="no">{}</span>', ", ".join(codes)) if codes else "—"
 
     @admin.display(description="Стан", ordering="status")
     def status_col(self, obj):
@@ -143,6 +153,7 @@ class MeetingAdmin(admin.ModelAdmin):
         w = self.admin_site.admin_view
         own = [
             path("new/", w(self.new_view), name="meetings_meeting_new"),
+            path("quick/", w(self.quick_view), name="meetings_meeting_quick"),
             path("protocols/", w(self.protocols_view), name="meetings_meeting_protocols"),
             path("<int:pk>/page/", w(self.page_view), name="meetings_meeting_page"),
             path("<int:pk>/record/", w(self.record_view), name="meetings_meeting_record"),
@@ -153,6 +164,8 @@ class MeetingAdmin(admin.ModelAdmin):
             path("<int:pk>/retry/", w(self.retry_view), name="meetings_meeting_retry"),
             path("<int:pk>/continue/", w(self.continue_view), name="meetings_meeting_continue"),
             path("<int:pk>/remove/", w(self.remove_view), name="meetings_meeting_remove"),
+            path("<int:pk>/projects/", w(self.projects_view), name="meetings_meeting_projects"),
+            path("<int:pk>/part/", w(self.part_view), name="meetings_meeting_part"),
         ]
         return own + super().get_urls()
 
@@ -189,6 +202,27 @@ class MeetingAdmin(admin.ModelAdmin):
                                 event=_digits(request.GET.get("event")),
                                 customer=_digits(request.GET.get("customer")))
         return self._prepare(request, admin_pages.state_from_prefill(data))
+
+    def quick_view(self, request):
+        """«⚡ Записати зараз»: GET — сторінка швидкого запису (з вікна запису на RAG-ПК — ?from=bench), POST —
+        нарада (services.quick_start) і одразу одноразове посилання → 302 на вікно запису, як record/."""
+        from_bench = (request.POST if request.method == "POST" else request.GET).get("from") == "bench"
+        back = reverse("admin:meetings_meeting_quick") + ("?from=bench" if from_bench else "")
+        if request.method != "POST":
+            ctx = self._ctx(request, "⚡ Швидкий запис наради",
+                            quick=admin_pages.quick_context(request.user, from_bench=from_bench))
+            return TemplateResponse(request, "admin/meetings/meeting/quick.html", ctx)
+        try:
+            m = services.quick_start(request.user, {"title": request.POST.get("title"),
+                                                    "project": _digits(request.POST.get("project")),
+                                                    "event": _digits(request.POST.get("event"))})
+            ticket = services.issue_ticket(m, request.user)
+        except MeetingError as e:
+            messages.error(request, f"❌ {e}")
+            return redirect(back)
+        response = HttpResponseRedirect(services.record_url(ticket))
+        response["Referrer-Policy"] = "no-referrer"
+        return response
 
     def continue_view(self, request, pk):
         m = services.get_own(request.user, pk)
@@ -249,7 +283,7 @@ class MeetingAdmin(admin.ModelAdmin):
         try:
             if action == "accept":
                 fields = {k: data[k] for k in ("title", "kind", "category", "probability", "impact", "owner", "date",
-                                               "side") if data.get(k) not in (None, "")}
+                                               "side", "project") if data.get(k) not in (None, "")}
                 if "assignee" in data:
                     fields["assignee"] = data.get("assignee") or None
                 services.accept(request.user, item, str(data.get("target") or ""), fields)
@@ -264,6 +298,46 @@ class MeetingAdmin(admin.ModelAdmin):
         item = MeetingItem.objects.select_related("highlight", "risk", "step", "event").get(pk=item.pk)
         return JsonResponse({"ok": True, "status": item.status, "html": admin_pages.render_item(request.user, m, item),
                              "pending": m.items.filter(status=MeetingItem.PENDING).count()})
+
+    def projects_view(self, request, pk):
+        """📁 Проєкти наради: POST JSON {action: add | remove | main, project} → {ok} (сторінка оновлюється)."""
+        return self._parts_action(request, pk, lambda user, m, data: {
+            "add": lambda: parts.add_project(user, m, data.get("project"), main=bool(data.get("main"))),
+            "remove": lambda: parts.remove_project(user, m, data.get("project")),
+            "main": lambda: parts.set_main(user, m, data.get("project")),
+        })
+
+    def part_view(self, request, pk):
+        """🏷 Частини: POST JSON {action: set, second, project ('' — загальне), note} | {action: remove, part}."""
+        return self._parts_action(request, pk, lambda user, m, data: {
+            "set": lambda: parts.set_part(user, m, data.get("second"), data.get("project"), data.get("note")),
+            "remove": lambda: parts.remove_part(user, m, data.get("part")),
+        })
+
+    def _parts_action(self, request, pk, actions):
+        refused = _post_only(request)
+        if refused:
+            return refused
+        m = services.get_own(request.user, pk)
+        refused = self._change_refused(request, m, as_json=True)
+        if refused:
+            return refused
+        data = _json_body(request)
+        run = actions(request.user, m, data).get(str(data.get("action") or ""))
+        if run is None:
+            return JsonResponse({"ok": False, "error": "Невідома дія"}, status=400)
+        try:
+            with transaction.atomic():
+                run()
+        except MeetingError as e:
+            return JsonResponse({"ok": False, "error": str(e)}, status=400)
+        m = Meeting.objects.get(pk=m.pk)
+        if m.approved_at and m.has_transcript:      # уже в базі знань — частини одразу у своїх проєктах
+            try:
+                knowledge.publish(m)
+            except MeetingError as e:
+                return JsonResponse({"ok": True, "note": str(e)})
+        return JsonResponse({"ok": True})
 
     def kb_view(self, request, pk):
         refused = _post_only(request)

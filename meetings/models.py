@@ -101,6 +101,8 @@ class Meeting(models.Model):
                                 related_name="meetings", verbose_name="Проєкт")
     customer = models.ForeignKey("crm.Customer", null=True, blank=True, on_delete=models.SET_NULL,
                                  related_name="meetings", verbose_name="Клієнт")
+    projects = models.ManyToManyField("projects.Project", through="MeetingProject", blank=True,
+                                      related_name="all_meetings", verbose_name="Проєкти наради")
     calendar_event = models.ForeignKey("calendar_app.CalendarEvent", null=True, blank=True, on_delete=models.SET_NULL,
                                        related_name="+", verbose_name="Подія календаря")
     continues = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL,
@@ -210,7 +212,8 @@ class MeetingTranscript(models.Model):
 
 class MeetingItem(models.Model):
     """Ключовий момент наради з дослівною цитатою (або 📌 позначка під час запису) — чекає ✓ / ✕ того, хто записав.
-    ✓ — 📌 момент / ⚠️ ризик / 📅 крок плану проєкту або ⏰ дедлайн у його календарі; ✕ — більше не пропонується
+    ✓ — 📌 момент / ⚠️ ризик / 📅 крок плану проєкту або ⏰ дедлайн у його календарі; 💬 лише обговорення — пункт
+    лишається тільки в нараді (теза розмови, нікуди не додається, можна повернути); ✕ — більше не пропонується
     (key однаковий для того самого виду й цитати, тож повторна передача його не повертає)."""
     DECISION, TASK, DEADLINE, RISK = "decision", "task", "deadline", "risk"
     QUESTION, PROMISE, INFO, MARK = "question", "promise", "info", "mark"
@@ -220,9 +223,9 @@ class MeetingItem(models.Model):
     BENCH_KINDS = (DECISION, TASK, DEADLINE, RISK, QUESTION, PROMISE, INFO)
     PENDING, ACCEPTED, REJECTED = "pending", "accepted", "rejected"
     STATUS_CHOICES = [(PENDING, "Чекає ✓ / ✕"), (ACCEPTED, "Прийнято"), (REJECTED, "Не те")]
-    MOMENT, RISK_TARGET, STEP, DEADLINE_TARGET = "moment", "risk", "step", "deadline"
+    MOMENT, RISK_TARGET, STEP, DEADLINE_TARGET, NOTE = "moment", "risk", "step", "deadline", "note"
     TARGET_CHOICES = [("", "—"), (MOMENT, "📌 Важливий момент"), (RISK_TARGET, "⚠️ Ризик"), (STEP, "📅 Крок плану"),
-                      (DEADLINE_TARGET, "⏰ Дедлайн у календарі")]
+                      (DEADLINE_TARGET, "⏰ Дедлайн у календарі"), (NOTE, "💬 Лише обговорення")]
 
     meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name="items")
     key = models.CharField(max_length=40)
@@ -235,6 +238,9 @@ class MeetingItem(models.Model):
     who = models.CharField("Хто", max_length=120, blank=True, default="")
     due_text = models.CharField("Строк, як сказали", max_length=120, blank=True, default="")
     segment = models.IntegerField(null=True, blank=True, help_text="Номер рядка розшифровки (n, з 1)")
+    project = models.ForeignKey("projects.Project", null=True, blank=True, on_delete=models.SET_NULL,
+                                related_name="+", verbose_name="Проєкт пункту",
+                                help_text="Порожньо — проєкт частини наради, де прозвучав пункт, інакше головний")
     status = models.CharField("Стан", max_length=10, choices=STATUS_CHOICES, default=PENDING, db_index=True)
     target = models.CharField("Куди додано", max_length=10, choices=TARGET_CHOICES, blank=True, default="")
     highlight = models.ForeignKey("projects.ProjectHighlight", null=True, blank=True, on_delete=models.SET_NULL,
@@ -256,6 +262,44 @@ class MeetingItem(models.Model):
 
     def __str__(self):
         return f"🎙 Пункт #{self.pk}"
+
+
+class MeetingProject(models.Model):
+    """Проєкт, про який говорили на нараді: одна нарада може стосуватися кількох проєктів. Головний —
+    Meeting.project (він завжди тут теж, meetings/parts.py); у кожному з цих проєктів нараду бачить її власник
+    («🎙 Мої наради», шкала), а прийняті пункти й частини бази знань ідуть у свій проєкт."""
+    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name="project_links")
+    project = models.ForeignKey("projects.Project", on_delete=models.CASCADE, related_name="meeting_links")
+    added_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = "Проєкт наради"
+        verbose_name_plural = "Проєкти нарад"
+        ordering = ["meeting", "added_at", "pk"]
+        constraints = [models.UniqueConstraint(fields=["meeting", "project"], name="unique_meeting_project")]
+
+    def __str__(self):
+        return f"🎙 Нарада #{self.meeting_id} → проєкт #{self.project_id}"
+
+
+class MeetingPart(models.Model):
+    """🏷 Позначка в записі: «звідси — про проєкт …» (діє до наступної позначки або до кінця). project порожній —
+    «загальне, не про конкретний проєкт». До першої позначки — головний проєкт наради."""
+    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name="parts")
+    start_s = models.FloatField("З секунди запису")
+    project = models.ForeignKey("projects.Project", null=True, blank=True, on_delete=models.SET_NULL,
+                                related_name="+", verbose_name="Проєкт")
+    note = models.CharField("Про що", max_length=200, blank=True, default="")
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = "Частина наради"
+        verbose_name_plural = "Частини нарад"
+        ordering = ["meeting", "start_s", "pk"]
+        constraints = [models.UniqueConstraint(fields=["meeting", "start_s"], name="unique_meeting_part_start")]
+
+    def __str__(self):
+        return f"🎙 Нарада #{self.meeting_id} · з {int(self.start_s)} с"
 
 
 class MeetingTombstone(models.Model):

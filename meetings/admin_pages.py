@@ -17,7 +17,7 @@ from django.template.loader import render_to_string
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
-from . import consent, knowledge, services
+from . import consent, knowledge, parts, services
 from .models import LANG_CHOICES, RETENTION_CHOICES, Meeting, MeetingItem, MeetingTranscript
 
 PROJECT_OPTIONS_MAX = 300
@@ -33,8 +33,12 @@ TARGET_TEXT = {
     "risk": ("⚠️ Ризик", "у реєстр ризиків проєкту"),
     "step": ("📅 Крок плану", "з виконавцем і строком, з’явиться в календарі виконавця"),
     "deadline": ("⏰ Дедлайн у моєму календарі", "бачите лише ви"),
+    "note": ("💬 Лише обговорення", "теза цієї наради: лишається тільки тут, у проєкт і календар нічого не додається"),
 }
-TARGET_DONE = {"moment": "📌 момент", "risk": "⚠️ ризик", "step": "📅 крок плану", "deadline": "⏰ дедлайн"}
+TARGET_DONE = {"moment": "📌 момент", "risk": "⚠️ ризик", "step": "📅 крок плану", "deadline": "⏰ дедлайн",
+               "note": "💬 лише обговорення"}
+NOTE_TITLE = ("Пункт стосується наради, але це не момент, ризик, крок чи дедлайн — просто тема обговорення. У проєкт "
+              "нічого не додається; повернути можна будь-коли.")
 SHARED_WARNING = ("🔒 Пункт і цитату побачать усі, хто бачить проєкт. Назву пункту можуть отримати "
                   "AI-помічники Minerva.")
 DEADLINE_WARNING = ("🔒 Дедлайн бачите лише ви; назва піде й у ваші підписки календаря (Google / Outlook), "
@@ -330,6 +334,46 @@ def prepare_context(user, state, settings=None) -> dict:
     }
 
 
+# ── ⚡ швидкий запис (список нарад і quick/) ────────────────────────────────
+
+QUICK_STATE = {Meeting.RECORDING: "🔴 записується", Meeting.PROCESSING: "⏳ обробка", Meeting.REVIEW: "✅ записано",
+               Meeting.FAILED: "⚠️ не вдалося"}
+
+
+def quick_context(user, *, from_bench=False, settings=None, now=None) -> dict:
+    """Блок «⚡ Швидкий запис»: «⚡ Записати зараз» (назва й проєкт — необов’язково), зустрічі календаря на сьогодні
+    (ще не записана — «⚡ Записати»; вже є нарада — її стан і посилання), підготовлені й ще не записані наради
+    («🎙 Записати» — той самий record/). from_bench — сторінку відкрили з вікна запису на RAG-ПК: форми без нової
+    вкладки (вікно запису відкриється в цій самій). Нічого не змінює."""
+    s = settings or services.settings_obj()
+    refusal = services.record_refusal(user)
+    out = {"refusal": refusal, "can": not refusal, "from_bench": from_bench, "health": health(user, s),
+           "phone_note": PHONE_NOTE, "action": url("admin:meetings_meeting_quick"),
+           "placeholder": services.quick_title(now=now), "events": [], "prepared": [], "projects": []}
+    if refusal:
+        return out
+    out["projects"] = project_options(user) if user.has_perm("projects.view_project") else []
+    events = services.quick_events(user, now)
+    linked = {}
+    for m in services.own(user).filter(calendar_event__in=events).order_by("pk"):
+        linked[m.calendar_event_id] = m           # найновіша нарада зустрічі
+    shown = set()
+    for ev in events:
+        m = linked.get(ev.pk)
+        row = {"event": ev, "start": local(ev.start_at), "meeting": m, "state": "", "page": ""}
+        if m is not None:
+            row["page"] = services.page_path(m)
+            if m.status == Meeting.READY:
+                shown.add(m.pk)
+            else:
+                row["state"] = QUICK_STATE.get(m.status, m.get_status_display())
+        out["events"].append(row)
+    prepared = (services.own(user).filter(status=Meeting.READY, transcript_deleted_at__isnull=True)
+                .exclude(pk__in=shown).select_related("project").order_by("-created_at")[:services.QUICK_PREPARED_MAX])
+    out["prepared"] = [{"meeting": m, "page": services.page_path(m), "created": local(m.created_at)} for m in prepared]
+    return out
+
+
 # ── сторінка наради ─────────────────────────────────────────────────────────
 
 def staff_options() -> list:
@@ -357,17 +401,38 @@ def result_link(item) -> dict:
     return {"label": label, "url": target}
 
 
-def item_context(user, m, item, base=None, staff=None) -> dict:
-    """Дані одного пункту для _item.html: куди можна додати (з причинами), що вибрано, підказки дати й виконавця."""
+def pj_state(user, m) -> dict:
+    """Проєкти наради для сторінки й пунктів (раз на запит): links — головний першим, colors, parts, main, plans
+    (кеш «є план»)."""
+    links = parts.links(m)
+    return {"links": links, "colors": parts.colors(links), "parts": parts.parts_of(m),
+            "main": m.project if m.project_id else None, "plans": {}}
+
+
+def item_context(user, m, item, base=None, staff=None, pj=None) -> dict:
+    """Дані одного пункту для _item.html: куди можна додати (з причинами), що вибрано, підказки дати й виконавця,
+    проєкт пункту (meetings/parts.item_project) і вибір серед проєктів наради."""
     from projects.models import ProjectHighlight, ProjectRisk, ProjectStep
-    base = base or services.targets(user, m)
+    pj = pj or pj_state(user, m)
+    project = parts.item_project(m, item, pj["parts"], pj["main"])
+    if item.status == MeetingItem.ACCEPTED:
+        project = _accepted_project(item) or project
+    base = services.targets(user, m, item, project=project, plans=pj["plans"])
     reasons = base["targets"]
+    choices = []
+    if len(pj["links"]) > 1 and item.status == MeetingItem.PENDING:
+        for p in pj["links"]:
+            planned = pj["plans"].get(p.pk)
+            if planned is None:
+                planned = pj["plans"][p.pk] = services.has_plan(p)
+            choices.append({"pk": p.pk, "code": p.code, "name": p.name, "selected": project is not None
+                            and p.pk == project.pk, "noplan": not planned})
     default = services.DEFAULT_TARGET.get(item.kind, "moment")
     if reasons.get(default):
         default = "deadline"
     targets = [{"key": key, "label": TARGET_TEXT[key][0], "meaning": TARGET_TEXT[key][1],
                 "reason": reasons.get(key, ""), "checked": key == default} for key in ("moment", "risk", "step",
-                                                                                        "deadline")]
+                                                                                        "deadline", "note")]
     day = services.parse_day(item.due_text) if item.due_text else None
     labels = services.speaker_labels(m)
     side = services._step_side(m, item, {})
@@ -384,13 +449,24 @@ def item_context(user, m, item, base=None, staff=None) -> dict:
         "sides": [{"code": code, "label": label, "selected": code == side} for code, label in ProjectStep.SIDE_CHOICES],
         "me": user.pk, "staff": staff if staff is not None else staff_options(),
         "date": day.isoformat() if day else "", "result": result_link(item) if item.status == MeetingItem.ACCEPTED
-        else None, "shared_warning": SHARED_WARNING, "deadline_warning": DEADLINE_WARNING,
+        else None, "shared_warning": SHARED_WARNING, "deadline_warning": DEADLINE_WARNING, "note_title": NOTE_TITLE,
         "item_url": url("admin:meetings_meeting_item", m.pk, item.pk),
+        "project": project, "pj_cls": (pj["colors"].get(project.pk, "") if project is not None else ""),
+        "pj_show": len(pj["links"]) > 1 or bool(pj["parts"]), "pj_choices": choices,
+        "no_plan_text": services.NO_PLAN_TEXT,
     }
 
 
-def render_item(user, m, item, base=None, staff=None) -> str:
-    return render_to_string("admin/meetings/meeting/_item.html", item_context(user, m, item, base, staff))
+def _accepted_project(item):
+    """Куди насправді додано прийнятий пункт (момент / ризик / крок) — і для старих пунктів без item.project."""
+    for obj in (item.highlight, item.risk, item.step):
+        if obj is not None and getattr(obj, "project_id", None):
+            return obj.project
+    return None
+
+
+def render_item(user, m, item, base=None, staff=None, pj=None) -> str:
+    return render_to_string("admin/meetings/meeting/_item.html", item_context(user, m, item, base, staff, pj))
 
 
 def log_lines(m) -> list:
@@ -419,14 +495,27 @@ def log_lines(m) -> list:
     return out
 
 
-def transcript_rows(m, tr) -> list:
-    """Рядки розшифровки й позначки під час запису (📌 людини, службові, згода) — за часом."""
+def transcript_rows(m, tr, pj=None) -> list:
+    """Рядки розшифровки й позначки під час запису (📌 людини, службові, згода) — за часом; з кількома проєктами
+    (або 🏷 позначками) — ще й клас кольору проєкту кожного рядка й рядки «🏷 Далі — про …»."""
     labels = services.speaker_labels(m)
     rows = []
+    show = bool(pj) and (len(pj["links"]) > 1 or bool(pj["parts"]))
     for s in (tr.segments if tr else None) or []:
-        rows.append({"type": "seg", "n": s.get("n"), "t": float(s.get("start") or 0), "time": clock(s.get("start")),
-                     "second": int(s.get("start") or 0), "who": labels.get(s.get("ch"), labels["M"]),
-                     "ch": s.get("ch") or "M", "text": s.get("text") or ""})
+        start = float(s.get("start") or 0)
+        cls = ""
+        if show:
+            project, _part = parts.project_at(pj["parts"], start, pj["main"])
+            cls = pj["colors"].get(project.pk, "") if project is not None else "mt-pj-gen"
+        rows.append({"type": "seg", "n": s.get("n"), "t": start, "time": clock(s.get("start")),
+                     "second": int(start), "who": labels.get(s.get("ch"), labels["M"]),
+                     "ch": s.get("ch") or "M", "text": s.get("text") or "", "pj": cls})
+    if show:
+        for part in pj["parts"]:
+            label = f"{part.project.code} · {part.project.name}" if part.project_id else ""
+            rows.append({"type": "part", "t": part.start_s, "time": clock(part.start_s), "second": int(part.start_s),
+                         "text": label, "note": part.note, "part": part.pk,
+                         "pj": pj["colors"].get(part.project_id, "") if part.project_id else "mt-pj-gen"})
     for mk in m.marks or []:
         kind = mk.get("kind")
         label = mk.get("label") or ""
@@ -441,7 +530,7 @@ def transcript_rows(m, tr) -> list:
             text, cls = f"· {label}", "auto"
         t = float(mk.get("t") or 0)
         rows.append({"type": cls, "t": t, "time": clock(t), "second": int(t), "text": text})
-    rows.sort(key=lambda r: (r["t"], 0 if r["type"] == "seg" else 1))
+    rows.sort(key=lambda r: (r["t"], {"part": -1, "seg": 0}.get(r["type"], 1)))
     return rows
 
 
@@ -456,16 +545,46 @@ def accepted_rows(m) -> list:
     return [{"item": i, "result": result_link(i)} for i in services.accepted_items(m)]
 
 
+def projects_context(user, m, pj, tr=None) -> dict:
+    """«📁 Проєкти наради» в шапці, 🏷 частини над розшифровкою й 💡 підказки (meetings/parts.py)."""
+    can_projects = user.has_perm("projects.view_project")
+    editable = can_change(user) and can_projects
+    linked = {p.pk for p in pj["links"]}
+    rows = []
+    for p in pj["links"]:
+        rows.append({"p": p, "main": p.pk == m.project_id, "cls": pj["colors"][p.pk],
+                     "url": url("admin:projects_project_change", p.pk) if can_projects else ""})
+    spans = []
+    if len(pj["links"]) > 1 or pj["parts"]:
+        for r in parts.ranges(m, pj["parts"], pj["main"]):
+            project = r["project"]
+            spans.append({"start": clock(r["start"]), "end": clock(r["end"]) if r["end"] is not None else "",
+                          "second": int(r["start"]), "label": project.code if project is not None else "загальне",
+                          "name": project.name if project is not None else "",
+                          "cls": pj["colors"].get(project.pk, "") if project is not None else "mt-pj-gen",
+                          "part": r["part"].pk if r["part"] is not None else None,
+                          "note": r["part"].note if r["part"] is not None else ""})
+    suggestions = []
+    if editable and tr is not None and m.has_transcript:
+        suggestions = [dict(s, cls=pj["colors"].get(s["project"].pk, "")) for s in
+                       parts.suggest(m, tr.segments, pj["links"], pj["parts"])]
+    return {"pj_rows": rows, "pj_edit": editable,
+            "pj_add": [o for o in project_options(user) if o["pk"] not in linked] if editable else [],
+            "pj_spans": spans, "pj_suggest": suggestions}
+
+
 def page_context(user, m, settings=None) -> dict:
     """Усе для page.html (лише власнику — перевірено до виклику)."""
     s = settings or services.settings_obj()
     tr = MeetingTranscript.objects.filter(meeting=m).first() if m.has_transcript else None
-    items = list(m.items.select_related("highlight", "risk", "step", "event").order_by("start_s", "pk"))
-    base = services.targets(user, m)
+    items = list(m.items.select_related("highlight", "risk", "step", "event", "project").order_by("start_s", "pk"))
+    pj = pj_state(user, m)
     staff = staff_options() if items else []
-    rendered = [{"item": i, "html": render_item(user, m, i, base, staff)} for i in items]
+    rendered = [{"item": i, "html": render_item(user, m, i, None, staff, pj)} for i in items]
     pending = [r for r in rendered if r["item"].status == MeetingItem.PENDING]
-    accepted = [r for r in rendered if r["item"].status == MeetingItem.ACCEPTED]
+    accepted = [r for r in rendered if r["item"].status == MeetingItem.ACCEPTED
+                and r["item"].target != MeetingItem.NOTE]
+    notes = [r for r in rendered if r["item"].status == MeetingItem.ACCEPTED and r["item"].target == MeetingItem.NOTE]
     rejected = [r for r in rendered if r["item"].status == MeetingItem.REJECTED]
     can_projects = user.has_perm("projects.view_project")
     can_customers = user.has_perm("crm.view_customer")
@@ -490,10 +609,11 @@ def page_context(user, m, settings=None) -> dict:
         "can_retry": services.can_retry(m) and can_change(user), "redo_confirm": REDO_CONFIRM,
         "phone_note": PHONE_NOTE,
         "can_continue": m.status in (Meeting.RECORDING, Meeting.PROCESSING, Meeting.REVIEW),
-        "pending": pending, "accepted": accepted, "rejected": rejected, "items_total": len(items),
+        "pending": pending, "accepted": accepted, "notes": notes, "rejected": rejected, "items_total": len(items),
         "summary": tr.summary if tr else "", "moments_wait": m.status == Meeting.PROCESSING and m.has_transcript
         and not m.moments_at, "moments_wait_text": MOMENTS_WAIT,
-        "no_project_hint": not m.project_id, "transcript": transcript_rows(m, tr) if tr else [],
+        "no_project_hint": not pj["links"], "transcript": transcript_rows(m, tr, pj) if tr else [],
+        **projects_context(user, m, pj, tr),
         "transcript_model": tr.model if tr else "",
         "kb": knowledge.parts_state(m, user) if m.approved_at else None, "kb_text": KB_TEXT,
         "consent_lang_label": CONSENT_LANG_LABELS.get(m.consent_lang, ""), "log": log_lines(m),
@@ -510,5 +630,10 @@ def page_context(user, m, settings=None) -> dict:
         "privacy_url": s.privacy_url,
         "config": {"status_url": url("admin:meetings_meeting_status", m.pk), "status": m.status,
                    "transcript": m.has_transcript, "moments": bool(m.moments_at),
-                   "poll": m.status in (Meeting.READY, Meeting.RECORDING, Meeting.PROCESSING)},
+                   "poll": m.status in (Meeting.READY, Meeting.RECORDING, Meeting.PROCESSING),
+                   "projects_url": url("admin:meetings_meeting_projects", m.pk),
+                   "part_url": url("admin:meetings_meeting_part", m.pk),
+                   "can_parts": can_change(user) and can_projects and m.has_transcript,
+                   "pj": [{"pk": p.pk, "label": f"{p.code} · {p.name}", "cls": pj["colors"][p.pk]}
+                          for p in pj["links"]] if can_projects else []},
     }

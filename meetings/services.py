@@ -564,6 +564,69 @@ def create(user, data) -> Meeting:
         consent_note=str(data.get("consent_note") or "").strip()[:2000])
 
 
+QUICK_REUSE = timedelta(minutes=2)     # «⚡ Записати зараз» ще раз за 2 хв — та сама нарада, не нова
+QUICK_EVENTS_BEFORE = timedelta(hours=3)  # зустрічі календаря, що почались до 3 год тому, — ще «сьогодні»
+QUICK_EVENTS_MAX = 6
+QUICK_PREPARED_MAX = 5
+QUICK_SKIP_TITLE = ("✖", "✕")           # «✖ Скасовано: …», «✕ Відхилено: …» (calendar_app.invites)
+
+
+def quick_title(project=None, customer=None, now=None) -> str:
+    """Назва «⚡ Записати зараз» без назви від людини: з проєктом / клієнтом — як підготовка, інакше з часом
+    («Нарада 16.11.2026 14:05» — кілька швидких нарад одного дня різняться)."""
+    now = timezone.localtime(now or timezone.now())
+    if project is None and customer is None:
+        return f"Нарада {now:%d.%m.%Y %H:%M}"
+    return default_title(project, customer, None, now.date())
+
+
+def quick_events(user, now=None) -> list:
+    """Зустрічі 🤝 з календаря людини на сьогодні (почались до 3 год тому або ще почнуться до кінця дня), без
+    скасованих, відхилених і виконаних. [CalendarEvent] за часом, ≤ QUICK_EVENTS_MAX."""
+    from calendar_app.models import CalendarEvent
+    now = now or timezone.now()
+    day_end = timezone.make_aware(datetime.combine(timezone.localtime(now).date(), time.max))
+    qs = (CalendarEvent.objects.filter(user=user, event_type=CalendarEvent.TYPE_MEETING, all_day=False, is_done=False,
+                                       start_at__gte=now - QUICK_EVENTS_BEFORE, start_at__lte=day_end)
+          .order_by("start_at"))
+    return [ev for ev in qs[:QUICK_EVENTS_MAX * 2] if not (ev.title or "").lstrip().startswith(QUICK_SKIP_TITLE)
+            ][:QUICK_EVENTS_MAX]
+
+
+def quick_start(user, data, now=None) -> Meeting:
+    """«⚡ Записати зараз» (список нарад, сторінка швидкого запису, посилання з вікна запису): нарада одразу готова
+    до запису — далі issue_ticket і вікно запису. data: title (порожньо — quick_title / назва зустрічі), project,
+    event. Зустріч календаря — учасники лише відмічені (організатор і ті, хто прийняв запрошення), як у підготовці;
+    уже підготовлена нарада цієї зустрічі (ще не записана) — та сама, без нової. Повтор за QUICK_REUSE з тими самими
+    назвою, проєктом і зустріччю (подвійний клік, оновлення сторінки) — та сама нарада. Згоду підтверджують у вікні
+    запису перед ▶, як завжди."""
+    if not can_record(user):
+        raise MeetingError(record_refusal(user) or NO_RIGHT_TEXT)
+    now = now or timezone.now()
+    event = _event(user, data.get("event"))
+    if event is not None:
+        prepared = own(user).filter(calendar_event=event, status=Meeting.READY,
+                                    transcript_deleted_at__isnull=True).order_by("-pk").first()
+        if prepared is not None:
+            return prepared
+    project = _project(user, data.get("project"))
+    pre = prefill(user, project=project.pk if project else None, event=event.pk if event else None)
+    project = project or pre["project"]
+    customer = pre["customer"]
+    title = " ".join(str(data.get("title") or "").split())[:200]
+    if not title:
+        title = pre["title"] if event is not None else quick_title(project, customer, now)
+    recent = own(user).filter(status=Meeting.READY, created_at__gte=now - QUICK_REUSE, title=title, project=project,
+                              calendar_event=event).order_by("-pk").first()
+    if recent is not None:
+        return recent
+    return create(user, {
+        "title": title, "project": project.pk if project else None, "customer": customer.pk if customer else None,
+        "calendar_event": event.pk if event else None, "lang_l": pre["lang_l"], "lang_r": pre["lang_r"],
+        "retention": pre["retention"], "consent_lang": pre["consent_lang"],
+        "participants": [p for p in pre["participants"] if p.get("checked")]})
+
+
 def continue_prefill(user, meeting) -> dict:
     """«🎙 Записати продовження»: нова підготовка з назвою «… (продовження)», тими самими проєктом, клієнтом,
     учасниками й мовами; continues — ця нарада."""
@@ -640,7 +703,7 @@ def _reset_recording(m) -> list:
     m.capture_mode, m.no_headset, m.transcript_chars, m.moments_error = "", False, 0, ""
     m.consent_announced = m.consent_all_agreed = False
     MeetingTranscript.objects.filter(meeting=m).delete()
-    m.items.exclude(status=MeetingItem.ACCEPTED).delete()
+    drop_unused_items(m)
     if m.approved_at:
         from . import knowledge
         knowledge.unpublish(m)
@@ -696,9 +759,10 @@ def hotwords(m) -> str:
     items = []
     if m.customer_id:
         items.append((m.customer.company or m.customer.name or "").strip())
-    if m.project_id:
-        items += [m.project.code, (m.project.name or "").strip()]
-        items += [sku for sku in m.project.products.order_by("sku").values_list("sku", flat=True)[:HOTWORD_SKUS]]
+    from . import parts
+    for project in parts.links(m):           # головний першим, далі інші проєкти наради
+        items += [project.code, (project.name or "").strip()]
+        items += [sku for sku in project.products.order_by("sku").values_list("sku", flat=True)[:HOTWORD_SKUS]]
     out, seen = [], set()
     for item in items:
         item = " ".join(str(item or "").split())
@@ -1480,20 +1544,34 @@ DEFAULT_TARGET = {"decision": "moment", "info": "moment", "question": "moment", 
                   "task": "step", "promise": "step", "deadline": "deadline"}
 
 
-def targets(user, m, item=None) -> dict:
-    """Куди можна додати пункт: {target: '' (можна) | причина}; default — що вибрати першим."""
+NO_PROJECT_TEXT = "Нарада без проєкту — підключіть її до проєкту: «📁 Проєкти наради» вгорі"
+NO_PLAN_TEXT = "У проєкті ще немає плану. Додайте як ⏰ дедлайн або спершу створіть план (вкладка «📅 План»)."
+_UNSET = object()
+
+
+def targets(user, m, item=None, project=_UNSET, plans=None) -> dict:
+    """Куди можна додати пункт: {target: '' (можна) | причина}; default — що вибрати першим. project — проєкт
+    пункту (meetings/parts.item_project; не вказано — рахується тут); plans — кеш {pk проєкту: є план}."""
+    from . import parts
+    if project is _UNSET:
+        project = parts.item_project(m, item) if item is not None else (m.project if m.project_id else None)
     out = {}
-    if not m.project_id:
-        reason = "Нарада без проєкту — виберіть проєкт: ✏️ Змінити"
+    if project is None:
+        reason = NO_PROJECT_TEXT
         out = {"moment": reason, "risk": reason, "step": reason}
     elif not user.has_perm("projects.change_project"):
         reason = "Немає права змінювати цей проєкт — доступний лише ⏰ дедлайн."
         out = {"moment": reason, "risk": reason, "step": reason}
     else:
-        out = {"moment": "", "risk": "",
-               "step": "" if has_plan(m.project) else ("У проєкті ще немає плану. Додайте як ⏰ дедлайн або спершу "
-                                                       "створіть план (вкладка «📅 План»).")}
+        if plans is not None and project.pk in plans:
+            planned = plans[project.pk]
+        else:
+            planned = has_plan(project)
+            if plans is not None:
+                plans[project.pk] = planned
+        out = {"moment": "", "risk": "", "step": "" if planned else NO_PLAN_TEXT}
     out["deadline"] = ""
+    out["note"] = ""            # 💬 лише обговорення: нічого не створюється — можна завжди, і без проєкту
     default = DEFAULT_TARGET.get(item.kind if item else "", "moment")
     if out.get(default):
         default = "deadline"
@@ -1512,16 +1590,26 @@ def _step_side(m, item, data) -> str:
 
 def accept(user, item, target, data=None) -> MeetingItem:
     """✓ — пункт у проєкт (📌 момент, ⚠️ ризик, 📅 крок плану) або ⏰ дедлайн у СВІЙ календар (до проєкту не
-    прив'язується; назва без цитати). data: title, kind (моменту), category / probability / impact / owner (ризику),
-    date, assignee, side (кроку / дедлайну)."""
+    прив'язується; назва без цитати); 💬 note — лише позначка «стосується наради»: нічого не створюється, назва (якщо
+    її змінили) і проєкт пункту запам'ятовуються в самому пункті. data: project (один із проєктів наради; порожньо — проєкт частини, де пункт
+    прозвучав, інакше головний — meetings/parts.item_project), title, kind (моменту), category / probability / impact /
+    owner (ризику), date, assignee, side (кроку / дедлайну)."""
     from projects import plan, risk_rules, risks, services as project_services
     from projects.models import ProjectHighlight
+    from . import parts
     data = data or {}
     m = item.meeting
     _check_owner(user, m)
     if item.status != MeetingItem.PENDING:
         raise MeetingError("Пункт уже вирішено")
-    allowed = targets(user, m, item)["targets"]
+    chosen = _pk(data.get("project"))
+    if chosen:
+        project = next((p for p in parts.links(m) if p.pk == chosen), None)
+        if project is None:
+            raise MeetingError("Цього проєкту немає серед проєктів наради — спершу додайте його вгорі")
+    else:
+        project = parts.item_project(m, item)
+    allowed = targets(user, m, item, project=project)["targets"]
     if target not in allowed:
         raise MeetingError("Виберіть, куди додати пункт")
     if allowed[target]:
@@ -1540,7 +1628,7 @@ def accept(user, item, target, data=None) -> MeetingItem:
                 kind = data.get("kind") if data.get("kind") in dict(ProjectHighlight.KIND_CHOICES) else \
                     DEFAULT_MOMENT_KIND.get(item.kind, ProjectHighlight.OTHER)
                 item.highlight = project_services.add_highlight(
-                    m.project, title=title, date=m.day, kind=kind, quote=item.quote, user=user,
+                    project, title=title, date=m.day, kind=kind, quote=item.quote, user=user,
                     source=ProjectHighlight.MEETING, meeting=m, meeting_second=second)
                 fields.append("highlight")
             elif target == "risk":
@@ -1549,7 +1637,7 @@ def accept(user, item, target, data=None) -> MeetingItem:
                            "quote": item.quote, "review_on": risk_rules.review_default().isoformat()}
                 if _int(data.get("owner")):
                     payload["owner"] = data.get("owner")
-                item.risk = risks.save(m.project, payload, user=user, source="meeting", meeting=m,
+                item.risk = risks.save(project, payload, user=user, source="meeting", meeting=m,
                                        meeting_second=second)
                 fields.append("risk")
             elif target == "step":
@@ -1559,12 +1647,18 @@ def accept(user, item, target, data=None) -> MeetingItem:
                 else:
                     assignee = user.pk if side == "we" else None
                 due = parse_day(data.get("date")) if data.get("date") else None
-                item.step = plan.meeting_step(m.project, title, assignee=assignee, due=due, side=side,
+                item.step = plan.meeting_step(project, title, assignee=assignee, due=due, side=side,
                                               quote=item.quote, meeting=m, meeting_second=second, user=user)
                 fields.append("step")
-            else:
+            elif target == "deadline":
                 item.event = _deadline_event(user, m, title, data.get("date"))
                 fields.append("event")
+            elif title and title[:300] != item.title:      # note: лише в нараді — назва тези, як її виправили
+                item.title = title[:300]
+                fields.append("title")
+            if target != "deadline" and project is not None and item.project_id != project.pk:
+                item.project = project
+                fields.append("project")
             item.status, item.target, item.decided_at = MeetingItem.ACCEPTED, target, timezone.now()
             item.save(update_fields=fields)
     except (project_services.HighlightError, risks.RiskError, plan.PlanError) as e:
@@ -1593,19 +1687,29 @@ def reject(user, item) -> MeetingItem:
 
 
 def restore(user, item) -> MeetingItem:
+    """↺ Повернути: «✕ Не те» і «💬 лише обговорення» (нічого ніде не створено) знову чекають ✓ / ✕."""
     _check_owner(user, item.meeting)
-    if item.status != MeetingItem.REJECTED:
-        raise MeetingError("Повернути можна лише пункт «Не те»")
-    item.status, item.decided_at = MeetingItem.PENDING, None
-    item.save(update_fields=["status", "decided_at"])
+    note = item.status == MeetingItem.ACCEPTED and item.target == MeetingItem.NOTE
+    if item.status != MeetingItem.REJECTED and not note:
+        raise MeetingError("Повернути можна лише пункт «Не те» або «Лише обговорення»")
+    item.status, item.target, item.decided_at = MeetingItem.PENDING, "", None
+    item.save(update_fields=["status", "target", "decided_at"])
     return item
+
+
+def drop_unused_items(m):
+    """Пункти, що живуть лише в нараді: ще не вирішені, «✕ Не те» і «💬 лише обговорення» (у проєкті й календарі
+    їх немає). Додані в проєкт / календар лишаються."""
+    m.items.exclude(status=MeetingItem.ACCEPTED).delete()
+    m.items.filter(target=MeetingItem.NOTE).delete()
 
 
 # ── видалення й прибирання ───────────────────────────────────────────────────
 
 def accepted_items(meeting) -> list:
-    """Прийняті пункти (для вікна «🗑 Видалити нараду»: що лишиться в проєкті / календарі)."""
-    return list(meeting.items.filter(status=MeetingItem.ACCEPTED)
+    """Прийняті пункти (для вікна «🗑 Видалити нараду»: що лишиться в проєкті / календарі; «💬 лише обговорення» —
+    ні, вони тільки в нараді)."""
+    return list(meeting.items.filter(status=MeetingItem.ACCEPTED).exclude(target=MeetingItem.NOTE)
                 .select_related("highlight", "risk", "step", "event").order_by("start_s", "pk"))
 
 
@@ -1698,7 +1802,7 @@ def admin_delete(user, meeting, request=None) -> dict:
     if not _is_admin(user):
         raise Http404("Сторінку не знайдено")
     from core.models import AuditLog
-    accepted = meeting.items.filter(status=MeetingItem.ACCEPTED).count()
+    accepted = meeting.items.filter(status=MeetingItem.ACCEPTED).exclude(target=MeetingItem.NOTE).count()
     pk = meeting.pk
     extra = {"consent_at": _iso(meeting.consent_at), "consent_all_agreed": meeting.consent_all_agreed,
              "accepted_items": accepted, "by_admin": True}
@@ -1714,13 +1818,13 @@ def admin_delete(user, meeting, request=None) -> dict:
 
 
 def drop_transcript(m, now=None) -> None:
-    """Строк зберігання минув / власника немає: розшифровка, підсумок, позначки, неприйняті пункти, документи бази
-    знань — геть; прийняті пункти — без назви й цитати (ключ, стан, куди додано лишаються). Протокол згоди лишається."""
+    """Строк зберігання минув / власника немає: розшифровка, підсумок, позначки, неприйняті пункти й «💬 лише
+    обговорення», документи бази знань — геть; прийняті пункти — без назви й цитати (ключ, стан, куди додано лишаються). Протокол згоди лишається."""
     now = now or timezone.now()
     from . import knowledge
     knowledge.unpublish(m)
     MeetingTranscript.objects.filter(meeting=m).delete()
-    m.items.exclude(status=MeetingItem.ACCEPTED).delete()
+    drop_unused_items(m)
     m.items.filter(status=MeetingItem.ACCEPTED).update(title="", quote="", who="", due_text="")
     m.marks = [{"t": mk.get("t"), "label": "", "kind": mk.get("kind")} for mk in m.marks or []]
     m.transcript_deleted_at, m.moments_error, m.bench_detail = now, "", ""

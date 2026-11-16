@@ -163,7 +163,7 @@ def _meetings_context(project, user, meetings) -> dict:
     """«🎙 Мої наради»: наради того, хто дивиться (timeline.own_meetings — лише свої, і адміністратору), «🎙 Записати
     нараду» — лише коли людина може записувати."""
     rows = [{"id": m.pk, "title": m.title, "line": timeline.meeting_line(m, pending=False), "cls": timeline.meeting_cls(m) or "def",
-             "pending": getattr(m, "pending", 0), "url": timeline.meeting_url(m.pk)}
+             "pending": getattr(m, "pending", 0), "url": timeline.meeting_url(m.pk, getattr(m, "part_second", None))}
             for m in meetings[:MEETINGS_SHOWN]]
     all_url = timeline._url("admin:meetings_meeting_changelist") if len(meetings) > MEETINGS_SHOWN else ""
     return {"rows": rows, "total": len(meetings), "all_url": all_url,

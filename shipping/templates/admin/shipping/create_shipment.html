@@ -1133,13 +1133,122 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="sh-card">
       <div class="sh-card-title" style="justify-content:space-between">
         <span>📬 Отримувач</span>
+        <span style="display:flex;gap:6px;flex-wrap:wrap">
+        <button type="button" onclick="shTogglePaste()" id="sh-paste-btn"
+          title="Вставити адресу з листа чи підпису — Minerva розкладе її по полях"
+          style="background:var(--bg-input);border:1px solid var(--border-strong);border-radius:5px;
+                 padding:4px 10px;cursor:pointer;font-size:12px;color:var(--text-muted);display:flex;
+                 align-items:center;gap:5px">
+          📋 <span>Вставити адресу</span>
+        </button>
         <button type="button" onclick="shToggleAddrBookFor('recipient')" id="sh-addr-btn-recipient"
           style="background:var(--bg-input);border:1px solid var(--border-strong);border-radius:5px;
                  padding:4px 10px;cursor:pointer;font-size:12px;color:var(--text-muted);display:flex;
                  align-items:center;gap:5px">
           📖 <span id="sh-addr-btn-lbl-recipient">Адресна книга</span>
         </button>
+        </span>
       </div>
+      <!-- 📋 Адреса з тексту (shipping/services/address_paste.py; з пошти — localStorage mv-ship-paste) -->
+      <div id="sh-paste" style="display:none;margin-bottom:14px;padding:10px 12px;border:1px solid var(--border-strong);
+           border-radius:6px;background:var(--bg-input)">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">
+          Вставте адресу з листа, підпису чи сайту — як є. Minerva розкладе її по полях отримувача: ім’я, компанія,
+          вулиця, індекс, місто, країна (код), телефон, email.
+        </div>
+        <textarea id="sh-paste-text" class="sh-input" rows="5" translate="no"
+          style="width:100%;box-sizing:border-box;resize:vertical"
+          placeholder="Muster GmbH&#10;z.H. Max Muster&#10;Musterstraße 1&#10;10115 Berlin&#10;Germany"></textarea>
+        <div style="display:flex;gap:12px;align-items:center;margin-top:8px;flex-wrap:wrap">
+          <button type="button" id="sh-paste-go" onclick="shPasteAddr()"
+            style="background:var(--accent);color:#fff;border:0;border-radius:5px;padding:6px 14px;
+                   cursor:pointer;font-size:13px;font-weight:600">✨ Заповнити отримувача</button>
+          <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:5px"
+            title="AI (Claude Haiku) розбирає будь-який формат і пише телефон з кодом країни; без AI — за правилами">
+            <input type="checkbox" id="sh-paste-ai" checked> 🤖 Розібрати з AI</label>
+        </div>
+        <div id="sh-paste-msg" role="status" style="font-size:12px;margin-top:6px;white-space:pre-line"></div>
+      </div>
+      <style>.sh-pasted{outline:2px solid var(--accent);outline-offset:1px;transition:outline-color .4s}</style>
+      <script>
+      (function(){
+        var URL_PARSE = '{% url "admin:shipping_shipment_parse_address" %}';
+        var MAP = {name:'recipient_name', company:'recipient_company', street:'recipient_street',
+                   zip:'recipient_zip', city:'recipient_city', state:'recipient_state',
+                   country:'recipient_country', phone:'recipient_phone', email:'recipient_email'};
+        var NAMES = {name:'ім’я', company:'компанія', street:'вулиця', zip:'індекс', city:'місто', state:'штат',
+                     country:'країна', phone:'телефон', email:'email'};
+        var msgPk = '';
+        function $(id){ return document.getElementById(id); }
+        function csrf(){
+          var el = document.querySelector('[name=csrfmiddlewaretoken]');
+          if (el && el.value) return el.value;
+          var m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+          return m ? decodeURIComponent(m[1]) : '';
+        }
+        function say(text, bad){ var m = $('sh-paste-msg'); if (!m) return; m.textContent = text; m.style.color = bad ? 'var(--err)' : 'var(--text-muted)'; }
+        window.shTogglePaste = function(open){
+          var box = $('sh-paste');
+          if (!box) return;
+          var show = open === true || box.style.display === 'none';
+          box.style.display = show ? 'block' : 'none';
+          if (show && $('sh-paste-text')) $('sh-paste-text').focus();
+        };
+        window.shPasteAddr = function(){
+          var ta = $('sh-paste-text'), btn = $('sh-paste-go'), ai = $('sh-paste-ai');
+          var text = ta ? ta.value.trim() : '';
+          if (!text) { say('Вставте текст адреси.', true); if (ta) ta.focus(); return; }
+          var first = document.querySelector('[name="recipient_name"]');
+          var form = first ? first.form : document;
+          if (btn) btn.disabled = true;
+          say(ai && ai.checked ? '⏳ AI розбирає адресу…' : '⏳ Розбираю адресу…');
+          fetch(URL_PARSE, {method:'POST', credentials:'same-origin',
+                headers:{'X-CSRFToken':csrf(), 'Content-Type':'application/json', 'Accept':'application/json'},
+                body: JSON.stringify({text: text, msg: msgPk, ai: !!(ai && ai.checked)})})
+            .then(function(r){ return r.json().catch(function(){ return {ok:false, error:'HTTP ' + r.status}; }); },
+                  function(){ return {ok:false, error:'Сервер не відповідає — спробуйте ще раз'}; })
+            .then(function(d){
+              if (btn) btn.disabled = false;
+              if (!d || !d.ok) { say('❌ ' + ((d && d.error) || 'Не вдалося'), true); return; }
+              var got = [], missing = [];
+              Object.keys(MAP).forEach(function(k){
+                var el = form.querySelector('[name="' + MAP[k] + '"]');
+                if (!el) return;
+                var v = (d.fields && d.fields[k]) || '';
+                if (!v && k === 'country') { if (!el.value) missing.push(NAMES[k]); return; }   // країну — лише замінити
+                if (!v && ['name', 'street', 'zip', 'city'].indexOf(k) >= 0) missing.push(NAMES[k]);
+                if (el.value === v) { if (v) got.push(NAMES[k]); return; }
+                el.value = v;
+                el.dispatchEvent(new Event('input', {bubbles:true}));
+                el.dispatchEvent(new Event('change', {bubbles:true}));
+                if (v) {
+                  got.push(NAMES[k]);
+                  el.classList.add('sh-pasted');
+                  setTimeout(function(){ el.classList.remove('sh-pasted'); }, 4000);
+                }
+              });
+              var lines = [(d.source === 'ai' ? '🤖 ' : '📋 ') + 'Заповнено: ' + (got.join(', ') || '—') +
+                           (d.cost_usd ? ' · $' + d.cost_usd : '') + '. Перевірте поля перед оформленням.'];
+              if (missing.length) lines.push('⚠️ Не знайдено: ' + missing.join(', ') + ' — допишіть вручну.');
+              (d.notes || []).forEach(function(n){ lines.push(n); });
+              say(lines.join('\n'), !!missing.length);
+            });
+        };
+        // з пошти: «📦 Відправлення» на виділеному тексті кладе його сюди (без адреси в URL) — підхопити й розібрати
+        document.addEventListener('DOMContentLoaded', function(){
+          if (!/[?&]paste=mail\b/.test(location.search)) return;
+          var data = null;
+          try { data = JSON.parse(localStorage.getItem('mv-ship-paste') || 'null'); localStorage.removeItem('mv-ship-paste'); }
+          catch (e) { data = null; }
+          try { history.replaceState(null, '', location.pathname); } catch (e) {}
+          if (!data || !data.text || (Date.now() - (data.at || 0)) > 10 * 60000) return;
+          msgPk = data.msg ? String(data.msg) : '';
+          shTogglePaste(true);
+          $('sh-paste-text').value = String(data.text).slice(0, 3000);
+          shPasteAddr();
+        });
+      })();
+      </script>
       <div id="sh-addr-book-recipient" style="display:none;margin-bottom:14px;border:1px solid var(--border-strong);border-radius:6px;overflow:hidden">
         <div style="padding:7px 10px;background:var(--bg-card-2);border-bottom:1px solid var(--border-strong)">
           <input id="sh-addr-search-recipient" type="text" placeholder="🔍 Пошук клієнта, міста, email…"

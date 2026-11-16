@@ -1,0 +1,25 @@
+{% extends "admin/base_site.html" %}
+{# ⚡ Швидкий запис наради (quick/): те саме, що блок угорі списку нарад. З вікна запису на RAG-ПК — ?from=bench: #}
+{# форми без нової вкладки, вікно запису відкриється в цій самій (meetings/admin.py quick_view). #}
+{% load static %}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=6">{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{{ list_url }}">🎙 Наради</a> &rsaquo; {{ title }}
+</div>
+{% endblock %}
+{% block content_title %}{% endblock %}
+{% block content %}
+<div id="mt-page" class="mt-wrap">
+  <h1>⚡ Швидкий запис наради</h1>
+  {% if quick.from_bench %}<p class="mt-muted">↩ З вікна запису на RAG-ПК: після «⚡ Записати зараз» воно відкриється тут же, з вашими налаштуваннями мікрофона.</p>{% endif %}
+  {% include "admin/meetings/meeting/_quick.html" %}
+  <div class="mt-actions">
+    <a class="button" href="{% url 'admin:meetings_meeting_new' %}">🎙 Підготувати нараду докладно</a>
+    <a class="button" href="{{ list_url }}">← До нарад</a>
+  </div>
+</div>
+<script src="{% static 'meetings/meetings.js' %}?v=4" defer></script>
+{% endblock %}
