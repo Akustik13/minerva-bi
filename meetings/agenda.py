@@ -14,9 +14,14 @@
 - 📎 файли (MeetingAgendaFile: скріншот з буфера, перетягнуті, з ПК) — до агенди або до пункту: `add_file` (тип за
   розширенням `FILE_EXT`, картинки й PDF — за першими байтами, ≤ `FILE_MAX_MB`, ≤ `FILES_MAX`), `remove_file`,
   `file_for` (лише власник; сторінка наради віддає його, /media/ теку meetings/ нікому не віддає);
+- 🌐 переклад під пунктами (`Meeting.agenda_lang`, `set_tr_lang`): пишете своєю мовою — під кожним пунктом і «що
+  вирішили» переклад (`MeetingAgendaItem.translations` {мова: {text, text_src, text_by, note, …}}, назва наради —
+  `Meeting.agenda_title_tr`); `*_src` — відбиток оригіналу: змінили текст — переклад застарів і перекладається знову;
+  `translate_missing` — один запит AI на все, чого ще немає (`_pieces`: лише тексти з літерами; українською — лише
+  тексти без кирилиці), людина може виправити переклад у ✏️ (`edit` → `*_by` human); `tr_info` — що перекладено якою мовою;
 - `send` — «✉️ Надіслати агенду»: чернетка у власній скриньці (учасники наради + дописані адреси, тема й привітання
-  мовою листа), за бажанням пункти перекладає AI (`translate` → core/ai_texts, Claude Haiku 5.5, бюджет AI) — людина перевіряє й
-  надсилає сама.
+  мовою листа); готовий переклад цією мовою береться як є, решту за бажанням перекладає AI (`translate` →
+  core/ai_texts, Claude Haiku 5.5, бюджет AI) і запам'ятовує — людина перевіряє й надсилає сама.
 """
 from __future__ import annotations
 
@@ -73,6 +78,39 @@ def _fmt(d) -> str:
     return d.strftime("%d.%m") if d else ""
 
 
+_CYR = re.compile(r"[А-Яа-яЁёЄєІіЇїҐґ]")
+_LAT = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]")
+
+
+def _needs(text, lang) -> bool:
+    """Чи перекладати текст мовою lang: лише з літерами; українською — коли кирилиці немає зовсім (українське речення
+    з назвою чи кодом латиницею — уже українською); німецьку від англійської так не відрізнити — латиницю AI
+    перекладає, а вже потрібною мовою лишає як є."""
+    cyr, lat = len(_CYR.findall(text or "")), len(_LAT.findall(text or ""))
+    if not cyr and not lat:
+        return False
+    return not cyr if lang == "uk" else True
+
+
+def _differs(tr, text) -> bool:
+    return bool(tr) and _clean(tr, 2000).lower() != _clean(text, 2000).lower()
+
+
+def _tr_fields(r, lang):
+    """Переклад пункту для сторінки: tr_text / tr_note — показати (порожньо — немає або такий самий, як оригінал),
+    *_raw — як збережено (поля ✏️), tr_stale — оригінал змінили після перекладу, tr_wait — ще не перекладено."""
+    tr = ((r.translations or {}).get(lang) or {}) if lang else {}
+    r.tr_text_raw = tr.get("text") or ""
+    r.tr_note_raw = (tr.get("note") or "") if r.note else ""
+    r.tr_text = r.tr_text_raw if _differs(r.tr_text_raw, r.text) else ""
+    r.tr_note = r.tr_note_raw if _differs(r.tr_note_raw, r.note) else ""
+    r.tr_stale = bool(lang) and bool((r.tr_text_raw and tr.get("text_src") != _hash(r.text))
+                                     or (r.tr_note_raw and tr.get("note_src") != _hash(r.note)))
+    r.tr_wait = bool(lang) and not r.frozen and bool(
+        (_needs(r.text, lang) and not r.tr_text_raw) or (r.note and _needs(r.note, lang) and not r.tr_note_raw))
+    r.tr_human = (tr.get("text_by") == "human") or (bool(r.tr_note_raw) and tr.get("note_by") == "human")
+
+
 def files(m) -> list:
     return list(MeetingAgendaFile.objects.filter(meeting=m).order_by("created_at", "pk"))
 
@@ -104,6 +142,9 @@ def items(m) -> list:
             c.level, c.num, c.first, c.last, c.kid_count = 1, f"{n}.{k}", k == 1, k == len(sub), 0
             c.group_top, c.group_end, c.frozen = t.pk, k == len(sub), frozen
             out.append(c)
+    lang = m.agenda_lang if m.agenda_lang in LANGS else ""
+    for r in out:
+        _tr_fields(r, lang)
     return out
 
 
@@ -177,9 +218,13 @@ def add(user, m, text, *, why="", ref="", url="", project=None, parent=None) -> 
     if ref.startswith("carry:"):
         src = _carry_source(user, m, ref[6:])
         if src is not None:
+            if src.translations and src.text == item.text:            # 🌐 переклад — разом з пунктом
+                item.translations = src.translations
+                item.save(update_fields=["translations"])
             for k, kid in enumerate(src.kids.filter(status=MeetingAgendaItem.OPEN).order_by("order", "pk"), 1):
                 MeetingAgendaItem.objects.create(meeting=m, order=k * 10, text=kid.text, why=kid.why, url=kid.url,
-                                                 project_id=kid.project_id, parent=item)
+                                                 project_id=kid.project_id, parent=item,
+                                                 translations=kid.translations or {})
             MeetingAgendaItem.objects.filter(pk=src.pk).update(status=MeetingAgendaItem.MOVED, moved_to=item,
                                                                updated_at=timezone.now())
     return item
@@ -206,7 +251,9 @@ def _sync_parent(top):
         MeetingAgendaItem.objects.filter(pk=top.pk).update(status=new, updated_at=timezone.now())
 
 
-def edit(user, m, pk, *, text=None, note=None) -> MeetingAgendaItem:
+def edit(user, m, pk, *, text=None, note=None, tr_text=None, tr_note=None) -> MeetingAgendaItem:
+    """Текст і «що вирішили»; tr_text / tr_note — переклад мовою агенди, виправлений людиною (не змінили — лишається,
+    а якщо змінили оригінал, стає застарілим і перекладається знову; порожньо — прибрати)."""
     item = _item(user, m, pk)
     fields = []
     if text is not None:
@@ -218,6 +265,26 @@ def edit(user, m, pk, *, text=None, note=None) -> MeetingAgendaItem:
     if note is not None:
         item.note = _clean(note, NOTE_MAX)
         fields.append("note")
+    lang = m.agenda_lang if m.agenda_lang in LANGS else ""
+    if lang and (tr_text is not None or tr_note is not None):
+        tr = dict(item.translations or {})
+        cur, changed = dict(tr.get(lang) or {}), False
+        for kind, value, src in (("text", tr_text, item.text), ("note", tr_note, item.note)):
+            if value is None:
+                continue
+            value = _clean(value, TEXT_MAX)
+            if value == _clean(cur.get(kind) or "", TEXT_MAX):
+                continue                                          # переклад не чіпали
+            changed = True
+            if value and src:
+                cur.update({kind: value, f"{kind}_src": _hash(src), f"{kind}_by": "human"})
+            else:
+                for k in (kind, f"{kind}_src", f"{kind}_by"):
+                    cur.pop(k, None)
+        if changed:
+            tr[lang] = cur
+            item.translations = tr
+            fields.append("translations")
     if fields:
         item.save(update_fields=fields + ["updated_at"])
     return item
@@ -265,10 +332,16 @@ def remove(user, m, pk) -> None:
         _sync_parent(top)
 
 
-def copy_text(m, rows=None) -> str:
-    """Агенда текстом — для запрошення, листа чи чату учасникам."""
+def copy_text(m, rows=None, lang="") -> str:
+    """Агенда текстом — для запрошення, листа чи чату учасникам; lang — збереженим перекладом (чого немає —
+    оригінал)."""
+    rows = items(m) if rows is None else rows
+    if lang in LANGS:
+        title, texts, notes = _translated(m, rows, lang)
+        head = MAIL[lang]["subject"].format(title=title)
+        return "\n".join([head, ""] + agenda_lines(rows, texts, notes)).strip()
     head = f"Агенда: {m.title}"
-    return "\n".join([head, ""] + agenda_lines(items(m) if rows is None else rows)).strip()
+    return "\n".join([head, ""] + agenda_lines(rows)).strip()
 
 
 def _live(rows) -> list:
@@ -489,13 +562,120 @@ def clean_emails(values) -> list:
     return out
 
 
-def translate(user, texts, lang) -> list:
+def translate(user, texts, lang, hint="") -> list:
     """Тексти агенди мовою lang (core/ai_texts: Claude Haiku 5.5, бюджет AI). Не вийшло — MeetingError."""
     from core import ai_texts
     try:
         return ai_texts.translate_list(user, texts, lang, AI_MODEL, about="These are items of a meeting agenda.")
     except ai_texts.TranslateError as e:
-        raise _err(f"{e} — або надішліть агенду без перекладу") from None
+        raise _err(f"{e}{hint}") from None
+
+
+# ── 🌐 Переклад під пунктами ──────────────────────────────────────────────────
+
+def _pieces(m, rows, lang) -> list:
+    """Що ще не перекладено мовою lang (немає перекладу або оригінал змінили після нього): [(вид, пункт | None,
+    текст)] — назва наради, тексти й «що вирішили» пунктів (без перенесених)."""
+    if lang not in LANGS:
+        return []
+    out = []
+    t = (m.agenda_title_tr or {}).get(lang) or {}
+    if _needs(m.title, lang) and t.get("src") != _hash(m.title):
+        out.append(("title", None, m.title))
+    for r in _live(rows):
+        tr = (r.translations or {}).get(lang) or {}
+        if _needs(r.text, lang) and tr.get("text_src") != _hash(r.text):
+            out.append(("text", r, r.text))
+        if r.note and _needs(r.note, lang) and tr.get("note_src") != _hash(r.note):
+            out.append(("note", r, r.note))
+    return out
+
+
+@transaction.atomic
+def _store(m, lang, pieces, done, by="ai") -> None:
+    """Запам'ятати переклад: кожному тексту — відбиток оригіналу, з якого перекладено (змінили потім — застарів)."""
+    rows = {}
+    for (kind, r, src), value in zip(pieces, done):
+        if kind == "title":
+            mm = Meeting.objects.select_for_update().filter(pk=m.pk).first()
+            if mm is not None:
+                d = dict(mm.agenda_title_tr or {})
+                d[lang] = {"text": _clean(value, 200), "src": _hash(src)}
+                Meeting.objects.filter(pk=m.pk).update(agenda_title_tr=d)
+                m.agenda_title_tr = d
+        else:
+            rows.setdefault(r.pk, []).append((kind, src, value))
+    for pk, parts in rows.items():
+        it = MeetingAgendaItem.objects.select_for_update().filter(pk=pk, meeting=m).first()
+        if it is None:                                   # прибрали, поки перекладали
+            continue
+        tr = dict(it.translations or {})
+        cur = dict(tr.get(lang) or {})
+        for kind, src, value in parts:
+            cur.update({kind: _clean(value, TEXT_MAX), f"{kind}_src": _hash(src), f"{kind}_by": by})
+        tr[lang] = cur
+        MeetingAgendaItem.objects.filter(pk=pk).update(translations=tr)
+
+
+def _translated(m, rows, lang):
+    """Збережений свіжий переклад мовою lang: (назва, {pk: текст}, {pk: що вирішили}); чого немає — оригінал."""
+    t = (m.agenda_title_tr or {}).get(lang) or {}
+    title = t["text"] if t.get("text") and t.get("src") == _hash(m.title) else m.title
+    texts, notes = {}, {}
+    for r in rows:
+        tr = (r.translations or {}).get(lang) or {}
+        if tr.get("text") and tr.get("text_src") == _hash(r.text):
+            texts[r.pk] = tr["text"]
+        if r.note and tr.get("note") and tr.get("note_src") == _hash(r.note):
+            notes[r.pk] = tr["note"]
+    return title, texts, notes
+
+
+def set_tr_lang(user, m, lang) -> None:
+    """🌐 Мова перекладу під пунктами ('' — без перекладу). Уже перекладене іншою мовою лишається (для листа)."""
+    _owner(user, m)
+    lang = str(lang or "")
+    if lang and lang not in LANGS:
+        raise _err("Невідома мова перекладу")
+    Meeting.objects.filter(pk=m.pk).update(agenda_lang=lang)
+    m.agenda_lang = lang
+
+
+def translate_missing(user, m, lang=None) -> int:
+    """🌐 Перекласти все, чого ще немає мовою lang (за замовчуванням — під пунктами), одним запитом AI → скільки
+    текстів перекладено."""
+    _owner(user, m)
+    lang = lang or m.agenda_lang
+    if lang not in LANGS:
+        raise _err("Виберіть мову перекладу")
+    pieces = _pieces(m, items(m), lang)
+    if not pieces:
+        return 0
+    _store(m, lang, pieces, translate(user, [p[2] for p in pieces], lang))
+    return len(pieces)
+
+
+def tr_info(m, rows) -> dict:
+    """Для сторінки: мова під пунктами й скільки ще не перекладено; для листа — кожна мова: missing (скільки текстів
+    перекладе AI), ready (усе вже перекладено — AI не потрібен); send_lang — мова листа за замовчуванням (мова під
+    пунктами, інакше та, якою все вже перекладено); suggest — підказати переклад (мова співрозмовників / згоди)."""
+    lang = m.agenda_lang if m.agenda_lang in LANGS else ""
+    live = _live(rows)
+    send = []
+    for code, label in LANGS.items():
+        missing = len(_pieces(m, rows, code))
+        have = any(((r.translations or {}).get(code) or {}).get("text") for r in live)
+        send.append({"code": code, "label": label, "missing": missing, "have": have, "ready": have and not missing})
+    by = {s["code"]: s for s in send}
+    suggest = ""
+    if not lang and live:
+        suggest = next((c for c in (m.lang_r, m.consent_lang) if c in LANGS and by[c]["missing"]), "")
+    send_lang = lang or next((s["code"] for s in send if s["ready"]), "") or (
+        m.consent_lang if m.consent_lang in LANGS else "de")
+    return {"lang": lang, "label": LANGS.get(lang, ""), "short": lang.upper(),
+            "missing": by[lang]["missing"] if lang else 0, "suggest": suggest, "suggest_label": LANGS.get(suggest, ""),
+            "send": send, "send_lang": send_lang,
+            "choices": [("", "без перекладу")] + [(c, LANGS[c]) for c in ("en", "de", "uk")]}
 
 
 # ── 📎 Файли агенди ────────────────────────────────────────────────────────────
@@ -570,24 +750,20 @@ def _when(m, lang) -> str:
 
 
 def compose(user, m, lang, ai=False, attach=True) -> dict:
-    """Тема й текст листа з агендою мовою lang; ai — пункти, назву й «що вирішили» перекладає AI."""
+    """Тема й текст листа з агендою мовою lang: готовий переклад цією мовою (🌐 під пунктами чи з попереднього листа)
+    береться як є; ai — решту (пункти, назву, «що вирішили») перекладає AI і запам'ятовує."""
     if lang not in MAIL:
         raise _err("Виберіть мову листа")
     rows = _live(items(m))
     if not rows:
         raise _err("Агенда порожня — спершу додайте пункти")
-    title, texts, notes = m.title, {}, {}
     if ai:
-        keys = [("title", None)] + [("text", r.pk) for r in rows] + [("note", r.pk) for r in rows if r.note]
-        source = [m.title] + [r.text for r in rows] + [r.note for r in rows if r.note]
-        done = translate(user, source, lang)
-        for (kind, pk), value in zip(keys, done):
-            if kind == "title":
-                title = value
-            elif kind == "text":
-                texts[pk] = value
-            else:
-                notes[pk] = value
+        pieces = _pieces(m, rows, lang)
+        if pieces:
+            _store(m, lang, pieces, translate(user, [p[2] for p in pieces], lang,
+                                              hint=" — або надішліть агенду без перекладу"))
+            rows = _live(items(m))
+    title, texts, notes = _translated(m, rows, lang)
     t = MAIL[lang]
     lines = [t["hello"], "", t["intro"].format(title=title, when=_when(m, lang)), ""]
     lines += agenda_lines(rows, texts, notes, indent="\u00a0" * 4, with_files=attach)

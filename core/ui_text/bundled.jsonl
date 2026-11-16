@@ -3340,6 +3340,8 @@
 {"uk": "{домен сайту: {at, file, file_enabled, file_url, file_key}} — сайт повідомляє, що в його private/minerva-config.php (без ключа), разом із запитом налаштувань.", "en": "{site domain: {at, file, file_enabled, file_url, file_key}} — the site reports what is in its private/minerva-config.php (without the key), together with the settings request.", "de": "{Domain der Website: {at, file, file_enabled, file_url, file_key}} – die Website meldet, was in ihrer private/minerva-config.php steht (ohne Schlüssel), zusammen mit der Einstellungsanfrage."}
 {"uk": "{домен: {at, …}} — що в пошті сайту (без пароля), разом із запитом налаштувань.", "en": "{domain: {at, …}} — what is in the site's mail settings (without the password), together with the settings request.", "de": "{Domain: {at, …}} – was in den E-Mail-Einstellungen der Website steht (ohne Passwort), zusammen mit der Einstellungsanfrage."}
 {"uk": "{ключ: [бал, дата]} — кліки, «старіють» вдвічі за 30 днів", "en": "{key: [score, date]} — clicks, they “age” by half every 30 days", "de": "{Schlüssel: [Punktzahl, Datum]} — Klicks, sie „altern“ alle 30 Tage um die Hälfte"}
+{"uk": "{мова: {text, src}} — назва наради для листа з агендою", "en": "{language: {text, src}} — meeting title for the agenda e-mail", "de": "{Sprache: {text, src}} — Titel der Besprechung für die E-Mail mit der Tagesordnung"}
+{"uk": "{мова: {text, text_src, text_by, note, note_src, note_by}} — переклад пункту; *_src — відбиток оригіналу, з якого перекладено", "en": "{language: {text, text_src, text_by, note, note_src, note_by}} — item translation; *_src — fingerprint of the original it was translated from", "de": "{Sprache: {text, text_src, text_by, note, note_src, note_by}} — Übersetzung des Punkts; *_src — Fingerabdruck des Originals, aus dem übersetzt wurde"}
 {"uk": "{перемикач: значення} — email_assistant/layout.py (шаблон Minerva / Outlook / Gmail / Thunderbird… або свій); порожньо — Minerva", "en": "{switch: value} — email_assistant/layout.py (Minerva / Outlook / Gmail / Thunderbird… preset or your own); empty — Minerva", "de": "{Schalter: Wert} — email_assistant/layout.py (Vorlage Minerva / Outlook / Gmail / Thunderbird… oder eigene); leer — Minerva"}
 {"uk": "{поле: значення в момент копіювання}; поле підсвічене червоним, доки його не змінили.", "en": "{field: value at the time of copying}; the field is highlighted in red until it is changed.", "de": "{Feld: Wert zum Zeitpunkt des Kopierens}; das Feld ist rot markiert, bis es geändert wird."}
 {"uk": "} const _EMAIL_TYPES = ['email_in', 'email_out']; const _TL_GROUP_KEY = 'mv-tl-group-orders'; let _tlGroupByOrder = true; try { _tlGroupByOrder = localStorage.getItem(_TL_GROUP_KEY) !== '0'; } catch(e) {0} const _tlOpen = {1}; // ключ гілки → розгорнута (вибір користувача до перезавантаження) let _tlEvents = []; function _renderEvent(e, idx) { const bodyHtml = e.ai_summary ? _renderBody(e.ai_summary, '#00d4aa', idx) : _renderBody(e.body, 'var(--text-dim)', idx); const mailLink = e.email_url ?", "en": "} const _EMAIL_TYPES = ['email_in', 'email_out']; const _TL_GROUP_KEY = 'mv-tl-group-orders'; let _tlGroupByOrder = true; try { _tlGroupByOrder = localStorage.getItem(_TL_GROUP_KEY) !== '0'; } catch(e) {0} const _tlOpen = {1}; // thread key → expanded (the user's choice until reload) let _tlEvents = []; function _renderEvent(e, idx) { const bodyHtml = e.ai_summary ? _renderBody(e.ai_summary, '#00d4aa', idx) : _renderBody(e.body, 'var(--text-dim)', idx); const mailLink = e.email_url ?", "de": "} const _EMAIL_TYPES = ['email_in', 'email_out']; const _TL_GROUP_KEY = 'mv-tl-group-orders'; let _tlGroupByOrder = true; try { _tlGroupByOrder = localStorage.getItem(_TL_GROUP_KEY) !== '0'; } catch(e) {0} const _tlOpen = {1}; // Schlüssel des Verlaufs → aufgeklappt (Auswahl des Benutzers bis zum Neuladen) let _tlEvents = []; function _renderEvent(e, idx) { const bodyHtml = e.ai_summary ? _renderBody(e.ai_summary, '#00d4aa', idx) : _renderBody(e.body, 'var(--text-dim)', idx); const mailLink = e.email_url ?"}
@@ -3936,9 +3938,12 @@
 {"uk": "Агенда порожня.", "en": "The agenda is empty.", "de": "Die Tagesordnung ist leer."}
 {"uk": "Агенда порожня. Напишіть, що обговорити, або «🧭 Підказати з проєкту» — Minerva запропонує теми з плану, ризиків і «Що зараз».", "en": "The agenda is empty. Write what to discuss, or «🧭 Suggest from the project» — Minerva proposes topics from the plan, risks and «What now».", "de": "Die Tagesordnung ist leer. Schreiben Sie, was zu besprechen ist, oder «🧭 Aus dem Projekt vorschlagen» — Minerva schlägt Themen aus Plan, Risiken und «Was jetzt» vor."}
 {"uk": "Агенда порожня. Напишіть, що обговорити.", "en": "The agenda is empty. Write what to discuss.", "de": "Die Tagesordnung ist leer. Schreiben Sie, was zu besprechen ist."}
+{"uk": "Агенда текстом мовою перекладу ({0}) — чого ще не перекладено, піде як написано", "en": "Agenda as text in the translation language ({0}) — anything not yet translated goes as written", "de": "Tagesordnung als Text in der Übersetzungssprache ({0}) — noch nicht Übersetztes bleibt wie geschrieben"}
 {"uk": "Агенда текстом — вставити в запрошення, лист чи чат учасникам", "en": "The agenda as text — paste it into the invitation, an e-mail or the participants' chat", "de": "Die Tagesordnung als Text — in die Einladung, eine E-Mail oder den Chat der Teilnehmer einfügen"}
 {"uk": "Агенда: {0}", "en": "Agenda: {0}", "de": "Tagesordnung: {0}"}
 {"uk": "Агенди нарад", "en": "Meeting agendas", "de": "Tagesordnungen der Besprechungen"}
+{"uk": "Агенду вже перекладено цією мовою", "en": "The agenda is already translated into this language", "de": "Die Tagesordnung ist bereits in diese Sprache übersetzt"}
+{"uk": "Агенду вже перекладено цією мовою — лист піде з цим перекладом, без нового запиту AI.", "en": "The agenda is already translated into this language — the e-mail will use this translation, without a new AI request.", "de": "Die Tagesordnung ist bereits in diese Sprache übersetzt — die E-Mail nutzt diese Übersetzung, ohne neue KI-Anfrage."}
 {"uk": "Агенду скопійовано — вставте в запрошення чи лист", "en": "Agenda copied — paste it into the invitation or an e-mail", "de": "Tagesordnung kopiert — in die Einladung oder eine E-Mail einfügen"}
 {"uk": "Агент", "en": "Agent", "de": "Agent"}
 {"uk": "Агент (AI) пише відповідь відправнику листа за інструкцією «Що робити».", "en": "The agent (AI) writes a reply to the sender following the «What to do» instruction.", "de": "Der Agent (KI) schreibt dem Absender eine Antwort nach der Anweisung «Was tun»."}
@@ -4796,6 +4801,7 @@
 {"uk": "Виберіть мову", "en": "Choose a language", "de": "Sprache wählen"}
 {"uk": "Виберіть мову документа", "en": "Choose the document language", "de": "Dokumentsprache wählen"}
 {"uk": "Виберіть мову листа", "en": "Choose the language of the e-mail", "de": "Sprache der E-Mail wählen"}
+{"uk": "Виберіть мову перекладу", "en": "Choose the translation language", "de": "Wählen Sie die Übersetzungssprache"}
 {"uk": "Виберіть модель", "en": "Choose a model", "de": "Modell wählen"}
 {"uk": "Виберіть один або кілька днів тижня.", "en": "Select one or more days of the week.", "de": "Wählen Sie einen oder mehrere Wochentage."}
 {"uk": "Виберіть один запит — на його основі відкриється форма нового.", "en": "Select one request — a new request form based on it will open.", "de": "Wählen Sie eine Anfrage — das Formular einer neuen Anfrage auf ihrer Grundlage öffnet sich."}
@@ -9937,8 +9943,10 @@
 {"uk": "Мова листів", "en": "E-mail language", "de": "Sprache der E-Mails"}
 {"uk": "Мова опису в askDANTE", "en": "Description language in askDANTE", "de": "Sprache der Beschreibung in askDANTE"}
 {"uk": "Мова перекладу", "en": "Translation language", "de": "Übersetzungssprache"}
+{"uk": "Мова перекладу під пунктами", "en": "Translation language under the items", "de": "Übersetzungssprache unter den Punkten"}
 {"uk": "Мова сповіщень команді", "en": "Team notification language", "de": "Sprache der Teambenachrichtigungen"}
 {"uk": "Мова співрозмовників", "en": "Others’ language", "de": "Sprache der Gesprächspartner"}
+{"uk": "Мова співрозмовників у цій нараді", "en": "Language of the other participants in this meeting", "de": "Sprache der Gesprächspartner in dieser Besprechung"}
 {"uk": "Мова тексту згоди", "en": "Consent text language", "de": "Sprache des Einwilligungstexts"}
 {"uk": "Мова тексту, який читаєте вголос", "en": "Language of the text you read aloud", "de": "Sprache des Textes, den Sie vorlesen"}
 {"uk": "Мова інтерфейсу", "en": "Interface language", "de": "Oberflächensprache"}
@@ -10942,6 +10950,7 @@
 {"uk": "Невідома дія або пункт", "en": "Unknown action or item", "de": "Unbekannte Aktion oder Eintrag"}
 {"uk": "Невідома категорія", "en": "Unknown category", "de": "Unbekannte Kategorie"}
 {"uk": "Невідома категорія.", "en": "Unknown category.", "de": "Unbekannte Kategorie."}
+{"uk": "Невідома мова перекладу", "en": "Unknown translation language", "de": "Unbekannte Übersetzungssprache"}
 {"uk": "Невідома помилка", "en": "Unknown error", "de": "Unbekannter Fehler"}
 {"uk": "Невідоме значення", "en": "Unknown value", "de": "Unbekannter Wert"}
 {"uk": "Невідоме значення «{0}».", "en": "Unknown value “{0}”.", "de": "Unbekannter Wert „{0}“."}
@@ -11881,6 +11890,7 @@
 {"uk": "Оренда складу — лютий 2026 {0}", "en": "Warehouse rent — February 2026 {0}", "de": "Lagermiete — Februar 2026 {0}"}
 {"uk": "Оригінал", "en": "Original", "de": "Original"}
 {"uk": "Оригінал зворотного боку", "en": "Original of the back side", "de": "Original der Rückseite"}
+{"uk": "Оригінал змінили після перекладу — переклад оновиться", "en": "The original was changed after translation — the translation will be updated", "de": "Das Original wurde nach der Übersetzung geändert — die Übersetzung wird aktualisiert"}
 {"uk": "Оригінальна назва папки на IMAP-сервері (напр. \"Meine Order\")", "en": "Original folder name on the IMAP server (e.g. \"Meine Order\")", "de": "Ursprünglicher Ordnername auf dem IMAP-Server (z. B. \"Meine Order\")"}
 {"uk": "Оригінальний лист", "en": "Original email", "de": "Original-E-Mail"}
 {"uk": "Оригінальний лист --- Від: {0} {1}", "en": "Original email --- From: {0} {1}", "de": "Originalnachricht --- Von: {0} {1}"}
@@ -12538,9 +12548,15 @@
 {"uk": "Перейти до налаштувань", "en": "Go to settings", "de": "Zu den Einstellungen"}
 {"uk": "Перейти до розділу Дашборд", "en": "Go to the Dashboard section", "de": "Zum Bereich Dashboard wechseln"}
 {"uk": "Переклав AI", "en": "Translated by AI", "de": "Von der KI übersetzt"}
+{"uk": "Переклад агенди", "en": "Agenda translation", "de": "Übersetzung der Tagesordnung"}
+{"uk": "Переклад виправлено вручну", "en": "Translation corrected by hand", "de": "Übersetzung von Hand korrigiert"}
 {"uk": "Переклад запущено у фоні — хід видно вгорі сторінки.", "en": "Translation started in the background — progress is shown at the top of the page.", "de": "Die Übersetzung wurde im Hintergrund gestartet — der Fortschritt ist oben auf der Seite zu sehen."}
 {"uk": "Переклад зупинився: {0}", "en": "Translation stopped: {0}", "de": "Die Übersetzung wurde angehalten: {0}"}
+{"uk": "Переклад пункту", "en": "Item translation", "de": "Übersetzung des Punkts"}
+{"uk": "Переклад пункту ({0}) — порожньо: перекладе AI", "en": "Item translation ({0}) — empty: AI will translate", "de": "Übersetzung des Punkts ({0}) — leer: die KI übersetzt"}
+{"uk": "Переклад під пунктами", "en": "Translation under the items", "de": "Übersetzung unter den Punkten"}
 {"uk": "Переклад робить Claude (хмарний AI) — туди піде текст агенди; рахується в бюджеті AI. Без перекладу пункти йдуть, як написано.", "en": "Claude (cloud AI) translates — the agenda text is sent there; it counts towards the AI budget. Without translation the items go as written.", "de": "Die Übersetzung macht Claude (Cloud-AI) — dorthin geht der Text der Tagesordnung; zählt zum AI-Budget. Ohne Übersetzung gehen die Punkte wie geschrieben."}
+{"uk": "Переклад робить Claude (хмарний AI) — туди піде текст агенди; рахується в бюджеті AI. Уже перекладене (🌐 під пунктами чи в попередньому листі) не перекладається вдруге. Без перекладу пункти йдуть, як написано.", "en": "Claude (cloud AI) does the translation — the agenda text is sent there; it counts toward the AI budget. Anything already translated (🌐 under the items or in an earlier e-mail) is not translated again. Without translation the items go as written.", "de": "Die Übersetzung macht Claude (Cloud-KI) — dorthin geht der Text der Tagesordnung; zählt zum KI-Budget. Bereits Übersetztes (🌐 unter den Punkten oder in einer früheren E-Mail) wird nicht erneut übersetzt. Ohne Übersetzung gehen die Punkte wie geschrieben."}
 {"uk": "Переклад уже йде.", "en": "A translation is already running.", "de": "Eine Übersetzung läuft bereits."}
 {"uk": "Перекладаю назви кроків і фаз (AI)…", "en": "Translating the step and phase names (AI)…", "de": "Übersetze die Namen der Schritte und Phasen (AI)…"}
 {"uk": "Перекладаю…", "en": "Translating…", "de": "Übersetze…"}
@@ -12554,11 +12570,14 @@
 {"uk": "Переклади інтерфейсу (core/admin_ui_text.py, core/ui_text): каталог написів, AI-переклад з оцінкою вартості, хід перекладу (опитування …/status/ кожні 3 с, поки йде).", "en": "Interface translations (core/admin_ui_text.py, core/ui_text): label catalog, AI translation with cost estimate, translation progress (polling …/status/ every 3 s while it runs).", "de": "Oberflächenübersetzungen (core/admin_ui_text.py, core/ui_text): Beschriftungskatalog, KI-Übersetzung mit Kostenschätzung, Übersetzungsfortschritt (Abfrage …/status/ alle 3 s, solange sie läuft)."}
 {"uk": "Переклади інтерфейсу Minerva", "en": "Minerva interface translations", "de": "Minerva-Oberflächenübersetzungen"}
 {"uk": "Перекласти", "en": "Translate", "de": "Übersetzen"}
+{"uk": "Перекласти AI те, чого ще немає цією мовою", "en": "Translate with AI whatever is not yet in this language", "de": "Mit KI übersetzen, was in dieser Sprache noch fehlt"}
+{"uk": "Перекласти AI тексти, яких ще немає мовою перекладу: пункти, що вирішили, назву наради", "en": "Translate with AI the texts not yet in the translation language: items, decisions, meeting title", "de": "Mit KI die Texte übersetzen, die in der Übersetzungssprache noch fehlen: Punkte, Beschlüsse, Titel der Besprechung"}
 {"uk": "Перекласти {0} написів", "en": "Translate {0} labels", "de": "{0} Beschriftungen übersetzen"}
 {"uk": "Перекласти вибрані (AI, Sonnet 5.5)", "en": "Translate selected (AI, Sonnet 5.5)", "de": "Ausgewählte übersetzen (KI, Sonnet 5.5)"}
 {"uk": "Перекласти відсутнє (AI)", "en": "Translate missing (AI)", "de": "Fehlendes übersetzen (KI)"}
 {"uk": "Перекласти назви кроків і фаз (AI)", "en": "Translate the step and phase names (AI)", "de": "Namen der Schritte und Phasen übersetzen (AI)"}
 {"uk": "Перекласти пункти цією мовою (AI)", "en": "Translate the items into this language (AI)", "de": "Punkte in diese Sprache übersetzen (AI)"}
+{"uk": "Перекласти ще не перекладене", "en": "Translate what is not yet translated", "de": "Noch nicht Übersetztes übersetzen"}
 {"uk": "Переконайся що Marketplace авторизований (", "en": "Make sure the Marketplace is authorized (", "de": "Stellen Sie sicher, dass der Marketplace autorisiert ist ("}
 {"uk": "Переконайся що в DigiKey App налаштований Redirect URI", "en": "Make sure the Redirect URI is configured in the DigiKey App", "de": "Stellen Sie sicher, dass in der DigiKey App der Redirect URI eingerichtet ist"}
 {"uk": "Перекривається", "en": "Overlaps", "de": "Überschneidet sich"}
@@ -12649,6 +12668,8 @@
 {"uk": "Питання є → Фіксація завершення онбордингу; немає питань → теж завершення.", "en": "Questions → Recording the end of onboarding; no questions → also the end.", "de": "Fragen vorhanden → Erfassung des Onboarding-Abschlusses; keine Fragen → ebenfalls Abschluss."}
 {"uk": "Питання, ліцензія", "en": "Questions, license", "de": "Fragen, Lizenz"}
 {"uk": "Питає Stripe про стан оплати й оновлює оплату замовлення.", "en": "Asks Stripe for the payment status and updates the order’s payment.", "de": "Fragt bei Stripe den Zahlungsstatus ab und aktualisiert die Zahlung des Auftrags."}
+{"uk": "Пишете своєю мовою — під кожним пунктом переклад (Claude, хмарний AI; рахується в бюджеті AI). Виправити переклад — ✏️. Лист з агендою за замовчуванням піде цією мовою.", "en": "You write in your language — a translation appears under each item (Claude, cloud AI; counts toward the AI budget). To correct a translation — ✏️. The agenda e-mail goes in this language by default.", "de": "Sie schreiben in Ihrer Sprache — unter jedem Punkt steht die Übersetzung (Claude, Cloud-KI; zählt zum KI-Budget). Übersetzung korrigieren — ✏️. Die E-Mail mit der Tagesordnung geht standardmäßig in dieser Sprache."}
+{"uk": "Пишете своєю мовою, а нарада іншою? Виберіть мову — під кожним пунктом з’явиться переклад, і лист з агендою піде нею.", "en": "Writing in your language but the meeting is in another? Choose the language — a translation appears under each item, and the agenda e-mail goes in it.", "de": "Sie schreiben in Ihrer Sprache, die Besprechung ist in einer anderen? Wählen Sie die Sprache — unter jedem Punkt erscheint die Übersetzung, und die E-Mail mit der Tagesordnung geht in dieser Sprache."}
 {"uk": "Пишеш КЛІЄНТУ із «ФАКТІВ З MINERVA», не відправнику листа й не колезі. Не пересилай внутрішніх деталей (рахунки UPS, наші номери клієнта в перевізника, імена колег).", "en": "Пишеш КЛІЄНТУ із «ФАКТІВ З MINERVA», не відправнику листа й не колезі. Не пересилай внутрішніх деталей (рахунки UPS, наші номери клієнта в перевізника, імена колег).", "de": "Пишеш КЛІЄНТУ із «ФАКТІВ З MINERVA», не відправнику листа й не колезі. Не пересилай внутрішніх деталей (рахунки UPS, наші номери клієнта в перевізника, імена колег)."}
 {"uk": "Пишеш людині з рядка «ПИШЕМО» у «ФАКТАХ З MINERVA», не відправнику листа й не колезі. Звертайся саме до неї; отримувач посилки — лише довідка (це може бути інша людина). Ім’я невідоме — «Dear Customer» / «Sehr geehrte Damen und Herren».", "en": "Пишеш людині з рядка «ПИШЕМО» у «ФАКТАХ З MINERVA», не відправнику листа й не колезі. Звертайся саме до неї; отримувач посилки — лише довідка (це може бути інша людина). Ім’я невідоме — «Dear Customer» / «Sehr geehrte Damen und Herren».", "de": "Пишеш людині з рядка «ПИШЕМО» у «ФАКТАХ З MINERVA», не відправнику листа й не колезі. Звертайся саме до неї; отримувач посилки — лише довідка (це може бути інша людина). Ім’я невідоме — «Dear Customer» / «Sehr geehrte Damen und Herren»."}
 {"uk": "Пиши за БРИФОМ: його склав і, можливо, виправив менеджер — він важливіший за переписку.", "en": "Write according to the BRIEF: it was compiled and possibly corrected by the manager — it matters more than the correspondence.", "de": "Schreiben Sie nach dem BRIEFING: Es wurde vom Manager erstellt und möglicherweise korrigiert — es ist wichtiger als der Schriftverkehr."}
@@ -14184,6 +14205,7 @@
 {"uk": "Північна Македонія", "en": "North Macedonia", "de": "Nordmazedonien"}
 {"uk": "Під загрозою", "en": "At risk", "de": "Gefährdet"}
 {"uk": "Під замовлення", "en": "On order", "de": "Auf Bestellung"}
+{"uk": "Під кожним пунктом агенди — переклад цією мовою (AI)", "en": "Under each agenda item — a translation into this language (AI)", "de": "Unter jedem Punkt der Tagesordnung — Übersetzung in diese Sprache (KI)"}
 {"uk": "Під час перевірки додали файли — перевірити ще раз одразу після неї", "en": "Files were added during the check — check again right after it", "de": "Während der Prüfung wurden Dateien hinzugefügt – unmittelbar danach erneut prüfen"}
 {"uk": "Під час перевірки сайт сам звернувся до Minerva ключем «{0}» — зв'язок працює в обидва боки.", "en": "During the check the site itself contacted Minerva with the key “{0}” — the connection works in both directions.", "de": "Während der Prüfung hat sich die Website selbst mit dem Schlüssel „{0}“ an Minerva gewandt – die Verbindung funktioniert in beide Richtungen."}
 {"uk": "Під час роботи — живий прогрес: N з M, поточний товар, скільки ще. Після ввімкнення Minerva сама перевіряє нові й змінені кожні 5 хв.", "en": "While it runs, live progress is shown: N of M, the current product, how many are left. Once enabled, Minerva checks new and changed ones itself every 5 min.", "de": "Während des Laufs wird der Fortschritt live angezeigt: N von M, aktueller Artikel, wie viele noch fehlen. Nach dem Aktivieren prüft Minerva neue und geänderte alle 5 Min. selbst."}
@@ -17884,6 +17906,8 @@
 {"uk": "Що вирішили", "en": "What was decided", "de": "Was beschlossen wurde"}
 {"uk": "Що вирішили (за бажанням)", "en": "What was decided (optional)", "de": "Was beschlossen wurde (optional)"}
 {"uk": "Що вирішили й чому (піде в історію запиту)", "en": "What was decided and why (goes into the request history)", "de": "Was entschieden wurde und warum (kommt in den Anfrageverlauf)"}
+{"uk": "Що вирішили — переклад", "en": "Decision — translation", "de": "Beschluss — Übersetzung"}
+{"uk": "Що вирішили — переклад ({0})", "en": "Decision — translation ({0})", "de": "Beschluss — Übersetzung ({0})"}
 {"uk": "Що включати у Telegram/Email сповіщення для нових замовлень і DigiKey авто-підтвердження. Вимкніть зайві поля щоб зменшити обсяг повідомлення. Фото товарів: надсилаються окремо після тексту — 1 фото або альбом (до 10 фото).", "en": "What to include in Telegram/Email notifications for new orders and DigiKey auto-confirmations. Turn off unneeded fields to reduce the message size. Product photos: sent separately after the text — 1 photo or an album (up to 10 photos).", "de": "Was in die Telegram-/E-Mail-Benachrichtigungen zu neuen Aufträgen und DigiKey-Autobestätigungen aufgenommen wird. Deaktivieren Sie überflüssige Felder, um die Nachricht zu verkürzen. Artikelfotos: werden nach dem Text separat gesendet — 1 Foto oder ein Album (bis zu 10 Fotos)."}
 {"uk": "Що включати у брифінг", "en": "What to include in the briefing", "de": "Was im Briefing enthalten sein soll"}
 {"uk": "Що включає (Telegram приклад)", "en": "What it includes (Telegram example)", "de": "Was enthalten ist (Telegram-Beispiel)"}
@@ -18243,6 +18267,7 @@
 {"uk": "або додайте його в групу/канал", "en": "or add it to a group/channel", "de": "oder fügen Sie ihn einer Gruppe/einem Kanal hinzu"}
 {"uk": "або додайте свій — «＋ Ризик»", "en": "or add your own — “＋ Risk”", "de": "oder fügen Sie ein eigenes hinzu — „＋ Risiko“"}
 {"uk": "або кнопка «💾 Зберегти» — збережено.", "en": "or the “💾 Save” button — saved.", "de": "oder die Schaltfläche „💾 Speichern“ — gespeichert."}
+{"uk": "або надішліть агенду без перекладу", "en": "or send the agenda without translation", "de": "oder senden Sie die Tagesordnung ohne Übersetzung"}
 {"uk": "або напишіть AI, що скласти", "en": "or tell the AI what to draw up", "de": "oder schreiben Sie der AI, was sie erstellen soll"}
 {"uk": "або обидва канали вимкнені", "en": "or both channels are disabled", "de": "oder beide Kanäle sind deaktiviert"}
 {"uk": "або перетягніть сюди файли чи папку з ПК", "en": "or drag files or a folder from the PC here", "de": "oder ziehen Sie Dateien oder einen Ordner vom PC hierher"}
@@ -18424,6 +18449,7 @@
 {"uk": "без пакету (використовувати роль)", "en": "no bundle (use the role)", "de": "ohne Paket (Rolle verwenden)"}
 {"uk": "без пароля", "en": "without a password", "de": "ohne Passwort"}
 {"uk": "без перезавантаження сторінки", "en": "without reloading the page", "de": "ohne die Seite neu zu laden"}
+{"uk": "без перекладу", "en": "no translation", "de": "ohne Übersetzung"}
 {"uk": "без плану", "en": "no plan", "de": "ohne Plan"}
 {"uk": "без події", "en": "no event", "de": "ohne Ereignis"}
 {"uk": "без пояснення", "en": "no explanation", "de": "ohne Erklärung"}
@@ -20853,6 +20879,7 @@
 {"uk": "перезаписані", "en": "overwritten", "de": "überschrieben"}
 {"uk": "перезапише поточні документи/зображення.", "en": "will overwrite the current documents/images.", "de": "überschreibt die aktuellen Dokumente/Bilder."}
 {"uk": "перейдіть далі або завершіть", "en": "go on or finish", "de": "fahren Sie fort oder beenden Sie"}
+{"uk": "переклад: {0}", "en": "translation: {0}", "de": "Übersetzung: {0}"}
 {"uk": "перекладів з комплекту: {0}", "en": "bundled translations: {0}", "de": "mitgelieferte Übersetzungen: {0}"}
 {"uk": "перекривається з записом askDANTE {0}", "en": "overlaps with askDANTE entry {0}", "de": "überschneidet sich mit askDANTE-Eintrag {0}"}
 {"uk": "переможець", "en": "winner", "de": "Gewinner"}

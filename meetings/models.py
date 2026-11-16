@@ -19,6 +19,7 @@ RETENTION_CHOICES = [
 ]
 LANG_CHOICES = [("", "Автоматично"), ("uk", "Українська"), ("de", "Deutsch"), ("en", "English"), ("ru", "Русский")]
 CONSENT_LANG_CHOICES = [("de", "Deutsch"), ("en", "English"), ("uk", "Українська")]
+AGENDA_LANG_CHOICES = [("", "без перекладу"), ("en", "English"), ("de", "Deutsch"), ("uk", "Українська")]
 
 
 class MeetingSettings(models.Model):
@@ -122,6 +123,10 @@ class Meeting(models.Model):
     consent_all_agreed = models.BooleanField("Усі, кого чути, вголос погодились", default=False)
     consent_at = models.DateTimeField("Згоду підтверджено", null=True, blank=True)
     participants = models.JSONField("Хто на нараді", default=list, blank=True)
+    agenda_lang = models.CharField("Переклад агенди", max_length=5, choices=AGENDA_LANG_CHOICES, blank=True,
+                                   default="", help_text="Під кожним пунктом агенди — переклад цією мовою (AI)")
+    agenda_title_tr = models.JSONField(default=dict, blank=True,
+                                       help_text="{мова: {text, src}} — назва наради для листа з агендою")
     consent_note = models.TextField("Примітка до протоколу", blank=True, default="")
     consent_log = models.JSONField(default=list, blank=True)
     consent_excerpt = models.JSONField(default=list, blank=True)
@@ -321,6 +326,9 @@ class MeetingAgendaItem(models.Model):
                                 related_name="+", verbose_name="Проєкт")
     status = models.CharField("Стан", max_length=10, choices=STATUS_CHOICES, default=OPEN, db_index=True)
     note = models.CharField("Що вирішили", max_length=300, blank=True, default="")
+    translations = models.JSONField(default=dict, blank=True,
+                                    help_text="{мова: {text, text_src, text_by, note, note_src, note_by}} — "
+                                              "переклад пункту; *_src — відбиток оригіналу, з якого перекладено")
     moved_to = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     parent = models.ForeignKey("self", null=True, blank=True, on_delete=models.CASCADE, related_name="kids",
                                verbose_name="Підпункт пункту")

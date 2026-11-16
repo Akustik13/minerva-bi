@@ -309,10 +309,11 @@ class MeetingAdmin(admin.ModelAdmin):
                              "pending": m.items.filter(status=MeetingItem.PENDING).count()})
 
     def agenda_view(self, request, pk):
-        """📋 Агенда: POST JSON {action: add {text, parent} | edit {item, text, note} | status {item, status} | move
-        {item, delta} | remove {item} | suggest | take {ref} | take_all} → {ok, html} — свіжий блок агенди (з
-        підказками після suggest / take, поки вони є); send {to: [...], extra, lang, ai} → {ok, compose} — чернетка
-        листа з агендою у власній скриньці. Лише власник з правом змінювати наради."""
+        """📋 Агенда: POST JSON {action: add {text, parent} | edit {item, text, note, tr_text, tr_note} | status {item,
+        status} | move {item, delta} | remove {item} | suggest | take {ref} | take_all | tr_lang {lang} | translate}
+        → {ok, html} — свіжий блок агенди (з підказками після suggest / take, поки вони є; translate — 🌐 перекласти
+        під пунктами те, чого ще немає, translated — скільки); send {to: [...], extra, lang, ai} → {ok, compose} —
+        чернетка листа з агендою у власній скриньці. Лише власник з правом змінювати наради."""
         from . import agenda
         refused = _post_only(request)
         if refused:
@@ -324,7 +325,7 @@ class MeetingAdmin(admin.ModelAdmin):
         data = _json_body(request)
         action = str(data.get("action") or "")
         user, item = request.user, data.get("item")
-        suggestions = None
+        suggestions, extra = None, {}
         try:
             if action == "add":
                 agenda.add(user, m, data.get("text"), parent=data.get("parent"))
@@ -336,7 +337,12 @@ class MeetingAdmin(admin.ModelAdmin):
             elif action == "file_remove":
                 agenda.remove_file(user, m, data.get("file"))
             elif action == "edit":
-                agenda.edit(user, m, item, text=data.get("text"), note=data.get("note"))
+                agenda.edit(user, m, item, text=data.get("text"), note=data.get("note"),
+                            tr_text=data.get("tr_text"), tr_note=data.get("tr_note"))
+            elif action == "tr_lang":
+                agenda.set_tr_lang(user, m, data.get("lang"))
+            elif action == "translate":
+                extra["translated"] = agenda.translate_missing(user, m)
             elif action == "status":
                 agenda.set_status(user, m, item, str(data.get("status") or ""))
             elif action == "move":
@@ -354,7 +360,7 @@ class MeetingAdmin(admin.ModelAdmin):
             return JsonResponse({"ok": False, "error": str(e)}, status=400)
         if suggestions is not None and not suggestions and action == "take":
             suggestions = None                                   # узяли останню підказку — список ховається
-        return JsonResponse({"ok": True, "html": admin_pages.render_agenda(user, m, suggestions)})
+        return JsonResponse({"ok": True, "html": admin_pages.render_agenda(user, m, suggestions), **extra})
 
     def agenda_upload_view(self, request, pk):
         """📎 Файли агенди: POST multipart {file (кілька), item — до пункту, порожньо — до агенди} → {ok, html}."""

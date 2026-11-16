@@ -3,7 +3,7 @@
 {# Назва, розшифровка, цитати, імена й адреси — лише в translate="no". JS — meetings/static/meetings/meetings.js. #}
 {% load static %}
 {% block title %}{{ title }} | Minerva{% endblock %}
-{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=11">{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=12">{% endblock %}
 {% block breadcrumbs %}
 <div class="breadcrumbs">
   <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
@@ -394,5 +394,5 @@
   </dialog>
 </div>
 {{ config|json_script:"mt-config" }}
-<script src="{% static 'meetings/meetings.js' %}?v=9" defer></script>
+<script src="{% static 'meetings/meetings.js' %}?v=10" defer></script>
 {% endblock %}

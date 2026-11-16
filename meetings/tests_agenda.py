@@ -4,6 +4,8 @@ python manage.py test meetings.tests_agenda --settings=tabele.settings_test
 Пункти й підпункти (1.1) — лише власнику наради; підказки з проєкту без AI (ризики, віхи, кроки клієнта, «Що зараз», AI-огляд), уже
 додане не пропонується; не обговорене на минулій нараді проєкту — підказка до наступної, узяли — там «перенесено»,
 прибрали — знову «обговорити»; ✉️ лист з агендою — чернетка у власній скриньці, переклад AI (підмінено); у пульті — «📋 агенда N / M» і «📋 Підготувати агенду» до зустрічі з календаря.
+🌐 Переклад під пунктами — збережений, з відбитком оригіналу (змінили — перекладається знову), людина виправляє вручну,
+лист цією мовою — без нового запиту AI.
 """
 import json
 from datetime import timedelta
@@ -238,13 +240,17 @@ class SendAgendaTests(AgendaBase):
         top = agenda.add(self.owner, m, "Демонстрація біконів")
         agenda.add(self.owner, m, "Точність", parent=top.pk)
         agenda.edit(self.owner, m, top.pk, note="Зразки до 25.11")
-        answer = json.dumps([f"{m.title} EN", "Beacon demo", "Accuracy", "Samples by 25.11"])
+        answer = json.dumps([f"{m.title} EN", "Beacon demo", "Samples by 25.11", "Accuracy"])   # назва, пункт, рішення
         with patch("email_assistant.ai_helper._call_ai_direct", return_value=f"Here: {answer}") as ai:
             url = agenda.send(self.owner, m, [], "en", ai=True)
         self.assertIn('"Демонстрація біконів"', ai.call_args.args[0])                   # тексти — даними, JSON
         draft = EmailDraft.objects.get(pk=int(url.rsplit("=", 1)[1]))
         self.assertEqual(draft.subject, f"Agenda: {m.title} EN")
         self.assertIn("1. Beacon demo — Samples by 25.11\n    1.1. Accuracy", draft.body)
+        with patch("email_assistant.ai_helper._call_ai_direct") as ai:                  # переклад запам'ятовано
+            agenda.send(self.owner, m, [], "en", ai=True)
+        ai.assert_not_called()
+        agenda.edit(self.owner, m, top.pk, text="Демонстрація біконів у залі")          # змінили — перекласти знову
         with patch("email_assistant.ai_helper._call_ai_direct", return_value="sorry"):
             with self.assertRaises(Exception):
                 agenda.send(self.owner, m, [], "en", ai=True)
@@ -325,3 +331,137 @@ class AgendaFilesTests(AgendaBase):
         self.assertEqual(self.client.get(self.url("agenda_file", m, f.pk)).status_code, 404)
         self.assertEqual(self.upload(m, "x.png", png_bytes()).status_code, 404)
         self.assertEqual(self.client.get("/media/" + f.file.name).status_code, 404)  # /media/meetings/ — нікому
+
+
+def ai_answer(*texts):
+    return patch("email_assistant.ai_helper._call_ai_direct", return_value=json.dumps(list(texts)))
+
+
+class AgendaTranslationTests(AgendaBase):
+    """🌐 Пишу українською, нарада англійською: під кожним пунктом переклад; лист — цією мовою без нового запиту AI."""
+    def test_needs(self):
+        self.assertFalse(agenda._needs("Строк зразків", "uk"))
+        self.assertFalse(agenda._needs("Progress-call з клієнтом", "uk"))   # з кирилицею — уже українською
+        self.assertTrue(agenda._needs("Samples deadline", "uk"))
+        self.assertTrue(agenda._needs("Строк зразків", "en"))
+        self.assertTrue(agenda._needs("Muster prüfen", "en"))        # латиниця: німецьку від англійської не відрізнити
+        self.assertFalse(agenda._needs("25.11 / 14:00 — 3×", "en"))  # без літер — не перекладається
+
+    def test_translate_store_stale_and_human_fix(self):
+        m = self.meeting()
+        top = agenda.add(self.owner, m, "Строк зразків")
+        kid = agenda.add(self.owner, m, "Точність", parent=top.pk)
+        agenda.set_tr_lang(self.owner, m, "en")
+        rows = agenda.items(m)
+        self.assertTrue(all(r.tr_wait for r in rows))                                     # «ще не перекладено»
+        with ai_answer(f"{m.title} EN", "Samples deadline", "Accuracy") as ai:
+            self.assertEqual(agenda.translate_missing(self.owner, m), 3)
+        self.assertIn('"Строк зразків"', ai.call_args.args[0])
+        top.refresh_from_db()
+        self.assertEqual(top.translations["en"]["text"], "Samples deadline")
+        self.assertEqual(top.translations["en"]["text_by"], "ai")
+        rows = {r.pk: r for r in agenda.items(m)}
+        self.assertEqual((rows[top.pk].tr_text, rows[kid.pk].tr_text), ("Samples deadline", "Accuracy"))
+        self.assertFalse(rows[top.pk].tr_wait or rows[top.pk].tr_stale)
+        with patch("email_assistant.ai_helper._call_ai_direct") as ai:                  # усе перекладено — без AI
+            self.assertEqual(agenda.translate_missing(self.owner, m), 0)
+        ai.assert_not_called()
+        agenda.edit(self.owner, m, top.pk, note="Погодили 25.11")                       # нове «що вирішили» — лише воно
+        self.assertTrue(agenda.items(m)[0].tr_wait)
+        with ai_answer("Agreed on 25.11") as ai:
+            self.assertEqual(agenda.translate_missing(self.owner, m), 1)
+        self.assertIn('["Погодили 25.11"]', ai.call_args.args[0])
+        agenda.edit(self.owner, m, top.pk, text="Строк зразків і серії")                # змінили оригінал — застарів
+        row = agenda.items(m)[0]
+        self.assertTrue(row.tr_stale)
+        self.assertEqual(row.tr_text, "Samples deadline")                                # поки — старий, з ⟳
+        agenda.edit(self.owner, m, top.pk, tr_text="Deadline for samples and series",    # людина виправила
+                    tr_note="Agreed on 25.11")
+        top.refresh_from_db()
+        self.assertEqual(top.translations["en"]["text_by"], "human")
+        self.assertEqual(top.translations["en"]["note_by"], "ai")                        # не чіпали — як був
+        self.assertFalse(agenda.items(m)[0].tr_stale)
+        self.assertEqual(agenda._pieces(m, agenda.items(m), "en"), [])
+        agenda.edit(self.owner, m, top.pk, tr_text="")                                   # порожньо — перекладе AI
+        self.assertEqual([p[0] for p in agenda._pieces(m, agenda.items(m), "en")], ["text"])
+
+    def test_same_language_and_translation_equal_to_original(self):
+        m = self.meeting(title="Нарада з клієнтом")
+        agenda.add(self.owner, m, "Строк зразків")
+        agenda.set_tr_lang(self.owner, m, "uk")
+        self.assertEqual(agenda.tr_info(m, agenda.items(m))["missing"], 0)              # уже українською
+        agenda.set_tr_lang(self.owner, m, "en")
+        agenda.add(self.owner, m, "Rohde & Schwarz EMV")
+        with ai_answer("Meeting with the customer", "Samples deadline", "Rohde & Schwarz EMV"):
+            agenda.translate_missing(self.owner, m)
+        rows = agenda.items(m)
+        self.assertEqual(rows[1].tr_text, "")                                             # такий самий — не дублюємо
+        self.assertFalse(rows[1].tr_wait)
+
+    def test_mail_uses_stored_translation_and_is_offered(self):
+        from email_assistant.models import EmailAccount, EmailDraft
+        EmailAccount.objects.create(user=self.owner, email_address="slava@sevskiy.example")
+        m = self.meeting(lang_r="en")
+        agenda.add(self.owner, m, "Строк зразків")
+        info = agenda.tr_info(m, agenda.items(m))
+        self.assertEqual((info["lang"], info["suggest"]), ("", "en"))                    # співрозмовники — English
+        agenda.set_tr_lang(self.owner, m, "en")
+        with ai_answer("Agenda meeting", "Samples deadline"):
+            agenda.translate_missing(self.owner, m)
+        info = agenda.tr_info(m, agenda.items(m))
+        self.assertEqual((info["send_lang"], info["missing"], info["suggest"]), ("en", 0, ""))
+        self.assertTrue(next(s for s in info["send"] if s["code"] == "en")["ready"])
+        with patch("email_assistant.ai_helper._call_ai_direct") as ai:
+            url = agenda.send(self.owner, m, [], "en", ai=False)                        # без AI — готовим перекладом
+        ai.assert_not_called()
+        draft = EmailDraft.objects.get(pk=int(url.rsplit("=", 1)[1]))
+        self.assertEqual(draft.subject, "Agenda: Agenda meeting")
+        self.assertIn("1. Samples deadline", draft.body)
+        self.assertIn("1. Samples deadline", agenda.copy_text(m, lang="en"))
+        agenda.set_tr_lang(self.owner, m, "")                                            # вимкнули показ —
+        info = agenda.tr_info(m, agenda.items(m))
+        self.assertEqual(info["send_lang"], "en")                                        # готова мова лишається першою
+
+    def test_carry_keeps_translation(self):
+        first = self.meeting()
+        top = agenda.add(self.owner, first, "Строк зразків")
+        agenda.add(self.owner, first, "Точність", parent=top.pk)
+        agenda.set_tr_lang(self.owner, first, "en")
+        with ai_answer("T", "Samples deadline", "Accuracy"):
+            agenda.translate_missing(self.owner, first)
+        second = self.meeting()
+        carry = next(r for r in agenda.suggest(self.owner, second) if r["group"] == "carry")
+        new = agenda.add(self.owner, second, carry["text"], ref=carry["ref"])
+        self.assertEqual(new.translations["en"]["text"], "Samples deadline")
+        self.assertEqual(new.kids.get().translations["en"]["text"], "Accuracy")
+
+    def test_views(self):
+        m = self.meeting()
+        top = agenda.add(self.owner, m, "Строк зразків")
+        self.login(self.owner)
+        html = self.client.get(self.url("page", m)).content.decode()
+        self.assertIn("data-ag-trlang", html)
+        self.assertIn("🌐 Переклад під пунктами", html)
+        self.assertFalse(self.send(m, action="tr_lang", lang="xx").json()["ok"])
+        data = self.send(m, action="tr_lang", lang="en").json()
+        self.assertTrue(data["ok"], data)
+        self.assertIn('data-ag-tr="en"', data["html"])
+        self.assertIn("ще не перекладено", data["html"])
+        with ai_answer("Meeting EN", "Samples deadline"):
+            data = self.send(m, action="translate").json()
+        self.assertEqual(data["translated"], 2)
+        self.assertIn("Samples deadline", data["html"])
+        self.assertIn('data-ag-tr-missing="0"', data["html"])
+        self.assertIn('name="tr_text"', data["html"])                                   # ✏️ — виправити переклад
+        data = self.send(m, action="edit", item=top.pk, text="Строк зразків", note="",
+                         tr_text="Sample deadline", tr_note="").json()
+        self.assertTrue(data["ok"], data)
+        self.assertIn("Sample deadline", data["html"])
+        self.assertIn("✋", data["html"])
+        with patch("email_assistant.ai_helper._call_ai_direct", return_value="sorry"):
+            agenda.edit(self.owner, m, top.pk, text="Інший текст")
+            data = self.send(m, action="translate").json()
+        self.assertFalse(data["ok"])                                                     # AI не переклав — зрозуміло
+        self.assertIn("AI не переклав", data["error"])
+        self.login(self.other)
+        self.assertEqual(self.send(m, action="translate").status_code, 404)              # чужа нарада

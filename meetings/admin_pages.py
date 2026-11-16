@@ -476,7 +476,9 @@ def agenda_context(user, m, suggestions=None) -> dict:
     """📋 Агенда (meetings/agenda.py): пункти, скільки обговорили, підказки (None — не показувати)."""
     rows = agenda.items(m)
     projects = agenda._projects(user, m)
+    tr = agenda.tr_info(m, rows)
     return {"rows": rows, "progress": agenda.progress(m, rows), "copy": agenda.copy_text(m, rows),
+            "tr": tr, "copy_tr": agenda.copy_text(m, rows, tr["lang"]) if tr["lang"] else "",
             "url": url("admin:meetings_meeting_agenda", m.pk), "can": can_change(user),
             "can_suggest": can_change(user) and user.has_perm("projects.view_project"), "projects": len(projects),
             "after": m.status != Meeting.READY, "suggestions": suggestions,
@@ -486,7 +488,7 @@ def agenda_context(user, m, suggestions=None) -> dict:
             "upload_url": url("admin:meetings_meeting_agenda_upload", m.pk),
             "file_url": url("admin:meetings_meeting_agenda_file", m.pk, 0).rstrip("/").rsplit("/", 1)[0] + "/",
             "file_max": agenda.FILE_MAX_MB, "accept": ",".join(sorted(agenda.FILE_EXT)),
-            "lang": m.consent_lang if m.consent_lang in agenda.LANGS else "de"}
+            "lang": tr["send_lang"]}
 
 
 def render_agenda(user, m, suggestions=None) -> str:

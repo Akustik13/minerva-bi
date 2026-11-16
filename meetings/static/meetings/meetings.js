@@ -544,21 +544,100 @@
     var input = row.querySelector('input[name=text]');
     if (input) input.focus();
   }
+  // 🌐 переклад під пунктами: після змін (AUTO_TR) — одним запитом, поки людина пише далі; відповідь, старіша за вже
+  // показану, не малюється; що людина саме вводить (поля, відкриті форми, фокус) — лишається після оновлення блоку
+  var agSeq = 0, agShown = 0, trBusy = false, trAgain = false;
+  var AUTO_TR = {add: 1, edit: 1, take: 1, take_all: 1, tr_lang: 1};
+  function agKey(el) {
+    var row = el.closest('[data-ag]'), sub = el.closest('[data-ag-subadd]');
+    var kind = el.closest('[data-ag-edit]') ? 'edit' : el.closest('[data-ag-send]') ? 'send' : sub ? 'sub'
+      : el.closest('[data-ag-add]') ? 'add' : 'bar';
+    return kind + ':' + (row ? row.getAttribute('data-ag') : sub ? sub.getAttribute('data-ag-subadd') : '') + ':'
+      + (el.name || '') + ':' + (el.type === 'radio' ? el.value : '');
+  }
+  function agPanel(f) {
+    if (f.hasAttribute('data-ag-subadd')) return 'sub:' + f.getAttribute('data-ag-subadd');
+    if (f.hasAttribute('data-ag-send')) return 'send';
+    var row = f.closest('[data-ag]');
+    return 'edit:' + (row ? row.getAttribute('data-ag') : '');
+  }
+  function agSnapshot() {
+    var box = agendaBox();
+    if (!box) return null;
+    var s = {vals: {}, open: {}, focus: '', sel: null};
+    box.querySelectorAll('input[name], select[name], textarea[name]').forEach(function (el) {
+      if (el.type === 'file') return;
+      var mine = (el.type === 'checkbox' || el.type === 'radio') ? el.checked !== el.defaultChecked
+        : el.value !== el.defaultValue;
+      if (mine) s.vals[agKey(el)] = (el.type === 'checkbox' || el.type === 'radio') ? el.checked : el.value;
+    });
+    box.querySelectorAll('[data-ag-edit], [data-ag-subadd], [data-ag-send]').forEach(function (f) {
+      if (!f.hidden) s.open[agPanel(f)] = 1;
+    });
+    var a = document.activeElement;
+    if (a && box.contains(a) && a.name) {
+      s.focus = agKey(a);
+      try { s.sel = [a.selectionStart, a.selectionEnd]; } catch (err) { s.sel = null; }
+    }
+    return s;
+  }
+  function agRestore(s) {
+    var box = agendaBox();
+    if (!box || !s) return;
+    box.querySelectorAll('[data-ag-edit], [data-ag-subadd], [data-ag-send]').forEach(function (f) {
+      if (s.open[agPanel(f)]) f.hidden = false;
+    });
+    box.querySelectorAll('input[name], select[name], textarea[name]').forEach(function (el) {
+      var k = agKey(el);
+      if (k in s.vals) {
+        if (el.type === 'checkbox' || el.type === 'radio') el.checked = s.vals[k]; else el.value = s.vals[k];
+      }
+      if (s.focus && k === s.focus) {
+        el.focus();
+        if (s.sel) { try { el.setSelectionRange(s.sel[0], s.sel[1]); } catch (err) { /* select, checkbox */ } }
+      }
+    });
+  }
+  function trMark() {
+    var b = document.querySelector('#agenda [data-ag-trbusy]');
+    if (b) b.hidden = !trBusy;
+  }
+  function autoTranslate(force) {
+    var box = agendaBox();
+    if (!box || !box.getAttribute('data-ag-tr')) return;
+    if (!force && !(+box.getAttribute('data-ag-tr-missing') > 0)) return;
+    if (trBusy) { trAgain = true; return; }
+    trBusy = true;
+    trMark();
+    agendaSend({action: 'translate'}).then(function () {
+      trBusy = false;
+      trMark();
+      if (trAgain) { trAgain = false; autoTranslate(); }
+    });
+  }
   function agendaSend(body, focusAdd) {
     var box = agendaBox();
-    if (!box) return;
-    box.classList.add('mt-ag-busy');
-    post(box.getAttribute('data-mt-agenda'), body).then(function (j) {
+    if (!box) return Promise.resolve(null);
+    var seq = ++agSeq, quiet = body.action === 'translate';
+    if (!quiet) box.classList.add('mt-ag-busy');
+    return post(box.getAttribute('data-mt-agenda'), body).then(function (j) {
       var cur = agendaBox();
-      if (cur) cur.classList.remove('mt-ag-busy');
-      if (!j || !j.ok) { toast('⚠️ ' + ((j && j.error) || 'Не вдалося')); return; }
+      if (cur && !quiet) cur.classList.remove('mt-ag-busy');
+      if (!j || !j.ok) { toast('⚠️ ' + (quiet ? '🌐 ' : '') + ((j && j.error) || 'Не вдалося')); return j; }
+      if (seq < agShown) return j;              // новіша відповідь уже на сторінці
+      agShown = seq;
+      var keep = quiet ? agSnapshot() : null;
       if (cur) cur.outerHTML = j.html;
+      if (keep) agRestore(keep);
+      trMark();
       if (focusAdd && body.parent) {
         openSub(body.parent);                     // підпункти — один за одним, поле лишається відкритим
       } else if (focusAdd) {
         var input = document.querySelector('#agenda > [data-ag-add] input[name=text]');
         if (input) input.focus();
       }
+      if (AUTO_TR[body.action]) autoTranslate();
+      return j;
     });
   }
   // 📎 файли агенди: вибір на ПК (📎 у пункті чи «виберіть на ПК»), перетягування на агенду чи пункт, Ctrl+V скріншот
@@ -654,14 +733,24 @@
     } else if (form.hasAttribute('data-ag-edit')) {
       var row = form.closest('[data-ag]');
       agendaSend({action: 'edit', item: row.getAttribute('data-ag'), text: form.elements.text.value,
-                  note: form.elements.note.value});
+                  note: form.elements.note.value,
+                  tr_text: form.elements.tr_text ? form.elements.tr_text.value : undefined,
+                  tr_note: form.elements.tr_note ? form.elements.tr_note.value : undefined});
     }
   });
   root.addEventListener('change', function (e) {
     var t = e.target;
-    if (t.matches && t.matches('#agenda [data-ag-send] input[name=lang]')) {      // українська — без перекладу
-      var ai = t.form.elements.ai;
-      if (ai) ai.checked = t.value !== 'uk';
+    if (t.matches && t.matches('#agenda [data-ag-send] input[name=lang]')) {
+      // мова листа: уже перекладене нею — без AI; чого бракує — галочка «перекласти AI»
+      var missing = +t.getAttribute('data-missing') || 0, f = t.form;
+      if (f.elements.ai) f.elements.ai.checked = missing > 0;
+      var lab = f.querySelector('[data-ag-ai]'), ready = f.querySelector('[data-ag-ready]');
+      if (lab) lab.hidden = !missing;
+      if (ready) ready.hidden = t.getAttribute('data-ready') !== '1';
+      return;
+    }
+    if (t.matches && t.matches('#agenda [data-ag-trlang]')) {
+      agendaSend({action: 'tr_lang', lang: t.value});
       return;
     }
     if (!t.matches || !t.matches('#agenda [data-ag-act=toggle]')) return;
@@ -706,8 +795,12 @@
     } else if (act === 'hide') {
       var sug = b.closest('.mt-ag-sug');
       if (sug) sug.remove();
-    } else if (act === 'copy') {
-      var text = agendaBox().getAttribute('data-ag-copy') || '';
+    } else if (act === 'translate') {
+      autoTranslate(true);
+    } else if (act === 'tr_suggest') {
+      agendaSend({action: 'tr_lang', lang: b.getAttribute('data-lang')});
+    } else if (act === 'copy' || act === 'copy_tr') {
+      var text = agendaBox().getAttribute(act === 'copy' ? 'data-ag-copy' : 'data-ag-copy-tr') || '';
       var ok = function () { toast('📋 Агенду скопійовано — вставте в запрошення чи лист'); };
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(ok, function () { window.prompt('Скопіюйте агенду:', text); });
@@ -725,6 +818,7 @@
   var banner = document.getElementById('mt-new');
 
   function busy() {
+    if (trBusy) return true;
     if (document.querySelector('#mt-items .mt-panel:not([hidden])')) return true;
     if (document.querySelector('dialog[open]')) return true;
     if (document.querySelector('details.mt-edit[open]')) return true;
