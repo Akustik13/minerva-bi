@@ -166,6 +166,7 @@ class MeetingAdmin(admin.ModelAdmin):
             path("<int:pk>/remove/", w(self.remove_view), name="meetings_meeting_remove"),
             path("<int:pk>/projects/", w(self.projects_view), name="meetings_meeting_projects"),
             path("<int:pk>/part/", w(self.part_view), name="meetings_meeting_part"),
+            path("<int:pk>/agenda/", w(self.agenda_view), name="meetings_meeting_agenda"),
         ]
         return own + super().get_urls()
 
@@ -298,6 +299,46 @@ class MeetingAdmin(admin.ModelAdmin):
         item = MeetingItem.objects.select_related("highlight", "risk", "step", "event").get(pk=item.pk)
         return JsonResponse({"ok": True, "status": item.status, "html": admin_pages.render_item(request.user, m, item),
                              "pending": m.items.filter(status=MeetingItem.PENDING).count()})
+
+    def agenda_view(self, request, pk):
+        """📋 Агенда: POST JSON {action: add {text} | edit {item, text, note} | status {item, status} | move {item,
+        delta} | remove {item} | suggest | take {ref} | take_all} → {ok, html} — свіжий блок агенди (з підказками
+        після suggest / take, поки вони є). Лише власник з правом змінювати наради."""
+        from . import agenda
+        refused = _post_only(request)
+        if refused:
+            return refused
+        m = services.get_own(request.user, pk)
+        refused = self._change_refused(request, m, as_json=True)
+        if refused:
+            return refused
+        data = _json_body(request)
+        action = str(data.get("action") or "")
+        user, item = request.user, data.get("item")
+        suggestions = None
+        try:
+            if action == "add":
+                agenda.add(user, m, data.get("text"))
+            elif action == "edit":
+                agenda.edit(user, m, item, text=data.get("text"), note=data.get("note"))
+            elif action == "status":
+                agenda.set_status(user, m, item, str(data.get("status") or ""))
+            elif action == "move":
+                agenda.move(user, m, item, data.get("delta"))
+            elif action == "remove":
+                agenda.remove(user, m, item)
+            elif action in ("take", "take_all"):
+                agenda.take(user, m, ["*"] if action == "take_all" else [str(data.get("ref") or "")])
+                suggestions = agenda.suggest(user, m) if action == "take" else None
+            elif action == "suggest":
+                suggestions = agenda.suggest(user, m)
+            else:
+                return JsonResponse({"ok": False, "error": "Невідома дія"}, status=400)
+        except MeetingError as e:
+            return JsonResponse({"ok": False, "error": str(e)}, status=400)
+        if suggestions is not None and not suggestions and action == "take":
+            suggestions = None                                   # узяли останню підказку — список ховається
+        return JsonResponse({"ok": True, "html": admin_pages.render_agenda(user, m, suggestions)})
 
     def projects_view(self, request, pk):
         """📁 Проєкти наради: POST JSON {action: add | remove | main, project} → {ok} (сторінка оновлюється)."""

@@ -3,7 +3,7 @@
 {# Галочок згоди тут немає — їх ставлять у вікні запису перед ▶ (meetings/admin.py new_view / continue_view). #}
 {% load static %}
 {% block title %}{{ title }} | Minerva{% endblock %}
-{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=6">{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=7">{% endblock %}
 {% block breadcrumbs %}
 <div class="breadcrumbs">
   <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
@@ -113,5 +113,5 @@
   <template id="mt-person-tpl"><div class="mt-person"><input type="text" name="x_name" placeholder="Ім’я" maxlength="200"><input type="email" name="x_email" placeholder="Email (необов’язково)" maxlength="254"></div></template>
   {% endif %}
 </div>
-<script src="{% static 'meetings/meetings.js' %}?v=4" defer></script>
+<script src="{% static 'meetings/meetings.js' %}?v=5" defer></script>
 {% endblock %}

@@ -136,16 +136,21 @@
     </section>
   </div>
 
-  {% if meetings.rows %}
+  {% if meetings.rows or meetings.upcoming %}
   <section class="pjc-card pjc-meet" aria-label="Мої наради">
     <h4>🎙 Мої наради <span class="pjc-sub">{{ meetings.total }} · бачите лише ви{% if meetings.pending %} · чекають ✓ / ✕: {{ meetings.pending }}{% endif %}</span>
       {% if meetings.record_url %}<a class="pjc-b pjc-right" href="{{ meetings.record_url }}" target="_blank" rel="noopener">🎙 Записати ще одну</a>{% endif %}</h4>
     <ul class="pjc-list pjc-mlist">
+      {% for u in meetings.upcoming %}
+        <li class="pjc-mt-up">🤝 <span translate="no">{{ u.title }}</span> <span class="pjc-sub">{{ u.day|date:"d.m" }}</span>
+          <a class="pjc-mt-ag" href="{{ u.url }}" target="_blank" rel="noopener" title="Підготувати нараду до цієї зустрічі й скласти агенду: що обговорити, щоб не забути">📋 Підготувати агенду</a></li>
+      {% endfor %}
       {% for m in meetings.rows %}
         <li class="pjc-mt-{{ m.cls }}">
           {% if m.url %}<a href="{{ m.url }}" target="_blank" rel="noopener" translate="no">🎙 {{ m.title }}</a>{% else %}<span translate="no">🎙 {{ m.title }}</span>{% endif %}
           <span class="pjc-sub">{{ m.line }}</span>
           {% if m.pending and m.url %}<a class="pjc-mt-pending" href="{{ m.url }}" target="_blank" rel="noopener">чекають ✓ / ✕: {{ m.pending }} →</a>{% elif m.pending %}<span class="pjc-mt-pending">чекають ✓ / ✕: {{ m.pending }}</span>{% endif %}
+          {% if m.agenda_total and m.agenda_url %}<a class="pjc-mt-ag" href="{{ m.agenda_url }}" target="_blank" rel="noopener" title="Агенда наради: скільки пунктів уже обговорили">📋 агенда {{ m.agenda_done }} / {{ m.agenda_total }}</a>{% elif m.ready and m.agenda_url %}<a class="pjc-mt-ag" href="{{ m.agenda_url }}" target="_blank" rel="noopener" title="Що обговорити на нараді, щоб не забути">📋 Скласти агенду</a>{% endif %}
         </li>
       {% endfor %}
     </ul>

@@ -302,6 +302,40 @@ class MeetingPart(models.Model):
         return f"🎙 Нарада #{self.meeting_id} · з {int(self.start_s)} с"
 
 
+class MeetingAgendaItem(models.Model):
+    """📋 Пункт агенди наради — що обговорити, щоб не забути (meetings/agenda.py). Як і нарада, бачить лише її
+    власник. ref — звідки підказано («risk:12», «step:34», «attn:<sha1>», «q:<sha1>», «carry:<pk пункту>»): той самий
+    пункт двічі не додається. Не обговорили (open) після наради — підказується до наступної наради цього проєкту;
+    узяли туди — moved."""
+    OPEN, DONE, SKIPPED, MOVED = "open", "done", "skipped", "moved"
+    STATUS_CHOICES = [(OPEN, "обговорити"), (DONE, "обговорили"), (SKIPPED, "не потрібно"),
+                      (MOVED, "перенесено на наступну нараду")]
+
+    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name="agenda")
+    order = models.PositiveIntegerField("Порядок", default=0)
+    text = models.CharField("Що обговорити", max_length=300)
+    why = models.CharField("Звідки", max_length=200, blank=True, default="")
+    ref = models.CharField(max_length=60, blank=True, default="")
+    url = models.CharField(max_length=300, blank=True, default="")
+    project = models.ForeignKey("projects.Project", null=True, blank=True, on_delete=models.SET_NULL,
+                                related_name="+", verbose_name="Проєкт")
+    status = models.CharField("Стан", max_length=10, choices=STATUS_CHOICES, default=OPEN, db_index=True)
+    note = models.CharField("Що вирішили", max_length=300, blank=True, default="")
+    moved_to = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Пункт агенди наради"
+        verbose_name_plural = "Агенди нарад"
+        ordering = ["meeting", "order", "pk"]
+        constraints = [models.UniqueConstraint(fields=["meeting", "ref"], condition=~models.Q(ref=""),
+                                               name="unique_meeting_agenda_ref")]
+
+    def __str__(self):
+        return f"🎙 Нарада #{self.meeting_id} · пункт агенди #{self.pk}"
+
+
 class MeetingTombstone(models.Model):
     """Слід видаленої наради (без змісту): RAG-ПК, який ще має її запис, отримує «видалити» (410 / sync), а не
     «невідома нарада». Пишеться в post_delete наради, живе щонайменше TOMBSTONE_DAYS (services.cleanup)."""

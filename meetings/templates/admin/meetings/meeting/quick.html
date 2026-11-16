@@ -3,7 +3,7 @@
 {# форми без нової вкладки, вікно запису відкриється в цій самій (meetings/admin.py quick_view). #}
 {% load static %}
 {% block title %}{{ title }} | Minerva{% endblock %}
-{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=6">{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=7">{% endblock %}
 {% block breadcrumbs %}
 <div class="breadcrumbs">
   <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
@@ -21,5 +21,5 @@
     <a class="button" href="{{ list_url }}">← До нарад</a>
   </div>
 </div>
-<script src="{% static 'meetings/meetings.js' %}?v=4" defer></script>
+<script src="{% static 'meetings/meetings.js' %}?v=5" defer></script>
 {% endblock %}

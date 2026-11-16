@@ -1,0 +1,75 @@
+{# 📋 Агенда наради (meetings/agenda.py, контекст — admin_pages.agenda_context). Лише власник наради. Тексти пунктів, #}
+{# підказок і «що вирішили» — дані людини / проєкту: лише в translate="no". JS — meetings.js «агенда». #}
+<section class="mt-card mt-ag" id="agenda" data-mt-agenda="{{ agenda.url }}" data-ag-copy="{{ agenda.copy }}">
+  <h2>📋 Агенда{% if agenda.progress.total %} <span class="mt-muted">· обговорили {{ agenda.progress.done }} з {{ agenda.progress.total }}</span>{% endif %}</h2>
+  <p class="mt-muted">{% if agenda.after %}Відмітьте ☑, що обговорили, і ✏️ — що вирішили. Не обговорене запропонується до наступної наради цього проєкту.{% else %}Що обговорити, щоб нічого не забути. Бачите лише ви. На нараді тримайте цю сторінку відкритою (можна на телефоні) і відмічайте ☑.{% endif %}</p>
+  {% if agenda.rows %}
+    <ol class="mt-ag-list">
+      {% for i in agenda.rows %}
+        <li class="mt-ag-row mt-ag-{{ i.status }}" data-ag="{{ i.pk }}">
+          {% if i.status == "moved" %}<span class="mt-ag-box" title="Перенесено на наступну нараду">→</span>
+          {% elif agenda.can %}<input type="checkbox" class="mt-ag-box" data-ag-act="toggle"{% if i.status == "done" %} checked{% endif %} title="Обговорили" aria-label="Обговорили">
+          {% else %}<span class="mt-ag-box">{% if i.status == "done" %}☑{% else %}☐{% endif %}</span>{% endif %}
+          <div class="mt-ag-body">
+            <div class="mt-ag-text" translate="no">{% if i.url %}<a href="{{ i.url }}" target="_blank" rel="noopener">{{ i.text }}</a>{% else %}{{ i.text }}{% endif %}</div>
+            <div class="mt-ag-meta">
+              {% if i.why %}<span class="mt-ag-why">{{ i.why }}</span>{% endif %}
+              {% if i.status == "skipped" %}<span class="mt-ag-why">⏭ не потрібно</span>{% elif i.status == "moved" %}<span class="mt-ag-why">→ перенесено на наступну нараду</span>{% endif %}
+              {% if i.note %}<span class="mt-ag-note">✍️ <span translate="no">{{ i.note }}</span></span>{% endif %}
+            </div>
+            {% if agenda.can and i.status != "moved" %}
+              <form class="mt-ag-edit" data-ag-edit hidden>
+                <input name="text" maxlength="300" value="{{ i.text }}" aria-label="Що обговорити" translate="no">
+                <input name="note" maxlength="300" value="{{ i.note }}" placeholder="Що вирішили (за бажанням)" aria-label="Що вирішили" translate="no">
+                <button type="submit" class="button mt-primary">💾 Зберегти</button>
+                <button type="button" class="button" data-ag-act="cancel">Скасувати</button>
+              </form>
+            {% endif %}
+          </div>
+          {% if agenda.can and i.status != "moved" %}
+            <span class="mt-ag-acts">
+              <button type="button" data-ag-act="edit" title="Змінити текст і записати, що вирішили">✏️</button>
+              <button type="button" data-ag-act="skip" title="{% if i.status == 'skipped' %}Повернути: обговорити{% else %}Не потрібно обговорювати{% endif %}">⏭</button>
+              <button type="button" data-ag-act="up" title="Вище"{% if forloop.first %} disabled{% endif %}>↑</button>
+              <button type="button" data-ag-act="down" title="Нижче"{% if forloop.last %} disabled{% endif %}>↓</button>
+              <button type="button" data-ag-act="remove" title="Прибрати з агенди">✕</button>
+            </span>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ol>
+  {% elif not agenda.suggestions %}
+    <p class="mt-muted">{% if agenda.can and agenda.can_suggest %}Агенда порожня. Напишіть, що обговорити, або «🧭 Підказати з проєкту» — Minerva запропонує теми з плану, ризиків і «Що зараз».{% elif agenda.can %}Агенда порожня. Напишіть, що обговорити.{% else %}Агенда порожня.{% endif %}</p>
+  {% endif %}
+  {% if agenda.can %}
+    <form class="mt-ag-add" data-ag-add>
+      <input name="text" maxlength="300" placeholder="Що обговорити — напр. «погодити строк зразків»" aria-label="Новий пункт агенди" autocomplete="off">
+      <button type="submit" class="button mt-primary">＋ Додати</button>
+      {% if agenda.can_suggest %}<button type="button" class="button" data-ag-act="suggest">🧭 Підказати з проєкту</button>{% endif %}
+      {% if agenda.rows %}<button type="button" class="button" data-ag-act="copy" title="Агенда текстом — вставити в запрошення, лист чи чат учасникам">📋 Копіювати текстом</button>{% endif %}
+    </form>
+  {% elif not agenda.rows %}
+    <p class="mt-muted">🔒 Немає права змінювати наради — агенду складає той, хто може.</p>
+  {% endif %}
+  {% if agenda.suggestions is not None %}
+    <div class="mt-ag-sug" aria-live="polite">
+      {% if agenda.suggestions %}
+        <div class="mt-ag-sug-head"><b>🧭 Підказки з проєкту</b> <span class="mt-muted">— додайте потрібне</span>
+          <button type="button" class="button" data-ag-act="take_all">＋ Додати всі ({{ agenda.suggestions|length }})</button>
+          <button type="button" class="button" data-ag-act="hide">Сховати</button></div>
+        {% for g in agenda.groups %}
+          <h3>{{ g.title }}</h3>
+          <ul class="mt-ag-sl">
+            {% for r in g.rows %}
+              <li><button type="button" class="mt-ag-take" data-ag-act="take" data-ref="{{ r.ref }}" title="Додати в агенду">＋</button>
+                <span translate="no">{{ r.text }}</span> <span class="mt-ag-why">{{ r.why }}</span></li>
+            {% endfor %}
+          </ul>
+        {% endfor %}
+      {% else %}
+        <p class="mt-muted">{% if agenda.projects %}🧭 Нових підказок немає: усе, що зараз потребує уваги в проєкті, уже в агенді.{% else %}🧭 Нарада ще не в проєкті — підключіть його (📁 угорі сторінки), і Minerva підкаже теми.{% endif %}
+          <button type="button" class="button" data-ag-act="hide">Сховати</button></p>
+      {% endif %}
+    </div>
+  {% endif %}
+</section>

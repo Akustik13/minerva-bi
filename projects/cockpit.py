@@ -159,14 +159,27 @@ def _acts(attention, can_change) -> list:
     return out
 
 
-def _meetings_context(project, user, meetings) -> dict:
+def _meetings_context(project, user, meetings, facts=None, today=None) -> dict:
     """«🎙 Мої наради»: наради того, хто дивиться (timeline.own_meetings — лише свої, і адміністратору), «🎙 Записати
-    нараду» — лише коли людина може записувати."""
-    rows = [{"id": m.pk, "title": m.title, "line": timeline.meeting_line(m, pending=False), "cls": timeline.meeting_cls(m) or "def",
-             "pending": getattr(m, "pending", 0), "url": timeline.meeting_url(m.pk, getattr(m, "part_second", None))}
-            for m in meetings[:MEETINGS_SHOWN]]
+    нараду» — лише коли людина може записувати. 📋 Агенда (meetings/agenda.py): скільки обговорили в кожної наради;
+    найближчі зустрічі проєкту з календаря людини, для яких наради ще немає, — «📋 Підготувати агенду»."""
+    shown = meetings[:MEETINGS_SHOWN]
+    try:
+        from meetings import agenda
+        counts = agenda.counts(m.pk for m in shown)
+        upcoming = [u for u in agenda.upcoming(project, user, facts or {}, today) if not u["prepared"]]
+    except Exception:  # noqa: BLE001 — без агенди блок нарад однаково показується
+        counts, upcoming = {}, []
+    rows = []
+    for m in shown:
+        done, total = counts.get(m.pk, (0, 0))
+        rows.append({"id": m.pk, "title": m.title, "line": timeline.meeting_line(m, pending=False),
+                     "cls": timeline.meeting_cls(m) or "def", "pending": getattr(m, "pending", 0),
+                     "url": timeline.meeting_url(m.pk, getattr(m, "part_second", None)),
+                     "agenda_url": timeline.meeting_url(m.pk) + "#agenda", "agenda_done": done, "agenda_total": total,
+                     "ready": m.status == "ready"})
     all_url = timeline._url("admin:meetings_meeting_changelist") if len(meetings) > MEETINGS_SHOWN else ""
-    return {"rows": rows, "total": len(meetings), "all_url": all_url,
+    return {"rows": rows, "total": len(meetings), "all_url": all_url, "upcoming": upcoming,
             "pending": sum(getattr(m, "pending", 0) for m in meetings),
             "record_url": timeline.new_meeting_url(user, project=project)}
 
@@ -335,7 +348,7 @@ def context(project, user, range_key="all", notice="") -> dict:
         "riskreg": _risks_context(project, can_change, user),
         "parties": _parties_context(project, can_change, today, facts, user),
         "sourcing": _sourcing_context(project, user),
-        "meetings": _meetings_context(project, user, meetings),
+        "meetings": _meetings_context(project, user, meetings, facts, today),
         "status": _status_context(project, user, facts, st, today, can_change),
         "urls": {"cockpit": reverse("projects:cockpit", args=[pk]), "highlight": reverse("projects:highlight", args=[pk]),
                  "mail_handled": reverse("projects:mail_handled", args=[pk]),

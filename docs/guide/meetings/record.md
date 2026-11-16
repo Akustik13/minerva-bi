@@ -6,7 +6,7 @@ where: 📁 Проєкти → 🎙 Наради → «⚡ Швидкий зап
 urls: /admin/meetings/meeting/, /admin/meetings/meeting/new/, /admin/meetings/meeting/quick/
 roles: усі з розділом «🎙 Наради» (менеджер — за роллю), коли адміністратор увімкнув записування
 keywords: записати нараду, запис наради, швидкий запис, записати зараз, швидкий старт, один клік, автоскан мікрофонів, нарада, мітинг, meeting, Besprechung, Aufnahme, aufnehmen, Teams, Zoom, Meet, диктофон, транскрипція, розшифровка, згода на запис, Einwilligung, вікно запису, RAG-ПК, сертифікат, мікрофон, гарнітура, звук наради, системний звук, продовження наради
-related: meetings/review, meetings/settings, crm/project-cockpit, calendar/overview, crm/customers, calendar/invites
+related: meetings/agenda, meetings/review, meetings/settings, crm/project-cockpit, calendar/overview, crm/customers, calendar/invites
 ---
 
 ## Що це

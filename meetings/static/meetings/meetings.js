@@ -7,6 +7,7 @@
    - 📁 проєкти наради (додати / ⭐ головний / ✕) і 🏷 «звідси — про проєкт …» на рядках розшифровки — POST JSON,
      потім сторінка оновлюється;
    - пошук у розшифровці й #t=<секунда> в адресі;
+   - 📋 агенда: додати, ☑ обговорили, ✏️ текст і «що вирішили», ⏭, ↑ ↓, ✕, 🧭 підказки з проєкту, 📋 копіювати;
    - опитування стану кожні 5 с: нове — перезавантаження, але не тоді, коли відкрито панель ✓ або курсор у полі
      (тоді смуга «🔄 Є нове — оновити сторінку»).
    Дані людини — лише через textContent; розшифровку браузер не зберігає (localStorage не використовується). */
@@ -376,6 +377,72 @@
   window.addEventListener('hashchange', jumpToTime);
   jumpToTime();
 
+  // ── 📋 Агенда (meetings/agenda.py, _agenda.html): POST JSON на data-mt-agenda, у відповідь — свіжий блок ──
+  function agendaBox() { return document.getElementById('agenda'); }
+  function agendaSend(body, focusAdd) {
+    var box = agendaBox();
+    if (!box) return;
+    box.classList.add('mt-ag-busy');
+    post(box.getAttribute('data-mt-agenda'), body).then(function (j) {
+      var cur = agendaBox();
+      if (cur) cur.classList.remove('mt-ag-busy');
+      if (!j || !j.ok) { toast('⚠️ ' + ((j && j.error) || 'Не вдалося')); return; }
+      if (cur) cur.outerHTML = j.html;
+      if (focusAdd) {
+        var input = document.querySelector('#agenda [data-ag-add] input[name=text]');
+        if (input) input.focus();
+      }
+    });
+  }
+  root.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!form.closest || !form.closest('#agenda')) return;
+    e.preventDefault();
+    if (form.hasAttribute('data-ag-add')) {
+      var text = (form.elements.text.value || '').trim();
+      if (text) agendaSend({action: 'add', text: text}, true);
+    } else if (form.hasAttribute('data-ag-edit')) {
+      var row = form.closest('[data-ag]');
+      agendaSend({action: 'edit', item: row.getAttribute('data-ag'), text: form.elements.text.value,
+                  note: form.elements.note.value});
+    }
+  });
+  root.addEventListener('change', function (e) {
+    var t = e.target;
+    if (!t.matches || !t.matches('#agenda [data-ag-act=toggle]')) return;
+    agendaSend({action: 'status', item: t.closest('[data-ag]').getAttribute('data-ag'), status: t.checked ? 'done' : 'open'});
+  });
+  root.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('#agenda button[data-ag-act]');
+    if (!b) return;
+    var act = b.getAttribute('data-ag-act'), row = b.closest('[data-ag]'), id = row ? row.getAttribute('data-ag') : '';
+    if (act === 'edit' || act === 'cancel') {
+      var form = row && row.querySelector('[data-ag-edit]');
+      if (!form) return;
+      form.hidden = act === 'cancel';
+      if (!form.hidden) form.elements.note.focus();
+    } else if (act === 'skip') {
+      agendaSend({action: 'status', item: id, status: row.classList.contains('mt-ag-skipped') ? 'open' : 'skipped'});
+    } else if (act === 'up' || act === 'down') {
+      agendaSend({action: 'move', item: id, delta: act === 'up' ? -1 : 1});
+    } else if (act === 'remove') {
+      agendaSend({action: 'remove', item: id});
+    } else if (act === 'suggest' || act === 'take_all') {
+      agendaSend({action: act});
+    } else if (act === 'take') {
+      agendaSend({action: 'take', ref: b.getAttribute('data-ref')});
+    } else if (act === 'hide') {
+      var sug = b.closest('.mt-ag-sug');
+      if (sug) sug.remove();
+    } else if (act === 'copy') {
+      var text = agendaBox().getAttribute('data-ag-copy') || '';
+      var ok = function () { toast('📋 Агенду скопійовано — вставте в запрошення чи лист'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(ok, function () { window.prompt('Скопіюйте агенду:', text); });
+      } else { window.prompt('Скопіюйте агенду:', text); }
+    }
+  });
+
   // ── опитування стану ──
   var cfgEl = document.getElementById('mt-config');
   var cfg = null;
@@ -389,6 +456,7 @@
     if (document.querySelector('#mt-items .mt-panel:not([hidden])')) return true;
     if (document.querySelector('dialog[open]')) return true;
     if (document.querySelector('details.mt-edit[open]')) return true;
+    if (document.querySelector('#agenda [data-ag-edit]:not([hidden]), #agenda .mt-ag-sug')) return true;
     var a = document.activeElement;
     return !!(a && root.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
   }

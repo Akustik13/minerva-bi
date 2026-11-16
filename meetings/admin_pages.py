@@ -17,7 +17,7 @@ from django.template.loader import render_to_string
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
-from . import consent, knowledge, parts, services
+from . import agenda, consent, knowledge, parts, services
 from .models import LANG_CHOICES, RETENTION_CHOICES, Meeting, MeetingItem, MeetingTranscript
 
 PROJECT_OPTIONS_MAX = 300
@@ -469,6 +469,21 @@ def render_item(user, m, item, base=None, staff=None, pj=None) -> str:
     return render_to_string("admin/meetings/meeting/_item.html", item_context(user, m, item, base, staff, pj))
 
 
+def agenda_context(user, m, suggestions=None) -> dict:
+    """📋 Агенда (meetings/agenda.py): пункти, скільки обговорили, підказки (None — не показувати)."""
+    rows = agenda.items(m)
+    projects = agenda._projects(user, m)
+    return {"rows": rows, "progress": agenda.progress(m, rows), "copy": agenda.copy_text(m, rows),
+            "url": url("admin:meetings_meeting_agenda", m.pk), "can": can_change(user),
+            "can_suggest": can_change(user) and user.has_perm("projects.view_project"), "projects": len(projects),
+            "after": m.status != Meeting.READY, "suggestions": suggestions,
+            "groups": agenda.grouped(suggestions or [])}
+
+
+def render_agenda(user, m, suggestions=None) -> str:
+    return render_to_string("admin/meetings/meeting/_agenda.html", {"agenda": agenda_context(user, m, suggestions)})
+
+
 def log_lines(m) -> list:
     """consent_log людською мовою: [{at, text}]."""
     out = []
@@ -616,6 +631,7 @@ def page_context(user, m, settings=None) -> dict:
         **projects_context(user, m, pj, tr),
         "transcript_model": tr.model if tr else "",
         "kb": knowledge.parts_state(m, user) if m.approved_at else None, "kb_text": KB_TEXT,
+        "agenda": agenda_context(user, m),
         "consent_lang_label": CONSENT_LANG_LABELS.get(m.consent_lang, ""), "log": log_lines(m),
         "participants": [dict(p, source_label=SOURCE_LABELS.get(p.get("source"), "")) for p in m.participants or []],
         "excerpt": excerpt_rows(m), "accepted_rows": accepted_rows(m),

@@ -446,6 +446,8 @@
   .pjc ul.pjc-mlist li.pjc-mt-ok { border-left-color: var(--ok, #3fb950); }
   .pjc ul.pjc-mlist li.pjc-mt-open { border-left-color: var(--accent, #58a6ff); }
   .pjc-mt-pending { font-weight: 600; color: var(--warn, #e3b341); }
+  .pjc-mt-ag { font-weight: 600; white-space: nowrap; }
+  .pjc ul.pjc-mlist li.pjc-mt-up { border-left-color: var(--accent, #58a6ff); border-left-style: dashed; }
   .pjc-from-meeting { white-space: nowrap; }
   @media (max-width: 768px) { .pjc-link.pjc-rec { flex: 1 1 100%; text-align: center; padding: 8px 9px; } }
 

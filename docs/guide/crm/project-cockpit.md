@@ -6,7 +6,7 @@ where: 📁 Проєкти → Усі проєкти → проєкт → «🧭
 urls: /admin/projects/project/
 roles: адміністратор, менеджер
 keywords: попередній перегляд листа, наведення на лист, що в листі, peek, про що йшла мова, підсумок розмови, нотатка дзвінка, результат зустрічі, експорт шкали, пульт проєкту, шкала проєкту, timeline, таймлайн, хронологія, важливий момент, моменти, 📌, ризики, що зараз, закупівля проєкту, JLC проєкту, відправлення проєкту, товари проєкту, строк клієнту, старт проєкту, стан проєкту, Projektübersicht, project cockpit, файли з листів, вкладення на шкалі, zip на шкалі, зустріч відбулась, термін виконано, хибно прострочено, подія з календаря, поля проєкту, пульт на телефоні, масштаб шкали, наблизити шкалу, прокрутка шкали, доріжки шкали, групи подій, накладаються підписи, відповіли телефоном, відповіли на зустрічі, відповідь не потрібна, позначити виконаним, нагадати, відпустка прострочено, Videobesprechung, записати нараду, мої наради, з наради, 🎙
-related: meetings/record, meetings/review, crm/project-workspace, crm/project-plan, crm/project-risks, crm/project-ai, crm/projects, crm/project-overview, crm/project-triage, inventory/purchases, shipping/shipments, worktime/projects
+related: meetings/record, meetings/agenda, meetings/review, crm/project-workspace, crm/project-plan, crm/project-risks, crm/project-ai, crm/projects, crm/project-overview, crm/project-triage, inventory/purchases, shipping/shipments, worktime/projects
 ---
 
 ## Що це

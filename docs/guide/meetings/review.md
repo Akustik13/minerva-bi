@@ -6,7 +6,7 @@ where: 📁 Проєкти → 🎙 Наради → нарада
 urls: /admin/meetings/meeting/
 roles: лише той, хто записав нараду
 keywords: сторінка наради, мої наради, лише обговорення, теза, тема обговорення, 💬, кілька проєктів, підключити до проєкту, нарада без проєкту, частини наради, позначка проєкту, 🏷, розшифровка, транскрипт, transcript, Transkript, протокол наради, ключові моменти, рішення, завдання, обіцянка, ризик, строк, прийняти, не те, ✓, ✕, протокол згоди, база знань, видалити нараду, спробувати ще раз, записати заново, продовження, хто бачить нараду, приватність, DSGVO, строк зберігання
-related: meetings/record, meetings/settings, crm/project-cockpit, crm/project-plan, crm/project-risks, ai/knowledge-documents
+related: meetings/agenda, meetings/record, meetings/settings, crm/project-cockpit, crm/project-plan, crm/project-risks, ai/knowledge-documents
 ---
 
 ## Що це
