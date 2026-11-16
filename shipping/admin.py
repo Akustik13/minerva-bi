@@ -2352,7 +2352,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             if dhl_code:
                 qs = urlencode({"product_code": dhl_code,
                                 "product_name": dhl_name,
-                                "price":        dhl_price})
+                                "price":        dhl_price,
+                                "account":      request.POST.get("dhl_account", "auto")})
                 messages.success(request, f"✅ Відправлення #{shipment.pk} збережено.")
                 return redirect(
                     reverse("admin:shipping_shipment_dhl_confirm", args=[shipment.pk]) + f"?{qs}"
@@ -2786,7 +2787,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             if dhl_code:
                 qs = urlencode({"product_code": dhl_code,
                                 "product_name": dhl_name,
-                                "price":        dhl_price})
+                                "price":        dhl_price,
+                                "account":      request.POST.get("dhl_account", "auto")})
                 messages.success(request, f"✅ Відправлення #{shipment.pk} оновлено.")
                 return redirect(
                     reverse("admin:shipping_shipment_dhl_confirm", args=[shipment.pk]) + f"?{qs}"
@@ -6043,9 +6045,20 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     # Кожна коробка окремо; відправник з форми (посилка до нас — справжній відправник)
                     _origin = ({"country": sender_override["country"], "postal": sender_override["postal"],
                                 "city": sender_override["city"]} if sender_override["country"] else None)
+                    # Акаунт: авто (за країною відправника) / експорт / імпорт — перемикач у порівнянні
+                    from .services.dhl import ACCOUNT_CHOICES, account_choice
+                    choice = body.get("dhl_account") if body.get("dhl_account") in ACCOUNT_CHOICES else "auto"
+                    acct, acct_kind = account_choice(carrier, sender_override["country"] or carrier.sender_country,
+                                                     choice)
+                    entry["dhl_account"] = {
+                        "choice": choice, "number": acct, "kind": acct_kind,
+                        "export": (carrier.connection_uuid or "").strip(),
+                        "import": (carrier.import_account or "").strip(),
+                    }
                     r = _dhl_rates(carrier, dest_country, dest_postal, dest_city,
                                    weight, length, width, height,
                                    is_customs_declarable=is_customs,
+                                   account_number=acct,
                                    packages=packages_raw or None, origin=_origin)
                     entry["products"] = r.get("products") or []
                     entry["error"]    = r.get("error")
@@ -6824,6 +6837,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 'pickup_close':    param('pickup_close', '18:00'),
                 'pickup_location': param('pickup_location', 'reception'),
                 'customs':         None if customs in (None, '') else customs == '1',
+                'account':         param('account', 'auto'),
             })
 
         # Уже оформлене / оформлюється — сторінка перевірки не потрібна
@@ -6849,8 +6863,13 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             reverse('admin:shipping_shipment_dhl_confirm', args=[shipment.pk])
             + '?' + urlencode({'product_code': product_code,
                                'product_name': product_name,
-                               'price': price_str})
+                               'price': price_str,
+                               'account': param('account', 'auto')})
         )
+        from .services.dhl import account_choice
+        _dhl_c = Carrier.objects.filter(carrier_type="dhl", is_active=True).first()   # як `_dhl_book`
+        dhl_acct = (account_choice(_dhl_c, shipment.sender_country or _dhl_c.sender_country, param('account', 'auto'))
+                    if _dhl_c else ('', ''))
 
         from datetime import date as _date, timedelta as _td
         _tomorrow = _date.today() + _td(days=1)
@@ -6873,6 +6892,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'back_url':             back_url,
             'pickup_min_date':      _tomorrow.strftime('%Y-%m-%d'),
             'pickup_default_date':  _tomorrow.strftime('%Y-%m-%d'),
+            'dhl_account':          {'number': dhl_acct[0], 'kind': dhl_acct[1],
+                                     'choice': param('account', 'auto')},
         })
 
     # ── DHL Book (POST /shipments) ────────────────────────────────────────────
@@ -6904,7 +6925,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                                 pickup_ready_time=params["pickup_ready"] or "09:00",
                                 pickup_close_time=params["pickup_close"] or "18:00",
                                 pickup_location=params["pickup_location"] or "reception",
-                                include_customs=params["customs"])
+                                include_customs=params["customs"],
+                                account=params.get("account") or "auto")
         except Exception as e:
             # Збій до відповіді DHL — «❌ Помилка», як і відмова DHL: виправити й оформити ще раз
             logger.exception("DHL booking failed for shipment %s", shipment.pk)

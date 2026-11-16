@@ -3556,6 +3556,7 @@
 {"uk": "Імпеданс", "en": "Impedance", "de": "Impedanz"}
 {"uk": "Імпорт", "en": "Import", "de": "Import"}
 {"uk": "Імпорт / API", "en": "Import / API", "de": "Import / API"}
+{"uk": "Імпорт / Drittland", "en": "Import / third country", "de": "Import / Drittland"}
 {"uk": "Імпорт Excel", "en": "Excel import", "de": "Excel-Import"}
 {"uk": "Імпорт атрибутів з Excel", "en": "Import attributes from Excel", "de": "Attribute aus Excel importieren"}
 {"uk": "Імпорт даних", "en": "Data import", "de": "Datenimport"}
@@ -3729,6 +3730,7 @@
 {"uk": "Австрія", "en": "Austria", "de": "Österreich"}
 {"uk": "Авто", "en": "Auto", "de": "Auto"}
 {"uk": "Авто (28 % екрана)", "en": "Auto (28 % of the screen)", "de": "Automatisch (28 % des Bildschirms)"}
+{"uk": "Авто (за країною відправника)", "en": "Auto (by sender country)", "de": "Automatisch (nach Absenderland)"}
 {"uk": "Авто (макс+1 з БД)", "en": "Auto (max+1 from DB)", "de": "Auto (Max+1 aus der DB)"}
 {"uk": "Авто · {0} px", "en": "Auto · {0} px", "de": "Automatisch · {0} px"}
 {"uk": "Авто з рекомендації — перевір", "en": "Auto from recommendation — check", "de": "Automatisch aus Empfehlung — bitte prüfen"}
@@ -3965,6 +3967,8 @@
 {"uk": "Азербайджан", "en": "Azerbaijan", "de": "Aserbaidschan"}
 {"uk": "Азія", "en": "Asia", "de": "Asien"}
 {"uk": "Акаунт", "en": "Account", "de": "Konto"}
+{"uk": "Акаунт DHL", "en": "DHL account", "de": "DHL-Konto"}
+{"uk": "Акаунт DHL:", "en": "DHL account:", "de": "DHL-Konto:"}
 {"uk": "Акаунт активовано!", "en": "Account activated!", "de": "Konto aktiviert!"}
 {"uk": "Акаунт видалено", "en": "Account deleted", "de": "Konto gelöscht"}
 {"uk": "Акаунт вимкнено.", "en": "Account disabled.", "de": "Konto deaktiviert."}
@@ -6689,6 +6693,7 @@
 {"uk": "Еквадор", "en": "Ecuador", "de": "Ecuador"}
 {"uk": "Екваторіальна Гвінея", "en": "Equatorial Guinea", "de": "Äquatorialguinea"}
 {"uk": "Експорт", "en": "Export", "de": "Export"}
+{"uk": "Експорт / Innerdeutsch", "en": "Export / domestic", "de": "Export / Innerdeutsch"}
 {"uk": "Експорт / Імпорт", "en": "Export / Import", "de": "Export / Import"}
 {"uk": "Експорт / лист", "en": "Export / e-mail", "de": "Export / E-Mail"}
 {"uk": "Експорт не завантажився — оновіть сторінку", "en": "Export did not load — reload the page", "de": "Export wurde nicht geladen — Seite neu laden"}
@@ -17713,7 +17718,7 @@
 {"uk": "або числовий ID", "en": "or a numeric ID", "de": "oder eine numerische ID"}
 {"uk": "або інше значення:", "en": "or another value:", "de": "oder anderer Wert:"}
 {"uk": "або: меню", "en": "or: menu", "de": "oder: Menü"}
-{"uk": "авто", "en": "auto", "de": "auto"}
+{"uk": "авто", "en": "auto", "de": "automatisch"}
 {"uk": "авто — не зважено", "en": "auto — not weighed", "de": "auto — nicht gewogen"}
 {"uk": "авто-обраний переможець (найбільше замовлень, при рівних — старший запис).", "en": "auto-selected winner (most orders; on a tie, the older record).", "de": "automatisch gewählter Gewinner (meiste Aufträge, bei Gleichstand – der ältere Datensatz)."}
 {"uk": "авто-обраний переможець (найбільше замовлень, при рівних — старший запис). Кнопка", "en": "auto-selected winner (most orders; on a tie, the older record). The button", "de": "automatisch gewählter Gewinner (meiste Aufträge, bei Gleichstand – der ältere Datensatz). Die Schaltfläche"}
@@ -17778,6 +17783,7 @@
 {"uk": "адресу — у листі; Angebot лишається чернеткою", "en": "address — in the e-mail; the Angebot remains a draft", "de": "Adresse — in der E-Mail; das Angebot bleibt ein Entwurf"}
 {"uk": "акаунт не потрібен — UPS виставить рахунок при доставці.", "en": "no account needed — UPS will bill on delivery.", "de": "kein Konto erforderlich — UPS stellt bei der Zustellung die Rechnung."}
 {"uk": "акаунт пошти", "en": "mail account", "de": "E-Mail-Konto"}
+{"uk": "акаунт імпорту не вписано в картці перевізника DHL — рахує експортним", "en": "import account is not set in the DHL carrier card — rated with the export account", "de": "Importkonto ist in der DHL-Versanddienstkarte nicht eingetragen — berechnet mit dem Exportkonto"}
 {"uk": "акаунти магазину й файли «📎 Документи» — теж до основного; нічого не лишається без клієнта", "en": "web shop accounts and “📎 Documents” files — also go to the primary customer; nothing is left without a customer", "de": "Webshop-Konten und Dateien unter „📎 Dokumente“ – gehen ebenfalls an den Hauptkunden; nichts bleibt ohne Kunden"}
 {"uk": "акаунти покупців: листи, сесії й паролі — без наслідків не перевірити", "en": "buyer accounts: emails, sessions and passwords — cannot be checked without consequences", "de": "Käuferkonten: E-Mails, Sitzungen und Passwörter — nicht ohne Folgen prüfbar"}
 {"uk": "акаунтів покупців", "en": "buyer accounts", "de": "Käuferkonten"}
@@ -20752,6 +20758,7 @@
 {"uk": "рахунок прив'язався; інакше прикріпіть на", "en": "the invoice got attached; otherwise attach it on", "de": "die Rechnung zugeordnet wurde; sonst hängen Sie sie an auf"}
 {"uk": "рахунок прикріплено до замовлення", "en": "invoice attached to the order", "de": "Rechnung an den Auftrag angehängt"}
 {"uk": "рахунок у замовленні. Не прив'язався — Minerva скаже, і тоді прикріпіть його на", "en": "the invoice in the order. Not attached — Minerva tells you, and then attach it on", "de": "die Rechnung im Auftrag anzeigt. Nicht zugeordnet — Minerva meldet es, dann hängen Sie sie an auf"}
+{"uk": "рахує", "en": "rated with", "de": "berechnet mit"}
 {"uk": "регіон", "en": "region", "de": "Region"}
 {"uk": "редагування", "en": "editing", "de": "Bearbeiten"}
 {"uk": "режим «Лише Minerva»", "en": "“Minerva only” mode", "de": "Modus „Nur Minerva“"}
@@ -21903,6 +21910,7 @@
 {"uk": "ім'я покупця", "en": "customer’s name", "de": "Name des Kunden"}
 {"uk": "імпорт", "en": "import", "de": "Import"}
 {"uk": "імпорт / API", "en": "import / API", "de": "Import / API"}
+{"uk": "імпорт / Drittland", "en": "import / third country", "de": "Import / Drittland"}
 {"uk": "імпорт / третя країна", "en": "import / third country", "de": "Import / Drittland"}
 {"uk": "імпортує атрибути, ціну", "en": "imports attributes, price", "de": "importiert Attribute, Preis"}
 {"uk": "імпортує атрибути, ціну, фото/датагарт для", "en": "imports attributes, price, photo/datasheet for", "de": "importiert Attribute, Preis, Foto/Datenblatt für"}

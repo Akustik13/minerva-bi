@@ -100,6 +100,13 @@
         <span class="dc-lbl">{% trans "Код" %}</span>
         <span class="dc-val" style="font-family:monospace">{{ product_code }}</span>
       </div>
+      {% if dhl_account.number %}
+      <div class="dc-row">
+        <span class="dc-lbl">{% trans "Акаунт DHL" %}</span>
+        <span class="dc-val" style="font-family:monospace" translate="no">{{ dhl_account.number }}</span>
+        <span class="dc-val">{% if dhl_account.kind == "import" %}{% trans "імпорт / третя країна" %}{% else %}{% trans "експорт / Innerdeutsch" %}{% endif %}{% if dhl_account.choice == "auto" %} · {% trans "авто" %}{% endif %}</span>
+      </div>
+      {% endif %}
       {% if price %}
       <div class="dc-row">
         <span class="dc-lbl">{% trans "Орієнтовна вартість" %}</span>

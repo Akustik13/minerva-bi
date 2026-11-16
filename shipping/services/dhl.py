@@ -89,6 +89,22 @@ def account_for(carrier, origin_country: str) -> tuple:
     return (import_acct or export_acct), "import"
 
 
+ACCOUNT_CHOICES = ("auto", "export", "import")
+
+
+def account_choice(carrier, origin_country: str, choice: str = "auto") -> tuple:
+    """(номер, вид) з вибору людини в порівнянні тарифів / оформленні: auto — `account_for` за країною
+    відправника, export — Account № (Export + Innerdeutsch), import — акаунт імпорту / третьої країни
+    (не вписаний — Account №)."""
+    export_acct = (carrier.connection_uuid or "").strip()
+    import_acct = (getattr(carrier, "import_account", "") or "").strip()
+    if choice == "export":
+        return export_acct, "export"
+    if choice == "import":
+        return (import_acct or export_acct), "import"
+    return account_for(carrier, origin_country)
+
+
 def customs_needed(origin_country: str, dest_country: str) -> bool:
     """Митна декларація потрібна, коли посилка перетинає кордон ЄС (з / до країни поза ЄС)."""
     o, d = (origin_country or "").upper()[:2], (dest_country or "").upper()[:2]
@@ -387,7 +403,7 @@ def create_shipment(carrier, shipment, product_code: str,
                     pickup_close_time: str = "18:00",
                     pickup_location: str = "reception",
                     include_customs: bool | None = None,
-                    dry_run: bool = False) -> dict:
+                    dry_run: bool = False, account: str = "auto") -> dict:
     """
     POST /shipments — створює відправлення DHL Express.
 
@@ -457,7 +473,7 @@ def create_shipment(carrier, shipment, product_code: str,
     _semail   = shipment.sender_email   or carrier.sender_email   or ""
 
     # Акаунт: відправник у DE — експорт / Innerdeutsch, з-за кордону — імпорт / третя країна
-    acct, acct_kind = account_for(carrier, _scountry)
+    acct, acct_kind = account_choice(carrier, _scountry, account)
     is_customs = customs_needed(_scountry, dest_country)
     # Явний override з форми (чекбокс)
     if include_customs is not None:

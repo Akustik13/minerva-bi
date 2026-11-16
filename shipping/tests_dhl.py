@@ -38,6 +38,34 @@ class AccountTests(BookingBase):
         c.import_account = ""
         self.assertEqual(dhl.account_for(c, "CN")[0], "144648348")
 
+    def test_account_choice(self):
+        c = carrier()
+        self.assertEqual(dhl.account_choice(c, "CN", "auto"), ("961444260", "import"))
+        self.assertEqual(dhl.account_choice(c, "CN", "export"), ("144648348", "export"))
+        self.assertEqual(dhl.account_choice(c, "DE", "import"), ("961444260", "import"))
+        c.import_account = ""
+        self.assertEqual(dhl.account_choice(c, "DE", "import"), ("144648348", "import"))
+
+    def test_compare_switch_and_confirm_shows_account(self):
+        import json
+        Carrier.objects.filter(pk=self.carrier.pk).update(connection_uuid="144648348", import_account="961444260",
+                                                          api_url="")
+        with mock.patch("shipping.services.dhl.get_rates", return_value={"products": []}) as rates:
+            r = self.client.post("/admin/shipping/shipment/compare-rates/", json.dumps({
+                "recipient_country": "DE", "recipient_zip": "81829", "recipient_city": "München",
+                "sender_country": "CN", "sender_zip": "523000", "sender_city": "Dongguan",
+                "packages": [{"weight_kg": 13, "length_cm": 50, "width_cm": 38, "height_cm": 39, "quantity": 2}],
+                "dhl_account": "export"}), content_type="application/json")
+        entry = next(c for c in r.json()["results"] if c["carrier_type"] == "dhl")
+        self.assertEqual((entry["dhl_account"]["number"], entry["dhl_account"]["choice"]), ("144648348", "export"))
+        self.assertEqual(rates.call_args.kwargs["account_number"], "144648348")
+        page = self.client.get(self.urls["dhl"][0] + "?product_code=P&product_name=X&price=1&account=import")
+        self.assertContains(page, "961444260")
+        with mock.patch("shipping.services.dhl.create_shipment", return_value=DHL_RESULT) as create:
+            self.client.post(self.urls["dhl"][0] + "?product_code=P&product_name=X&price=1&account=import",
+                             {"pickup_type": "dropoff"})
+        self.assertEqual(create.call_args.kwargs["account"], "import")
+
     def test_customs_needed(self):
         self.assertFalse(dhl.customs_needed("DE", "DE"))
         self.assertFalse(dhl.customs_needed("DE", "FR"))

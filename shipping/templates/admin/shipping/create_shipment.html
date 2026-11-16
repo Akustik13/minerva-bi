@@ -418,6 +418,7 @@ document.addEventListener('DOMContentLoaded',function(){
       document.getElementById('id_dhl_product_code').value = d.code;
       document.getElementById('id_dhl_product_name').value = d.name;
       document.getElementById('id_dhl_price').value = d.price;
+      const acc = document.getElementById('id_dhl_account'); if (acc) acc.value = window._dhlAccount || 'auto';
       const h = document.createElement('input');
       h.type='hidden'; h.name='action_btn'; h.value='dhl_book';
       form.appendChild(h); _syncDimsAndSubmit(form);
@@ -544,6 +545,7 @@ function compareRates(){
     recipient_state:   get('recipient_state'),
     packages,
     order_id: '{% if order %}{{ order.pk }}{% endif %}',
+    dhl_account: window._dhlAccount || 'auto',
   };
   const csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
 
@@ -788,6 +790,22 @@ function buildSummary(carriers){
   return h;
 }
 
+/* ── DHL: яким акаунтом рахує (авто / експорт / імпорт) — перемикач перераховує тарифи ── */
+window._dhlAccount = window._dhlAccount || 'auto';
+function dhlAccountBar(a){
+  const kind = a.kind === 'import' ? 'імпорт / Drittland' : 'експорт / Innerdeutsch';
+  const opt = (v, label, num) => `<option value="${v}"${a.choice===v?' selected':''}>${label}${num?' — '+esc(num):''}</option>`;
+  const noImport = !a.import
+    ? `<span style="color:var(--warn,#ef6c00)">· ⚠️ акаунт імпорту не вписано в картці перевізника DHL — рахує експортним</span>` : '';
+  return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12px;margin:0 0 8px">
+      <span style="color:var(--text-muted)">Акаунт DHL:</span>
+      <select onchange="window._dhlAccount=this.value;compareRates()" style="font-size:12px">
+        ${opt('auto','Авто (за країною відправника)','')}${opt('export','Експорт / Innerdeutsch',a.export)}${opt('import','Імпорт / Drittland',a.import)}
+      </select>
+      <span>рахує <b translate="no">${esc(a.number||'—')}</b> (${kind})</span>${noImport}
+    </div>`;
+}
+
 /* ── Детальна таблиця одного перевізника ───────────────────────── */
 function buildTable(c){
   const isDHL     = c.carrier_type==='dhl';
@@ -878,7 +896,7 @@ function renderComparison(carriers){
           display:flex;align-items:center;gap:6px">
         ${icon} ${esc(c.carrier_name)}
         ${c.products&&c.products.length?`<span style="color:var(--text-dim);font-weight:400">(${c.products.length} тарифів)</span>`:''}
-      </div>${body}</div>`;
+      </div>${c.dhl_account ? dhlAccountBar(c.dhl_account) : ''}${body}</div>`;
   });
   return html;
 }
@@ -2254,6 +2272,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     <!-- Кнопки дій -->
     <input type="hidden" name="dhl_product_code"   id="id_dhl_product_code"   value="">
+    <input type="hidden" name="dhl_account"        id="id_dhl_account"        value="auto">
     <input type="hidden" name="dhl_product_name"   id="id_dhl_product_name"   value="">
     <input type="hidden" name="dhl_price"          id="id_dhl_price"          value="">
     <input type="hidden" name="jumingo_preview_id"  id="id_jumingo_preview_id"  value="">
