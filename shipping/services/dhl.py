@@ -15,6 +15,7 @@ shipping/services/dhl.py — DHL Express MyDHL API
 Документація: https://developer.dhl.com/api-reference/dhl-express-mydhl-api
 """
 import logging
+import re
 from datetime import date, timedelta
 
 logger = logging.getLogger(__name__)
@@ -71,13 +72,73 @@ def _split_address(addr: str, max_len: int = 45) -> dict:
     return result
 
 
+def home_country(carrier) -> str:
+    return (carrier.sender_country or "DE").upper()[:2]
+
+
+def account_for(carrier, origin_country: str) -> tuple:
+    """(номер акаунта DHL, вид) за країною відправника: з країни перевізника (DE) — Account № (експорт /
+    Innerdeutsch), з-за кордону (посилка до нас або між двома іншими країнами) — «акаунт імпорту / третьої
+    країни», якщо вписаний. Вид: export (з DE, і Innerdeutsch) | import (з-за кордону)."""
+    home = home_country(carrier)
+    origin = (origin_country or home).upper()[:2]
+    export_acct = (carrier.connection_uuid or "").strip()
+    if origin == home:
+        return export_acct, "export"
+    import_acct = (getattr(carrier, "import_account", "") or "").strip()
+    return (import_acct or export_acct), "import"
+
+
+def customs_needed(origin_country: str, dest_country: str) -> bool:
+    """Митна декларація потрібна, коли посилка перетинає кордон ЄС (з / до країни поза ЄС)."""
+    o, d = (origin_country or "").upper()[:2], (dest_country or "").upper()[:2]
+    if not o or not d or o == d:
+        return False
+    return not (o in _EU_COUNTRIES and d in _EU_COUNTRIES)
+
+
+def _planned(ship_date, hour=10, minute=0) -> str:
+    """Дата й час для DHL: «2026-11-17T10:00:00 GMT+01:00» (пояс Europe/Berlin)."""
+    from datetime import datetime
+    try:
+        from zoneinfo import ZoneInfo
+        off = datetime(ship_date.year, ship_date.month, ship_date.day, hour, minute,
+                       tzinfo=ZoneInfo("Europe/Berlin")).strftime("%z")
+        off = f"{off[:3]}:{off[3:]}"
+    except Exception:  # noqa: BLE001
+        off = "+01:00"
+    return f"{ship_date.isoformat()}T{hour:02d}:{minute:02d}:00 GMT{off}"
+
+
+def _rate_packages(packages, weight_kg, length_cm, width_cm, height_cm) -> list:
+    """Коробки для /rates: [{weight_kg, length_cm, width_cm, height_cm, quantity}] → кожна окремо."""
+    out = []
+    for p in packages or []:
+        try:
+            box = {"weight": round(max(0.1, float(p.get("weight_kg") or 1)), 3),
+                   "dimensions": {"length": max(1, int(float(p.get("length_cm") or 20))),
+                                  "width": max(1, int(float(p.get("width_cm") or 15))),
+                                  "height": max(1, int(float(p.get("height_cm") or 10)))}}
+        except (TypeError, ValueError):
+            continue
+        out += [dict(box) for _ in range(max(1, int(p.get("quantity") or 1)))]
+    if not out:
+        out = [{"weight": round(max(0.1, float(weight_kg or 1)), 3),
+                "dimensions": {"length": int(length_cm or 20), "width": int(width_cm or 15),
+                               "height": int(height_cm or 10)}}]
+    return out
+
+
 def get_rates(carrier, destination_country: str, destination_postal: str,
               destination_city: str, weight_kg: float,
               length_cm: float, width_cm: float, height_cm: float,
               is_customs_declarable: bool = False,
-              account_number: str = "") -> dict:
+              account_number: str = "", packages=None, origin=None) -> dict:
     """
-    GET /rates — повертає список DHL Express продуктів з цінами.
+    POST /rates — тарифи DHL Express для кожної коробки окремо (packages: [{weight_kg, length_cm, width_cm,
+    height_cm, quantity}], без них — одна коробка з weight/length/width/height). origin {country, postal, city} —
+    справжній відправник (посилка до нас), без нього — адреса перевізника. Акаунт — `account_for`, митниця —
+    `customs_needed` (з / до країни поза ЄС).
 
     carrier.api_key    = DHL API Username
     carrier.api_secret = DHL API Password
@@ -104,36 +165,37 @@ def get_rates(carrier, destination_country: str, destination_postal: str,
     use_test = (carrier.api_url or "").strip().lower() == "test"
     base      = _TEST_BASE if use_test else _PROD_BASE
 
-    acct = account_number or carrier.connection_uuid or ""
+    origin = origin or {}
+    o_country = (origin.get("country") or home_country(carrier)).upper()[:2]
+    o_postal = origin.get("postal") if origin.get("country") else carrier.sender_zip
+    o_city = origin.get("city") if origin.get("country") else carrier.sender_city
+    dest = (destination_country or "").upper()[:2]
+    acct = account_number or account_for(carrier, o_country)[0]
 
     # Дата відправлення: наступний робочий день
     ship_date = date.today() + timedelta(days=1)
-    # Якщо неділя → понеділок
-    if ship_date.weekday() == 6:
+    while ship_date.weekday() >= 5:
         ship_date += timedelta(days=1)
-    params = {
-        "accountNumber":          acct,
-        "originCountryCode":      carrier.sender_country or "DE",
-        "originPostalCode":       _norm_postal(carrier.sender_zip, carrier.sender_country or "DE"),
-        "originCityName":         carrier.sender_city   or "",
-        "destinationCountryCode": destination_country,
-        "destinationPostalCode":  _norm_postal(destination_postal, destination_country),
-        "destinationCityName":    destination_city,
-        "weight":                 round(float(weight_kg), 3),
-        "length":                 int(length_cm),
-        "width":                  int(width_cm),
-        "height":                 int(height_cm),
-        "plannedShippingDate":    ship_date.isoformat(),   # YYYY-MM-DD, без часу
-        "isCustomsDeclarable":    str(is_customs_declarable).lower(),
-        "unitOfMeasurement":      "metric",
+    body = {
+        "customerDetails": {
+            "shipperDetails":  {"postalCode": _norm_postal(o_postal, o_country), "cityName": o_city or "",
+                                "countryCode": o_country},
+            "receiverDetails": {"postalCode": _norm_postal(destination_postal, dest),
+                                "cityName": destination_city or "", "countryCode": dest},
+        },
+        "accounts": [{"typeCode": "shipper", "number": acct}] if acct else [],
+        "plannedShippingDateAndTime": _planned(ship_date),
+        "unitOfMeasurement": "metric",
+        "isCustomsDeclarable": customs_needed(o_country, dest) or bool(is_customs_declarable and o_country != dest),
+        "packages": _rate_packages(packages, weight_kg, length_cm, width_cm, height_cm),
     }
 
     try:
         from tabele.api_logger import logged_request
-        resp = logged_request('dhl', 'get_rates', 'GET', f"{base}/rates", req.get,
-                              params=params,
+        resp = logged_request('dhl', 'get_rates', 'POST', f"{base}/rates", req.post,
+                              json=body,
                               auth=(carrier.api_key, carrier.api_secret),
-                              headers={"Accept": "application/json"},
+                              headers={"Accept": "application/json", "Content-Type": "application/json"},
                               timeout=20)
     except req.exceptions.Timeout:
         return {"products": [], "error": "Timeout — DHL API не відповідає"}
@@ -375,12 +437,7 @@ def create_shipment(carrier, shipment, product_code: str,
     except Exception:
         planned_dt = f"{ship_date.isoformat()}T{_rh:02d}:{_rm:02d}:00 GMT+01:00"
 
-    acct         = carrier.connection_uuid or ""
     dest_country = (shipment.recipient_country or "").upper()
-    is_customs   = dest_country not in _EU_COUNTRIES
-    # Явний override з форми (чекбокс)
-    if include_customs is not None:
-        is_customs = include_customs
 
     # shipment.sender_* має пріоритет над carrier.sender_* (якщо заповнені у формі)
     _sname    = shipment.sender_name    or carrier.sender_name    or carrier.sender_company or "Sender"
@@ -388,7 +445,17 @@ def create_shipment(carrier, shipment, product_code: str,
     _sstreet  = shipment.sender_street  or carrier.sender_street  or ""
     _scity    = shipment.sender_city    or carrier.sender_city    or ""
     _szip     = shipment.sender_zip     or carrier.sender_zip     or ""
-    _scountry = shipment.sender_country or carrier.sender_country or "DE"
+    _scountry = (shipment.sender_country or carrier.sender_country or "DE").upper()
+    _semail   = shipment.sender_email   or carrier.sender_email   or ""
+
+    # Акаунт: відправник у DE — експорт / Innerdeutsch, з-за кордону — імпорт / третя країна
+    acct, acct_kind = account_for(carrier, _scountry)
+    is_customs = customs_needed(_scountry, dest_country)
+    # Явний override з форми (чекбокс)
+    if include_customs is not None:
+        is_customs = include_customs
+    customs_data = shipment.customs_articles or {}
+    incoterm = (customs_data.get("incoterm") or "DAP").upper()[:3]
     sender_name    = _sname
     sender_company = _scompany
     recv_name      = shipment.recipient_name or shipment.recipient_company or "Recipient"
@@ -441,7 +508,7 @@ def create_shipment(carrier, shipment, product_code: str,
                     "fullName":    sender_name,
                     "companyName": sender_company,
                     "phone":       send_phone,
-                    "email":       carrier.sender_email or "",
+                    "email":       _semail,
                 },
             },
             "receiverDetails": {
@@ -463,7 +530,7 @@ def create_shipment(carrier, shipment, product_code: str,
             "packages": dhl_packages,
             "isCustomsDeclarable":   is_customs,
             "description":           (shipment.description or "Goods")[:35],
-            "incoterm":              "DAP",
+            "incoterm":              incoterm,
             "unitOfMeasurement":     "metric",
             "declaredValue":         round(float(shipment.declared_value or 0), 2),
             "declaredValueCurrency": shipment.declared_currency or "EUR",
@@ -509,10 +576,18 @@ def create_shipment(carrier, shipment, product_code: str,
                             pkg_weight_map[desc] = dist.get("weight_per_item", weight_per_item)
 
         for idx, item in enumerate(items, start=1):
-            # Визначити вагу на товар: з розподілу або з загальної формули
+            # Вага рядка (DHL — за весь рядок): «Вага/шт (кг)» митної декларації × к-сть,
+            # інакше з розподілу по коробках або загальна вага порівну між рядками
             item_desc = item.get("description", "")
-            item_weight = pkg_weight_map.get(item_desc, weight_per_item)
-            item_weight = round(max(0.1, item_weight), 3)
+            try:
+                per_unit = float(item.get("weight") or 0)
+            except (TypeError, ValueError):
+                per_unit = 0.0
+            if per_unit > 0 and not item.get("weight_auto"):
+                item_weight = per_unit * max(1, int(item.get("quantity") or 1))
+            else:
+                item_weight = pkg_weight_map.get(item_desc, weight_per_item)
+            item_weight = round(max(0.001, item_weight), 3)
 
             li: dict = {
                 "number":      idx,
@@ -549,28 +624,47 @@ def create_shipment(carrier, shipment, product_code: str,
                 "additionalCharges": [],
                 "placeOfIncoterm":   _scity or "Frankfurt",
             }
+            # Інвойс DHL (шаблон COMMERCIAL_INVOICE_P_10) — PDF у відповіді, зберігається в Minerva
+            # (як митна декларація UPS) і йде в «Друкувати всі документи»
+            payload["outputImageProperties"]["imageOptions"].append({
+                "typeCode": "invoice", "templateName": "COMMERCIAL_INVOICE_P_10",
+                "isRequested": True, "invoiceType": "commercial",
+            })
+            # Paperless Trade (WY): DHL бере інвойс в електронному вигляді, папір до посилки не потрібен.
+            # Якщо акаунт не має цієї послуги — повтор без неї (нижче)
+            payload["valueAddedServices"] = [{"serviceCode": "WY"}]
 
     if dry_run:
         return payload
 
-    try:
-        from tabele.api_logger import logged_request
-        resp = logged_request('dhl', 'create_shipment', 'POST', f"{base}/shipments", req.post,
-                              json=payload,
-                              auth=(carrier.api_key, carrier.api_secret),
-                              headers={"Accept": "application/json", "Content-Type": "application/json"},
-                              timeout=30)
-    except req.exceptions.Timeout:
-        return {"success": False, "error": "Timeout — DHL API не відповідає",
-                "raw_request": payload, "raw_response": None}
-    except Exception as e:
-        return {"success": False, "error": str(e),
-                "raw_request": payload, "raw_response": None}
+    notes = []
+    for attempt in range(2):
+        try:
+            from tabele.api_logger import logged_request
+            resp = logged_request('dhl', 'create_shipment', 'POST', f"{base}/shipments", req.post,
+                                  json=payload,
+                                  auth=(carrier.api_key, carrier.api_secret),
+                                  headers={"Accept": "application/json", "Content-Type": "application/json"},
+                                  timeout=30)
+        except req.exceptions.Timeout:
+            return {"success": False, "error": "Timeout — DHL API не відповідає",
+                    "raw_request": payload, "raw_response": None}
+        except Exception as e:
+            return {"success": False, "error": str(e),
+                    "raw_request": payload, "raw_response": None}
 
-    try:
-        data = resp.json()
-    except Exception:
-        data = {"raw_text": resp.text[:3000]}
+        try:
+            data = resp.json()
+        except Exception:
+            data = {"raw_text": resp.text[:3000]}
+        # Акаунт без Paperless Trade (WY): DHL відмовляє (400 / 422) — ще раз без неї, інвойс лишається PDF
+        if (attempt == 0 and not resp.ok and resp.status_code in (400, 422) and payload.get("valueAddedServices")
+                and re.search(r"\bWY\b|paperless|value.?added", str(data), re.I)):
+            payload.pop("valueAddedServices", None)
+            notes.append("Paperless Trade (WY) для цього акаунта DHL не ввімкнено — інвойс треба роздрукувати "
+                         "й покласти до посилки.")
+            continue
+        break
 
     if not resp.ok:
         title = (data.get("title") or data.get("message") or "Error")
@@ -595,27 +689,34 @@ def create_shipment(carrier, shipment, product_code: str,
 
     tracking_number = data.get("shipmentTrackingNumber", "")
 
-    # Витягуємо base64 PDF label
-    label_bytes = None
-    for doc in (data.get("documents") or []):
-        if doc.get("typeCode") == "label":
-            b64 = doc.get("content", "")
-            if b64:
+    # Документи у відповіді (base64 PDF): етикетка (одна на всі коробки) й інвойс DHL
+    def _doc(type_code):
+        for doc in (data.get("documents") or []):
+            if doc.get("typeCode") == type_code and doc.get("content"):
                 try:
-                    label_bytes = base64.b64decode(b64)
-                except Exception:
-                    pass
-            break
+                    return base64.b64decode(doc["content"])
+                except Exception:  # noqa: BLE001
+                    return None
+        return None
+
+    package_tracking = [p.get("trackingNumber") for p in (data.get("packages") or [])
+                        if isinstance(p, dict) and p.get("trackingNumber")]
 
     return {
-        "success":         True,
-        "tracking_number": tracking_number,
-        "label_bytes":     label_bytes,
-        "carrier_service": product_name or product_code,
-        "carrier_price":   price,
-        "raw_request":     payload,
-        "raw_response":    data,
-        "error":           None,
+        "success":          True,
+        "tracking_number":  tracking_number,
+        "package_tracking": package_tracking,
+        "label_bytes":      _doc("label"),
+        "invoice_bytes":    _doc("invoice"),
+        "account":          acct,
+        "account_kind":     acct_kind,
+        "paperless":        bool(payload.get("valueAddedServices")),
+        "notes":            notes,
+        "carrier_service":  product_name or product_code,
+        "carrier_price":    price,
+        "raw_request":      payload,
+        "raw_response":     data,
+        "error":            None,
     }
 
 

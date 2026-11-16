@@ -182,7 +182,13 @@ class Carrier(models.Model):
     )
     connection_uuid = models.CharField(
         "Connection UUID / Account №", max_length=100, blank=True, default="",
-        help_text="Jumingo: UUID інтеграції | DHL: Account Number (9 цифр) | UPS: Account Number (6 символів)",
+        help_text="Jumingo: UUID інтеграції | DHL: Account Number експорту й Innerdeutsch (9 цифр; відправник — "
+                  "Німеччина) | UPS: Account Number (6 символів)",
+    )
+    import_account = models.CharField(
+        "DHL: акаунт імпорту / третьої країни", max_length=20, blank=True, default="",
+        help_text="DHL Express Import + Drittland (9 цифр): посилки, де відправник за кордоном — до нас або між "
+                  "двома іншими країнами. Порожньо — для всіх посилок «Account №».",
     )
 
     # ── Дані відправника (звідси беруться при кожному відправленні) ──────────

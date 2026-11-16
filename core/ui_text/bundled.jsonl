@@ -1159,6 +1159,7 @@
 {"uk": "DDP + мито «Отримувач»", "en": "DDP + duty “Recipient”", "de": "DDP + Zoll „Empfänger“"}
 {"uk": "DELETE не підтримується.", "en": "DELETE is not supported.", "de": "DELETE wird nicht unterstützt."}
 {"uk": "DHL Carrier не має API ключа/секрету. Заповніть поля.", "en": "DHL Carrier has no API key/secret. Fill in the fields.", "de": "DHL Carrier hat keinen API-Schlüssel/kein Secret. Füllen Sie die Felder aus."}
+{"uk": "DHL Express Import + Drittland (9 цифр): посилки, де відправник за кордоном — до нас або між двома іншими країнами. Порожньо — для всіх посилок «Account №».", "en": "DHL Express Import + Drittland (9 digits): parcels whose sender is abroad — to us or between two other countries. Empty — «Account №» for all parcels.", "de": "DHL Express Import + Drittland (9 Ziffern): Sendungen mit Absender im Ausland — zu uns oder zwischen zwei anderen Ländern. Leer — «Account №» für alle Sendungen."}
 {"uk": "DHL Express — Тарифи та Трекінг", "en": "DHL Express — Rates and Tracking", "de": "DHL Express — Tarife und Sendungsverfolgung"}
 {"uk": "DHL Paket). Якщо префікс не знайдено — визначає трекер за типом перевізника. Правила перебираються по пріоритету; при помилці пробує наступний.", "en": "DHL Paket). If no prefix is found — the tracker is determined by the carrier type. Rules are tried in priority order; on error the next one is tried.", "de": "DHL Paket). Wird kein Präfix gefunden, wird der Tracker anhand des Versanddienstleistertyps bestimmt. Die Regeln werden nach Priorität durchlaufen; bei einem Fehler wird die nächste versucht."}
 {"uk": "DHL Shipment Tracking – Unified API ключ (developer.dhl.com → My Apps). Окремий від API ключа для тарифів.", "en": "DHL Shipment Tracking – Unified API key (developer.dhl.com → My Apps). Separate from the API key for rates.", "de": "DHL Shipment Tracking – Unified API-Schlüssel (developer.dhl.com → My Apps). Getrennt vom API-Schlüssel für Tarife."}
@@ -1175,6 +1176,7 @@
 {"uk": "DHL: API Secret | UPS/FedEx: Client Secret | Jumingo: не використовується", "en": "DHL: API Secret | UPS/FedEx: Client Secret | Jumingo: not used", "de": "DHL: API Secret | UPS/FedEx: Client Secret | Jumingo: nicht verwendet"}
 {"uk": "DHL: track_api_key не налаштовано в Carrier", "en": "DHL: track_api_key is not configured in Carrier", "de": "DHL: track_api_key ist im Carrier nicht konfiguriert"}
 {"uk": "DHL: «test» для sandbox | UPS: «sandbox» для sandbox | решта: порожньо = production", "en": "DHL: “test” for sandbox | UPS: “sandbox” for sandbox | others: empty = production", "de": "DHL: „test“ für Sandbox | UPS: „sandbox“ für Sandbox | übrige: leer = Produktion"}
+{"uk": "DHL: акаунт імпорту / третьої країни", "en": "DHL: import / third-country account", "de": "DHL: Import- / Drittland-Konto"}
 {"uk": "DK Category ID довший за {0} символів", "en": "DK Category ID is longer than {0} characters", "de": "DK Category ID ist länger als {0} Zeichen"}
 {"uk": "DK атрибути", "en": "DK attributes", "de": "DK-Attribute"}
 {"uk": "DK → Склад", "en": "DK → Stock", "de": "DK → Lager"}
@@ -1576,6 +1578,7 @@
 {"uk": "Jumingo сервіс не налаштований.", "en": "Jumingo service is not configured.", "de": "Der Jumingo-Dienst ist nicht konfiguriert."}
 {"uk": "Jumingo → Мої відправлення", "en": "Jumingo → My shipments", "de": "Jumingo → Meine Sendungen"}
 {"uk": "Jumingo: UUID інтеграції | DHL: Account Number (9 цифр) | UPS: Account Number (6 символів)", "en": "Jumingo: integration UUID | DHL: Account Number (9 digits) | UPS: Account Number (6 characters)", "de": "Jumingo: UUID der Integration | DHL: Account Number (9 Ziffern) | UPS: Account Number (6 Zeichen)"}
+{"uk": "Jumingo: UUID інтеграції | DHL: Account Number експорту й Innerdeutsch (9 цифр; відправник — Німеччина) | UPS: Account Number (6 символів)", "en": "Jumingo: integration UUID | DHL: export & domestic (Innerdeutsch) Account Number (9 digits; sender in Germany) | UPS: Account Number (6 characters)", "de": "Jumingo: Integrations-UUID | DHL: Kontonummer Export & Innerdeutsch (9 Ziffern; Absender Deutschland) | UPS: Kontonummer (6 Zeichen)"}
 {"uk": "Jumingo: ціна та сервіс", "en": "Jumingo: price and service", "de": "Jumingo: Preis und Service"}
 {"uk": "KEY = \"…\" # ключ API з Minerva (REST API → API Ключі)", "en": "KEY = \"…\" # API key from Minerva (REST API → API Keys)", "de": "KEY = \"…\" # API-Schlüssel aus Minerva (REST API → API-Schlüssel)"}
 {"uk": "KPI картки", "en": "KPI cards", "de": "KPI-Karten"}
@@ -1827,6 +1830,7 @@
 {"uk": "Packing List (свій шаблон)", "en": "Packing List (custom template)", "de": "Packing List (eigene Vorlage)"}
 {"uk": "Packing List цієї посилки", "en": "Packing List for this parcel", "de": "Packing List für dieses Paket"}
 {"uk": "Packing List — пакувальний лист", "en": "Packing List", "de": "Packing List — Packliste"}
+{"uk": "Paperless Trade (WY) для цього акаунта DHL не ввімкнено — інвойс треба роздрукувати й покласти до посилки.", "en": "Paperless Trade (WY) is not enabled for this DHL account — print the invoice and put it in the parcel.", "de": "Paperless Trade (WY) ist für dieses DHL-Konto nicht aktiviert — Rechnung ausdrucken und dem Paket beilegen."}
 {"uk": "Parcel {0}: нетто {1} кг > брутто {2} кг", "en": "Parcel {0}: net {1} kg > gross {2} kg", "de": "Parcel {0}: netto {1} kg > brutto {2} kg"}
 {"uk": "Personal Effects — особисті речі", "en": "Personal Effects — personal belongings", "de": "Personal Effects — persönliche Gegenstände"}
 {"uk": "Polarization — поляризація", "en": "Polarization — polarization", "de": "Polarization — Polarisation"}
@@ -18527,6 +18531,7 @@
 {"uk": "діє — форма Stripe на сторінці сайту (Kasse)", "en": "on — Stripe form on the site page (Kasse)", "de": "aktiv — Stripe-Formular auf der Website (Kasse)"}
 {"uk": "дії", "en": "actions", "de": "Aktionen"}
 {"uk": "експорт", "en": "export", "de": "Export"}
+{"uk": "експорт / Innerdeutsch", "en": "export / domestic", "de": "Export / Innerdeutsch"}
 {"uk": "елемент", "en": "item", "de": "Element"}
 {"uk": "елементи", "en": "items", "de": "Elemente"}
 {"uk": "елементів", "en": "items", "de": "Elemente"}
@@ -21895,6 +21900,7 @@
 {"uk": "ім'я покупця", "en": "customer’s name", "de": "Name des Kunden"}
 {"uk": "імпорт", "en": "import", "de": "Import"}
 {"uk": "імпорт / API", "en": "import / API", "de": "Import / API"}
+{"uk": "імпорт / третя країна", "en": "import / third country", "de": "Import / Drittland"}
 {"uk": "імпортує атрибути, ціну", "en": "imports attributes, price", "de": "importiert Attribute, Preis"}
 {"uk": "імпортує атрибути, ціну, фото/датагарт для", "en": "imports attributes, price, photo/datasheet for", "de": "importiert Attribute, Preis, Foto/Datenblatt für"}
 {"uk": "ім’я невідоме", "en": "name unknown", "de": "Name unbekannt"}

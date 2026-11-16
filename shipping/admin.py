@@ -263,10 +263,12 @@ class CarrierAdmin(admin.ModelAdmin):
             "fields": ("name", "carrier_type", "is_active", "is_default", "notes")
         }),
         ("🔑 API налаштування", {
-            "fields": ("api_key", "api_secret", "api_url", "connection_uuid", "track_api_key"),
+            "fields": ("api_key", "api_secret", "api_url", "connection_uuid", "import_account", "track_api_key"),
             "description": (
                 "<b>Jumingo:</b> api_key = X-AUTH-TOKEN, connection_uuid = UUID інтеграції.<br>"
-                "<b>DHL:</b> api_key = API Key, api_secret = API Secret, connection_uuid = Account Number, api_url = <code>test</code> для sandbox.<br>"
+                "<b>DHL:</b> api_key = API Key, api_secret = API Secret, connection_uuid = Account Number експорту й "
+                "Innerdeutsch, «акаунт імпорту / третьої країни» — для посилок, де відправник за кордоном "
+                "(Minerva вибирає сама), api_url = <code>test</code> для sandbox.<br>"
                 "<b>UPS:</b> api_key = Client ID, api_secret = Client Secret, connection_uuid = Account Number, "
                 "api_url = <code>sandbox</code> для тестів (порожньо = production).<br>"
                 "<b>DHL Tracking:</b> track_api_key = окремий Tracking API ключ."
@@ -6019,9 +6021,13 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             if carrier.carrier_type == "dhl":
                 if carrier.api_key and carrier.api_secret:
                     from .services.dhl import get_rates as _dhl_rates
+                    # Кожна коробка окремо; відправник з форми (посилка до нас — справжній відправник)
+                    _origin = ({"country": sender_override["country"], "postal": sender_override["postal"],
+                                "city": sender_override["city"]} if sender_override["country"] else None)
                     r = _dhl_rates(carrier, dest_country, dest_postal, dest_city,
                                    weight, length, width, height,
-                                   is_customs_declarable=is_customs)
+                                   is_customs_declarable=is_customs,
+                                   packages=packages_raw or None, origin=_origin)
                     entry["products"] = r.get("products") or []
                     entry["error"]    = r.get("error")
                 else:
@@ -6693,11 +6699,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         width   = int(shipment.width_cm   or 15)
         height  = int(shipment.height_cm  or 10)
 
-        dest_country = order.addr_country or ""
-        dest_postal  = order.addr_zip     or ""
-        dest_city    = order.addr_city    or ""
-
-        is_customs = dest_country not in getattr(__import__('shipping.services.jumingo', fromlist=['JumingoService']), 'JumingoService', type('', (), {'_EU_COUNTRIES': set()}))._EU_COUNTRIES
+        # Адреси — з відправлення (поміняли відправника й отримувача — посилка до нас), інакше з замовлення
+        dest_country = (shipment.recipient_country or (order.addr_country if order else "") or "").upper()
+        dest_postal  = shipment.recipient_zip  or (order.addr_zip if order else "") or ""
+        dest_city    = shipment.recipient_city or (order.addr_city if order else "") or ""
+        origin = ({"country": shipment.sender_country, "postal": shipment.sender_zip, "city": shipment.sender_city}
+                  if shipment.sender_country else None)
+        boxes = [{"weight_kg": p.weight_kg, "length_cm": p.length_cm, "width_cm": p.width_cm,
+                  "height_cm": p.height_cm, "quantity": p.quantity} for p in shipment.packages.order_by("pk")]
 
         result = dhl_get_rates(
             carrier=dhl_carrier,
@@ -6708,7 +6717,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             length_cm=length,
             width_cm=width,
             height_cm=height,
-            is_customs_declarable=is_customs,
+            packages=boxes or None,
+            origin=origin,
         )
 
         return render(request, "admin/shipping/dhl_rates.html", {
@@ -6900,6 +6910,23 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         tracking_number = result.get("tracking_number", "")
         label_bytes     = result.get("label_bytes")
+        for note in result.get("notes") or []:
+            messages.warning(request, f"⚠️ {note}")
+
+        # Інвойс DHL (COMMERCIAL_INVOICE_P_10) → митний документ відправлення, документи замовлення
+        customs_url = ""
+        if result.get("invoice_bytes") and tracking_number:
+            try:
+                cdir = os.path.join(settings.MEDIA_ROOT, "shipping", "customs")
+                os.makedirs(cdir, exist_ok=True)
+                cpath = os.path.join(cdir, f"dhl_invoice_{shipment.pk}_{tracking_number}.pdf")
+                with open(cpath, "wb") as fh:
+                    fh.write(result["invoice_bytes"])
+                customs_url = f"{settings.MEDIA_URL}shipping/customs/{os.path.basename(cpath)}"
+                _copy_shipment_file_local(cpath, shipment)
+                _copy_shipment_file_to_order_docs(cpath, shipment)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("DHL invoice save failed: %s", exc)
 
         # Зберегти label PDF до media/labels/dhl/
         label_url = ""
@@ -6935,6 +6962,18 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         if label_url:
             shipment.label_url = label_url
             update_fields.append("label_url")
+        if customs_url:
+            shipment.customs_url = customs_url
+            update_fields.append("customs_url")
+        boxes = [t for t in (result.get("package_tracking") or []) if t]
+        if len(boxes) > 1:
+            shipment.package_tracking = boxes
+            update_fields.append("package_tracking")
+        if result.get("account"):
+            kind = "імпорт / третя країна" if result.get("account_kind") == "import" else "експорт / Innerdeutsch"
+            shipment.notes = ((shipment.notes.rstrip() + "\n") if shipment.notes else "") + \
+                f"DHL_ACCOUNT | {result['account']} ({kind})" + (" | Paperless Trade" if result.get("paperless") else "")
+            update_fields.append("notes")
         shipment.save(update_fields=update_fields)
 
         # Синхронізуємо SalesOrder
