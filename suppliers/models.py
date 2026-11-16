@@ -374,3 +374,33 @@ class SupplierRequestRecipient(models.Model):
 
     def __str__(self):
         return f"{self.request.code} → {self.supplier}"
+
+
+def _reply_path(instance, filename):
+    from inventory.services.po_documents import safe_name
+    return (f"supplier_requests/{instance.recipient.request_id}/replies/{instance.recipient_id}/"
+            f"{uuid.uuid4().hex[:8]}_{safe_name(filename)}")
+
+
+class SupplierReplyFile(models.Model):
+    """📎 Вкладення з листа постачальника у відповідь на запит (пропозиція, прайс, креслення…) — лежить у запиті.
+    Окремо від SupplierRequestFile: ті йдуть вкладенням кожному отримувачу, ці — ні. Той самий файл двічі
+    (вміст — sha256) у рядку зберігається раз."""
+    recipient = models.ForeignKey(SupplierRequestRecipient, on_delete=models.CASCADE, related_name="reply_files")
+    message = models.ForeignKey("email_assistant.EmailMessage", null=True, blank=True, on_delete=models.SET_NULL,
+                                related_name="+")
+    index = models.SmallIntegerField("№ вкладення в листі", default=-1)
+    file = models.FileField(upload_to=_reply_path, max_length=300)
+    name = models.CharField(max_length=255)
+    size = models.PositiveIntegerField(default=0)
+    content_type = models.CharField(max_length=100, blank=True, default="")
+    sha256 = models.CharField(max_length=64, blank=True, default="")
+    received_at = models.DateTimeField("Коли надіслали", null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-received_at", "pk"]
+        constraints = [models.UniqueConstraint(fields=["recipient", "sha256"], name="rfq_reply_file_once")]
+
+    def __str__(self):
+        return self.name

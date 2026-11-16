@@ -4687,5 +4687,15 @@ window.bulkAction = async function(action) {
     window.refreshBadges && window.refreshBadges();
   } catch(e) {}
 };
+
+/* /email/?msg=<pk> — посилання «✉️ лист» з інших сторінок Minerva: одразу відкрити цей лист */
+(function() {
+  var pk = {{ open_msg|default:0 }};
+  if (!pk) return;
+  if (pk < 0) { _showToast('⚠️ {% trans "Цього листа немає у вашій скриньці (інша скринька або видалено)" %}'); return; }
+  var row = document.getElementById('row-' + pk);
+  if (row) row.scrollIntoView({block: 'center'});
+  previewMsg(pk, 0, row || document.createElement('div'));
+})();
 </script>
 {% endblock %}

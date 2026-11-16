@@ -9,7 +9,8 @@ suppliers/services/rfq.py — 📨 Запити постачальникам (RF
                    в Minerva й гілка (як «Написати»), проєкт запиту → гілка в проєкті; стан кожного отримувача;
                    повторне натискання не шле вдруге (атомарний UPDATE зі стану «ще не надіслано / не надіслано»);
   відповіді      — on_incoming (сигнал нового листа): та сама гілка, або номер запиту в темі й відправник —
-                   цей постачальник → «📥 Відповів», запит → «Є відповіді»;
+                   цей постачальник → «📥 Відповів», запит → «Є відповіді»; вкладення листів постачальника — у запит
+                   (suppliers/services/rfq_replies.py: collect, панель рядка, підказка при наведенні);
   пропозиції     — set_quote (вручну), apply_ai (з AI, suppliers/services/ai.quote), comparison (ціна в валюті
                    Minerva, строк, оцінка постачальника), choose, close, remind (нагадування в тій самій гілці),
                    make_purchase (чернетка закупівлі для вибраного).
@@ -475,14 +476,23 @@ def on_incoming(msg) -> int:
         updates = {"reply_message": msg} if r.reply_message_id is None else {}
         if r.state in (R.SENT, R.FAILED, R.SILENT):
             updates.update(state=R.REPLIED, replied_at=msg.sent_at or timezone.now())
-        if not updates:
-            continue
-        R.objects.filter(pk=r.pk).update(**updates)
-        SupplierRequest.objects.filter(pk=r.request_id, status=SupplierRequest.SENT).update(
-            status=SupplierRequest.ANSWERED)
-        SupplierEvent.objects.create(supplier=r.supplier, kind=SupplierEvent.REQUEST, request=r.request, message=msg,
-                                     text=f"📥 Відповідь на запит {r.request.code}: «{(msg.subject or '')[:120]}»")
-        found += 1
+        if updates:
+            R.objects.filter(pk=r.pk).update(**updates)
+            SupplierRequest.objects.filter(pk=r.request_id, status=SupplierRequest.SENT).update(
+                status=SupplierRequest.ANSWERED)
+            SupplierEvent.objects.create(supplier=r.supplier, kind=SupplierEvent.REQUEST, request=r.request,
+                                         message=msg,
+                                         text=f"📥 Відповідь на запит {r.request.code}: «{(msg.subject or '')[:120]}»")
+            found += 1
+            if "reply_message" in updates:
+                r.reply_message_id = msg.pk
+        # 📎 вкладення листа (і кожного наступного в гілці) — у запит; з IMAP тут не тягнемо (синхронізація пошти
+        # зберігає документи сама), решту забере панель рядка
+        try:
+            from suppliers.services.rfq_replies import collect
+            collect(r)
+        except Exception:  # noqa: BLE001
+            logger.warning("rfq reply files for recipient %s failed", r.pk, exc_info=True)
     return found
 
 

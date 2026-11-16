@@ -872,6 +872,7 @@
 {"uk": "AI пропонує нову категорію", "en": "AI proposes a new category", "de": "KI schlägt eine neue Kategorie vor"}
 {"uk": "AI прочитає", "en": "AI will read", "de": "Die KI liest"}
 {"uk": "AI прочитає відповідь (і вкладення) й заповнить ціни, строк, умови", "en": "AI reads the reply (and attachments) and fills in prices, lead time, terms", "de": "KI liest die Antwort (und Anhänge) und füllt Preise, Lieferzeit, Bedingungen aus"}
+{"uk": "AI прочитає відповідь і вкладення або ✏️ внесіть вручну", "en": "AI will read the reply and attachments, or ✏️ enter manually", "de": "AI liest die Antwort und die Anhänge, oder ✏️ manuell eingeben"}
 {"uk": "AI прочитає листи проєкту, Angebote, замовлення, терміни й знайдене в базі знань RAG і складе", "en": "The AI will read the project e-mails, Angebote, orders, deadlines and what is found in the RAG knowledge base and compile", "de": "Die KI liest die Projekt-E-Mails, Angebote, Aufträge, Fristen und das in der RAG-Wissensdatenbank Gefundene und erstellt"}
 {"uk": "AI прочитає листи проєкту, Angebote, замовлення, терміни й знайдене в базі знань RAG і складе: обіцянки (наші, клієнта, постачальника) зі статусом, що виконано, відкриті питання й наступну дію — кожен пункт із посиланням на лист.", "en": "The AI will read the project e-mails, Angebote, orders, deadlines and what is found in the RAG knowledge base and compile: promises (ours, the customer's, the supplier's) with a status, what has been done, open questions and the next action — each item with a link to the e-mail.", "de": "Die KI liest die Projekt-E-Mails, Angebote, Aufträge, Fristen und das in der RAG-Wissensdatenbank Gefundene und erstellt: Zusagen (unsere, des Kunden, des Lieferanten) mit Status, was erledigt ist, offene Fragen und die nächste Aktion — jeder Punkt mit Link zur E-Mail."}
 {"uk": "AI прочитає листи цього замовлення з ваших скриньок і випише прохання про відправку — з цитатами", "en": "AI reads this order's emails from your mailboxes and lists the shipping requests — with quotes", "de": "Die KI liest die E-Mails zu diesem Auftrag aus Ihren Postfächern und listet Versandwünsche — mit Zitaten"}
@@ -5130,8 +5131,10 @@
 {"uk": "Вкладення", "en": "Attachments", "de": "Anhänge"}
 {"uk": "Вкладення {0}", "en": "Attachment {0}", "de": "Anhang {0}"}
 {"uk": "Вкладення «{0}» з листа {1} від {2}", "en": "Attachment “{0}” from email {1} from {2}", "de": "Anhang „{0}“ aus E-Mail {1} von {2}"}
+{"uk": "Вкладення від постачальника", "en": "Attachments from the supplier", "de": "Anhänge vom Lieferanten"}
 {"uk": "Вкладення з вашої пошти сюди не зберігаються — увімкнути: Пошта → ⋯ Ще → «📎 Вкладення → документи замовлення».", "en": "Attachments from your mail are not saved here — enable: Mail → ⋯ More → “📎 Attachments → order documents”.", "de": "Anhänge aus Ihrer E-Mail werden hier nicht gespeichert – aktivieren unter: E-Mail → ⋯ Mehr → „📎 Anhänge → Auftragsdokumente“."}
 {"uk": "Вкладення з вашої пошти: PDF, Word, Excel… з листів до цього замовлення Minerva кладе сюди сама (той самий файл не дублюється).", "en": "Attachments from your mail: Minerva puts PDF, Word, Excel… from e-mails about this order here itself (the same file is not duplicated).", "de": "Anhänge aus Ihrer E-Mail: PDF, Word, Excel … aus E-Mails zu diesem Auftrag legt Minerva selbst hier ab (dieselbe Datei wird nicht doppelt gespeichert)."}
+{"uk": "Вкладення з листів постачальника — у запиті", "en": "Attachments from the supplier's e-mails — kept in the request", "de": "Anhänge aus den E-Mails des Lieferanten — in der Anfrage"}
 {"uk": "Вкладення змінилось — перечитайте документ.", "en": "The attachment has changed — reload the document.", "de": "Der Anhang hat sich geändert – lesen Sie das Dokument neu ein."}
 {"uk": "Вкладення листів", "en": "E-mail attachments", "de": "E-Mail-Anhänge"}
 {"uk": "Вкладення листів → документи", "en": "Email attachments → documents", "de": "E-Mail-Anhänge → Dokumente"}
@@ -5181,6 +5184,7 @@
 {"uk": "Внесено клієнтом CRM", "en": "Entered as CRM customer", "de": "Als CRM-Kunde erfasst"}
 {"uk": "Внесено постачальником", "en": "Entered as supplier", "de": "Als Lieferant erfasst"}
 {"uk": "Внесено самому (доручення «", "en": "Entered by itself (instruction «", "de": "Selbst eingetragen (Auftrag «"}
+{"uk": "Внести вручну", "en": "Enter manually", "de": "Manuell eingeben"}
 {"uk": "Внести дані з QR", "en": "Apply data from QR", "de": "Daten aus QR übernehmen"}
 {"uk": "Внести пропозицію вручну", "en": "Enter offer manually", "de": "Angebot manuell eintragen"}
 {"uk": "Внизу кожного листа: компанія, адреса, контакти.", "en": "At the bottom of every e-mail: company, address, contacts.", "de": "Am Ende jeder E-Mail: Firma, Adresse, Kontaktdaten."}
@@ -6886,6 +6890,7 @@
 {"uk": "За замовчуванням — базова відповідальність (Ohne). Standard/Premium передають суму страхування рівну задекларованій вартості.", "en": "By default — basic liability (Ohne). Standard/Premium pass an insurance amount equal to the declared value.", "de": "Standardmäßig Grundhaftung (Ohne). Standard/Premium übermitteln eine Versicherungssumme in Höhe des deklarierten Werts."}
 {"uk": "За замовчуванням — відправник (BillShipper). Для BillReceiver / BillThirdParty вкажіть номер UPS-акаунту, поштовий індекс та країну платника.", "en": "By default — the sender (BillShipper). For BillReceiver / BillThirdParty specify the UPS account number, postal code and country of the payer.", "de": "Standardmäßig — der Absender (BillShipper). Für BillReceiver / BillThirdParty geben Sie UPS-Kontonummer, Postleitzahl und Land des Zahlers an."}
 {"uk": "За категоріями (з тих, що можна передати)", "en": "By category (of those that can be sent)", "de": "Nach Kategorien (von den übertragbaren)"}
+{"uk": "За кількістю", "en": "By quantity", "de": "Nach Menge"}
 {"uk": "За кількістю листів", "en": "By number of emails", "de": "Nach Anzahl der E-Mails"}
 {"uk": "За назвою", "en": "By name", "de": "Nach Name"}
 {"uk": "За планом", "en": "On track", "de": "Im Plan"}
@@ -7003,6 +7008,7 @@
 {"uk": "Завантажте файл шаблону — після цього з'являться кнопки перевірки", "en": "Upload the template file — the check buttons will then appear", "de": "Laden Sie die Vorlagendatei hoch — danach erscheinen die Prüfschaltflächen"}
 {"uk": "Завантажую", "en": "Downloading", "de": "Wird heruntergeladen"}
 {"uk": "Завантажую і парсю файл…", "en": "Uploading and parsing the file…", "de": "Datei wird hochgeladen und ausgewertet…"}
+{"uk": "Завантажую…", "en": "Loading…", "de": "Wird geladen…"}
 {"uk": "Завантажуємо на ПК…", "en": "Downloading to PC…", "de": "Wird auf den PC heruntergeladen…"}
 {"uk": "Завдання", "en": "Task", "de": "Aufgabe"}
 {"uk": "Завдання RAG не знайдено (минув строк)", "en": "RAG job not found (expired)", "de": "RAG-Auftrag nicht gefunden (abgelaufen)"}
@@ -7512,6 +7518,7 @@
 {"uk": "Запит уже завершився або RAG ще не вміє зупиняти через API", "en": "The request has already finished or RAG cannot stop requests via the API yet", "de": "Die Anfrage ist bereits beendet oder RAG kann Anfragen noch nicht über die API stoppen"}
 {"uk": "Запит цьому постачальнику", "en": "Request to this supplier", "de": "Anfrage an diesen Lieferanten"}
 {"uk": "Запит ціни й строку у виробника", "en": "Ask the manufacturer for price and lead time", "de": "Preis und Lieferzeit beim Hersteller anfragen"}
+{"uk": "Запит ще не надіслано.", "en": "The request has not been sent yet.", "de": "Die Anfrage wurde noch nicht gesendet."}
 {"uk": "Запит і специфікація", "en": "Inquiry and specification", "de": "Anfrage und Spezifikation"}
 {"uk": "Запит — заголовки", "en": "Request — headers", "de": "Anfrage — Header"}
 {"uk": "Запит — тіло", "en": "Request — body", "de": "Anfrage — Body"}
@@ -8573,6 +8580,8 @@
 {"uk": "Клік — відкрити лист", "en": "Click — open the e-mail", "de": "Klick — E-Mail öffnen"}
 {"uk": "Клік — згорнути чи розгорнути кроки фази", "en": "Click — collapse or expand the steps of the phase", "de": "Klick — Schritte der Phase ein- oder ausklappen"}
 {"uk": "Клік — показати цю сторінку", "en": "Click — show this page", "de": "Klick — diese Seite anzeigen"}
+{"uk": "Клік — увесь лист праворуч · Ctrl + клік — у пошті", "en": "Click — the whole e-mail on the right · Ctrl + click — in mail", "de": "Klick — die ganze E-Mail rechts · Strg + Klick — in der Post"}
+{"uk": "Клік — усе про цю пропозицію праворуч: ціни, вкладення, листи", "en": "Click — everything about this offer on the right: prices, attachments, e-mails", "de": "Klick — alles zu diesem Angebot rechts: Preise, Anhänge, E-Mails"}
 {"uk": "Клік — ✓ виконано, зустріч чи термін, лист", "en": "Click — ✓ done, meeting or deadline, e-mail", "de": "Klick — ✓ erledigt, Besprechung oder Frist, E-Mail"}
 {"uk": "Клікайте рівні розділів, 🚫 біля сторінок, особливі права; правий клік — те саме меню. Сторінка", "en": "Click the section levels, the 🚫 next to pages, special permissions; right-click opens the same menu. The page", "de": "Klicken Sie auf die Bereichsstufen, das 🚫 neben Seiten, besondere Berechtigungen; ein Rechtsklick öffnet dasselbe Menü. Die Seite"}
 {"uk": "Клікайте рівні розділів, 🚫 біля сторінок, особливі права; правий клік — те саме меню. Сторінка одразу показує, як буде. Нічого не збережено, доки не натиснете «💾 Зберегти».", "en": "Click the section levels, the 🚫 next to pages, special permissions; right-click opens the same menu. The page immediately shows the result. Nothing is saved until you click “💾 Save”.", "de": "Klicken Sie auf die Bereichsstufen, das 🚫 neben Seiten, besondere Berechtigungen; ein Rechtsklick öffnet dasselbe Menü. Die Seite zeigt sofort das Ergebnis. Es wird nichts gespeichert, bis Sie auf „💾 Speichern“ klicken."}
@@ -8741,6 +8750,7 @@
 {"uk": "Коли людина запустила лист повторно (пропущений чи з помилкою) — тоді й давній лист обробляється", "en": "When a person queued the email again (skipped or failed) — then even an old email is processed", "de": "Wann eine Person die E-Mail erneut gestartet hat (übersprungen oder fehlerhaft) — dann wird auch eine ältere E-Mail verarbeitet"}
 {"uk": "Коли надсилати звіт", "en": "When to send the report", "de": "Wann der Bericht gesendet wird"}
 {"uk": "Коли надсилає", "en": "When it is sent", "de": "Wann gesendet wird"}
+{"uk": "Коли надіслали", "en": "When sent", "de": "Wann gesendet"}
 {"uk": "Коли план буде, тут з'явиться діаграма Ганта — перемикач над нею: «Діаграма Minerva» або «Класична діаграма Ганта».", "en": "Once there is a plan, a Gantt chart will appear here — the switch above it: «Minerva chart» or «Classic Gantt chart».", "de": "Sobald es einen Plan gibt, erscheint hier ein Gantt-Diagramm — der Umschalter darüber: «Minerva-Diagramm» oder «Klassisches Gantt-Diagramm»."}
 {"uk": "Коли почали роботу; порожньо — шкала починається з першої події проєкту", "en": "When work started; empty — the timeline starts with the first project event", "de": "Wann die Arbeit begann; leer — die Zeitleiste beginnt mit dem ersten Projektereignis"}
 {"uk": "Коли розклад сервера востаннє надіслав брифінг — щоб не надсилати двічі за день.", "en": "When the server schedule last sent the briefing — so that it is not sent twice a day.", "de": "Wann der Serverzeitplan das Briefing zuletzt gesendet hat — damit es nicht zweimal am Tag gesendet wird."}
@@ -9306,6 +9316,7 @@
 {"uk": "Листи у ваших скриньках", "en": "E-mails in your mailboxes", "de": "E-Mails in Ihren Postfächern"}
 {"uk": "Листи цього юзера будуть читатися з його особистого ящика. ionos: host=imap.ionos.de, port=993, SSL=✓, Sent=INBOX.Sent. Команда", "en": "This user’s e-mails will be read from their personal mailbox. ionos: host=imap.ionos.de, port=993, SSL=✓, Sent=INBOX.Sent. Command", "de": "Die E-Mails dieses Benutzers werden aus seinem persönlichen Postfach gelesen. ionos: host=imap.ionos.de, port=993, SSL=✓, Sent=INBOX.Sent. Befehl"}
 {"uk": "Листи — з", "en": "E-mails — from", "de": "E-Mails — ab"}
+{"uk": "Листи — у скриньці", "en": "The e-mails are in the mailbox of", "de": "Die E-Mails liegen im Postfach von"}
 {"uk": "Листом", "en": "By email", "de": "Per E-Mail"}
 {"uk": "Листопад", "en": "November", "de": "November"}
 {"uk": "Листування", "en": "Correspondence", "de": "Korrespondenz"}
@@ -10401,6 +10412,7 @@
 {"uk": "Наступний запуск", "en": "Next run", "de": "Nächster Lauf"}
 {"uk": "Наступний крок", "en": "Next step", "de": "Nächster Schritt"}
 {"uk": "Наступний номер рахунку", "en": "Next invoice number", "de": "Nächste Rechnungsnummer"}
+{"uk": "Наступний постачальник (↓)", "en": "Next supplier (↓)", "de": "Nächster Lieferant (↓)"}
 {"uk": "Наступний цикл VIP-утримання через 60 днів.", "en": "Next VIP retention cycle in 60 days.", "de": "Nächster VIP-Bindungszyklus in 60 Tagen."}
 {"uk": "Наступний щоденний запуск: {0}{1}", "en": "Next daily run: {0}{1}", "de": "Nächster täglicher Lauf: {0}{1}"}
 {"uk": "Наступний: {0}", "en": "Next: {0}", "de": "Nächster: {0}"}
@@ -10484,6 +10496,7 @@
 {"uk": "Не вдалося завантажити", "en": "Could not load", "de": "Laden fehlgeschlagen"}
 {"uk": "Не вдалося завантажити бібліотеку графіків (Chart.js) — перевірте інтернет і оновіть сторінку.", "en": "Failed to load the charts library (Chart.js) — check your internet connection and refresh the page.", "de": "Die Diagrammbibliothek (Chart.js) konnte nicht geladen werden — prüfen Sie die Internetverbindung und aktualisieren Sie die Seite."}
 {"uk": "Не вдалося завантажити листи", "en": "Could not load emails", "de": "E-Mails konnten nicht geladen werden"}
+{"uk": "Не вдалося завантажити.", "en": "Could not load.", "de": "Konnte nicht geladen werden."}
 {"uk": "Не вдалося завантажити: {0}", "en": "Could not load: {0}", "de": "Laden fehlgeschlagen: {0}"}
 {"uk": "Не вдалося записати файл ({0}) — папка лише для читання або немає прав", "en": "Could not write the file ({0}) — the folder is read-only or permissions are missing", "de": "Datei konnte nicht geschrieben werden ({0}) – der Ordner ist schreibgeschützt oder Berechtigungen fehlen"}
 {"uk": "Не вдалося запустити", "en": "Could not start", "de": "Start nicht möglich"}
@@ -12947,6 +12960,7 @@
 {"uk": "Попередній перегляд PDF", "en": "PDF preview", "de": "PDF-Vorschau"}
 {"uk": "Попередній перегляд листа", "en": "Email preview", "de": "E-Mail-Vorschau"}
 {"uk": "Попередній перегляд фото / PDF", "en": "Photo / PDF preview", "de": "Vorschau von Foto / PDF"}
+{"uk": "Попередній постачальник (↑)", "en": "Previous supplier (↑)", "de": "Vorheriger Lieferant (↑)"}
 {"uk": "Попередній статус ({0}): {1}", "en": "Previous status ({0}): {1}", "de": "Vorheriger Status ({0}): {1}"}
 {"uk": "Попередній: {0} – {1}", "en": "Previous: {0} – {1}", "de": "Vorperiode: {0} – {1}"}
 {"uk": "Поповнювати при отриманні PO", "en": "Replenish on receiving a PO", "de": "Bei Erhalt der PO auffüllen"}
@@ -13141,6 +13155,7 @@
 {"uk": "Постачальник «{0}» уже є.", "en": "Supplier «{0}» already exists.", "de": "Lieferant «{0}» existiert bereits."}
 {"uk": "Постачальник з листа", "en": "Supplier from e-mail", "de": "Lieferant aus E-Mail"}
 {"uk": "Постачальник компонентів", "en": "Component supplier", "de": "Komponentenlieferant"}
+{"uk": "Постачальник ще не відповідав — вкладень немає.", "en": "The supplier has not replied yet — no attachments.", "de": "Der Lieferant hat noch nicht geantwortet — keine Anhänge."}
 {"uk": "Постачальник, PO-12, номер підтвердження, артикул або трек-номер; порожньо — останні відкриті", "en": "Supplier, PO-12, confirmation number, SKU or tracking number; empty — latest open ones", "de": "Lieferant, PO-12, Bestätigungsnummer, Artikel oder Sendungsnummer; leer — die letzten offenen"}
 {"uk": "Постачальник: {0} ({1}).", "en": "Supplier: {0} ({1}).", "de": "Lieferant: {0} ({1})."}
 {"uk": "Постачальник: {0} | Статус: {1} | Відкрито: {2}", "en": "Supplier: {0} | Status: {1} | Opened: {2}", "de": "Lieferant: {0} | Status: {1} | Eröffnet: {2}"}
@@ -13244,6 +13259,7 @@
 {"uk": "Пошта — на {0}", "en": "Email — to {0}", "de": "E-Mail — an {0}"}
 {"uk": "Пошта — немає вашої адреси", "en": "Email — no address of yours", "de": "E-Mail — keine Adresse von Ihnen"}
 {"uk": "Пошта → ⋯ Ще", "en": "Mail → ⋯ More", "de": "E-Mail → ⋯ Mehr"}
+{"uk": "Пошта: {0}", "en": "Mail: {0}", "de": "Post: {0}"}
 {"uk": "Поштовий відділ", "en": "Post office branch", "de": "Postfiliale"}
 {"uk": "Поштовий індекс", "en": "Postal code", "de": "Postleitzahl"}
 {"uk": "Поштовий індекс адреси платника (потрібен для BillReceiver/BillThirdParty).", "en": "Postal code of the payer's address (required for BillReceiver/BillThirdParty).", "de": "Postleitzahl der Adresse des Zahlers (erforderlich für BillReceiver/BillThirdParty)."}
@@ -13642,6 +13658,7 @@
 {"uk": "Пропозиція діє до", "en": "Offer valid until", "de": "Angebot gültig bis"}
 {"uk": "Пропозиція з цінами, залишком, MOQ і строком (Offers API) на затверджений товар.", "en": "An offer with prices, stock, MOQ and lead time (Offers API) for the approved product.", "de": "Ein Offer mit Preisen, Bestand, MOQ und Lieferzeit (Offers API) für den freigegebenen Artikel."}
 {"uk": "Пропозиція нової категорії", "en": "New category proposal", "de": "Vorschlag einer neuen Kategorie"}
+{"uk": "Пропозиція постачальника", "en": "Supplier's offer", "de": "Angebot des Lieferanten"}
 {"uk": "Пропозиції", "en": "Suggestions", "de": "Vorschläge"}
 {"uk": "Пропозиції AI", "en": "AI suggestions", "de": "KI-Vorschläge"}
 {"uk": "Пропозиції агента", "en": "Agent proposals", "de": "Vorschläge des Agenten"}
@@ -13730,6 +13747,7 @@
 {"uk": "Прочитано з askDANTE", "en": "Read from askDANTE", "de": "Aus askDANTE gelesen"}
 {"uk": "Прочитано листів: {0} · нових пропозицій: {1}", "en": "Emails read: {0} · new suggestions: {1}", "de": "E-Mails gelesen: {0} · neue Vorschläge: {1}"}
 {"uk": "Прочитані AI листи", "en": "Emails read by AI", "de": "Von der KI gelesene E-Mails"}
+{"uk": "Прочитати AI", "en": "Read with AI", "de": "Mit AI lesen"}
 {"uk": "Прочитати AI заново", "en": "Read with AI again", "de": "Erneut mit KI lesen"}
 {"uk": "Прочитати QR з фото", "en": "Read QR from photo", "de": "QR vom Foto lesen"}
 {"uk": "Прочитати з DigiKey і перевірити", "en": "Read from DigiKey and check", "de": "Von DigiKey lesen und prüfen"}
@@ -14009,6 +14027,7 @@
 {"uk": "Разом з email при спрацюванні алерту. Вручну — кнопка", "en": "Together with the email when an alert triggers. Manually — the button", "de": "Zusammen mit der E-Mail, wenn eine Warnung ausgelöst wird. Manuell — die Schaltfläche"}
 {"uk": "Разом з ПДВ", "en": "Including VAT", "de": "Inkl. USt."}
 {"uk": "Разом за посилки", "en": "Total for parcels", "de": "Summe der Pakete"}
+{"uk": "Разом у {0}", "en": "Total in {0}", "de": "Gesamt in {0}"}
 {"uk": "Разом чекають: {0}", "en": "Waiting in total: {0}", "de": "Insgesamt wartend: {0}"}
 {"uk": "Разом, USD", "en": "Total, USD", "de": "Gesamt, USD"}
 {"uk": "Разом: {0} USD", "en": "Total: {0} USD", "de": "Gesamt: {0} USD"}
@@ -16216,6 +16235,7 @@
 {"uk": "У курсах ЄЦБ немає", "en": "Not in the ECB rates", "de": "In den EZB-Kursen nicht enthalten"}
 {"uk": "У кімнаті (мікрофон)", "en": "In the room (microphone)", "de": "Im Raum (Mikrofon)"}
 {"uk": "У листах (", "en": "In emails (", "de": "In E-Mails ("}
+{"uk": "У листах постачальника вкладень немає.", "en": "No attachments in the supplier's e-mails.", "de": "Keine Anhänge in den E-Mails des Lieferanten."}
 {"uk": "У листі немає адреси клієнта — введіть email або ім'я", "en": "The email has no customer address — enter an email or name", "de": "In der E-Mail gibt es keine Kundenadresse — geben Sie eine E-Mail-Adresse oder einen Namen ein"}
 {"uk": "У лістингу немає ID офера — спершу «📦 Створити Offer» або «🔗 Звірити офери».", "en": "The listing has no offer ID — first “📦 Create Offer” or “🔗 Reconcile offers”.", "de": "Das Listing hat keine Offer-ID — zuerst „📦 Offer erstellen“ oder „🔗 Offers abgleichen“."}
 {"uk": "У магазин", "en": "To shop", "de": "In den Shop"}
@@ -16549,6 +16569,7 @@
 {"uk": "Файли замовлення", "en": "Order files", "de": "Bestelldateien"}
 {"uk": "Файли клієнта ({0} шт.)", "en": "Customer files ({0} pcs.)", "de": "Kundendateien ({0} Stk.)"}
 {"uk": "Файли клієнта: договори, рахунки, листування. Зберігаються у", "en": "Customer files: contracts, invoices, correspondence. Stored in", "de": "Kundendateien: Verträge, Rechnungen, Korrespondenz. Gespeichert in"}
+{"uk": "Файли нашого запиту ({0})", "en": "Files of our request ({0})", "de": "Dateien unserer Anfrage ({0})"}
 {"uk": "Файли не вибрані", "en": "No files selected", "de": "Keine Dateien ausgewählt"}
 {"uk": "Файли не знайдено. Відкрийте DevTools (F12) → Console і скопіюйте вивід «Order files debug»", "en": "No files found. Open DevTools (F12) → Console and copy the output of “Order files debug”", "de": "Keine Dateien gefunden. Öffnen Sie DevTools (F12) → Console und kopieren Sie die Ausgabe von „Order files debug“"}
 {"uk": "Файли разом понад {0} МБ — більшість пошт не прийме. Стисніть у ZIP або дайте посилання в тексті.", "en": "Files together exceed {0} MB — most mail servers will not accept them. Compress into a ZIP or put a link in the text.", "de": "Dateien zusammen über {0} MB — die meisten Mailserver nehmen das nicht an. In ZIP komprimieren oder Link in den Text."}
@@ -16816,6 +16837,7 @@
 {"uk": "Цитата з листа або примітка (за бажанням)", "en": "Quote from the email or a note (optional)", "de": "Zitat aus der E-Mail oder Notiz (optional)"}
 {"uk": "Цих листів немає у ваших скриньках.", "en": "These e-mails are not in your mailboxes.", "de": "Diese E-Mails sind nicht in Ihren Postfächern."}
 {"uk": "Цього боку ще немає.", "en": "This side does not exist yet.", "de": "Diese Seite gibt es noch nicht."}
+{"uk": "Цього листа немає у вашій скриньці (інша скринька або видалено)", "en": "This e-mail is not in your mailbox (another mailbox or deleted)", "de": "Diese E-Mail ist nicht in Ihrem Postfach (anderes Postfach oder gelöscht)"}
 {"uk": "Цього місяця", "en": "This month", "de": "Diesen Monat"}
 {"uk": "Цього місяця {0}", "en": "This month {0}", "de": "Diesen Monat {0}"}
 {"uk": "Цього постачальника немає серед запитів проєкту", "en": "This supplier is not among the project's requests", "de": "Dieser Lieferant ist nicht unter den Anfragen des Projekts"}
@@ -16845,6 +16867,7 @@
 {"uk": "Ціле число ≥ 0. Мінімальний залишок.", "en": "Integer ≥ 0. Minimum stock level.", "de": "Ganzzahl ≥ 0. Mindestbestand."}
 {"uk": "Ціль: 3 міс + 20% буфер = 36 шт. Замовити: 36 − 25 = 11 шт.", "en": "Target: 3 months + 20% buffer = 36 pcs. Order: 36 − 25 = 11 pcs.", "de": "Ziel: 3 Monate + 20 % Puffer = 36 Stk. Bestellen: 36 − 25 = 11 Stk."}
 {"uk": "Цін за кількістю ще немає.", "en": "No quantity prices yet.", "de": "Noch keine Mengenpreise."}
+{"uk": "Цін ще немає", "en": "No prices yet", "de": "Noch keine Preise"}
 {"uk": "Цін ще немає.", "en": "No prices yet.", "de": "Noch keine Preise."}
 {"uk": "Цін ще немає: заповніть «Базові ціни (ступені)» або «Ціну продажу».", "en": "No prices yet: fill in “Base prices (tiers)” or “Sale price”.", "de": "Noch keine Preise: Füllen Sie „Basispreise (Staffeln)“ oder „Verkaufspreis“ aus."}
 {"uk": "Ціна", "en": "Price", "de": "Preis"}
@@ -17297,6 +17320,8 @@
 {"uk": "ЩО ХОЧЕ МЕНЕДЖЕР: {0}", "en": "WHAT THE MANAGER WANTS: {0}", "de": "WAS DER MANAGER MÖCHTE: {0}"}
 {"uk": "Ще", "en": "More", "de": "Mehr"}
 {"uk": "Ще (вільним текстом)", "en": "More (free text)", "de": "Weiteres (Freitext)"}
+{"uk": "Ще {0} лишилось у пошті — не вдалося забрати: {1}. Відкрийте панель пізніше або лист у пошті.", "en": "{0} more still in mail — could not fetch: {1}. Open the panel later or the e-mail in mail.", "de": "Noch {0} in der Post — konnte nicht abgerufen werden: {1}. Öffnen Sie das Panel später oder die E-Mail in der Post."}
+{"uk": "Ще {0} у пошті — забираю…", "en": "{0} more in mail — fetching…", "de": "Noch {0} in der Post — wird abgerufen…"}
 {"uk": "Ще в картці", "en": "Also in the card", "de": "Weitere in der Karte"}
 {"uk": "Ще відправити", "en": "Still to ship", "de": "Noch zu versenden"}
 {"uk": "Ще відправити: {0} — замовлення «{1}».", "en": "Still to ship: {0} — order “{1}”.", "de": "Noch zu versenden: {0} — Auftrag „{1}“."}
@@ -18143,6 +18168,7 @@
 {"uk": "вказано вручну", "en": "entered manually", "de": "manuell angegeben"}
 {"uk": "вкладення {0} #{1}", "en": "attachment {0} #{1}", "de": "Anhang {0} #{1}"}
 {"uk": "вкладення «{0}»", "en": "attachment “{0}”", "de": "Anhang „{0}“"}
+{"uk": "вкладення в листі", "en": "attachment in the e-mail", "de": "Anhang in der E-Mail"}
 {"uk": "вкладення документа", "en": "document attachment", "de": "Dokumentanhang"}
 {"uk": "вкладення не індексуються (налаштування «🧠 База знань»)", "en": "attachments are not indexed (“🧠 Knowledge base” settings)", "de": "Anhänge werden nicht indexiert (Einstellung „🧠 Wissensdatenbank“)"}
 {"uk": "вкладення нового листа знайдено", "en": "attachment of the new e-mail found", "de": "Anhang der neuen E-Mail gefunden"}
@@ -19173,6 +19199,7 @@
 {"uk": "кожні {0} дн.", "en": "every {0} days", "de": "alle {0} Tage"}
 {"uk": "кожні {0} хв", "en": "every {0} min", "de": "alle {0} Min."}
 {"uk": "колега", "en": "colleague", "de": "Kollege"}
+{"uk": "колеги", "en": "a colleague", "de": "eines Kollegen"}
 {"uk": "колегу", "en": "colleague", "de": "Kollegen"}
 {"uk": "колекцій {0}", "en": "collections {0}", "de": "Collections {0}"}
 {"uk": "коли статус змінюється на «Відправлено».", "en": "when the status changes to “Shipped”.", "de": "wenn der Status auf „Versendet“ wechselt."}
@@ -19864,6 +19891,7 @@
 {"uk": "немає доступу", "en": "no access", "de": "kein Zugriff"}
 {"uk": "немає етикетки в базі", "en": "no label in the library", "de": "kein Etikett in der Bibliothek"}
 {"uk": "немає етикетки в базі.", "en": "there is no label in the database.", "de": "es gibt kein Etikett in der Datenbank."}
+{"uk": "немає з'єднання", "en": "no connection", "de": "keine Verbindung"}
 {"uk": "немає з'єднання з сервером", "en": "no connection to the server", "de": "keine Verbindung zum Server"}
 {"uk": "немає записів", "en": "no records", "de": "keine Datensätze"}
 {"uk": "немає зв'язку з Minerva", "en": "no connection to Minerva", "de": "keine Verbindung zu Minerva"}
@@ -19876,6 +19904,7 @@
 {"uk": "немає ключа API сайту, прив'язаного до магазину", "en": "no site API key bound to the shop", "de": "kein dem Shop zugeordneter API-Schlüssel der Website"}
 {"uk": "немає кому надсилати: заповніть «Кому» або «Email для звіту» працівників", "en": "nobody to send to: fill in “To” or the employees' “Report email”", "de": "kein Empfänger: Füllen Sie „An“ oder die „E-Mail für Bericht“ der Mitarbeiter aus"}
 {"uk": "немає курсу", "en": "no rate", "de": "kein Kurs"}
+{"uk": "немає курсу {0} у «Курсах валют»", "en": "no {0} rate in «Exchange rates»", "de": "kein {0}-Kurs in «Wechselkurse»"}
 {"uk": "немає курсу {0} → {1}", "en": "no rate {0} → {1}", "de": "kein Kurs {0} → {1}"}
 {"uk": "немає курсу {0} → {1} («Налаштування цін магазину → Курси валют»)", "en": "no exchange rate {0} → {1} (“Shop price settings → Exchange rates”)", "de": "kein Wechselkurs {0} → {1} („Preiseinstellungen des Webshops → Wechselkurse“)"}
 {"uk": "немає курсу {0} → {1} — різницю не пораховано", "en": "no rate {0} → {1} — difference not calculated", "de": "kein Kurs {0} → {1} — Differenz nicht berechnet"}
@@ -20185,6 +20214,7 @@
 {"uk": "оформити замовлення через Jumingo API автоматично (потрібен метод оплати на Jumingo: Zahlungsmethoden).", "en": "place the order automatically via the Jumingo API (a payment method on Jumingo is required: Zahlungsmethoden).", "de": "Bestellung automatisch über die Jumingo API aufgeben (ein Zahlungsmittel bei Jumingo ist erforderlich: Zahlungsmethoden)."}
 {"uk": "оформити замовлення через Jumingo API автоматично (потрібен метод оплати на Jumingo: Zahlungsmethoden). Після оплати трекінг-номер з'явиться автоматично (або натисніть «🔄 Оновити трекінг»).", "en": "place the order automatically via the Jumingo API (a payment method on Jumingo is required: Zahlungsmethoden). After payment the tracking number will appear automatically (or click “🔄 Refresh tracking”).", "de": "Bestellung automatisch über die Jumingo API aufgeben (ein Zahlungsmittel bei Jumingo ist erforderlich: Zahlungsmethoden). Nach der Zahlung erscheint die Sendungsnummer automatisch (oder klicken Sie auf „🔄 Tracking aktualisieren“)."}
 {"uk": "оцінка Minerva", "en": "Minerva rating", "de": "Minerva-Bewertung"}
+{"uk": "оцінка {0}/100", "en": "score {0}/100", "de": "Bewertung {0}/100"}
 {"uk": "оцінка {0}/5", "en": "rating {0}/5", "de": "Bewertung {0}/5"}
 {"uk": "очікували {0}", "en": "expected {0}", "de": "erwartet am {0}"}
 {"uk": "очікувати N днів", "en": "wait N days", "de": "N Tage warten"}
@@ -21197,6 +21227,7 @@
 {"uk": "тема «{0}» {1}", "en": "subject “{0}” {1}", "de": "Betreff „{0}“ {1}"}
 {"uk": "тема: {0}", "en": "subject: {0}", "de": "Betreff: {0}"}
 {"uk": "тема: «{0}»", "en": "subject: “{0}”", "de": "Betreff: „{0}“"}
+{"uk": "тему й текст бачить лише власник скриньки.", "en": "only the mailbox owner sees the subject and text.", "de": "Betreff und Text sieht nur der Postfachinhaber."}
 {"uk": "термін", "en": "deadline", "de": "Frist"}
 {"uk": "термін від", "en": "lead time from", "de": "Lieferzeit ab"}
 {"uk": "термін постачання", "en": "delivery time", "de": "Lieferzeit"}

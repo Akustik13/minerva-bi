@@ -539,6 +539,11 @@ def inbox_view(request):
 
     folder   = request.GET.get('folder', 'inbox')
     q        = request.GET.get('q', '').strip()
+    # /email/?msg=<pk> (посилання «✉️ лист» з усієї Minerva) — одразу відкрити цей лист; чужий / видалений — -1
+    open_msg = 0
+    if str(request.GET.get('msg', '')).isdigit():
+        open_msg = int(request.GET['msg']) if EmailMessage.objects.filter(
+            pk=int(request.GET['msg']), account=account).exists() else -1
     page     = max(1, int(request.GET.get('page', 1)))
     per_page = 30
 
@@ -654,6 +659,7 @@ def inbox_view(request):
     return render(request, 'email_assistant/inbox.html', _ctx(request, {
         'title':                 'Email Асистент',
         'account':               account,
+        'open_msg':              open_msg,
         'email_settings':        EmailSettings.get_for_user(request.user),
         'ctx_hidden':            ctx_hidden,
         'mail_layout':           mail_layout,

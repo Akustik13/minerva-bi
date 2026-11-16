@@ -1,0 +1,92 @@
+{# 📨 Панель праворуч на сторінці запиту: усе про пропозицію одного постачальника. suppliers/admin.py panel_view, services/rfq_replies.py panel #}
+{% with row=row %}
+<div class="rwp" data-rid="{{ r.pk }}" data-waiting="{{ out.waiting }}" data-order="{{ order|join:',' }}">
+  <div class="rwp-head">
+    <button type="button" class="rwp-btn" data-rwp-go="-1" title="Попередній постачальник (↑)">‹</button>
+    <button type="button" class="rwp-btn" data-rwp-go="1" title="Наступний постачальник (↓)">›</button>
+    <div class="rwp-title">
+      <a href="{% url 'admin:inventory_supplier_change' r.supplier.pk %}" target="_blank" translate="no"><b>{{ r.supplier.name }}</b></a>{% if r.chosen %} 🏆{% endif %}
+      <div class="spf-muted" translate="no">{% if r.contact %}{{ r.contact.name }} · {% endif %}{{ r.email }}</div>
+    </div>
+    <button type="button" class="rwp-btn" data-rwp-close title="Закрити (Esc)">✕</button>
+  </div>
+  <div class="rwp-chips">
+    <span class="spf-tag">{{ r.get_state_display }}</span>
+    {% if row.score is not None %}<span class="spf-tag">оцінка {{ row.score }}/100</span>{% endif %}
+    {% if r.sent_at %}<span class="spf-tag">↑ {{ r.sent_at|date:"d.m.Y H:i" }}</span>{% endif %}
+    {% if r.replied_at %}<span class="spf-tag">↓ {{ r.replied_at|date:"d.m.Y H:i" }}</span>{% endif %}
+    {% if r.reminded_at %}<span class="spf-tag">⏰ {{ r.reminded_at|date:"d.m" }}</span>{% endif %}
+    {% if r.award %}<span class="spf-tag spf-ok" translate="no">✅ {{ r.award }}</span>{% endif %}
+    {% if r.reject_reason %}<span class="spf-tag">✖ не взяли{% if r.reject_reason != "—" %}: <span translate="no">{{ r.reject_reason }}</span>{% endif %}</span>{% endif %}
+  </div>
+
+  <section class="rwp-sec">
+    <div class="spf-h">💶 Пропозиція</div>
+    {% if r.price is not None or r.tiers or r.total is not None or r.lead_days is not None or r.quote_note or ai.summary %}
+    <table class="spf-table rwp-kv">
+      {% if r.price is not None %}<tr><th>Ціна за шт.</th><td><b>{{ row.price_text }} {{ r.currency }}</b>{% if row.price_home is not None and r.currency and r.currency != row.home %} <span class="spf-muted">≈ {{ row.price_home }} {{ row.home }}</span>{% endif %}</td></tr>{% endif %}
+      {% if r.tiers %}<tr><th>За кількістю</th><td><table class="rwp-tiers">{% for t in r.tiers %}<tr><td>{{ t.qty }} шт.</td><td>{{ t.unit_price }}</td><td class="spf-muted">{% if t.total %}= {{ t.total }}{% endif %} {{ r.currency }}</td></tr>{% endfor %}</table></td></tr>{% endif %}
+      {% if r.total is not None %}<tr><th>Сума{% if quantities %} ({{ quantities.0 }} шт.){% endif %}</th><td>{{ r.total }} {{ r.currency }}</td></tr>{% endif %}
+      {% if row.all_in is not None %}<tr><th>Разом у {{ row.home }}</th><td><b>{{ row.all_in }}</b>{% if row.cheapest %} <span class="rw-best spf-ok">найдешевше</span>{% endif %}</td></tr>{% elif row.no_rate %}<tr><th>У {{ row.home }}</th><td class="spf-warn">немає курсу {{ r.currency }} у «Курсах валют»</td></tr>{% endif %}
+      {% if r.lead_days is not None %}<tr><th>Строк</th><td>{{ r.lead_days }} дн.{% if row.fastest %} <span class="rw-best spf-ok">найшвидше</span>{% endif %}</td></tr>{% endif %}
+      {% if r.shipping is not None %}<tr><th>Доставка</th><td>{{ r.shipping }} {{ r.currency }}</td></tr>{% endif %}
+      {% if ai.moq %}<tr><th>MOQ</th><td>{{ ai.moq }} шт.</td></tr>{% endif %}
+      {% if r.valid_until %}<tr><th>Діє до</th><td>{{ r.valid_until|date:"d.m.Y" }}</td></tr>{% endif %}
+      {% if conditions %}<tr><th>Умови</th><td translate="no">{{ conditions }}</td></tr>{% endif %}
+      {% if r.quote_note %}<tr><th>Примітки</th><td translate="no" style="white-space:pre-wrap">{{ r.quote_note }}</td></tr>{% endif %}
+      {% if ai.summary %}<tr><th>🧠 AI</th><td>{{ ai.summary }}{% if ai.questions %}<div class="spf-muted">питають: {{ ai.questions|join:"; " }}</div>{% endif %}</td></tr>{% endif %}
+    </table>
+    {% else %}
+    <div class="spf-muted">Цін ще немає{% if r.reply_message_id or r.thread_id %} — 🧠 AI прочитає відповідь і вкладення або ✏️ внесіть вручну{% endif %}.</div>
+    {% endif %}
+    {% if can_change and r.state != "planned" %}
+    <div class="spf-row">
+      <button type="button" class="button" data-rwp-edit="{{ r.pk }}">✏️ Внести вручну</button>
+      {% if r.thread_id or r.reply_message_id %}<button type="button" class="button" data-rwp-ai="{{ r.pk }}" title="AI прочитає відповідь (і вкладення) й заповнить ціни, строк, умови">🧠 Прочитати AI</button>{% endif %}
+      {% if r.state == "quoted" or r.state == "replied" %}<form method="post" action="{{ act }}" style="display:inline">{% csrf_token %}<input type="hidden" name="rid" value="{{ r.pk }}"><button type="submit" name="do" value="choose" class="button">🏆 Вибрати</button></form>{% endif %}
+      <span class="spf-job" id="rwp-job-{{ r.pk }}"></span>
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="rwp-sec">
+    <div class="spf-h">📎 Вкладення від постачальника{% if files %} ({{ files|length }}){% endif %}</div>
+    {% for f in files %}
+    <a class="rwp-file" href="{{ f.obj.file.url }}" target="_blank" title="{{ f.obj.name }}">
+      <span class="rwp-ic">{{ f.icon }}</span><span class="rwp-fn" translate="no">{{ f.obj.name }}</span>
+      <span class="spf-muted">{{ f.size }}{% if f.obj.received_at %} · {{ f.obj.received_at|date:"d.m H:i" }}{% endif %}</span></a>
+    {% empty %}
+    {% if not out.waiting %}<div class="spf-muted">{% if r.replied_at or r.reply_message_id %}У листах постачальника вкладень немає.{% else %}Постачальник ще не відповідав — вкладень немає.{% endif %}</div>{% endif %}
+    {% endfor %}
+    {% if out.waiting and out.error %}<div class="spf-warn">📭 Ще {{ out.waiting }} лишилось у пошті — не вдалося забрати: {{ out.error }}. Відкрийте панель пізніше або лист у пошті.</div>
+    {% elif out.waiting %}<div class="spf-muted rwp-wait">⏳ Ще {{ out.waiting }} у пошті — забираю…</div>
+    {% elif out.error %}<div class="spf-warn">⚠️ Пошта: {{ out.error }}</div>{% endif %}
+    {% if request_files %}<details class="rwp-our"><summary class="spf-muted">Файли нашого запиту ({{ request_files|length }})</summary>
+      {% for f in request_files %}<a class="rwp-file" href="{{ f.file.url }}" target="_blank"><span class="rwp-ic">📤</span><span class="rwp-fn" translate="no">{{ f.name }}</span></a>{% endfor %}</details>{% endif %}
+  </section>
+
+  <section class="rwp-sec">
+    <div class="spf-h">✉️ Листування{% if letters %} ({{ letters|length }}){% endif %}</div>
+    {% if hidden_mail %}<div class="spf-muted">🔒 Листи — у скриньці <span translate="no">{{ owner.get_full_name|default:owner.username|default:"колеги" }}</span>: тему й текст бачить лише власник скриньки.</div>{% endif %}
+    {% for l in letters %}
+    <details class="rwp-mail{% if l.ours %} ours{% endif %}" id="rwl-{{ l.pk }}" {% if forloop.first and l.readable %}open{% endif %}>
+      <summary><span class="rwp-dir">{% if l.ours %}↑{% else %}↓{% endif %}</span> <b>{{ l.at|date:"d.m.Y H:i" }}</b> · <span translate="no">{{ l.who }}</span>{% if l.reply %} <span class="spf-tag">відповідь</span>{% endif %}{% if l.files %} · 📎 {{ l.files|length }}{% endif %}
+        {% if l.subject %}<div class="rwp-subj" translate="no">{{ l.subject }}</div>{% endif %}
+        {% if l.short %}<div class="spf-muted rwp-short" translate="no">{{ l.short }}</div>{% endif %}</summary>
+      {% if l.readable %}
+      <div class="spf-mail rwp-body" translate="no">{{ l.full|default:"(без тексту)" }}</div>
+      {% if l.files %}<div class="rwp-chipsline">{% for a in l.files %}<span class="spf-tag" translate="no">{{ a.icon }} {{ a.name }} · {{ a.size }}</span>{% endfor %}</div>{% endif %}
+      <div class="spf-row"><a href="/email/?msg={{ l.pk }}" target="_blank">↗ Відкрити в пошті</a></div>
+      {% endif %}
+    </details>
+    {% empty %}<div class="spf-muted">{% if r.state == "planned" %}Запит ще не надіслано.{% else %}Листів не знайдено.{% endif %}</div>{% endfor %}
+  </section>
+
+  {% if events %}
+  <section class="rwp-sec">
+    <div class="spf-h">🕘 Історія</div>
+    {% for e in events %}<div class="rwp-ev"><span class="spf-muted">{{ e.created_at|date:"d.m.Y H:i" }}</span> {{ e.text }} <span class="spf-muted">— {% if e.user %}{{ e.user.get_full_name|default:e.user.username }}{% else %}Minerva{% endif %}</span></div>{% endfor %}
+  </section>
+  {% endif %}
+</div>
+{% endwith %}

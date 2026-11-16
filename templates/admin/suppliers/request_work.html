@@ -14,6 +14,47 @@
   .rw-q .spf-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   tr.rw-chosen td { background: rgba(76, 175, 80, .10); }
   .rw-best { font-size: 11px; border-radius: 8px; padding: 0 6px; border: 1px solid currentColor; margin-left: 4px; }
+  /* рядок постачальника — клік відкриває панель праворуч */
+  tr.rw-row { cursor: pointer; }
+  tr.rw-row:hover td { background: rgba(127, 127, 127, .07); }
+  tr.rw-row.rw-on td { background: rgba(91, 141, 239, .13); }
+  .rw-files { font-size: 11px; white-space: nowrap; }
+  /* ✉️ відповідь: при наведенні — коротко сам лист */
+  .rw-peek-w { position: relative; display: inline-block; }
+  .rw-peek { display: none; position: absolute; left: 0; top: 100%; z-index: 40; width: 380px; max-width: 70vw;
+    background: var(--body-bg, #fff); color: var(--body-fg); border: 1px solid var(--border-strong, #ccc);
+    border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); padding: 10px 12px; font-size: 12px;
+    white-space: normal; text-align: left; }
+  .rw-peek-w:hover .rw-peek, .rw-peek-w:focus-within .rw-peek { display: block; }
+  body.rw-panel-on .rw-peek-w .rw-peek { display: none; }
+  .rw-peek-t { white-space: pre-wrap; margin-top: 6px; max-height: 190px; overflow: hidden; }
+  /* панель праворуч */
+  .rw-panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 94vw); z-index: 1000; overflow: auto;
+    background: var(--body-bg, #fff); color: var(--body-fg); border-left: 1px solid var(--border-strong, #ccc);
+    box-shadow: -10px 0 30px rgba(0, 0, 0, .25); padding: 0 16px 96px; box-sizing: border-box; }
+  .rw-panel[hidden] { display: none; }
+  .rwp-head { position: sticky; top: 0; z-index: 2; display: flex; gap: 6px; align-items: center; padding: 10px 0 8px;
+    background: var(--body-bg, #fff); border-bottom: 1px solid var(--border-strong, #ddd); }
+  .rwp-title { flex: 1; min-width: 0; }
+  .rwp-btn { border: 1px solid var(--border-strong, #ccc); background: transparent; color: var(--body-fg);
+    border-radius: 6px; min-width: 32px; height: 32px; cursor: pointer; font-size: 16px; }
+  .rwp-chips { margin: 8px 0 2px; }
+  .rwp-sec { margin-top: 14px; }
+  .rwp-kv th { width: 34%; font-weight: 600; color: var(--text-muted, #888); white-space: nowrap; }
+  .rwp-tiers td { border: 0; padding: 0 10px 0 0; }
+  .rwp-file { display: flex; gap: 8px; align-items: baseline; padding: 6px 8px; border-radius: 6px; text-decoration: none; }
+  .rwp-file:hover { background: rgba(127, 127, 127, .1); }
+  .rwp-ic { font-size: 16px; } .rwp-fn { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .rwp-our { margin-top: 6px; }
+  .rwp-mail { border: 1px solid var(--border-strong, #ddd); border-radius: 8px; padding: 6px 10px; margin: 6px 0; }
+  .rwp-mail.ours { border-style: dashed; }
+  .rwp-mail > summary { cursor: pointer; }
+  .rwp-mail.rw-hl { outline: 2px solid var(--primary, #5b8def); }
+  .rwp-dir { font-weight: 700; } .rwp-subj { font-size: 12px; margin-top: 2px; }
+  .rwp-mail[open] .rwp-short { display: none; }
+  .rwp-body { max-height: none; margin-top: 6px; }
+  .rwp-chipsline { margin-top: 4px; }
+  .rwp-ev { font-size: 12px; margin: 3px 0; }
 </style>
 {% url 'admin:suppliers_supplierrequest_action' req.pk as act %}
 <div class="spp">
@@ -39,14 +80,18 @@
     <table class="spf-table">
       <tr><th>Постачальник</th><th>Стан</th><th>Ціна за шт.</th><th>Сума{% if quantities %} ({{ quantities.0 }} шт.){% endif %}</th><th>У {{ rows.0.home|default:"EUR" }}</th><th>Строк</th><th>Доставка</th><th>Оцінка</th><th></th></tr>
       {% for row in rows %}{% with r=row.recipient %}
-      <tr class="{% if r.chosen %}rw-chosen{% endif %}">
+      <tr class="rw-row{% if r.chosen %} rw-chosen{% endif %}" data-rw-row="{{ r.pk }}" title="Клік — усе про цю пропозицію праворуч: ціни, вкладення, листи">
         <td><a href="{% url 'admin:inventory_supplier_change' r.supplier.pk %}" translate="no"><b>{{ r.supplier.name }}</b></a>{% if r.chosen %} 🏆{% endif %}
           {% if r.award %}<div class="spf-muted">✅ <span translate="no">{{ r.award }}</span></div>{% endif %}
           {% if r.reject_reason %}<div class="spf-muted">✖ не взяли{% if r.reject_reason != "—" %}: <span translate="no">{{ r.reject_reason }}</span>{% endif %}</div>{% endif %}
           <div class="spf-muted" translate="no">{% if r.contact %}{{ r.contact.name }} · {% endif %}{{ r.email }}</div></td>
         <td>{{ r.get_state_display }}
           <div class="spf-muted">{% if r.sent_at %}↑ {{ r.sent_at|date:"d.m H:i" }}{% if row.sent_link %} <a href="/email/?msg={{ row.sent_link }}" target="_blank">✉️</a>{% endif %}{% endif %}
-            {% if r.replied_at %}<br>↓ {{ r.replied_at|date:"d.m H:i" }}{% if row.reply_link %} <a href="/email/?msg={{ row.reply_link }}" target="_blank">✉️ відповідь</a>{% endif %}{% endif %}
+            {% if r.replied_at %}<br>↓ {{ r.replied_at|date:"d.m H:i" }}{% if row.reply_link %} <span class="rw-peek-w"><a href="/email/?msg={{ row.reply_link }}" target="_blank" data-rw-reply="{{ r.pk }}" data-msg="{{ row.reply_link }}">✉️ відповідь</a>{% if row.peek %}<span class="rw-peek"><b translate="no">{{ row.peek.from }}</b> <span class="spf-muted" translate="no">&lt;{{ row.peek.email }}&gt; · {{ row.peek.at|date:"d.m.Y H:i" }}</span>
+              {% if row.peek.subject %}<div translate="no">{{ row.peek.subject }}</div>{% endif %}<div class="rw-peek-t" translate="no">{{ row.peek.text|default:"(без тексту)" }}</div>
+              {% if row.peek.files %}<div class="spf-muted" translate="no">📎 {{ row.peek.files|join:" · " }}</div>{% endif %}
+              <div class="spf-muted">Клік — увесь лист праворуч · Ctrl + клік — у пошті</div></span>{% endif %}</span>{% endif %}{% endif %}
+            {% if row.files_n %}<br><span class="rw-files" title="Вкладення з листів постачальника — у запиті">📎 {{ row.files_n }}</span>{% endif %}
             {% if r.reminded_at %}<br>⏰ {{ r.reminded_at|date:"d.m" }}{% endif %}</div>
           {% if r.error %}<div class="spf-bad">{{ r.error|truncatechars:160 }}</div>{% endif %}</td>
         <td>{% if r.price is not None %}{{ row.price_text }} {{ r.currency }}{% else %}—{% endif %}
@@ -134,6 +179,7 @@
   </div>
   {% endif %}
 </div>
+<aside class="rw-panel" id="rw-panel" hidden aria-label="Пропозиція постачальника"></aside>
 {{ job_js }}
 <script>
 (function(){
@@ -147,6 +193,103 @@
   if (c) c.addEventListener('click', function(){
     spJob(act, {do: 'compare_ai', model: document.getElementById('rw-model').value}, document.getElementById('rw-cmp-job'));
   });
+
+  /* ── панель праворуч: клік по рядку постачальника — ціни, вкладення, листи, історія ── */
+  var panel = document.getElementById('rw-panel');
+  document.body.appendChild(panel);   // fixed — від вікна, а не від контейнера сторінки (той може мати transform)
+  var panelUrl = "{% url 'admin:suppliers_supplierrequest_panel' req.pk 0 %}".replace('/0/panel/', '/{rid}/panel/');
+  var keep = 'rw-open-{{ req.pk }}';
+  var cur = 0, seq = 0;
+  function mark(rid) {
+    document.querySelectorAll('tr.rw-row').forEach(function(tr){
+      tr.classList.toggle('rw-on', tr.getAttribute('data-rw-row') === String(rid)); });
+  }
+  function close() {
+    panel.hidden = true; panel.innerHTML = ''; cur = 0; mark(0);
+    document.body.classList.remove('rw-panel-on');
+    try { sessionStorage.removeItem(keep); } catch (e) {}
+  }
+  function show(msg) {
+    if (!msg) return;
+    var d = document.getElementById('rwl-' + msg);
+    if (!d) return;
+    d.open = true; d.classList.add('rw-hl');
+    d.scrollIntoView({block: 'start', behavior: 'smooth'});
+  }
+  async function open(rid, msg, fetch) {
+    var my = ++seq;
+    cur = Number(rid); mark(rid);
+    try { sessionStorage.setItem(keep, String(rid)); } catch (e) {}
+    document.body.classList.add('rw-panel-on');
+    if (panel.hidden || !fetch) {
+      panel.hidden = false;
+      if (!fetch) panel.innerHTML = '<div class="spf-muted" style="padding:20px">⏳ Завантажую…</div>';
+    }
+    try {
+      var r = await fetch_(panelUrl.replace('{rid}', rid) + (fetch ? '?fetch=1' : ''));
+      if (my !== seq) return;
+      panel.innerHTML = await r.text();
+    } catch (e) {
+      if (my === seq) panel.innerHTML = '<div class="spf-bad" style="padding:20px">⚠️ Не вдалося завантажити.</div>';
+      return;
+    }
+    bind();
+    show(msg);
+    var root = panel.querySelector('.rwp');
+    if (!fetch && root && Number(root.getAttribute('data-waiting')) > 0) open(rid, msg, true);  // вкладення з пошти
+  }
+  function fetch_(url) { return fetch(url, {credentials: 'same-origin'}); }
+  function go(step) {
+    var rows = Array.prototype.map.call(document.querySelectorAll('tr.rw-row'), function(tr){ return tr.getAttribute('data-rw-row'); });
+    var i = rows.indexOf(String(cur));
+    if (i < 0) return;
+    var n = rows[(i + step + rows.length) % rows.length];
+    open(n);
+    var tr = document.querySelector('tr.rw-row[data-rw-row="' + n + '"]');
+    if (tr) tr.scrollIntoView({block: 'nearest'});
+  }
+  function bind() {
+    panel.querySelectorAll('[data-rwp-close]').forEach(function(b){ b.addEventListener('click', close); });
+    panel.querySelectorAll('[data-rwp-go]').forEach(function(b){ b.addEventListener('click', function(){ go(Number(b.getAttribute('data-rwp-go'))); }); });
+    panel.querySelectorAll('[data-rwp-edit]').forEach(function(b){ b.addEventListener('click', function(){
+      var f = document.getElementById('rq-' + b.getAttribute('data-rwp-edit'));
+      if (!f) return;
+      f.classList.add('on'); f.scrollIntoView({block: 'center', behavior: 'smooth'});
+      var inp = f.querySelector('input[name="price"]'); if (inp) inp.focus({preventScroll: true});
+    }); });
+    panel.querySelectorAll('[data-rwp-ai]').forEach(function(b){ b.addEventListener('click', function(){
+      var id = b.getAttribute('data-rwp-ai');
+      var m = document.getElementById('rw-model'), o = document.getElementById('rw-over');
+      spJob(act, {do: 'ai_quote', rid: id, model: m ? m.value : '', overwrite: o && o.checked ? '1' : ''},
+            document.getElementById('rwp-job-' + id));
+    }); });
+  }
+  document.querySelectorAll('tr.rw-row').forEach(function(tr){
+    tr.addEventListener('click', function(e){
+      if (e.target.closest('a, button, form, input, select, textarea, label, details')) return;
+      if (window.getSelection && String(window.getSelection()).length) return;   // виділяли текст — не відкривати
+      var rid = tr.getAttribute('data-rw-row');
+      if (!panel.hidden && String(cur) === rid) { close(); return; }
+      open(rid);
+    });
+  });
+  // ✉️ відповідь: звичайний клік — лист у панелі праворуч; Ctrl / середня кнопка — у пошті
+  document.querySelectorAll('[data-rw-reply]').forEach(function(a){
+    a.addEventListener('click', function(e){
+      if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+      e.preventDefault();
+      var rid = a.getAttribute('data-rw-reply'), msg = a.getAttribute('data-msg');
+      if (!panel.hidden && String(cur) === rid) { show(msg); return; }
+      open(rid, msg);
+    });
+  });
+  document.addEventListener('keydown', function(e){
+    if (panel.hidden || e.target.closest('input, textarea, select')) return;
+    if (e.key === 'Escape') { close(); e.preventDefault(); }
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { go(e.key === 'ArrowDown' ? 1 : -1); e.preventDefault(); }
+  });
+  // після «💾 Зберегти» / дії сторінка перезавантажується — панель того самого постачальника відкривається знову
+  try { var was = sessionStorage.getItem(keep); if (was && document.querySelector('tr.rw-row[data-rw-row="' + was + '"]')) open(was); } catch (e) {}
 })();
 </script>
 {% endblock %}

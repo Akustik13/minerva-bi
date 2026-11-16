@@ -113,6 +113,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             path("<int:pk>/edit/", view(self.form_view), name="suppliers_supplierrequest_edit"),
             path("<int:pk>/work/", view(self.work_view), name="suppliers_supplierrequest_work"),
             path("<int:pk>/action/", view(self.action_view), name="suppliers_supplierrequest_action"),
+            path("<int:pk>/recipient/<int:rid>/panel/", view(self.panel_view), name="suppliers_supplierrequest_panel"),
             path("preview/", view(self.preview_view), name="suppliers_supplierrequest_preview"),
             path("ai-letter/", view(self.ai_letter_view), name="suppliers_supplierrequest_ai_letter"),
             path("test-mail/", view(self.test_mail_view), name="suppliers_supplierrequest_test_mail"),
@@ -456,14 +457,25 @@ class SupplierRequestAdmin(admin.ModelAdmin):
 
     # ── сторінка запиту ──
     def work_view(self, request, pk):
+        from suppliers.models import SupplierReplyFile
+        from suppliers.services import rfq_replies
         req = self._request(request, pk)
+        for r in req.recipients.exclude(thread=None, reply_message=None):
+            try:   # 📎 вкладення відповідей, що вже на диску (з пошти — панель рядка)
+                rfq_replies.collect(r)
+            except Exception:  # noqa: BLE001
+                pass
         rows = rfq.comparison(req)
+        n_files = dict(SupplierReplyFile.objects.filter(recipient__request=req).values_list("recipient")
+                       .annotate(n=Count("pk")).values_list("recipient", "n"))
         for row in rows:
             r = row["recipient"]
             row["sent_link"] = r.sent_message_id if r.sent_message_id and r.sent_message and \
                 r.sent_message.account.user_id == request.user.pk else None
             row["reply_link"] = r.reply_message_id if r.reply_message_id and r.reply_message and \
                 r.reply_message.account.user_id == request.user.pk else None
+            row["peek"] = rfq_replies.peek(r, request.user) if row["reply_link"] else None
+            row["files_n"] = n_files.get(r.pk, 0)
         from inventory.models import Supplier
         in_req = {row["recipient"].supplier_id for row in rows}
         more = Supplier.objects.exclude(pk__in=in_req).exclude(status=Supplier.STATUS_BLOCKED)
@@ -477,6 +489,27 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             more=more.order_by("name")[:200], events=events, quantities=rfq.parse_quantities(req.quantities),
             planned=sum(1 for row in rows if row["recipient"].state in (SupplierRequestRecipient.PLANNED,
                                                                           SupplierRequestRecipient.FAILED))))
+
+    def panel_view(self, request, pk, rid):
+        """Панель праворуч: усе про пропозицію одного постачальника — ціни, вкладення, листування, історія.
+        ?fetch=1 — вкладення, яких ще немає на диску, забрати з пошти (IMAP)."""
+        from suppliers.services import rfq_replies
+        req = self._request(request, pk)
+        r = (req.recipients.select_related("supplier", "contact", "reply_message__account", "sent_message__account")
+             .filter(pk=rid).first())
+        if r is None:
+            raise Http404
+        try:
+            out = rfq_replies.collect(r, fetch=request.GET.get("fetch") == "1")
+        except Exception as e:  # noqa: BLE001
+            out = {"saved": 0, "waiting": 0, "error": str(e)[:200]}
+        row = next((x for x in rfq.comparison(req) if x["recipient"].pk == r.pk), {})
+        order = list(req.recipients.order_by("pk").values_list("pk", flat=True))
+        return TemplateResponse(request, "admin/suppliers/_request_panel.html", {
+            **rfq_replies.panel(req, r, request.user, row), "req": req, "out": out, "order": order,
+            "can_change": self.has_change_permission(request, req),
+            "quantities": rfq.parse_quantities(req.quantities),
+            "act": reverse("admin:suppliers_supplierrequest_action", args=[req.pk])})
 
     def action_view(self, request, pk):
         if request.method != "POST":
