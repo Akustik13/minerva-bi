@@ -81,6 +81,42 @@ class FedExCustomsTests(TestCase):
         self.assertEqual(_merge_pdfs(["bad"]), "bad")
 
 
+class CompareRatesBoxesTests(TestCase):
+    """«📊 Порівняти тарифи»: UPS і FedEx отримують кожну коробку (раніше — одну з усією вагою), DHL без дублів."""
+
+    def test_each_box(self):
+        from shipping.admin import _each_box
+        boxes = _each_box([{"weight_kg": 13.2, "length_cm": 50, "width_cm": 38, "height_cm": 39, "quantity": 25},
+                           {"weight_kg": 11.1, "length_cm": 41, "width_cm": 41, "height_cm": 20}], 300, 50, 38, 39)
+        self.assertEqual(len(boxes), 26)
+        self.assertEqual(boxes[-1]["weight_kg"], 11.1)
+        self.assertEqual(_each_box([], 5, 20, 15, 10), [{"weight_kg": 5, "length_cm": 20, "width_cm": 15,
+                                                          "height_cm": 10}])
+
+    def test_fedex_rate_has_packaging(self):
+        c = FedExClient(carrier=fedex())
+        with mock.patch.object(FedExClient, "_post", return_value={"output": {}}) as post:
+            c.get_rates({"country": "DE", "postal": "81829", "city": "München"}, [{"weight_kg": 13}, {"weight_kg": 21}],
+                        from_address={"country": "CN", "postal": "523000", "city": "Dongguan"})
+        rs = post.call_args.args[1]["requestedShipment"]
+        self.assertEqual((rs["packagingType"], len(rs["requestedPackageLineItems"])), ("YOUR_PACKAGING", 2))
+
+    def test_dhl_same_product_once(self):
+        from shipping.services import dhl
+
+        class R:
+            ok, status_code = True, 200
+            def json(self):
+                p = {"productName": "EXPRESS WORLDWIDE", "productCode": "P",
+                     "totalPrice": [{"price": 34789.07, "priceCurrency": "EUR"}]}
+                return {"products": [dict(p, deliveryCapabilities={"totalTransitDays": 3}),
+                                     dict(p, deliveryCapabilities={"totalTransitDays": 2})]}
+        c = Carrier(name="DHL", carrier_type="dhl", api_key="u", api_secret="p", connection_uuid="1", sender_country="DE")
+        with mock.patch("tabele.api_logger.logged_request", return_value=R()):
+            out = dhl.get_rates(c, "DE", "81829", "München", 1, 20, 15, 10)
+        self.assertEqual([(p["code"], p["transit_days"]) for p in out["products"]], [("P", 2)])
+
+
 class JumingoTests(TestCase):
     def setUp(self):
         from sales.models import SalesOrder

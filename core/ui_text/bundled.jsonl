@@ -207,6 +207,7 @@
 {"uk": "(CSS, JS, іконки) — необхідно запустити", "en": "(CSS, JS, icons) — must be run", "de": "(CSS, JS, Icons) — muss ausgeführt werden"}
 {"uk": "(Carrier у Sandbox режимі — для реальних номерів очисти поле API URL)", "en": "(Carrier in Sandbox mode — clear the API URL field for real numbers)", "de": "(Carrier im Sandbox-Modus — für echte Nummern das Feld API-URL leeren)"}
 {"uk": "(DE) або", "en": "(DE) or", "de": "(DE) oder"}
+{"uk": "(DHL Freight / Global Forwarding, UPS Freight, FedEx Freight) — вона в цьому порівнянні не рахується.", "en": "(DHL Freight / Global Forwarding, UPS Freight, FedEx Freight) — it is not included in this comparison.", "de": "(DHL Freight / Global Forwarding, UPS Freight, FedEx Freight) — er ist in diesem Vergleich nicht enthalten."}
 {"uk": "(DOCX; PDF недоступний — немає LibreOffice).", "en": "(DOCX; PDF unavailable — LibreOffice is missing).", "de": "(DOCX; PDF nicht verfügbar — LibreOffice fehlt)."}
 {"uk": "(DOCX; PDF — на сервері немає LibreOffice).", "en": "(DOCX; PDF — LibreOffice is not installed on the server).", "de": "(DOCX; PDF — auf dem Server ist kein LibreOffice installiert)."}
 {"uk": "(DigiKey продає від {0} шт)", "en": "(DigiKey sells from {0} pcs)", "de": "(DigiKey verkauft ab {0} Stk.)"}
@@ -4633,6 +4634,7 @@
 {"uk": "Вебхуки → адреса сайту", "en": "Webhooks → website address", "de": "Webhooks → Website-Adresse"}
 {"uk": "Вебчат RAG", "en": "RAG web chat", "de": "RAG-Webchat"}
 {"uk": "Велика Британія", "en": "United Kingdom", "de": "Vereinigtes Königreich"}
+{"uk": "Велика посилка — кур'єрські тарифи (Express) для неї дуже дорогі. Порівняйте з вантажною доставкою", "en": "Large shipment — courier (Express) rates are very expensive for it. Compare with freight", "de": "Große Sendung — Kurier-Tarife (Express) sind dafür sehr teuer. Vergleichen Sie mit Frachtversand"}
 {"uk": "Великий (18px)", "en": "Large (18px)", "de": "Groß (18px)"}
 {"uk": "Вендор", "en": "Vendor", "de": "Anbieter"}
 {"uk": "Венесуела", "en": "Venezuela", "de": "Venezuela"}
@@ -8690,6 +8692,7 @@
 {"uk": "Кожен шаблон містить", "en": "Each template contains", "de": "Jede Vorlage enthält"}
 {"uk": "Кожна вибрана: такий постачальник уже є — фото й контакт до нього; немає — новий постачальник (🌱 потенційний); уже внесені й без даних — пропускаються", "en": "Each selected: the supplier already exists — photo and contact go to it; otherwise a new supplier (🌱 potential); already entered ones and ones without data are skipped", "de": "Jede ausgewählte: Lieferant existiert bereits — Foto und Kontakt zu ihm; sonst ein neuer Lieferant (🌱 potenziell); bereits erfasste und ohne Daten werden übersprungen"}
 {"uk": "Кожна зміна — у", "en": "Every change is recorded in the", "de": "Jede Änderung steht im"}
+{"uk": "Кожна коробка йде до перевізника окремо — ціна для всієї посилки.", "en": "Every box goes to the carrier separately — the price is for the whole shipment.", "de": "Jeder Karton geht einzeln an den Versanddienst — der Preis gilt für die ganze Sendung."}
 {"uk": "Кожна надіслана версія Angebot (DOCX / PDF) — документ бази знань, прив'язаний до клієнта й проєкту.", "en": "Every sent version of an Angebot (DOCX / PDF) is a knowledge base document linked to the customer and the project.", "de": "Jede versendete Version eines Angebots (DOCX / PDF) ist ein Dokument der Wissensdatenbank, das dem Kunden und dem Projekt zugeordnet ist."}
 {"uk": "Кожне замовлення має «Джерело» = код магазину. Фільтр у Продажах, дашборд і RFM рахують по всіх джерелах разом або окремо.", "en": "Every order has a “Source” = the shop code. The filter in Sales, the dashboard and RFM count all sources together or separately.", "de": "Jeder Auftrag hat eine „Quelle“ = Shop-Code. Der Filter im Verkauf, das Dashboard und RFM rechnen alle Quellen zusammen oder getrennt."}
 {"uk": "Кожне посилання й файл заново (довше)", "en": "Every link and file anew (takes longer)", "de": "Jeden Link und jede Datei neu (dauert länger)"}

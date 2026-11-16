@@ -18,6 +18,22 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 
+def _each_box(packages_raw, weight, length, width, height) -> list:
+    """Коробки з форми ([{weight_kg, length_cm, width_cm, height_cm, quantity}]) → кожна окремо для UPS / FedEx
+    (раніше йшла одна коробка з усією вагою: 58 коробок по 13–22 кг ставали однією на 1032 кг — тарифів не було).
+    Без коробок — одна з загальних ваги й розмірів."""
+    out = []
+    for p in packages_raw or []:
+        try:
+            box = {'weight_kg': max(0.1, float(p.get('weight_kg') or 1)),
+                   'length_cm': float(p.get('length_cm') or 20), 'width_cm': float(p.get('width_cm') or 15),
+                   'height_cm': float(p.get('height_cm') or 10)}
+        except (TypeError, ValueError):
+            continue
+        out += [dict(box) for _ in range(max(1, int(p.get('quantity') or 1)))]
+    return out or [{'weight_kg': weight, 'length_cm': length, 'width_cm': width, 'height_cm': height}]
+
+
 def _copy_shipment_file_to_order_docs(abs_path: str, shipment) -> None:
     """Copies shipment label/customs file into media/orders/{source}/{order_number}/
     if SalesSettings.auto_save_labels_to_server is True."""
@@ -6105,8 +6121,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                             'country':      sender_override.get('country') or carrier.sender_country or 'DE',
                             'state':        sender_override.get('state') or carrier.sender_state or '',
                         }
-                        pkgs = [{'weight_kg': weight, 'length_cm': length,
-                                 'width_cm': width, 'height_cm': height}]
+                        pkgs = _each_box(packages_raw, weight, length, width, height)
                         rates = client.get_rates(to_addr, pkgs, from_address=from_addr_ups)
                         entry["products"] = [
                             {
@@ -6155,8 +6170,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                             'country':      sender_override.get('country') or carrier.sender_country or 'DE',
                             'state':        sender_override.get('state') or carrier.sender_state or '',
                         }
-                        pkgs = [{'weight_kg': weight, 'length_cm': length,
-                                 'width_cm': width, 'height_cm': height}]
+                        pkgs = _each_box(packages_raw, weight, length, width, height)
                         rates = client.get_rates(to_addr, pkgs, from_address=from_addr_fedex)
                         entry["products"] = [
                             {

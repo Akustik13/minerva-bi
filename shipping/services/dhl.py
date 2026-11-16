@@ -252,6 +252,14 @@ def get_rates(carrier, destination_country: str, destination_postal: str,
             "delivery_date": delivery_date,
         })
 
+    # Той самий продукт з тією самою ціною DHL інколи повертає двічі (різні дати / мережі) — лишаємо найшвидший
+    best = {}
+    for p in products:
+        key = (p["code"], p["price"], p["currency"])
+        old = best.get(key)
+        if old is None or (p["transit_days"] or 99) < (old["transit_days"] or 99):
+            best[key] = p
+    products = list(best.values())
     # Сортуємо від найдешевшого
     products.sort(key=lambda x: x["price"] if x["price"] is not None else 9999)
 

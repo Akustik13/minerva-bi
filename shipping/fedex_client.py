@@ -297,6 +297,8 @@ class FedExClient:
                     'address': self._fmt_addr(to_address),
                 },
                 'pickupType':                  'DROPOFF_AT_FEDEX_LOCATION',
+                # Без типу упаковки FedEx відповідав «Invalid service and packaging combination»
+                'packagingType':               _PACKAGING_DEFAULT,
                 'rateRequestType':             ['ACCOUNT', 'LIST'],
                 'requestedPackageLineItems':   [self._pkg_dict(p, i) for i, p in enumerate(packages)],
             },

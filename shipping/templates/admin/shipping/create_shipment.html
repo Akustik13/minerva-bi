@@ -573,7 +573,6 @@ function compareRates(){
       const totalBoxes = data.packages.reduce((s, p) => s + (p.quantity || 1), 0);
       const multiBox   = packages.length > 1;
       meta.innerHTML = `<span style="color:var(--text-muted,#9aafbe)">📦 ${totalBoxes} коробок · ${esc(data.total_weight_kg)} кг заг.</span>`
-        + (multiBox ? ` <span style="color:#d97706;font-weight:700;font-size:11px">~ приблизно</span>` : '')
         + (destStr ? ` &nbsp;→&nbsp; <span style="color:var(--text-muted,#9aafbe)">${esc(destStr)}</span>` : '');
       pkgHtml = '<br><span style="color:var(--text-muted)">📦 Коробки:</span> '
         + data.packages.map((p, i) =>
@@ -582,10 +581,14 @@ function compareRates(){
           ).join(' &nbsp;|&nbsp; ')
         + ` &nbsp;&nbsp;<span style="color:var(--text-dim)">= ${totalBoxes} коробок, ${esc(data.total_weight_kg)} кг заг.</span>`
         + (multiBox
+            ? `<br><span style="color:var(--text-muted);font-size:11px">ℹ️ Кожна коробка йде до перевізника окремо — ціна для всієї посилки.</span>`
+            : '')
+        + (Number(data.total_weight_kg) > 300 || totalBoxes > 40
             ? `<br><span style="display:inline-flex;align-items:center;gap:5px;margin-top:7px;`
             + `background:rgba(217,119,6,.1);border:1px solid #d97706;border-radius:5px;`
             + `padding:4px 10px;font-size:11px;color:#d97706">`
-            + `⚠️ Кілька коробок — розрахунок <b>приблизний</b>. Розміри найбільшої (${largestPkg.length_cm}×${largestPkg.width_cm}×${largestPkg.height_cm} см) · фінальна ціна може відрізнятись від реальної.</span>`
+            + `⚠️ Велика посилка — кур'єрські тарифи (Express) для неї дуже дорогі. Порівняйте з вантажною доставкою `
+            + `(DHL Freight / Global Forwarding, UPS Freight, FedEx Freight) — вона в цьому порівнянні не рахується.</span>`
             : '');
     } else {
       meta.innerHTML = `<span style="color:var(--text-muted,#9aafbe)">📦 ${esc(data.total_weight_kg||body.weight_kg)} кг · ${esc(data.dims||'')} см</span>`
