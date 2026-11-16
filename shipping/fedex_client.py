@@ -371,6 +371,9 @@ class FedExClient:
             (to_address.get('country') or 'DE').upper() !=
             (shipper.get('country') or 'DE').upper()
         )
+        # Доставку оплачує наш акаунт: від нас — як відправник, посилка з-за кордону (до нас) — як отримувач
+        home = (self.carrier.sender_country or 'DE').upper()
+        payment_type = 'SENDER' if (shipper.get('country') or home).upper() == home else 'RECIPIENT'
 
         requested_shipment = {
             'shipper': {
@@ -394,7 +397,7 @@ class FedExClient:
             'packagingType':              _PACKAGING_DEFAULT,
             'pickupType':                 'DROPOFF_AT_FEDEX_LOCATION',
             'shippingChargesPayment': {
-                'paymentType': 'SENDER',
+                'paymentType': payment_type,
                 'payor': {
                     'responsibleParty': {
                         'accountNumber': {'value': self.carrier.connection_uuid},
@@ -419,7 +422,8 @@ class FedExClient:
             requested_shipment['customsClearanceDetail'] = self._build_customs(customs_info, shipper)
 
         payload = {
-            'labelResponseOptions':   'URL_ONLY',  # or 'LABEL'
+            # LABEL — етикетка кожної коробки у відповіді (base64), Minerva зводить їх в один PDF
+            'labelResponseOptions':   'LABEL',
             'requestedShipment':      requested_shipment,
             'accountNumber':          {'value': self.carrier.connection_uuid},
         }
@@ -437,14 +441,21 @@ class FedExClient:
         ship_result    = ship_results[0] if ship_results else {}
 
         master_tracking = ship_result.get('masterTrackingNumber', '')
-        pkg_results     = ship_result.get('pieceResponses', [{}])
+        pkg_results     = ship_result.get('pieceResponses') or [{}]
         pkg_result      = pkg_results[0] if pkg_results else {}
 
         tracking  = pkg_result.get('trackingNumber', '') or master_tracking
-        label_url = pkg_result.get('packageDocuments', [{}])
-        label_url = label_url[0].get('url', '') if label_url else ''
-        label_b64 = pkg_result.get('packageDocuments', [{}])
-        label_b64 = label_b64[0].get('encodedLabel', '') if label_b64 else ''
+        # Етикетка КОЖНОЇ коробки: base64 → один PDF (раніше бралась лише перша коробка)
+        labels, urls = [], []
+        for piece in pkg_results:
+            for doc in (piece.get('packageDocuments') or []):
+                if doc.get('encodedLabel'):
+                    labels.append(doc['encodedLabel'])
+                elif doc.get('url'):
+                    urls.append(doc['url'])
+        label_b64 = _merge_pdfs(labels) if len(labels) > 1 else (labels[0] if labels else '')
+        label_url = urls[0] if urls else ''
+        package_tracking = [p.get('trackingNumber') for p in pkg_results if p.get('trackingNumber')]
 
         charges = ship_result.get('shipmentRating', {}).get('shipmentRateDetails', [{}])
         charges = charges[0] if charges else {}
@@ -458,6 +469,7 @@ class FedExClient:
         return {
             'tracking_number': tracking,
             'master_tracking':  master_tracking,
+            'package_tracking': package_tracking,
             'shipment_id':      transaction_id,
             'label_base64':     label_b64,
             'label_url':        label_url,
@@ -619,37 +631,44 @@ class FedExClient:
             'country':     shipper.get('country', self.carrier.sender_country or 'DE'),
         }]
 
-        # ExportDetail reason map: SALE / GIFT / SAMPLE / RETURN / OTHER
+        # commercialInvoice.shipmentPurpose: SOLD / GIFT / SAMPLE / REPAIR_AND_RETURN / PERSONAL_EFFECTS / NOT_SOLD
         contents_map = {
             'SALE':       'SOLD',
             'COMMERCIAL': 'SOLD',
             'GIFT':       'GIFT',
             'SAMPLE':     'SAMPLE',
-            'RETURN':     'RETURNED_GOODS',
-            'REPAIR':     'RETURNED_GOODS',  # FedEx: no Repair, use RETURNED_GOODS
-            'PERSONAL':   'PERSONAL_BELONGINGS',
-            'OTHER':      'OTHER',
-            'CLAIM':      'OTHER',            # legacy compat
+            'RETURN':     'REPAIR_AND_RETURN',
+            'REPAIR':     'REPAIR_AND_RETURN',
+            'PERSONAL':   'PERSONAL_EFFECTS',
+            'OTHER':      'NOT_SOLD',
+            'CLAIM':      'NOT_SOLD',          # legacy compat
         }
         reason = contents_map.get((info.get('contents_type') or 'SALE').upper(), 'SOLD')
 
+        # `value` у митній декларації Minerva — вартість УСЬОГО рядка, `weight_kg` — вага 1 шт;
+        # FedEx: unitPrice — за 1 шт, customsValue і weight — за весь рядок
+        currency = info.get('currency', 'EUR')
         commodities = []
+        total_customs_value = 0.0
         for item in items_list:
+            qty = max(1, int(item.get('quantity', 1) or 1))
+            line_value = round(float(item.get('value', 0) or 0), 2)
+            total_customs_value += line_value
             cm = {
                 'description':    item.get('description', 'Goods')[:50],
-                'quantity':       int(item.get('quantity', 1)),
+                'quantity':       qty,
                 'quantityUnits':  'PCS',
                 'unitPrice': {
-                    'amount':   round(float(item.get('value', 0)), 2),
-                    'currency': info.get('currency', 'EUR'),
+                    'amount':   round(line_value / qty, 4),
+                    'currency': currency,
                 },
                 'customsValue': {
-                    'amount':   round(float(item.get('value', 0)) * int(item.get('quantity', 1)), 2),
-                    'currency': info.get('currency', 'EUR'),
+                    'amount':   line_value,
+                    'currency': currency,
                 },
                 'weight': {
                     'units': 'KG',
-                    'value': round(float(item.get('weight_kg', 0.1)), 3),
+                    'value': round(max(0.001, float(item.get('weight_kg', 0.1) or 0.1) * qty), 3),
                 },
                 'countryOfManufacture': item.get('country', shipper.get('country', 'DE')),
             }
@@ -657,30 +676,48 @@ class FedExClient:
                 cm['harmonizedCode'] = item['hs_code']
             commodities.append(cm)
 
-        total_customs_value = sum(
-            round(float(it.get('value', 0)) * int(it.get('quantity', 1)), 2)
-            for it in items_list
-        )
+        # Мито й податки: DDP — ми (рахунок відправника), інакше (DAP…) — отримувач
+        terms = (info.get('terms_of_shipment') or 'DAP').upper()
+        if terms == 'DDP':
+            duties = {'paymentType': 'SENDER',
+                      'payor': {'responsibleParty': {'accountNumber': {'value': self.carrier.connection_uuid}}}}
+        else:
+            duties = {'paymentType': 'RECIPIENT'}
 
         return {
-            'dutiesPayment': {
-                'paymentType': 'SENDER',
-                'payor': {
-                    'responsibleParty': {
-                        'accountNumber': {'value': self.carrier.connection_uuid},
-                    },
-                },
-            },
+            'dutiesPayment': duties,
             'customsValue': {
                 'amount':   round(total_customs_value, 2),
-                'currency': info.get('currency', 'EUR'),
+                'currency': currency,
             },
-            'exportDetail': {'exportComplianceStatement': reason},
+            'commercialInvoice': {
+                'shipmentPurpose': reason,
+                'termsOfSale':     terms if terms in ('DAP', 'DDP', 'EXW', 'FCA', 'CPT', 'CIP', 'DPU', 'FOB',
+                                                      'CFR', 'CIF') else 'DAP',
+            },
             'commodities':  commodities,
         }
 
 
 # ── Utility ─────────────────────────────────────────────────────────────────────
+
+def _merge_pdfs(b64_list) -> str:
+    """Кілька PDF (base64) → один PDF (base64); не вдалось — перший."""
+    import base64
+    import io
+    try:
+        from pypdf import PdfReader, PdfWriter
+        writer = PdfWriter()
+        for b64 in b64_list:
+            for page in PdfReader(io.BytesIO(base64.b64decode(b64))).pages:
+                writer.add_page(page)
+        out = io.BytesIO()
+        writer.write(out)
+        return base64.b64encode(out.getvalue()).decode()
+    except Exception as e:  # noqa: BLE001 — етикетка першої коробки краще, ніж нічого
+        logger.warning('FedEx: labels not merged (%s)', e)
+        return b64_list[0] if b64_list else ''
+
 
 def _parse_transit_days(raw: str) -> int | None:
     """Convert FedEx transitTime string to integer days. Returns None if unparseable."""

@@ -199,7 +199,9 @@ class JumingoService(BaseCarrierService):
         Пріоритет: customs_articles (з форми) → автогенерація з ліній замовлення.
         """
         country = (shipment.recipient_country or "").upper()
-        if country in self._EU_COUNTRIES or not country:
+        origin = (shipment.sender_country or self.carrier.sender_country or "DE").upper()
+        # Митниця — коли посилка перетинає кордон ЄС (і для посилки з-за меж ЄС до нас)
+        if not country or country == origin or (country in self._EU_COUNTRIES and origin in self._EU_COUNTRIES):
             return None
 
         currency     = shipment.declared_currency or "EUR"
@@ -312,6 +314,8 @@ class JumingoService(BaseCarrierService):
         _szip     = s.sender_zip     or c.sender_zip     or ""
         _scountry = s.sender_country or c.sender_country or "DE"
         _sphone   = s.sender_phone   or c.sender_phone   or ""
+        _semail   = s.sender_email   or c.sender_email   or ""
+        _sstate   = s.sender_state   or getattr(c, "sender_state", "") or ""
         sender_country = _scountry.upper()
         from_address = {
             "name":    _sname[:35],
@@ -321,10 +325,10 @@ class JumingoService(BaseCarrierService):
             "zip":     _szip,
             "country": _scountry,
             "phone":   _sphone,
-            "settings": {"email": c.sender_email or ""},
+            "settings": {"email": _semail},
         }
-        if sender_country in self._STATE_REQUIRED and getattr(c, "sender_state", ""):
-            from_address["state"] = c.sender_state[:10]
+        if sender_country in self._STATE_REQUIRED and _sstate:
+            from_address["state"] = _sstate[:10]
 
         # ── Пакети: multi-package якщо є ShipmentPackage, інакше — один з полів Shipment ──
         pkg_qs = list(shipment.packages.order_by("pk")) if hasattr(shipment, "packages") else []
@@ -437,10 +441,12 @@ class JumingoService(BaseCarrierService):
                           weight_kg: float, length_cm: int, width_cm: int, height_cm: int,
                           dest_name: str = "Recipient",
                           insurance_type: str = "none",
-                          declared_value: float = 1.0) -> dict:
+                          declared_value: float = 1.0,
+                          packages=None, origin=None) -> dict:
         """
         Тимчасово створює відправлення на Jumingo (без збереження в Minerva DB),
-        отримує тарифи і повертає їх.
+        отримує тарифи і повертає їх. packages — [{weight_kg, length_cm, width_cm, height_cm, quantity}]
+        (кожна коробка окремо), origin — {country, postal, city} справжнього відправника (посилка до нас).
 
         Повертає dict:
           {
@@ -452,14 +458,26 @@ class JumingoService(BaseCarrierService):
         import requests as req
 
         c = self.carrier
+        origin = origin or {}
+        abroad = bool(origin.get("country")) and origin["country"].upper() != (c.sender_country or "DE").upper()
+        boxes = []
+        for p in packages or []:
+            try:
+                box = {"weight": max(0.1, float(p.get("weight_kg") or 1)),
+                       "length": max(1, int(float(p.get("length_cm") or 20))),
+                       "width": max(1, int(float(p.get("width_cm") or 15))),
+                       "height": max(1, int(float(p.get("height_cm") or 10)))}
+            except (TypeError, ValueError):
+                continue
+            boxes += [dict(box) for _ in range(max(1, int(p.get("quantity") or 1)))]
         payload = {
             "from_address": {
                 "name":    c.sender_name or "Sender",
                 "company": c.sender_company or "",
                 "street":  c.sender_street or "Main St 1",
-                "city":    c.sender_city or "City",
-                "zip":     c.sender_zip or "00000",
-                "country": c.sender_country or "DE",
+                "city":    (origin.get("city") if abroad else c.sender_city) or "City",
+                "zip":     (origin.get("postal") if abroad else c.sender_zip) or "00000",
+                "country": (origin.get("country") if abroad else c.sender_country) or "DE",
                 "phone":   c.sender_phone or "+4900000000",
                 "settings": {"email": c.sender_email or ""},
             },
@@ -473,7 +491,7 @@ class JumingoService(BaseCarrierService):
                 "phone":   "+4900000000",
                 "settings": {"email": ""},
             },
-            "packages": [{
+            "packages": boxes or [{
                 "weight": max(0.1, float(weight_kg or 1)),
                 "length": int(length_cm) if length_cm else 20,
                 "width":  int(width_cm)  if width_cm  else 15,

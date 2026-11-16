@@ -5560,9 +5560,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         shipment.carrier_price       = result.get('total_charge') or shipment.carrier_price
         shipment.carrier_currency    = result.get('currency', 'EUR')
         shipment.status              = Shipment.Status.LABEL_READY
-        shipment.save(update_fields=[
-            'tracking_number', 'carrier_shipment_id', 'carrier_price', 'carrier_currency', 'status',
-        ])
+        fields = ['tracking_number', 'carrier_shipment_id', 'carrier_price', 'carrier_currency', 'status']
+        boxes = [t for t in (result.get('package_tracking') or []) if t]
+        if len(boxes) > 1:                     # кілька коробок — номер кожної (як UPS / DHL)
+            shipment.package_tracking = boxes
+            fields.append('package_tracking')
+        shipment.save(update_fields=fields)
 
         # Зберігаємо PDF-етикетку (як UPS: media/shipping/labels/ + копії в документи замовлення)
         label_b64 = result.get('label_base64', '')
@@ -6047,6 +6050,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                         weight, length, width, height,
                         insurance_type=insurance_type,
                         declared_value=declared_value,
+                        packages=packages_raw or None,          # кожна коробка окремо
+                        origin=({"country": sender_override["country"], "postal": sender_override["postal"],
+                                 "city": sender_override["city"]} if sender_override["country"] else None),
                     )
                     preview_id = r.get("preview_id", "")
                     if preview_id:
