@@ -271,3 +271,14 @@ span.mt-ag-box { cursor: default; text-align: center; color: var(--text-muted); 
 .mt-ai-consent { display: block; margin: 8px 0 4px; padding: 6px 10px; border-radius: 6px; font-size: 13px;
   background: color-mix(in srgb, var(--warn) 14%, transparent); }
 .mt-ai-state { font-size: 13px; }
+
+/* ✏️ правки розпізнавання (meetings/ai_fix.py): у тексті й панель «було → стало» */
+.mt-fx { background: color-mix(in srgb, var(--warn) 22%, transparent); text-decoration: underline wavy var(--warn);
+  text-underline-offset: 3px; border-radius: 2px; cursor: pointer; }
+.mt-fx-ok { text-decoration: underline dotted var(--ok); text-underline-offset: 3px; }
+.mt-fixes:empty { display: none; }
+.mt-fixes-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0 4px; }
+.mt-fix-list { list-style: none; margin: 4px 0 8px; padding: 0; max-height: 360px; overflow: auto; }
+.mt-fix { padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; line-height: 1.6; }
+.mt-fix .button { padding: 1px 8px; margin-left: 4px; }
+.mt-fix s { color: var(--text-muted); }

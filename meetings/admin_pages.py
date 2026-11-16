@@ -17,7 +17,7 @@ from django.template.loader import render_to_string
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
-from . import agenda, consent, knowledge, parts, services
+from . import agenda, ai_fix, consent, knowledge, parts, services
 from .models import LANG_CHOICES, RETENTION_CHOICES, Meeting, MeetingItem, MeetingTranscript
 
 PROJECT_OPTIONS_MAX = 300
@@ -215,6 +215,7 @@ def status_json(m) -> dict:
     out = services.poll_state(m)
     out["lines"] = progress_lines(m)
     out["ai_moments"] = ai_moments.state(m)
+    out["ai_fix"] = ai_fix.state(m)
     return out
 
 
@@ -516,7 +517,8 @@ def log_lines(m) -> list:
             from . import ai_moments
             where = "у Minerva" if e.get("where") == "minerva" else "на RAG-ПК"
             model = ai_moments.SHORT.get(e.get("model"), e.get("model") or "Claude")
-            text = (f"☁️ Текст розшифровки оброблено в {model} (Anthropic, США) {where} — учасники погодились "
+            what = ("перевірено на помилки розпізнавання" if e.get("task") == "fix" else "оброблено")
+            text = (f"☁️ Текст розшифровки {what} в {model} (Anthropic, США) {where} — учасники погодились "
                     f"(підтвердив той, хто записав)")
         else:
             continue
@@ -538,7 +540,8 @@ def transcript_rows(m, tr, pj=None) -> list:
             cls = pj["colors"].get(project.pk, "") if project is not None else "mt-pj-gen"
         rows.append({"type": "seg", "n": s.get("n"), "t": start, "time": clock(s.get("start")),
                      "second": int(start), "who": labels.get(s.get("ch"), labels["M"]),
-                     "ch": s.get("ch") or "M", "text": s.get("text") or "", "pj": cls})
+                     "ch": s.get("ch") or "M", "text": s.get("text") or "", "pj": cls,
+                     "pieces": ai_fix.pieces(s)})
     if show:
         for part in pj["parts"]:
             label = f"{part.project.code} · {part.project.name}" if part.project_id else ""
@@ -614,6 +617,30 @@ def ai_box(user, m) -> dict | None:
             "open": (m.has_transcript and (not m.items.exists()))}
 
 
+def fix_box(user, m, tr) -> dict | None:
+    """«✏️ Виправити помилки розпізнавання» (meetings/ai_fix.py): запуск і ✓ / ✕ / ↶ — лише власнику з правом
+    змінювати; правки «було → стало» з панеллю й позначками в тексті."""
+    if not (tr and m.has_transcript and m.transcript_at and can_change(user)):
+        return None
+    segments = tr.segments or []
+    return {"models": list(ai_fix.MODELS.items()), "default": ai_fix.DEFAULT, "available": ai_fix.available(),
+            "consent_text": ai_fix.CONSENT_TEXT, "state": ai_fix.state(m),
+            "url": url("admin:meetings_meeting_fix", m.pk),
+            "decide_url": url("admin:meetings_meeting_fix_decide", m.pk),
+            "rows": ai_fix.rows(m, segments), "counts": ai_fix.counts(segments)}
+
+
+def fix_panel_html(user, m, tr) -> str:
+    """Панель правок для відповіді ✓ / ✕ / ↶ (та сама частина шаблону, що на сторінці)."""
+    return render_to_string("admin/meetings/meeting/_fixes.html", {"fix": fix_box(user, m, tr)})
+
+
+def fix_text_html(seg) -> str:
+    """Текст рядка розшифровки з позначками правок (для відповіді ✓ / ✕ / ↶)."""
+    return render_to_string("admin/meetings/meeting/_fix_text.html",
+                            {"text": seg.get("text") or "", "pieces": ai_fix.pieces(seg)})
+
+
 def page_context(user, m, settings=None) -> dict:
     """Усе для page.html (лише власнику — перевірено до виклику)."""
     s = settings or services.settings_obj()
@@ -656,7 +683,7 @@ def page_context(user, m, settings=None) -> dict:
         "no_project_hint": not pj["links"], "transcript": transcript_rows(m, tr, pj) if tr else [],
         **projects_context(user, m, pj, tr),
         "transcript_model": tr.model if tr else "",
-        "moments_model": tr.moments_model if tr else "", "ai_box": ai_box(user, m),
+        "moments_model": tr.moments_model if tr else "", "ai_box": ai_box(user, m), "fix": fix_box(user, m, tr),
         "kb": knowledge.parts_state(m, user) if m.approved_at else None, "kb_text": KB_TEXT,
         "agenda": agenda_context(user, m),
         "consent_lang_label": CONSENT_LANG_LABELS.get(m.consent_lang, ""), "log": log_lines(m),

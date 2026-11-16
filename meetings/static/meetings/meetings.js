@@ -364,6 +364,109 @@
     });
   }
 
+  // ── ✏️ Помилки розпізнавання — Claude у Minerva (meetings/ai_fix.py): запуск, хід (status/ → ai_fix), ✓ / ✕ / ↶ ──
+  var fixBox = document.getElementById('mt-fix');
+  if (fixBox) {
+    var fixState = document.getElementById('mt-fix-state');
+    var fixCfgEl = document.getElementById('mt-config'), fixCfg = null;
+    try { fixCfg = fixCfgEl ? JSON.parse(fixCfgEl.textContent) : null; } catch (err) { fixCfg = null; }
+    var fixPoll = function () {
+      if (!fixCfg || !fixCfg.status_url) return;
+      fetch(fixCfg.status_url, {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+        .then(function (r) { return r.json(); })
+        .then(function (s) {
+          var st = s && s.ai_fix;
+          if (!st || st.state === 'running') { setTimeout(fixPoll, 4000); return; }
+          if (st.state === 'done') { location.reload(); return; }
+          if (fixState) fixState.textContent = '⚠️ ' + (st.error || 'Не вдалося');
+          var b = fixBox.querySelector('[data-mt-fix-start]');
+          if (b) b.disabled = false;
+        }, function () { setTimeout(fixPoll, 8000); });
+    };
+    if (fixState && fixState.getAttribute('data-state') === 'running') setTimeout(fixPoll, 4000);
+    fixBox.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-mt-fix-start]');
+      if (!b) return;
+      var picked = fixBox.querySelector('input[name=mt-fix-model]:checked');
+      var consent = document.getElementById('mt-fix-consent');
+      if (!consent || !consent.checked) {
+        if (fixState) fixState.textContent = '⚠️ Поставте галочку згоди учасників на обробку в хмарі.';
+        if (consent) consent.focus();
+        return;
+      }
+      b.disabled = true;
+      if (fixState) fixState.textContent = '⏳ Надсилаю розшифровку…';
+      post(b.getAttribute('data-url'), {model: picked ? picked.value : '', consent: true}).then(function (res) {
+        if (!res || !res.ok) {
+          b.disabled = false;
+          if (fixState) fixState.textContent = '⚠️ ' + ((res && res.error) || 'Не вдалося');
+          return;
+        }
+        if (res.state && res.state.state === 'done') { location.reload(); return; }
+        if (fixState) fixState.textContent = '⏳ ' + ((res.state && res.state.label) || 'Claude') + ' перевіряє розшифровку… (зазвичай 1–3 хв; сторінку можна не тримати відкритою)';
+        setTimeout(fixPoll, 4000);
+      });
+    });
+  }
+
+  function fixDecide(action, ids) {
+    var panel = document.getElementById('mt-fixes');
+    if (!panel || !panel.getAttribute('data-url')) return;
+    post(panel.getAttribute('data-url'), {action: action, ids: ids === 'all' ? 'all' : [ids]}).then(function (res) {
+      if (!res || !res.ok) { toast('⚠️ ' + ((res && res.error) || 'Не вдалося')); return; }
+      var cur = document.getElementById('mt-fixes');
+      if (cur && res.panel) {
+        var wrap = document.createElement('div');
+        wrap.innerHTML = res.panel.trim();
+        if (wrap.firstElementChild) cur.replaceWith(wrap.firstElementChild);
+      }
+      Object.keys(res.rows || {}).forEach(function (n) {
+        var span = document.querySelector('#t-' + n + ' .mt-text');
+        if (!span) return;
+        span.innerHTML = res.rows[n];             // готовий фрагмент сервера (екранований шаблоном)
+        span.removeAttribute('data-raw');
+        span.removeAttribute('data-html');
+      });
+      var msg = {accept: '✓ Виправлено', reject: '✕ Відхилено', reset: '↶ Повернуто'}[action] || '';
+      if (res.changed > 1) msg += ': ' + res.changed;
+      if (res.skipped) msg += ' · пропущено ' + res.skipped + ' (це місце вже змінила інша правка)';
+      toast(msg);
+    });
+  }
+
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-mt-fix]');
+    if (!b) return;
+    e.preventDefault();
+    var action = b.getAttribute('data-mt-fix'), ids = b.getAttribute('data-ids');
+    if (ids === 'all') {
+      var n = document.getElementById('mt-fix-n');
+      var ask = action === 'accept' ? 'Прийняти всі правки ({0})? Текст розшифровки зміниться — кожну можна повернути «↶».'
+        : 'Відхилити всі правки ({0})?';
+      if (!confirm(ask.replace('{0}', n ? n.textContent : ''))) return;
+    }
+    fixDecide(action, ids);
+  });
+
+  // позначка правки в тексті: ✓ / ✕ прямо з рядка
+  var trFix = document.getElementById('mt-tr');
+  if (trFix) {
+    trFix.addEventListener('click', function (e) {
+      var mk = e.target.closest('.mt-fx');
+      if (!mk) return;
+      var id = mk.getAttribute('data-fix');
+      if (!window.MVMenu) {
+        var row = document.getElementById('fx-' + id);
+        if (row) row.scrollIntoView({block: 'center'});
+        return;
+      }
+      window.MVMenu.open(e, [
+        {label: '✓ Прийняти правку', onSelect: function () { fixDecide('accept', id); }},
+        {label: '✕ Відхилити', onSelect: function () { fixDecide('reject', id); }}
+      ], {title: mk.getAttribute('title') || '✏️ Правка', titleData: true, label: 'Правка розпізнавання'});
+    });
+  }
+
   // ── розшифровка: пошук і #t=<секунда> ──
   var tr = document.getElementById('mt-tr');
   var q = document.getElementById('mt-tr-q');
@@ -371,9 +474,17 @@
 
   function highlight(span, needle) {
     var text = span.getAttribute('data-raw');
-    if (text === null) { text = span.textContent; span.setAttribute('data-raw', text); }
+    if (text === null) {
+      text = span.textContent;
+      span.setAttribute('data-raw', text);
+      span.setAttribute('data-html', span.innerHTML);    // позначки правок — повернути, коли пошук очищено
+    }
+    if (!needle) {
+      var html = span.getAttribute('data-html');
+      if (html !== null) span.innerHTML = html; else span.textContent = text;
+      return false;
+    }
     span.textContent = '';
-    if (!needle) { span.textContent = text; return false; }
     var low = text.toLowerCase(), at = 0, i, found = false;
     while ((i = low.indexOf(needle, at)) >= 0) {
       span.appendChild(document.createTextNode(text.slice(at, i)));

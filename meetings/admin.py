@@ -13,6 +13,8 @@
   <pk>/save/                 POST «✏️ Змінити»
   <pk>/retry/                POST «🔄 Спробувати ще раз»
   <pk>/moments/              POST JSON «🔄 Знайти ключові моменти ще раз» — Claude у Minerva (meetings/ai_moments.py)
+  <pk>/fix/                  POST JSON «✏️ Виправити помилки розпізнавання» — Claude пропонує правки (meetings/ai_fix.py)
+  <pk>/fix/decide/           POST JSON ✓ / ✕ / ↶ правок розшифровки → свіжа панель і рядки
   <pk>/continue/             GET підготовка продовження («… (продовження)»)
   <pk>/remove/               POST «🗑 Видалити нараду»
   <pk>/projects/             POST JSON «📁 Проєкти наради» (add / remove / main — meetings/parts.py)
@@ -164,6 +166,8 @@ class MeetingAdmin(admin.ModelAdmin):
             path("<int:pk>/save/", w(self.save_view), name="meetings_meeting_save"),
             path("<int:pk>/retry/", w(self.retry_view), name="meetings_meeting_retry"),
             path("<int:pk>/moments/", w(self.moments_view), name="meetings_meeting_moments"),
+            path("<int:pk>/fix/", w(self.fix_view), name="meetings_meeting_fix"),
+            path("<int:pk>/fix/decide/", w(self.fix_decide_view), name="meetings_meeting_fix_decide"),
             path("<int:pk>/continue/", w(self.continue_view), name="meetings_meeting_continue"),
             path("<int:pk>/remove/", w(self.remove_view), name="meetings_meeting_remove"),
             path("<int:pk>/projects/", w(self.projects_view), name="meetings_meeting_projects"),
@@ -499,6 +503,48 @@ class MeetingAdmin(admin.ModelAdmin):
         except MeetingError as e:
             return JsonResponse({"ok": False, "error": str(e)}, status=400)
         return JsonResponse({"ok": True, "state": st})
+
+    def fix_view(self, request, pk):
+        """POST JSON {model, consent} → «✏️ Виправити помилки розпізнавання»: Claude у фоні пропонує правки
+        (meetings/ai_fix.py); хід — status/ (ai_fix)."""
+        from . import ai_fix
+        refused = _post_only(request)
+        if refused:
+            return refused
+        m = services.get_own(request.user, pk)
+        refused = self._change_refused(request, m, as_json=True)
+        if refused:
+            return refused
+        data = _json_body(request)
+        try:
+            st = ai_fix.start(m, request.user, str(data.get("model") or ""),
+                              data.get("consent") in (True, "1", "true", "on"))
+        except MeetingError as e:
+            return JsonResponse({"ok": False, "error": str(e)}, status=400)
+        return JsonResponse({"ok": True, "state": st})
+
+    def fix_decide_view(self, request, pk):
+        """POST JSON {action accept | reject | reset, ids: [...] | "all"} → {panel, rows {n: html тексту}, counts}."""
+        from . import ai_fix
+        from .models import MeetingTranscript
+        refused = _post_only(request)
+        if refused:
+            return refused
+        m = services.get_own(request.user, pk)
+        refused = self._change_refused(request, m, as_json=True)
+        if refused:
+            return refused
+        data = _json_body(request)
+        ids = data.get("ids")
+        try:
+            res = ai_fix.decide(request.user, m, str(data.get("action") or ""),
+                                "all" if ids == "all" else (ids if isinstance(ids, list) else []))
+        except MeetingError as e:
+            return JsonResponse({"ok": False, "error": str(e)}, status=400)
+        tr = MeetingTranscript.objects.filter(meeting=m).first()
+        return JsonResponse({"ok": True, "changed": res["changed"], "skipped": res["skipped"],
+                             "counts": res["counts"], "panel": admin_pages.fix_panel_html(request.user, m, tr),
+                             "rows": {str(n): admin_pages.fix_text_html(seg) for n, seg in res["rows"].items()}})
 
     def retry_view(self, request, pk):
         refused = _post_only(request)

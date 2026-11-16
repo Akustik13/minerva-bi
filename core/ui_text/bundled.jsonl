@@ -422,6 +422,7 @@
 {"uk": "(усі люди)", "en": "(all people)", "de": "(alle Personen)"}
 {"uk": "(фаз немає)", "en": "(no phases)", "de": "(keine Phasen)"}
 {"uk": "(формат", "en": "(format", "de": "(Format"}
+{"uk": "(це місце вже змінила інша правка)", "en": "(another correction already changed this spot)", "de": "(eine andere Korrektur hat diese Stelle bereits geändert)"}
 {"uk": "(ціни на DigiKey можуть змінитися на 1 цент)", "en": "(prices on DigiKey may change by 1 cent)", "de": "(die Preise auf DigiKey können sich um 1 Cent ändern)"}
 {"uk": "(червоних", "en": "(red", "de": "(rot"}
 {"uk": "(через RAG API помічника Minerva)", "en": "(via the RAG API of the Minerva assistant)", "de": "(über die RAG-API des Minerva-Assistenten)"}
@@ -1141,6 +1142,7 @@
 {"uk": "Claude Sonnet складає чернетку плану з ваших листів, шаблонів, тривалостей минулих проєктів і вашої підказки (що врахувати, що вже відбулось); перед застосуванням ви її переглядаєте", "en": "Claude Sonnet drafts a plan from your e-mails, templates, durations of past projects and your hint (what to take into account, what has already happened); you review it before applying", "de": "Claude Sonnet erstellt einen Planentwurf aus Ihren E-Mails, Vorlagen, Dauern früherer Projekte und Ihrem Hinweis (was zu berücksichtigen ist, was schon geschehen ist); vor dem Übernehmen sehen Sie ihn durch"}
 {"uk": "Claude аналізує цінову стратегію…", "en": "Claude is analyzing the pricing strategy…", "de": "Claude analysiert die Preisstrategie…"}
 {"uk": "Claude аналізує…", "en": "Claude is analyzing…", "de": "Claude analysiert…"}
+{"uk": "Claude звіряє розшифровку з назвами з Minerva — клієнт, проєкти, артикули, учасники, порядок денний — і пропонує правки «було → стало» для слів, які RAG-ПК розпізнав неправильно. Текст змінюється лише після ✓. Надсилається лише текст, без аудіо; ключ Minerva, витрати — у бюджеті AI.", "en": "Claude checks the transcript against names from Minerva — customer, projects, articles, participants, agenda — and suggests “before → after” corrections for words the RAG PC misrecognized. The text changes only after ✓. Only the text is sent, no audio; Minerva’s key, costs count towards the AI budget.", "de": "Claude gleicht das Transkript mit Namen aus Minerva ab — Kunde, Projekte, Artikel, Teilnehmende, Tagesordnung — und schlägt Korrekturen „vorher → nachher“ für Wörter vor, die der RAG-PC falsch erkannt hat. Der Text ändert sich erst nach ✓. Gesendet wird nur Text, kein Audio; Minerva-Schlüssel, Kosten im KI-Budget."}
 {"uk": "Claude і RAG разом", "en": "Claude and RAG together", "de": "Claude und RAG zusammen"}
 {"uk": "Client ID не вказано", "en": "Client ID not specified", "de": "Client ID nicht angegeben"}
 {"uk": "Client ID та Secret не вказані.", "en": "Client ID and Secret are not specified.", "de": "Client ID und Secret sind nicht angegeben."}
@@ -3004,6 +3006,7 @@
 {"uk": "{0} отримано", "en": "{0} received", "de": "{0} erhalten"}
 {"uk": "{0} пар.", "en": "{0} params", "de": "{0} Param."}
 {"uk": "{0} переадресовує на {1}. {2} Вкажіть у «Адреса сайту» {3}, а URL вебхука сайту — {4}api/shop/webhook.php (REST API → Вебхуки).", "en": "{0} redirects to {1}. {2} Enter {3} in «Адреса сайту», and as the site's webhook URL — {4}api/shop/webhook.php (REST API → Вебхуки).", "de": "{0} leitet weiter auf {1}. {2} In «Адреса сайту» {3} eintragen, als Webhook-URL der Website — {4}api/shop/webhook.php (REST API → Вебхуки)."}
+{"uk": "{0} перевіряє розшифровку…", "en": "{0} is checking the transcript…", "de": "{0} prüft das Transkript…"}
 {"uk": "{0} повторно надіслав замовлення {1} — воно вже було, нового не створено", "en": "{0} resent order {1} — it already existed, no new one was created", "de": "{0} hat den Auftrag {1} erneut gesendet — er existierte bereits, es wurde kein neuer angelegt"}
 {"uk": "{0} повід. · {1}", "en": "{0} msg. · {1}", "de": "{0} Nachr. · {1}"}
 {"uk": "{0} подій тут — клік, щоб наблизити", "en": "{0} events here — click to zoom in", "de": "{0} Ereignisse hier — Klick zum Heranzoomen"}
@@ -3233,6 +3236,7 @@
 {"uk": "{0}: немає права створювати клієнтів", "en": "{0}: no permission to create customers", "de": "{0}: keine Berechtigung, Kunden anzulegen"}
 {"uk": "{0}: немає права створювати постачальників", "en": "{0}: no right to create suppliers", "de": "{0}: kein Recht, Lieferanten anzulegen"}
 {"uk": "{0}: немає сторінки гіда «{1}»", "en": "{0}: no guide page “{1}”", "de": "{0}: keine Leitfaden-Seite „{1}“"}
+{"uk": "{0}: нових правок — {1}", "en": "{0}: new corrections — {1}", "de": "{0}: neue Korrekturen — {1}"}
 {"uk": "{0}: оновлено листів {1}", "en": "{0}: e-mails updated {1}", "de": "{0}: aktualisierte E-Mails {1}"}
 {"uk": "{0}: оприбутковано на склад — {1}", "en": "{0}: received into stock — {1}", "de": "{0}: ins Lager eingebucht — {1}"}
 {"uk": "{0}: офер надіслано на DigiKey — нижче те, що DigiKey повертає тепер.", "en": "{0}: offer sent to DigiKey — below is what DigiKey returns now.", "de": "{0}: Offer an DigiKey gesendet — unten sehen Sie, was DigiKey jetzt zurückgibt."}
@@ -4458,6 +4462,7 @@
 {"uk": "Було", "en": "Was", "de": "Vorher"}
 {"uk": "Було на DigiKey", "en": "Was on DigiKey", "de": "War bei DigiKey"}
 {"uk": "Було, {0}", "en": "Was, {0}", "de": "Vorher, {0}"}
+{"uk": "Було: «{0}» — виправлено", "en": "Was: “{0}” — corrected", "de": "Vorher: „{0}“ — korrigiert"}
 {"uk": "Буркіна-Фасо", "en": "Burkina Faso", "de": "Burkina Faso"}
 {"uk": "Бурунді", "en": "Burundi", "de": "Burundi"}
 {"uk": "Бутан", "en": "Bhutan", "de": "Bhutan"}
@@ -5053,10 +5058,12 @@
 {"uk": "Випиши лише прохання й умови ЩОДО ВІДПРАВКИ цього замовлення: перевізник чи служба (Express, Standard…), дата (не раніше / до), адреса чи отримувач, упаковка й маркування, документи в посилці чи митниця, номер рахунку клієнта в перевізника (collect), відправити частинами, інше важливе для відправки. Ціни, оплату, технічні питання про товар — не виписуй. Наші власні листи (позначені «НАШ ЛИСТ») — лише якщо там домовлено про відправку.", "en": "Випиши лише прохання й умови ЩОДО ВІДПРАВКИ цього замовлення: перевізник чи служба (Express, Standard…), дата (не раніше / до), адреса чи отримувач, упаковка й маркування, документи в посилці чи митниця, номер рахунку клієнта в перевізника (collect), відправити частинами, інше важливе для відправки. Ціни, оплату, технічні питання про товар — не виписуй. Наші власні листи (позначені «НАШ ЛИСТ») — лише якщо там домовлено про відправку.", "de": "Випиши лише прохання й умови ЩОДО ВІДПРАВКИ цього замовлення: перевізник чи служба (Express, Standard…), дата (не раніше / до), адреса чи отримувач, упаковка й маркування, документи в посилці чи митниця, номер рахунку клієнта в перевізника (collect), відправити частинами, інше важливе для відправки. Ціни, оплату, технічні питання про товар — не виписуй. Наші власні листи (позначені «НАШ ЛИСТ») — лише якщо там домовлено про відправку."}
 {"uk": "Виправ всі помилки. Збережи стиль, тон та форматування.", "en": "Fix all errors. Keep the style, tone and formatting.", "de": "Korrigieren Sie alle Fehler. Behalten Sie Stil, Ton und Formatierung bei."}
 {"uk": "Виправити знак qty для Outgoing з позитивним qty (пошкоджені дані)", "en": "Fix the qty sign for Outgoing with positive qty (corrupted data)", "de": "Vorzeichen von qty bei Outgoing mit positivem qty korrigieren (beschädigte Daten)"}
+{"uk": "Виправити помилки розпізнавання — Claude", "en": "Fix recognition errors — Claude", "de": "Erkennungsfehler korrigieren — Claude"}
 {"uk": "Виправити помилку", "en": "Fix the error", "de": "Fehler beheben"}
 {"uk": "Виправити і завантажити", "en": "Fix and upload", "de": "Korrigieren und hochladen"}
 {"uk": "Виправлений системою", "en": "Corrected by the system", "de": "Vom System korrigiert"}
 {"uk": "Виправлено", "en": "Fixed", "de": "Behoben"}
+{"uk": "Виправлено ({0})", "en": "Corrected ({0})", "de": "Korrigiert ({0})"}
 {"uk": "Виправлено {0} транзакцій: qty змінено на від'ємне значення.", "en": "{0} transactions fixed: qty changed to a negative value.", "de": "{0} Transaktionen korrigiert: qty auf einen negativen Wert geändert."}
 {"uk": "Виправлено людиною", "en": "Corrected by a human", "de": "Von Menschen korrigiert"}
 {"uk": "Виправлено трек-номерів: {0}.", "en": "Tracking numbers fixed: {0}.", "de": "Sendungsnummern korrigiert: {0}."}
@@ -5848,12 +5855,16 @@
 {"uk": "Відхилена адреса кабінету", "en": "Rejected account link address", "de": "Abgelehnte Adresse des Kundenkontos"}
 {"uk": "Відхилення частоти від номінальної в ppm", "en": "Frequency deviation from nominal in ppm", "de": "Frequenzabweichung vom Nennwert in ppm"}
 {"uk": "Відхилено", "en": "Rejected", "de": "Abgelehnt"}
+{"uk": "Відхилено ({0})", "en": "Rejected ({0})", "de": "Abgelehnt ({0})"}
 {"uk": "Відхилено: {0}", "en": "Rejected: {0}", "de": "Abgelehnt: {0}"}
 {"uk": "Відхилено: {0}. Ці самі ціни Minerva більше не пропонуватиме.", "en": "Rejected: {0}. Minerva will not propose these same prices again.", "de": "Abgelehnt: {0}. Minerva schlägt dieselben Preise nicht erneut vor."}
 {"uk": "Відхилити", "en": "Reject", "de": "Ablehnen"}
 {"uk": "Відхилити (409), якщо товару недостатньо", "en": "Reject (409) if there is not enough stock", "de": "Ablehnen (409), wenn der Artikel nicht ausreicht"}
 {"uk": "Відхилити (повернутись до редагування)", "en": "Discard (return to editing)", "de": "Verwerfen (zurück zur Bearbeitung)"}
 {"uk": "Відхилити вибрані", "en": "Reject selected", "de": "Ausgewählte ablehnen"}
+{"uk": "Відхилити всі", "en": "Reject all", "de": "Alle ablehnen"}
+{"uk": "Відхилити всі правки ({0})?", "en": "Reject all corrections ({0})?", "de": "Alle Korrekturen ablehnen ({0})?"}
+{"uk": "Відхилити правку", "en": "Reject correction", "de": "Korrektur ablehnen"}
 {"uk": "Відхилити, якщо товару не вистачає (check_stock)", "en": "Reject if there is not enough stock (check_stock)", "de": "Ablehnen, wenn der Artikel nicht ausreicht (check_stock)"}
 {"uk": "Відхід", "en": "Clock-out", "de": "Gehen"}
 {"uk": "Відхід за замовчуванням", "en": "Default clock-out", "de": "Standard-Gehen"}
@@ -8333,6 +8344,7 @@
 {"uk": "Знайти моменти й ризики", "en": "Find moments and risks", "de": "Momente und Risiken finden"}
 {"uk": "Знайти пов'язане", "en": "Find related", "de": "Zugehöriges finden"}
 {"uk": "Знайти поле", "en": "Find field", "de": "Feld suchen"}
+{"uk": "Знайти помилки розпізнавання", "en": "Find recognition errors", "de": "Erkennungsfehler finden"}
 {"uk": "Знайти постачальників у пошті", "en": "Find suppliers in mail", "de": "Lieferanten in der Post finden"}
 {"uk": "Знайти про них в інтернеті", "en": "Find them on the internet", "de": "Im Internet über sie suchen"}
 {"uk": "Знайти про них в інтернеті (AI)…", "en": "Find them on the internet (AI)…", "de": "Im Internet über sie suchen (KI)…"}
@@ -8374,6 +8386,7 @@
 {"uk": "Знову в черзі: {0} — агент обробить протягом хвилини за теперішніми налаштуваннями доручень.", "en": "Queued again: {0} — the agent will process them within a minute with the current rule settings.", "de": "Wieder in der Warteschlange: {0} — der Agent verarbeitet sie innerhalb einer Minute mit den aktuellen Einstellungen der Regeln."}
 {"uk": "Знову на розгляд", "en": "Back for review", "de": "Wieder zur Prüfung"}
 {"uk": "Знову рахуються (знято рішень: {0}).", "en": "Counted again (decisions removed: {0}).", "de": "Werden wieder gezählt (aufgehobene Entscheidungen: {0})."}
+{"uk": "Знову розглянути", "en": "Review again", "de": "Erneut prüfen"}
 {"uk": "Знову шаблон на бланку Commercial Invoice.", "en": "The template is again based on the Commercial Invoice letterhead.", "de": "Die Vorlage basiert wieder auf dem Commercial-Invoice-Briefbogen."}
 {"uk": "Зняти", "en": "Clear", "de": "Entfernen"}
 {"uk": "Зняти акцію", "en": "Remove promotion", "de": "Aktion entfernen"}
@@ -10724,6 +10737,7 @@
 {"uk": "Не вдалося отримати статус", "en": "Could not get the status", "de": "Status konnte nicht abgerufen werden"}
 {"uk": "Не вдалося очистити лог: {0}", "en": "Could not clear the log: {0}", "de": "Protokoll konnte nicht geleert werden: {0}"}
 {"uk": "Не вдалося перевірити ваш доступ (немає профілю Minerva?) — зверніться до адміністратора.", "en": "Could not verify your access (no Minerva profile?) — contact the administrator.", "de": "Ihr Zugriff konnte nicht geprüft werden (kein Minerva-Profil?) — wenden Sie sich an den Administrator."}
+{"uk": "Не вдалося перевірити розшифровку — спробуйте ще раз.", "en": "Could not check the transcript — please try again.", "de": "Das Transkript konnte nicht geprüft werden — bitte erneut versuchen."}
 {"uk": "Не вдалося перерахувати — спробуйте ще раз.", "en": "Could not recalculate — please try again.", "de": "Neuberechnung nicht möglich — bitte erneut versuchen."}
 {"uk": "Не вдалося перечитати день в askDANTE: {0}", "en": "Could not re-read the day in askDANTE: {0}", "de": "Der Tag konnte in askDANTE nicht neu gelesen werden: {0}"}
 {"uk": "Не вдалося повідомити", "en": "Could not notify", "de": "Benachrichtigung fehlgeschlagen"}
@@ -10746,6 +10760,7 @@
 {"uk": "Не вибрано жодного тиру для зміни.", "en": "No price break selected for change.", "de": "Es wurde keine Preisstaffel zur Änderung ausgewählt."}
 {"uk": "Не вибрано жодної гілки.", "en": "No thread selected.", "de": "Kein Verlauf ausgewählt."}
 {"uk": "Не вибрано жодної позиції.", "en": "No items selected.", "de": "Es wurde keine Position ausgewählt."}
+{"uk": "Не вибрано жодної правки", "en": "No correction selected", "de": "Keine Korrektur ausgewählt"}
 {"uk": "Не вибрано, що оновлювати.", "en": "Nothing selected to update.", "de": "Es wurde nichts zum Aktualisieren ausgewählt."}
 {"uk": "Не видалено {0} — це фото інших людей, а права змінювати постачальників у вас немає.", "en": "{0} not deleted — these are other people's photos and you have no right to change suppliers.", "de": "{0} nicht gelöscht — das sind Fotos anderer Personen, und Sie dürfen Lieferanten nicht ändern."}
 {"uk": "Не видно, від кого лист", "en": "Cannot see who the e-mail is from", "de": "Absender der E-Mail nicht erkennbar"}
@@ -12358,6 +12373,7 @@
 {"uk": "Перевірка вмісту", "en": "Content check", "de": "Inhaltsprüfung"}
 {"uk": "Перевірка зв'язку", "en": "Connection check", "de": "Verbindungsprüfung"}
 {"uk": "Перевірка зв'язку з Minerva", "en": "Connection check with Minerva", "de": "Verbindungsprüfung mit Minerva"}
+{"uk": "Перевірка зупинилась (сервер перезапустили) — спробуйте ще раз.", "en": "The check stopped (the server was restarted) — try again.", "de": "Die Prüfung wurde unterbrochen (Server neu gestartet) — bitte erneut versuchen."}
 {"uk": "Перевірка кошика", "en": "Cart check", "de": "Warenkorbprüfung"}
 {"uk": "Перевірка наявності для кошика", "en": "Availability check for the cart", "de": "Verfügbarkeitsprüfung für den Warenkorb"}
 {"uk": "Перевірка не вдалась: {0}", "en": "The check failed: {0}", "de": "Die Prüfung ist fehlgeschlagen: {0}"}
@@ -12692,6 +12708,7 @@
 {"uk": "Повернути як було до AI", "en": "Restore as before AI", "de": "Zurücksetzen auf den Stand vor der AI"}
 {"uk": "Повернути № {0} з «{1}» у «{2}»? {3}", "en": "Move № {0} back from “{1}” to “{2}”? {3}", "de": "Nr. {0} von „{1}“ zurück nach „{2}“ versetzen? {3}"}
 {"uk": "Повернути № {0} у роботу («{1}»)? Товар знову забронюється або спишеться. {2}", "en": "Put № {0} back into work (“{1}”)? The product will be reserved or deducted again. {2}", "de": "Nr. {0} wieder in Bearbeitung setzen („{1}“)? Der Artikel wird erneut reserviert oder abgebucht. {2}"}
+{"uk": "Повернути, як розпізнав RAG-ПК", "en": "Restore what the RAG PC recognized", "de": "Wiederherstellen, wie der RAG-PC erkannt hat"}
 {"uk": "Повернути: обговорити", "en": "Back to: to discuss", "de": "Zurück: besprechen"}
 {"uk": "Повернутись до адмін-панелі", "en": "Back to the admin panel", "de": "Zurück zum Admin-Panel"}
 {"uk": "Повернутись до входу", "en": "Back to sign-in", "de": "Zurück zur Anmeldung"}
@@ -13427,6 +13444,7 @@
 {"uk": "Поставка після дедлайну! Очікується", "en": "Delivery after the deadline! Expected", "de": "Lieferung nach der Frist! Erwartet"}
 {"uk": "Поставте галочку «Так, перевести» — нічого не змінено.", "en": "Tick “Yes, convert” — nothing was changed.", "de": "Setzen Sie das Häkchen „Ja, umrechnen“ — es wurde nichts geändert."}
 {"uk": "Поставте галочку згоди учасників на обробку в хмарі.", "en": "Tick the participants’ consent to processing in the cloud.", "de": "Einwilligung der Teilnehmenden zur Verarbeitung in der Cloud ankreuzen."}
+{"uk": "Поставте галочку: учасники погодились на обробку тексту в хмарі. Вголос їм обіцяли обробку на наших серверах — без їхньої згоди текст у Claude не надсилається.", "en": "Tick the box: the participants agreed to the text being processed in the cloud. They were told aloud it stays on our servers — without their consent the text is not sent to Claude.", "de": "Bitte ankreuzen: Die Teilnehmenden haben der Verarbeitung des Textes in der Cloud zugestimmt. Mündlich wurde ihnen die Verarbeitung auf unseren Servern zugesagt — ohne ihre Zustimmung wird der Text nicht an Claude gesendet."}
 {"uk": "Поставте ✅ біля \"Надсилати email-сповіщення\" та збережіть", "en": "Tick ✅ next to \"Send email notifications\" and save", "de": "Setzen Sie ✅ bei \"E-Mail-Benachrichtigungen senden\" und speichern Sie"}
 {"uk": "Постачальник", "en": "Supplier", "de": "Lieferant"}
 {"uk": "Постачальник (склад)", "en": "Supplier (stock)", "de": "Lieferant (Lager)"}
@@ -13644,7 +13662,9 @@
 {"uk": "Правило: посилання на даташит", "en": "Rule: datasheet link", "de": "Regel: Link zum Datenblatt"}
 {"uk": "Правило: посилання на фото", "en": "Rule: photo link", "de": "Regel: Link zum Foto"}
 {"uk": "Правило: фото для DigiKey", "en": "Rule: photo for DigiKey", "de": "Regel: Foto für DigiKey"}
+{"uk": "Правка розпізнавання", "en": "Recognition correction", "de": "Erkennungskorrektur"}
 {"uk": "Правки", "en": "Edits", "de": "Änderungen"}
+{"uk": "Правки розпізнавання", "en": "Recognition corrections", "de": "Erkennungskorrekturen"}
 {"uk": "Правки — лише для цього друку, у базі нічого не змінюється", "en": "Edits are for this print only, nothing changes in the database", "de": "Änderungen gelten nur für diesen Druck, in der Datenbank ändert sich nichts"}
 {"uk": "Право", "en": "Permission", "de": "Berechtigung"}
 {"uk": "Праворуч від списку позицій, коли їх не більше 4: одне фото — на всю висоту, кілька — сіткою з номером позиції. Фото — з картки товару (файл або посилання). У вікні перегляду перед друком — галочка «🖼 Фото артикулів» для одного друку.", "en": "To the right of the item list when there are no more than 4: one photo — full height, several — in a grid with the item number. Photos come from the product card (file or link). In the preview window before printing — the “🖼 SKU photos” checkbox for a single print.", "de": "Rechts neben der Positionsliste, wenn es höchstens 4 sind: ein Foto — in voller Höhe, mehrere — als Raster mit der Positionsnummer. Fotos stammen aus der Artikelkarte (Datei oder Link). Im Vorschaufenster vor dem Drucken — das Kontrollkästchen „🖼 Artikelfotos“ für einen einzelnen Druck."}
@@ -13763,8 +13783,11 @@
 {"uk": "Приймає поля: {0}", "en": "Accepts fields: {0}", "de": "Akzeptiert Felder: {0}"}
 {"uk": "Приймає: {0}", "en": "Accepts: {0}", "de": "Akzeptiert: {0}"}
 {"uk": "Прийняти", "en": "Accept", "de": "Übernehmen"}
+{"uk": "Прийняти всі", "en": "Accept all", "de": "Alle übernehmen"}
+{"uk": "Прийняти всі правки ({0})? Текст розшифровки зміниться — кожну можна повернути «↶».", "en": "Accept all corrections ({0})? The transcript text will change — each one can be undone with “↶”.", "de": "Alle Korrekturen übernehmen ({0})? Der Transkripttext ändert sich — jede lässt sich mit „↶“ zurücknehmen."}
 {"uk": "Прийняти можна надіслану (або погоджену) пропозицію.", "en": "Only a sent (or approved) quotation can be accepted.", "de": "Angenommen werden kann ein gesendetes (oder genehmigtes) Angebot."}
 {"uk": "Прийняти на склад", "en": "Receive into stock", "de": "Ins Lager übernehmen"}
+{"uk": "Прийняти правку", "en": "Accept correction", "de": "Korrektur übernehmen"}
 {"uk": "Прийнято", "en": "Accepted", "de": "Angenommen"}
 {"uk": "Прийнято {0} шт.", "en": "Received {0} pcs.", "de": "{0} Stk. übernommen."}
 {"uk": "Прийнято записів зі звітів RAG за етап", "en": "Records accepted from RAG reports for the stage", "de": "Aus RAG-Berichten für die Phase übernommene Einträge"}
@@ -14665,6 +14688,7 @@
 {"uk": "Розшифрований текст QR-коду з фото (vCard, посилання…) — suppliers/services/qr.py", "en": "Decoded QR code text from the photo (vCard, link…) — suppliers/services/qr.py", "de": "Entschlüsselter QR-Code-Text vom Foto (vCard, Link…) — suppliers/services/qr.py"}
 {"uk": "Розшифровка", "en": "Transcript", "de": "Transkript"}
 {"uk": "Розшифровка #{0}", "en": "Transcript #{0}", "de": "Transkript #{0}"}
+{"uk": "Розшифровка вже перевіряється — зачекайте", "en": "The transcript is already being checked — please wait", "de": "Das Transkript wird bereits geprüft — bitte warten"}
 {"uk": "Розшифровка готова", "en": "Transcript ready", "de": "Transkript fertig"}
 {"uk": "Розшифровка задовга", "en": "Transcript too long", "de": "Transkript zu lang"}
 {"uk": "Розшифровка наради", "en": "Meeting transcript", "de": "Besprechungstranskript"}
@@ -20740,6 +20764,7 @@
 {"uk": "перевізника «{0}» немає серед активних — див. list_carriers", "en": "carrier “{0}” is not among the active ones — see list_carriers", "de": "Versanddienstleister „{0}“ ist nicht unter den aktiven – siehe list_carriers"}
 {"uk": "перевір: числові коди в «Всі атрибути DigiKey» (не порожні), категорія вибрана правильно.", "en": "check: numeric codes in “All DigiKey attributes” (not empty), the category is selected correctly.", "de": "prüfen: numerische Codes in „Alle DigiKey-Attribute“ (nicht leer), Kategorie richtig gewählt."}
 {"uk": "перевірено", "en": "checked", "de": "geprüft"}
+{"uk": "перевірено на помилки розпізнавання", "en": "checked for recognition errors", "de": "auf Erkennungsfehler geprüft"}
 {"uk": "перевірено раніше", "en": "checked earlier", "de": "früher geprüft"}
 {"uk": "перевірено)", "en": "checked)", "de": "geprüft)"}
 {"uk": "перевірив вхід персоналу сайту", "en": "checked a website staff login", "de": "hat eine Anmeldung des Website-Personals geprüft"}
@@ -20766,6 +20791,7 @@
 {"uk": "перевірте логін і пароль (використовується звичайний пароль поштової скриньки, не App Password).", "en": "check the login and password (the regular mailbox password is used, not an App Password).", "de": "prüfen Sie Login und Passwort (es wird das normale Postfach-Passwort verwendet, kein App-Passwort)."}
 {"uk": "перевірте їх вручну та видаліть зайвий.", "en": "check them manually and delete the extra one.", "de": "prüfen Sie sie manuell und löschen Sie den überflüssigen."}
 {"uk": "перевіряє пароль персоналу й пише журнал сайту", "en": "checks the staff password and writes the website log", "de": "prüft das Passwort des Personals und schreibt das Website-Protokoll"}
+{"uk": "перевіряє розшифровку… (зазвичай 1–3 хв; сторінку можна не тримати відкритою)", "en": "is checking the transcript… (usually 1–3 min; you do not need to keep the page open)", "de": "prüft das Transkript… (meist 1–3 Min.; die Seite muss nicht offen bleiben)"}
 {"uk": "перегляд", "en": "viewing", "de": "Ansehen"}
 {"uk": "перегляд → принтер", "en": "preview → printer", "de": "Vorschau → Drucker"}
 {"uk": "переглянути й занести", "en": "review and add", "de": "prüfen und eintragen"}

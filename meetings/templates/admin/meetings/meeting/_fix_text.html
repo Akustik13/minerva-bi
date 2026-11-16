@@ -1,0 +1,1 @@
+{% if pieces %}{% for p in pieces %}{% if p.kind == "p" %}<span class="mt-fx" data-fix="{{ p.id }}" title="{{ p.hint }}">{{ p.text }}</span>{% elif p.kind == "a" %}<span class="mt-fx-ok" title="{{ p.hint }}">{{ p.text }}</span>{% else %}{{ p.text }}{% endif %}{% endfor %}{% else %}{{ text }}{% endif %}

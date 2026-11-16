@@ -1,0 +1,36 @@
+{# ✏️ Правки розпізнавання від Claude (meetings/ai_fix.py): ✓ / ✕ / ↶. Ту саму частину віддає fix/decide/ після кожної дії. #}
+<div class="mt-fixes" id="mt-fixes"{% if fix %} data-url="{{ fix.decide_url }}"{% endif %}>
+{% if fix %}{% with c=fix.counts r=fix.rows %}
+  {% if c.pending %}
+  <div class="mt-fixes-head">
+    <b>✏️ Правки розпізнавання: <span id="mt-fix-n">{{ c.pending }}</span> чекають ✓ / ✕</b>
+    <button type="button" class="button mt-primary" data-mt-fix="accept" data-ids="all">✓ Прийняти всі</button>
+    <button type="button" class="button" data-mt-fix="reject" data-ids="all">✕ Відхилити всі</button>
+  </div>
+  <ul class="mt-fix-list">
+    {% for f in r.pending %}<li class="mt-fix" id="fx-{{ f.id }}"><a class="mt-time" href="#t={{ f.second }}">[{{ f.time }}]</a> <span class="mt-muted">{{ f.who }}:</span> «<s translate="no">{{ f.from }}</s>» → «<b translate="no">{{ f.to }}</b>»{% if f.why %} <span class="mt-muted" translate="no">· {{ f.why }}</span>{% endif %}
+      <button type="button" class="button" data-mt-fix="accept" data-ids="{{ f.id }}" title="Прийняти правку">✓</button>
+      <button type="button" class="button" data-mt-fix="reject" data-ids="{{ f.id }}" title="Відхилити правку">✕</button></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% if r.accepted %}
+  <details class="mt-rejected"><summary>✓ Виправлено ({{ c.accepted }})</summary>
+    <ul class="mt-fix-list">
+      {% for f in r.accepted %}<li class="mt-fix" id="fx-{{ f.id }}"><a class="mt-time" href="#t={{ f.second }}">[{{ f.time }}]</a> «<s translate="no">{{ f.from }}</s>» → «<b translate="no">{{ f.to }}</b>»
+        <button type="button" class="button" data-mt-fix="reset" data-ids="{{ f.id }}" title="Повернути, як розпізнав RAG-ПК">↶</button></li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+  {% if r.rejected %}
+  <details class="mt-rejected"><summary>✕ Відхилено ({{ c.rejected }})</summary>
+    <ul class="mt-fix-list">
+      {% for f in r.rejected %}<li class="mt-fix" id="fx-{{ f.id }}"><a class="mt-time" href="#t={{ f.second }}">[{{ f.time }}]</a> «<span translate="no">{{ f.from }}</span>» → «<span translate="no">{{ f.to }}</span>»
+        <button type="button" class="button" data-mt-fix="reset" data-ids="{{ f.id }}" title="Знову розглянути">↶</button></li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+{% endwith %}{% endif %}
+</div>
