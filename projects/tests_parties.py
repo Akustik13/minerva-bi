@@ -112,6 +112,16 @@ class ExportTests(PartiesBase):
         self.assertTrue(r.content.startswith(b"%PDF"))
         self.assertIn(f'{self.project.code}_Projektplan_', r["Content-Disposition"])
 
+    def test_unexpected_error_is_shown_not_bare_500(self):
+        from unittest import mock
+
+        from projects import export
+        with mock.patch.object(export, "xlsx", side_effect=KeyError("phase")), \
+                self.assertLogs("projects.views", level="ERROR"):
+            r = self.send(formats="xlsx", image="")
+        self.assertEqual(r.status_code, 500)
+        self.assertEqual(r.json(), {"ok": False, "error": "Не вдалося зібрати файл: KeyError: 'phase'"})
+
     def test_excel_download(self):
         r = self.send(formats="xlsx", image="")
         self.assertEqual(r.status_code, 200)

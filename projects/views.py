@@ -428,6 +428,11 @@ def export_view(request, pk):
             return JsonResponse({"ok": True, "compose": export.mail(request.user, project, what, lang, files)})
     except export.ExportError as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=400)
+    except Exception as e:                                   # причина — у вікні експорту й у журналі сервера
+        import logging
+        logging.getLogger(__name__).exception("export %s %s %s", project.code, what, lang)
+        return JsonResponse({"ok": False, "error": f"Не вдалося зібрати файл: {type(e).__name__}: {str(e)[:300]}"},
+                            status=500)
     if len(files) == 1:
         name, data, ctype = files[0]
     else:                        # кілька файлів — одним ZIP: браузер блокує кілька завантажень поспіль
