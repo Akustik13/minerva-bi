@@ -286,6 +286,7 @@
         box.classList.toggle('mvd-shut', now);
         b.setAttribute('aria-expanded', now ? 'false' : 'true');
         lsSet('mvd-sg-' + id, now ? '1' : null);
+        if (!now && oneOpen()) shutSimple(box);              // «лише один розділ»: інші згортаються
       });
       box.appendChild(b);
       var list = el('div', 'mvd-gitems'); list.id = gid;
@@ -295,6 +296,13 @@
       box.appendChild(list);
       snav.appendChild(box);
     });
+    if (oneOpen()) {                                     // «лише один розділ»: лишається група поточної сторінки
+      var open = [].filter.call(snav.querySelectorAll('.mvd-group[data-sg]'), function (x) {
+        return !x.classList.contains('mvd-shut');
+      });
+      var keep = open.filter(function (x) { return x.classList.contains('mvd-cur'); })[0] || open[0];
+      if (keep) shutSimple(keep);
+    }
     var all = el('button', 'mvd-item mvd-all'); all.type = 'button';
     all.appendChild(ico('☰'));
     all.appendChild(el('span', 'mvd-lbl', 'Усі розділи…'));
@@ -490,15 +498,57 @@
     }
   }
   function onGroups(recs, silent) {
-    var changed = false;
+    var changed = false, opened1 = null;
     recs.forEach(function (r) {
       var g = r.target;
       if (!isEl(g) || !g.classList.contains('mg-group')) return;
       syncAria(g);
       var was = (' ' + (r.oldValue || '') + ' ').indexOf(' collapsed ') >= 0, now = g.classList.contains('collapsed');
-      if (!silent && !quiet && was !== now) { rememberOpen(g.dataset.groupId, !now); changed = true; }
+      if (!silent && !quiet && was !== now) {
+        rememberOpen(g.dataset.groupId, !now); changed = true;
+        if (was && !now && oneOpen()) opened1 = g;         // «лише один розділ» — інші згорнути після циклу
+      }
     });
+    if (opened1) {
+      setCollapsed(groupsList().filter(function (x) { return x !== opened1 && !x.classList.contains('collapsed'); }), true);
+      groupsList().forEach(function (x) { if (x !== opened1) rememberOpen(x.dataset.groupId, false); });
+      changed = true;
+    }
     if (changed) saveOpen();
+  }
+  /* «📂 Розгорнуті розділи меню: лише один» (ui_prefs menu_groups → data-mv-groups на <html>) */
+  function oneOpen() { return root.getAttribute('data-mv-groups') === 'one'; }
+  function shutSimple(keep) {                         // Просте меню: усі групи, крім keep, згорнути (і запам'ятати)
+    if (!snav) return;
+    [].forEach.call(snav.querySelectorAll('.mvd-group[data-sg]'), function (x) {
+      if (x === keep || x.classList.contains('mvd-shut')) return;
+      x.classList.add('mvd-shut');
+      var b = x.querySelector(':scope > .mvd-gbtn');
+      if (b) b.setAttribute('aria-expanded', 'false');
+      lsSet('mvd-sg-' + x.dataset.sg, '1');
+    });
+  }
+  function setGroupsMode(v) {
+    root.setAttribute('data-mv-groups', v);
+    if (v === 'one') {
+      restoreOpen();
+      if (snav) {
+        var open = [].filter.call(snav.querySelectorAll('.mvd-group[data-sg]'), function (x) {
+          return !x.classList.contains('mvd-shut');
+        });
+        var keep = open.filter(function (x) { return x.classList.contains('mvd-cur'); })[0] || open[0];
+        if (keep) shutSimple(keep);
+      }
+    }
+    post('/core/my-settings/', { ui: { menu_groups: v } }).catch(function () { toast('Не вдалося зберегти — перевірте зв’язок.'); });
+  }
+  function groupsModeItems() {
+    return [
+      { type: 'radio', group: 'menu_groups', label: 'Як лишив — кілька розгорнутих', checked: !oneOpen(),
+        onSelect: function () { setGroupsMode('many'); } },
+      { type: 'radio', group: 'menu_groups', label: 'Лише один — інші згортаються', checked: oneOpen(),
+        onSelect: function () { setGroupsMode('one'); } }
+    ];
   }
   function loadOpen() {
     try {
@@ -578,6 +628,18 @@
       openIds = list.filter(function (g) { return !g.classList.contains('collapsed'); })
         .map(function (g) { return g.dataset.groupId; });
       saveOpen();
+    }
+    if (oneOpen()) {
+      var keep = activeGroup;
+      if (!keep) {
+        for (var k = openIds.length - 1; k >= 0 && !keep; k -= 1) {
+          keep = list.filter(function (g) { return g.dataset.groupId === openIds[k]; })[0] || null;
+        }
+      }
+      quietly(function () { list.forEach(function (g) { g.classList.toggle('collapsed', g !== keep); }); });
+      openIds = keep ? [keep.dataset.groupId] : [];
+      saveOpen();
+      return;
     }
     quietly(function () {
       list.forEach(function (g) {
@@ -718,6 +780,9 @@
       { type: 'separator' },
       { type: 'title', label: 'Бокове меню' }
     ].concat(sidebarItems(), [
+      { type: 'separator' },
+      { type: 'title', label: 'Розгорнуті розділи' }
+    ], groupsModeItems(), [
       { type: 'separator' },
       { type: 'submenu', icon: '🌗', label: 'Тема', hint: themeName, items: themeItems },
       { type: 'separator' },
@@ -1074,17 +1139,24 @@
       items.push({ label: g.classList.contains('collapsed') ? 'Розгорнути' : 'Згорнути', icon: '⇕',
                    onSelect: function () { setCollapsed([g], !g.classList.contains('collapsed')); } });
       items.push({ label: 'Згорнути всі', onSelect: function () { setCollapsed(groupsList(), true); } });
-      items.push({ label: 'Розгорнути всі', onSelect: function () { setCollapsed(groupsList(), false); } });
+      if (!oneOpen()) items.push({ label: 'Розгорнути всі', onSelect: function () { setCollapsed(groupsList(), false); } });
     }
     items.push({ type: 'submenu', label: 'Розкривати',
-                 hint: function () { return st.expand === 'current' ? 'Лише групу поточної сторінки' : 'Як я лишив'; },
+                 hint: function () {
+                   return oneOpen() ? 'Лише один розділ' : st.expand === 'current' ? 'Лише групу поточної сторінки' : 'Як я лишив';
+                 },
                  items: function () {
                    return [
+                     { type: 'title', label: 'Скільки розділів розгорнуто' }
+                   ].concat(groupsModeItems(), [
+                     { type: 'separator' },
+                     { type: 'title', label: 'Коли відкриваю сторінку' },
                      { type: 'radio', group: 'expand', label: 'Як я лишив', checked: st.expand !== 'current',
-                       onSelect: function () { setExpand('remember'); } },
-                     { type: 'radio', group: 'expand', label: 'Лише групу поточної сторінки', checked: st.expand === 'current',
-                       onSelect: function () { setExpand('current'); } }
-                   ];
+                       disabled: oneOpen, onSelect: function () { setExpand('remember'); } },
+                     { type: 'radio', group: 'expand', label: 'Лише групу поточної сторінки',
+                       checked: function () { return oneOpen() || st.expand === 'current'; },
+                       disabled: oneOpen, onSelect: function () { setExpand('current'); } }
+                   ]);
                  } });
     items.push({ type: 'separator' });
     items.push({ label: 'Групу вище', icon: '⬆', disabled: i <= 0, onSelect: function () { moveGroup(g, -1); } });

@@ -6776,6 +6776,7 @@
 {"uk": "Діє", "en": "In effect", "de": "Gültig"}
 {"uk": "Діє акція", "en": "Promotion active", "de": "Aktion läuft"}
 {"uk": "Діє безкоштовна доставка", "en": "Free shipping applies", "de": "Kostenloser Versand gilt"}
+{"uk": "Діє в новому вигляді — «Просте» і «Повне» меню. Те саме — правий клік на розділі меню → «Розкривати» або меню «🎨» унизу.", "en": "Works in the new look — “Simple” and “Full” menu. The same — right-click a menu section → “Expand” or the “🎨” menu at the bottom.", "de": "Gilt im neuen Aussehen — Menü „Einfach“ und „Vollständig“. Dasselbe — Rechtsklick auf einen Menübereich → „Aufklappen“ oder Menü „🎨“ unten."}
 {"uk": "Діє в новому вигляді. ⇤ / ⇥ унизу меню — швидко перемкнути.", "en": "Applies to the new look. ⇤ / ⇥ at the bottom of the menu — quick switch.", "de": "Gilt in der neuen Ansicht. ⇤ / ⇥ unten im Menü — schnell umschalten."}
 {"uk": "Діє в усіх інтернет-магазинах (NRND і EOL — наліпки та посилання на заміну). Лише для одного магазину — «Асортимент і ціни» → позиція → «Життєвий цикл у цьому магазині».", "en": "Applies in all web shops (NRND and EOL — badges and replacement links). For a single shop only — “Range and prices” → item → “Lifecycle in this shop”.", "de": "Gilt in allen Webshops (NRND und EOL — Hinweis-Badges und Links zum Ersatz). Nur für einen Shop — „Sortiment und Preise“ → Position → „Lebenszyklus in diesem Shop“."}
 {"uk": "Діє до", "en": "Valid until", "de": "Gültig bis"}
@@ -8852,6 +8853,7 @@
 {"uk": "Коли Minerva востаннє читала ціни цього офера з DigiKey.", "en": "When Minerva last read the prices of this offer from DigiKey.", "de": "Wann Minerva die Preise dieses Offers zuletzt von DigiKey gelesen hat."}
 {"uk": "Коли автоматично зменшувати залишок при продажах.", "en": "When to automatically reduce the stock level on sales.", "de": "Wann der Bestand bei Verkäufen automatisch verringert wird."}
 {"uk": "Коли виникає", "en": "When it occurs", "de": "Wann es auftritt"}
+{"uk": "Коли відкриваю сторінку", "en": "When I open a page", "de": "Beim Öffnen einer Seite"}
 {"uk": "Коли відповіли", "en": "Replied at", "de": "Beantwortet am"}
 {"uk": "Коли відправлення цієї посилки підтверджено в магазині (DigiKey тощо). Посилка частини замовлення: банер більше не пропонує підтвердити її вдруге.", "en": "When shipment of this parcel was confirmed in the shop (DigiKey etc.). For a parcel with part of the order the banner no longer offers to confirm it again.", "de": "Wann der Versand dieses Pakets im Shop bestätigt wurde (DigiKey usw.). Bei einem Teilpaket bietet das Banner keine zweite Bestätigung an."}
 {"uk": "Коли етикетка йде на принтер DYMO. Перегляд малює сама служба DYMO — так, як надрукує; «✏️ Правки» — тексти й штрихкод лише для цього друку. Правий клік на 🖨️ — другий варіант.", "en": "When the label goes to the DYMO printer. The preview is rendered by the DYMO service itself — exactly as it will print; “✏️ Edits” — texts and barcode for this print only. Right-click on 🖨️ — the second option.", "de": "Wann das Etikett an den DYMO-Drucker geht. Die Vorschau wird vom DYMO-Dienst selbst erzeugt — genau so, wie gedruckt wird; „✏️ Änderungen“ — Texte und Barcode nur für diesen Druck. Rechtsklick auf 🖨️ — die zweite Variante."}
@@ -9519,6 +9521,9 @@
 {"uk": "Лише обговорення ({0})", "en": "Discussion only ({0})", "de": "Nur Gesprächsthema ({0})"}
 {"uk": "Лише обговорення — лишається в цій нараді", "en": "Discussion only — stays in this meeting", "de": "Nur Gesprächsthema — bleibt in dieser Besprechung"}
 {"uk": "Лише обриси й деталі, без заливки — термопринтер не друкує чорної плями", "en": "Only contours and details, no fill — the thermal printer does not print a black blot", "de": "Nur Konturen und Details, ohne Füllung — der Thermodrucker druckt keinen schwarzen Fleck"}
+{"uk": "Лише один розділ", "en": "Only one section", "de": "Nur ein Bereich"}
+{"uk": "Лише один — розгортаєте розділ, інші згортаються (його підрозділи лишаються як є)", "en": "Only one — expanding a section collapses the others (its subsections stay as they are)", "de": "Nur einer — beim Aufklappen eines Bereichs klappen die anderen zu (seine Unterbereiche bleiben, wie sie sind)"}
+{"uk": "Лише один — інші згортаються", "en": "Only one — the others collapse", "de": "Nur einer — die anderen klappen zu"}
 {"uk": "Лише останні ревізії даташитів", "en": "Only the latest datasheet revisions", "de": "Nur die neuesten Datenblatt-Revisionen"}
 {"uk": "Лише перевіряє наявність — нічого не змінює (тому досить права читання).", "en": "Only checks availability — changes nothing (so the read permission is enough).", "de": "Prüft nur die Verfügbarkeit — ändert nichts (daher genügt das Leserecht)."}
 {"uk": "Лише перегляд", "en": "View only", "de": "Nur Ansicht"}
@@ -14487,6 +14492,8 @@
 {"uk": "Розгорнути кроки", "en": "Expand the steps", "de": "Schritte ausklappen"}
 {"uk": "Розгорнути меню", "en": "Expand menu", "de": "Menü ausklappen"}
 {"uk": "Розгорнути/Згорнути", "en": "Expand/Collapse", "de": "Ausklappen/Einklappen"}
+{"uk": "Розгорнуті розділи", "en": "Expanded sections", "de": "Aufgeklappte Bereiche"}
+{"uk": "Розгорнуті розділи меню", "en": "Expanded menu sections", "de": "Aufgeklappte Menübereiche"}
 {"uk": "Розгортання на вашому сервері", "en": "Deployment on your server", "de": "Bereitstellung auf Ihrem Server"}
 {"uk": "Роздрібний", "en": "Retail", "de": "Einzelhandel"}
 {"uk": "Розділ", "en": "Section", "de": "Bereich"}
@@ -15144,6 +15151,7 @@
 {"uk": "Скільки останніх спроб трекінгу зберігати у базі (100–2000).", "en": "How many of the latest tracking attempts to keep in the database (100–2000).", "de": "Wie viele der letzten Tracking-Versuche in der Datenbank gespeichert werden (100–2000)."}
 {"uk": "Скільки разів повторити запит перед тим як надіслати сповіщення (1–10)", "en": "How many times to retry the request before sending a notification (1–10)", "de": "Wie oft die Anfrage wiederholt wird, bevor eine Benachrichtigung gesendet wird (1–10)"}
 {"uk": "Скільки разів роботу продовжено після перерви", "en": "How many times the work was resumed after an interruption", "de": "Wie oft die Arbeit nach einer Unterbrechung fortgesetzt wurde"}
+{"uk": "Скільки розділів розгорнуто", "en": "How many sections are expanded", "de": "Wie viele Bereiche aufgeklappt sind"}
 {"uk": "Скільки різних товарів / замовлень (за артикулом або номером) ключ може побачити за добу. Уже переглянуті сьогодні — без обмежень, решта у списках приховується. Порожньо — без ліміту.", "en": "How many different products / orders (by SKU or number) the key may see per day. Those already viewed today are not limited; the rest are hidden in lists. Empty — no limit.", "de": "Wie viele verschiedene Artikel / Aufträge (nach Artikelnummer oder Nummer) der Schlüssel pro Tag sehen darf. Heute bereits angesehene unterliegen keiner Beschränkung, der Rest wird in Listen ausgeblendet. Leer — kein Limit."}
 {"uk": "Скільки таких коробок є. Оформлене відправлення з коробкою цих розмірів списує її, скасоване — повертає; прихід і інвентаризація — у картці.", "en": "How many of these boxes there are. A booked shipment with a box of these dimensions uses it up, a cancelled one returns it; receipts and stocktaking — in the card.", "de": "Wie viele dieser Kartons es gibt. Eine gebuchte Sendung mit einem Karton dieser Maße bucht ihn ab, eine stornierte bucht ihn zurück; Zugang und Inventur — in der Karte."}
 {"uk": "Скільки фрагментів (за замовчуванням {0})", "en": "How many fragments (default {0})", "de": "Wie viele Fragmente (Standard: {0})"}
@@ -17882,11 +17890,13 @@
 {"uk": "Як з'явився", "en": "How it appeared", "de": "Wie es entstanden ist"}
 {"uk": "Як запустити імпорт (3 кроки)", "en": "How to run the import (3 steps)", "de": "So starten Sie den Import (3 Schritte)"}
 {"uk": "Як зараз на DigiKey (ті самі кількості, ціни з Minerva)", "en": "As currently on DigiKey (same quantities, prices from Minerva)", "de": "Wie aktuell auf DigiKey (gleiche Mengen, Preise aus Minerva)"}
+{"uk": "Як зараз — розгорнуті розділи лишаються розгорнутими", "en": "As now — expanded sections stay expanded", "de": "Wie bisher — aufgeklappte Bereiche bleiben aufgeklappt"}
 {"uk": "Як зараз: вкладки внизу лівої колонки, лист праворуч", "en": "As now: tabs at the bottom of the left column, email on the right", "de": "Wie jetzt: Registerkarten unten in der linken Spalte, E-Mail rechts"}
 {"uk": "Як змінити оформлення: завантажте поточний шаблон, відредагуйте у Word (шрифти, логотип, тексти), не чіпаючи змінних у", "en": "How to change the design: download the current template, edit it in Word (fonts, logo, texts) without touching the variables in", "de": "So ändern Sie die Gestaltung: Laden Sie die aktuelle Vorlage herunter, bearbeiten Sie sie in Word (Schriften, Logo, Texte), ohne die Variablen zu verändern in"}
 {"uk": "Як змінити оформлення: завантажте поточний шаблон, відредагуйте у Word (шрифти, розміщення, тексти), не чіпаючи змінних у", "en": "How to change the design: download the current template, edit it in Word (fonts, layout, texts) without touching the variables in", "de": "So ändern Sie das Layout: Laden Sie die aktuelle Vorlage herunter, bearbeiten Sie sie in Word (Schriften, Anordnung, Texte), ohne die Variablen in"}
 {"uk": "Як його передала зовнішня система (товару з таким артикулом у Minerva може не бути).", "en": "As the external system passed it (a product with this SKU may not exist in Minerva).", "de": "So, wie das externe System ihn übergeben hat (ein Artikel mit dieser Artikelnummer muss in Minerva nicht existieren)."}
 {"uk": "Як клієнт просив у листі", "en": "As the customer asked in an email", "de": "Wie vom Kunden per E-Mail gewünscht"}
+{"uk": "Як лишив — кілька розгорнутих", "en": "As I left them — several expanded", "de": "Wie hinterlassen — mehrere aufgeklappt"}
 {"uk": "Як магазин називається в листах покупцям і на сторінці оплати Stripe, напр. «Sevskiy GmbH». Порожньо — «Ім'я відправника», інакше назва вище.", "en": "How the shop is named in e-mails to customers and on the Stripe payment page, e.g. “Sevskiy GmbH”. Empty — “Sender name”, otherwise the name above.", "de": "Wie der Shop in E-Mails an Kunden und auf der Stripe-Zahlungsseite heißt, z. B. „Sevskiy GmbH“. Leer – „Absendername“, sonst der Name oben."}
 {"uk": "Як ми відповіли?", "en": "How did we reply?", "de": "Wie haben wir geantwortet?"}
 {"uk": "Як модулі обмінюються даними та які події тригерять які дії", "en": "How modules exchange data and which events trigger which actions", "de": "Wie Module Daten austauschen und welche Ereignisse welche Aktionen auslösen"}
