@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('inventory', '0049_productcategory_icon'),
+        ('inventory', '0050_ai_fill_run'),
     ]
 
     operations = [
