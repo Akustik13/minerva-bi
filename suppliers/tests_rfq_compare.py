@@ -67,7 +67,9 @@ class CompareTests(Base):
         self.assertEqual(half["cells"][0]["total"], Decimal("1050.00"))      # 200 × 5 + 50 (лише для 5 шт)
         # 5 шт: Half 1050 < Full 1231 → 🥇 у Half, Full +17 %; 2500 шт: лише Full
         self.assertTrue(half["cells"][0]["best"])
-        self.assertEqual(full["cells"][0]["over"], 17)
+        self.assertEqual((full["cells"][0]["over"], full["cells"][0]["over_text"]), (17, "+17 %"))
+        self.assertEqual(rfq_compare.over_text(42723), "×428")
+        self.assertIn(rfq_compare.over_text(350), ("×4,5", "×4.5"))
         self.assertTrue(full["cells"][1]["best"])
         self.assertEqual(full["gaps"], [])
         if self.cur == "USD":
@@ -87,8 +89,10 @@ class CompareTests(Base):
         row = self.row(rfq_compare.table(self.req), self.full)
         self.assertFalse(row["cells"][1]["exact"])                             # 3000 замість 2500 — «≈»
         self.assertIn("ціна на 3000 шт замість 2500", row["notes"])
-        self.assertIn("що входить у ціну — не сказано", row["notes"])
-        self.assertTrue(row["comparable"])
+        # не сказано, що входить, а просили монтаж — не знаємо, чи це те саме: неповна, у 🥇 не бере участі
+        self.assertIn("не сказано, що входить у ціну (просили: 🔧 монтаж)", row["gaps"])
+        self.assertFalse(row["comparable"])
+        self.assertNotIn("best", row["cells"][0])
         self.full.tiers = [{"qty": 5, "unit_price": "246.2"}, {"qty": 10000, "unit_price": "13"}]
         self.full.save()
         self.assertTrue(self.row(rfq_compare.table(self.req), self.full)["cells"][1]["missing"])   # надто далеко

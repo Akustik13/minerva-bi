@@ -6707,6 +6707,7 @@
 {"uk": "Дорожня карта публікації лістингу на DigiKey (bots/services/dk_publish.roadmap): крапки зі смужкою", "en": "Roadmap of listing publication on DigiKey (bots/services/dk_publish.roadmap): dots with a bar", "de": "Roadmap der Listing-Veröffentlichung auf DigiKey (bots/services/dk_publish.roadmap): Punkte mit Leiste"}
 {"uk": "Дорожня карта публікації лістингу на DigiKey (bots/services/dk_publish.roadmap): крапки зі смужкою, дата й тривалість кожного кроку. Клік по кроку — панель: що це, звідки дата, ID, помилка DigiKey, що зробити (кнопки). Карта стоїть усередині форми картки, тож POST-кнопки створюють окрему форму в", "en": "Roadmap of listing publication on DigiKey (bots/services/dk_publish.roadmap): dots with a bar, the date and duration of each step. Clicking a step opens a panel: what it is, where the date comes from, ID, DigiKey error, what to do (buttons). The map sits inside the card form, so POST buttons create a separate form in", "de": "Roadmap der Listing-Veröffentlichung auf DigiKey (bots/services/dk_publish.roadmap): Punkte mit Leiste, Datum und Dauer jedes Schritts. Klick auf einen Schritt — Panel: was das ist, woher das Datum stammt, ID, DigiKey-Fehler, was zu tun ist (Schaltflächen). Die Karte befindet sich innerhalb des Kartenformulars, daher erzeugen POST-Schaltflächen ein separates Formular in"}
 {"uk": "Дорожня карта підключення магазину (shop/onboarding.py) — у картці магазину, стилі й переходи до полів — change_form.html", "en": "Shop connection roadmap (shop/onboarding.py) — on the shop card, styles and jumps to fields — change_form.html", "de": "Fahrplan zur Shop-Anbindung (shop/onboarding.py) – in der Shop-Karte, Stile und Sprünge zu Feldern – change_form.html"}
+{"uk": "Дорожче за найдешевше для {0} шт", "en": "More expensive than the cheapest for {0} pcs", "de": "Teurer als das günstigste für {0} Stk."}
 {"uk": "Доручення", "en": "Rule", "de": "Regel"}
 {"uk": "Доручення «{0}»", "en": "Agent rule “{0}”", "de": "Agentenregel „{0}“"}
 {"uk": "Доручення агента", "en": "Agent rules", "de": "Agentenregeln"}
@@ -20506,6 +20507,7 @@
 {"uk": "не підтримується (405)", "en": "not supported (405)", "de": "nicht unterstützt (405)"}
 {"uk": "не рекомендовано для нових розробок", "en": "not recommended for new developments", "de": "für Neuentwicklungen nicht empfohlen"}
 {"uk": "не сказано", "en": "not stated", "de": "nicht angegeben"}
+{"uk": "не сказано, що входить у ціну (просили", "en": "not stated what is included in the price (requested", "de": "nicht angegeben, was im Preis enthalten ist (angefragt"}
 {"uk": "не стосується", "en": "not applicable", "de": "nicht zutreffend"}
 {"uk": "не стосується проєкту", "en": "not related to the project", "de": "betrifft das Projekt nicht"}
 {"uk": "не сформовано", "en": "not generated", "de": "nicht erzeugt"}

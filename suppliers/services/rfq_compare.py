@@ -252,18 +252,19 @@ def table(req) -> dict:
                 gaps.append("немає ціни на " + ", ".join(f"{q:,}".replace(",", " ") for q in missing) + " шт")
             if lacks:
                 gaps.append("у ціні немає: " + ", ".join(lacks))
+            elif need and not includes:      # не знаємо, чи це те саме — у 🥇 не беремо (голі плати проти PCBA)
+                gaps.append("не сказано, що входить у ціну (просили: " + scope_text(need) + ")")
             if rate is None:
                 gaps.append(f"немає курсу {(r.currency or home).upper()} → {home}")
             notes += approx
-            if need and not includes:
-                notes.append("що входить у ціну — не сказано")
             if r.lead_days is None and not any(c.get("lead") is not None for c in cells):
                 notes.append("строк")
             if r.shipping is None:
                 notes.append("доставка")
             if r.valid_until is None:
                 notes.append("термін дії")
-        comparable = priced and not lacks and rate is not None and len(missing) < len(qtys)
+        unknown_scope = bool(need) and not includes
+        comparable = priced and not lacks and not unknown_scope and rate is not None and len(missing) < len(qtys)
         ship_home = (r.shipping * rate).quantize(CENT) if r.shipping is not None and rate is not None else None
         first = next((c for c in cells if not c.get("missing")), None)
         try:
@@ -303,6 +304,7 @@ def table(req) -> dict:
             c["best"] = c["total_home"] == best
             c["over"] = None if c["best"] or not best else int(((c["total_home"] / best - 1) * 100)
                                                               .quantize(Decimal(1), ROUND_HALF_UP))
+            c["over_text"] = over_text(c["over"])
     if qtys:
         for row in rows:
             if row["cells"] and row["cells"][0].get("best"):
@@ -331,6 +333,17 @@ def table(req) -> dict:
     return {"rows": rows, "qtys": qtys, "home": home, "fx": fx.notes(), "missing_fx": fx.missing(),
             "needed": scope_text(need), "counts": counts,
             "unparsed": [x["recipient"].pk for x in rows if x["unparsed"]]}
+
+
+def over_text(over) -> str:
+    """+17 % · +250 % · ×12 — у скільки разів дорожче, коли різниця велика."""
+    if over is None:
+        return ""
+    if over < 300:
+        return f"+{over} %"
+    times = Decimal(over + 100) / 100
+    return "×" + (number_format(times.quantize(Decimal("0.1"), ROUND_HALF_UP), decimal_pos=1, use_l10n=True)
+                  if times < 10 else str(int(times.quantize(Decimal(1), ROUND_HALF_UP))))
 
 
 def comparison(req) -> list:

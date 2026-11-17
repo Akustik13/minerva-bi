@@ -29,7 +29,7 @@
       {% if row.cells %}<tr><th>За кількістю</th><td><table class="rwp-tiers">
         {% for c in row.cells %}<tr><td>{{ c.qty }} шт</td>
           {% if c.missing %}<td colspan="2" class="spf-warn">немає ціни</td>{% else %}
-          <td><b>{% if c.eff_home_text %}{{ c.eff_home_text }} {{ row.home }}{% else %}{{ c.eff_text }} {{ r.currency }}{% endif %}</b>/шт{% if c.best %} 🥇{% elif c.over is not None %} <span class="spf-muted">+{{ c.over }} %</span>{% endif %}</td>
+          <td><b>{% if c.eff_home_text %}{{ c.eff_home_text }} {{ row.home }}{% else %}{{ c.eff_text }} {{ r.currency }}{% endif %}</b>/шт{% if c.best %} 🥇{% elif c.over_text %} <span class="spf-muted">{{ c.over_text }}</span>{% endif %}</td>
           <td class="spf-muted" translate="no">{{ c.unit_text }} {{ r.currency|default:row.home }}{% if c.one_time_text %} + {{ c.one_time_text }} разово{% endif %} · разом {{ c.total_text }} {{ r.currency|default:row.home }}{% if not c.exact %} · ≈ ціна на {{ c.tier_qty }} шт{% endif %}{% if c.lead is not None %} · {{ c.lead }} дн.{% endif %}</td>{% endif %}</tr>{% endfor %}
       </table></td></tr>{% endif %}
       {% if row.one_time %}<tr><th>Разово</th><td translate="no">{% for it in row.one_time %}{{ it.name }}: {{ it.amount }} {{ r.currency }}{% if it.qty %} (лише {{ it.qty }} шт){% endif %}{% if not forloop.last %}; {% endif %}{% endfor %}</td></tr>{% endif %}
