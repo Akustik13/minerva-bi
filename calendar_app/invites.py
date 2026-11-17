@@ -304,6 +304,7 @@ def detect(message, texts=None) -> list:
     if is_blocked(user, message):   # спам або «більше не заносити від цього відправника»
         return []
     auto = CalendarSettings.for_user(user).invites_auto
+    from .outgoing_invites import owns_uid
     touched = []
     for text in texts:
         for ev in parse_ics(text):
@@ -312,8 +313,8 @@ def detect(message, texts=None) -> list:
                 if inv is not None:
                     touched.append(inv)
                 continue
-            if ev["method"] in NOT_INVITES:
-                continue
+            if ev["method"] in NOT_INVITES or owns_uid(user, ev["uid"]):
+                continue     # відповідь учасника або наше ж запрошення (копія в «Надісланих»)
             inv = _apply(user, message, ev)
             if inv is not None:
                 touched.append(inv)

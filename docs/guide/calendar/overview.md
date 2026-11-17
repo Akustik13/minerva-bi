@@ -6,7 +6,7 @@ where: 📅 Календар → Мій календар
 urls: /calendar/, /calendar/full/, /admin/calendar_app/calendarevent/add/, /calendar/settings/
 roles: усі користувачі
 keywords: календар, подія, зустріч, дедлайн, нагадування, термін, Termin, Kalender, calendar, event, reminder, повний вигляд, тиждень, категорія, push, Telegram, дедлайн замовлення, відправлено, критичні, записати нараду, відкрити нараду, 🎙
-related: meetings/record, calendar/invites, calendar/deadlines, calendar/connections, calendar/cleanup, worktime/calendar
+related: meetings/record, calendar/invites, calendar/send-invites, calendar/deadlines, calendar/connections, calendar/cleanup, worktime/calendar
 ---
 
 ## Що це
@@ -67,6 +67,9 @@ related: meetings/record, calendar/invites, calendar/deadlines, calendar/connect
 4. Блок **«🔔 Нагадування»** → **«Нагадати за N хвилин»** — за скільки до початку нагадати (60 за замовчуванням).
 5. **«Зберегти»**.
 
+Зустріч, на яку треба запросити людей (Outlook / Google / Teams покажуть «Прийняти / Відхилити»), —
+**«🤝 + Зустріч з учасниками»** угорі: [Запросити учасників на зустріч](guide:calendar/send-invites).
+
 ### Вікно події
 
 Клік на чип події відкриває вікно: назва, час, опис, **«Категорія»** (змінити одним кліком),
@@ -84,6 +87,9 @@ related: meetings/record, calendar/invites, calendar/deadlines, calendar/connect
 ([Як записати нараду](guide:meetings/record)). Якщо ви вже записували цю зустріч, там **«🎙 Відкрити нараду»**, а
 нижче — **«записати ще одну»**. Кнопка є, коли адміністратор увімкнув записування нарад і у вас є розділ
 «🎙 Наради». Сама подія календаря від цього не змінюється.
+
+Блок **«👥 Учасники»** — кого ви запросили і що вони відповіли (✅ / ❔ / ✕ / ⏳), кнопка **«👥 Запросити учасників…»** —
+[Запросити учасників на зустріч](guide:calendar/send-invites).
 
 ### Список подій і масові дії
 

@@ -6,7 +6,7 @@ where: 📅 Календар → Мій календар (блок «📨 Зап
 urls: /calendar/, /calendar/settings/, /admin/calendar_app/meetinginvite/
 roles: усі користувачі
 keywords: відповідь з Outlook, відповів з телефона, варіанти зустрічі, проєкт, запрошення, зустріч, відповісти на запрошення, буду, можливо, відхилити, прийняти, accept, decline, tentative, zusagen, absagen, RSVP, meeting, invite, Einladung, Besprechung, Teams, Zoom, Outlook, Google Meet, ics, iCalendar, скасовано, перенесено
-related: calendar/overview, calendar/cleanup, worktime/meetings, crm/project-cockpit
+related: calendar/overview, calendar/send-invites, calendar/cleanup, worktime/meetings, crm/project-cockpit
 ---
 
 ## Що це
@@ -20,6 +20,8 @@ related: calendar/overview, calendar/cleanup, worktime/meetings, crm/project-coc
 - Відповіді учасників («прийняв», «відхилив», «пропоную інший час») — не запрошення, вони не з'являються.
 - Від спаму й від відправників, яких ви заблокували в календарі, запрошення не приходять
   ([Почистити календар](guide:calendar/cleanup)).
+
+> 💡 Самому запросити людей на зустріч — [Запросити учасників на зустріч](guide:calendar/send-invites).
 
 > ℹ️ Без блоку iCalendar Minerva дату зустрічі не вгадує: «давайте в четвер о 14:00» у звичайному тексті не стане
 > зустріччю. Таку подію додайте вручну або знайдіть як термін — [Терміни з пошти](guide:calendar/deadlines).

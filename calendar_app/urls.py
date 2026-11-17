@@ -1,5 +1,5 @@
 from django.urls import path
-from . import sync, views, views_cleanup
+from . import sync, views, views_cleanup, views_invites
 
 app_name = 'calendar_app'
 
@@ -12,6 +12,8 @@ urlpatterns = [
     path('event/<int:pk>/toggle/',          views.event_toggle_done,   name='event_toggle'),
     path('event/<int:pk>/set-type/',        views.event_set_type,      name='event_set_type'),
     path('event/<int:pk>/not-needed/',      views_cleanup.event_not_needed, name='event_not_needed'),
+    path('event/<int:pk>/invite/',          views_invites.event_invite, name='event_invite'),
+    path('outgoing/<int:pk>/<str:action>/', views_invites.outgoing_cancel, name='outgoing_cancel'),
     path('blocks/preview/',                 views_cleanup.block_preview, name='block_preview'),
     path('blocks/',                         views_cleanup.block_create, name='block_create'),
     path('cleanup/',                        views_cleanup.cleanup_view, name='cleanup'),
