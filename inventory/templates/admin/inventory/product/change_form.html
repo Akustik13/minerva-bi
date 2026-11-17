@@ -3,7 +3,7 @@
 
 {% block extrahead %}
 {{ block.super }}
-{% if ai_fill %}<link rel="stylesheet" href="/static/admin/css/mv_ai_fill.css?v=1"><script src="/static/admin/js/mv_ai_fill.js?v=3"></script>
+{% if ai_fill %}<link rel="stylesheet" href="/static/admin/css/mv_ai_fill.css?v=1"><script src="/static/admin/js/mv_ai_fill.js?v=4"></script>
 <script>
 /* 🤖 AI-заповнення картки товару (inventory/services/ai_fill.py): пропозиції → поля форми, параметри → таблиця
    «Технічні атрибути», PDF / фото з панелі → поля файлів. Записує «Зберегти». */
@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', function () {
   MVAiFill.mount(host, cfg, {
     open: !cfg.product_id,
     key: 'product:' + (cfg.product_id || 'new'),
+    jobField: '_ai_fill_job',               // запуск → історія товару / лістингу, коли його збережуть
     read: function (k) { var el = field(k); return el ? el.value : ''; },
     readAttr: function (k) { var a = attrsNow(), hit = attrKey(a, k); return hit ? a[hit] : ''; },
     files: { pdf: 'Datasheet (PDF файл)', image: 'Зображення (файл)' },

@@ -35,6 +35,11 @@
 .mvaf-all, .mvaf-none, .mvaf-stop { background: var(--bg-hover, #1e2d40); color: var(--text, #c9d8e4);
   border: 1px solid var(--border-strong, #2a3f52); border-radius: 4px; padding: 5px 10px; cursor: pointer; font-size: 12px; }
 .mvaf-progress { margin-top: 10px; font-size: 13px; }
+.mvaf-hist { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; }
+.mvaf-h { background: var(--bg-hover, #1e2d40); color: var(--text, #c9d8e4); border: 1px solid var(--border-strong, #2a3f52);
+  border-radius: 12px; padding: 3px 10px; cursor: pointer; font-size: 12px; }
+.mvaf-h:hover, .mvaf-h.is-on { border-color: var(--accent, #58a6ff); }
+.mvaf-last, .mvaf-at { color: var(--text-muted, #9aafbe); font-size: 12px; font-weight: 400; }
 .mvaf-steps { max-height: 170px; overflow: auto; padding: 6px 10px; border-radius: 6px; background: var(--bg-hover, #1e2d40);
   line-height: 1.6; word-break: break-word; }
 .mvaf-steps small { color: var(--text-muted, #9aafbe); }

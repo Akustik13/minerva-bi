@@ -2223,7 +2223,7 @@ var _SKU_CHECK_URL = '{{ sku_check_url|default:"" }}';
 })();
 </script>
 {% if ai_fill %}{{ ai_fill|json_script:"mvaf-config" }}
-<link rel="stylesheet" href="/static/admin/css/mv_ai_fill.css?v=1"><script src="/static/admin/js/mv_ai_fill.js?v=3"></script>
+<link rel="stylesheet" href="/static/admin/css/mv_ai_fill.css?v=1"><script src="/static/admin/js/mv_ai_fill.js?v=4"></script>
 <script>
 /* 🤖 AI-заповнення картки DigiKey (inventory/services/ai_fill.py, ціль digikey — bots/services/dk_ai_fill.py):
    поля → форма (DK_FIELD_MAP), параметри — кодами в «Технічні атрибути DigiKey», фільтр — ще й у поля fa_*.
@@ -2251,6 +2251,7 @@ document.addEventListener('DOMContentLoaded', function () {
   MVAiFill.mount(host, cfg, {
     open: !cfg.listing_id,
     key: 'dk:' + (cfg.listing_id || 'new'),
+    jobField: '_ai_fill_job',               // запуск → історія товару / лістингу, коли його збережуть
     extra: function () {
       var p = document.getElementById('id_product');
       return { product_id: p && /^\d+$/.test(p.value) ? p.value : cfg.product_id, listing_id: cfg.listing_id };

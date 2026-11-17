@@ -978,6 +978,8 @@
 {"uk": "AI-асистент для тебе вимкнений.", "en": "The AI assistant is disabled for you.", "de": "Der KI-Assistent ist für dich deaktiviert."}
 {"uk": "AI-відповідь, «📋 Підготувати відповідь», «❓ Запитати про лист», переклад", "en": "AI reply, «📋 Prepare a reply», «❓ Ask about this message», translation", "de": "KI-Antwort, «📋 Antwort vorbereiten», «❓ Frage zur Nachricht», Übersetzung"}
 {"uk": "AI-генерована", "en": "AI-generated", "de": "KI-generiert"}
+{"uk": "AI-заповнення картки", "en": "AI fill of a record", "de": "KI-Ausfüllen eines Eintrags"}
+{"uk": "AI-заповнення карток", "en": "AI fills of records", "de": "KI-Ausfüllen von Einträgen"}
 {"uk": "AI-модель підказок", "en": "AI model for suggestions", "de": "KI-Modell für Vorschläge"}
 {"uk": "AI-огляд проєкту", "en": "AI project overview", "de": "KI-Projektübersicht"}
 {"uk": "AI-огляд проєкту від {0}", "en": "AI project overview from {0}", "de": "KI-Projektübersicht vom {0}"}
@@ -8833,6 +8835,7 @@
 {"uk": "Картка", "en": "Card", "de": "Karte"}
 {"uk": "Картка Angebot", "en": "Angebot card", "de": "Angebot-Karte"}
 {"uk": "Картка CRM", "en": "CRM card", "de": "CRM-Karte"}
+{"uk": "Картка DigiKey", "en": "DigiKey listing", "de": "DigiKey-Eintrag"}
 {"uk": "Картка в новій вкладці", "en": "Card in a new tab", "de": "Karte in neuem Tab"}
 {"uk": "Картка вебхука", "en": "Webhook card", "de": "Webhook-Karte"}
 {"uk": "Картка ключа", "en": "Key card", "de": "Schlüsselkarte"}
@@ -10034,6 +10037,7 @@
 {"uk": "Лінійний цикл без розгалужень. Регулярна турбота про VIP-клієнта кожні 3 місяці.", "en": "A linear cycle without branches. Regular care for the VIP customer every 3 months.", "de": "Linearer Zyklus ohne Verzweigungen. Regelmäßige Betreuung des VIP-Kunden alle 3 Monate."}
 {"uk": "Лістинг", "en": "Listing", "de": "Listing"}
 {"uk": "Лістинг (SKU)", "en": "Listing (SKU)", "de": "Listing (SKU)"}
+{"uk": "Лістинг DigiKey", "en": "DigiKey listing", "de": "DigiKey-Eintrag"}
 {"uk": "Лістинг DigiKey — «{0}»: ціни DigiKey ще не діють для покупців.", "en": "DigiKey listing — “{0}”: DigiKey prices are not yet effective for buyers.", "de": "DigiKey-Listing — „{0}“: Die DigiKey-Preise gelten für Käufer noch nicht."}
 {"uk": "Лістинг Minerva", "en": "Minerva listing", "de": "Minerva-Listing"}
 {"uk": "Лістинг вже відправлено на перевірку DigiKey — зачекайте затвердження", "en": "The listing has already been sent to DigiKey for review — wait for approval", "de": "Das Listing wurde bereits zur Prüfung an DigiKey gesendet — bitte die Freigabe abwarten"}
@@ -12651,6 +12655,7 @@
 {"uk": "Паролі застосунків", "en": "App passwords", "de": "App-Passwörter"}
 {"uk": "Паролі не співпадають.", "en": "Passwords do not match.", "de": "Die Passwörter stimmen nicht überein."}
 {"uk": "Партномер / артикул", "en": "Part number / SKU", "de": "Teilenummer / Artikelnummer"}
+{"uk": "Партномер, посилання, початок тексту, назви файлів, «🌐», «📄 даташит товару»", "en": "Part number, links, beginning of the text, file names, «🌐», «📄 product datasheet»", "de": "Teilenummer, Links, Textanfang, Dateinamen, «🌐», «📄 Artikeldatenblatt»"}
 {"uk": "Партія 1 · 1500 шт · до 15.03", "en": "Batch 1 · 1500 pcs · by 15.03", "de": "Charge 1 · 1500 Stk · bis 15.03."}
 {"uk": "Партія, кількість, строк: «партія 1 · 1500 шт · до 15.03»", "en": "Batch, quantity, date: «batch 1 · 1500 pcs · by 15.03»", "de": "Charge, Menge, Termin: «Charge 1 · 1500 Stk · bis 15.03.»"}
 {"uk": "Пауза", "en": "Pause", "de": "Pause"}
@@ -13664,6 +13669,7 @@
 {"uk": "Попередили «мало»", "en": "«Low» notice sent", "de": "«Wenig» gemeldet"}
 {"uk": "Попередньо: лист організатору «Можливо», у календарі — з", "en": "Tentative: a «Tentative» reply to the organiser, in the calendar — with", "de": "Vorläufig: Antwort «Vorbehaltlich» an den Organisator, im Kalender — mit"}
 {"uk": "Попередні версії", "en": "Previous versions", "de": "Frühere Versionen"}
+{"uk": "Попередні заповнення", "en": "Previous fills", "de": "Frühere Ausfüllungen"}
 {"uk": "Попередні пропозиції AI лишаться в таблиці — нові додадуться до них. Далі?", "en": "The previous AI suggestions stay in the table — the new ones are added to them. Continue?", "de": "Die bisherigen AI-Vorschläge bleiben in der Tabelle — die neuen kommen dazu. Weiter?"}
 {"uk": "Попередній", "en": "Previous", "de": "Vorheriger"}
 {"uk": "Попередній / наступний розділ", "en": "Previous / next section", "de": "Vorheriger / nächster Bereich"}
@@ -14515,6 +14521,7 @@
 {"uk": "Прочитано {0}", "en": "Read {0}", "de": "Gelesen {0}"}
 {"uk": "Прочитано з askDANTE", "en": "Read from askDANTE", "de": "Aus askDANTE gelesen"}
 {"uk": "Прочитано листів: {0} · нових пропозицій: {1}", "en": "Emails read: {0} · new suggestions: {1}", "de": "E-Mails gelesen: {0} · neue Vorschläge: {1}"}
+{"uk": "Прочитано сторінок", "en": "Pages read", "de": "Gelesene Seiten"}
 {"uk": "Прочитані AI листи", "en": "Emails read by AI", "de": "Von der KI gelesene E-Mails"}
 {"uk": "Прочитані сторінки", "en": "Pages read", "de": "Gelesene Seiten"}
 {"uk": "Прочитати AI", "en": "Read with AI", "de": "Mit AI lesen"}
@@ -17702,6 +17709,7 @@
 {"uk": "Хто дав завдання", "en": "Who assigned the task", "de": "Wer die Aufgabe erteilt hat"}
 {"uk": "Хто з помічників для чого", "en": "Which assistant is for what", "de": "Welcher Assistent wofür"}
 {"uk": "Хто записав", "en": "Recorded by", "de": "Aufgenommen von"}
+{"uk": "Хто запускав", "en": "Started by", "de": "Gestartet von"}
 {"uk": "Хто звертався за 2 год", "en": "Who made requests in the last 2 h", "de": "Wer in den letzten 2 Std. zugegriffen hat"}
 {"uk": "Хто змінив", "en": "Changed by", "de": "Geändert von"}
 {"uk": "Хто й звідки", "en": "Who and from where", "de": "Wer und woher"}
@@ -18444,6 +18452,7 @@
 {"uk": "Що відбувалось", "en": "What happened", "de": "Was geschah"}
 {"uk": "Що відбувається", "en": "What happens", "de": "Was passiert"}
 {"uk": "Що відбудеться після злиття", "en": "What will happen after the merge", "de": "Was nach der Zusammenführung passiert"}
+{"uk": "Що дали AI", "en": "What the AI was given", "de": "Was die KI bekam"}
 {"uk": "Що далі", "en": "What next", "de": "Wie geht es weiter"}
 {"uk": "Що дає", "en": "What it gives", "de": "Was es bringt"}
 {"uk": "Що доручаємо — партія, кількість, строк", "en": "What we assign — batch, quantity, date", "de": "Was wir vergeben — Charge, Menge, Termin"}
@@ -18455,6 +18464,8 @@
 {"uk": "Що записалось би зараз (без запису)", "en": "What would be recorded now (without recording)", "de": "Was jetzt eingetragen würde (ohne Eintrag)"}
 {"uk": "Що записували", "en": "What was recorded", "de": "Was aufgenommen wurde"}
 {"uk": "Що запитуємо", "en": "What we request", "de": "Was wir anfragen"}
+{"uk": "Що заповнювали", "en": "What was filled in", "de": "Was ausgefüllt wurde"}
+{"uk": "Що запропонував AI", "en": "What the AI proposed", "de": "Was die KI vorschlug"}
 {"uk": "Що зараз", "en": "What now", "de": "Was jetzt"}
 {"uk": "Що зараз в учасників", "en": "What the attendees have now", "de": "Was die Teilnehmer jetzt haben"}
 {"uk": "Що зараз потребує уваги", "en": "What needs attention now", "de": "Was jetzt Aufmerksamkeit braucht"}
@@ -19496,6 +19507,7 @@
 {"uk": "даташит (PDF), фото, таблицю (XLSX, CSV), DOCX чи TXT · або", "en": "a datasheet (PDF), photo, table (XLSX, CSV), DOCX or TXT · or", "de": "Datenblatt (PDF), Foto, Tabelle (XLSX, CSV), DOCX oder TXT · oder"}
 {"uk": "даташит {0}.pdf", "en": "datasheet {0}.pdf", "de": "Datenblatt {0}.pdf"}
 {"uk": "даташит {0}: {1}", "en": "datasheet {0}: {1}", "de": "Datenblatt {0}: {1}"}
+{"uk": "даташит товару", "en": "product datasheet", "de": "Artikeldatenblatt"}
 {"uk": "даташит товару ({0})", "en": "product datasheet ({0})", "de": "Artikeldatenblatt ({0})"}
 {"uk": "даташит товару: {0}", "en": "product datasheet: {0}", "de": "Artikeldatenblatt: {0}"}
 {"uk": "даташит із картки товару", "en": "datasheet from the product record", "de": "Datenblatt aus dem Artikel"}
@@ -21771,6 +21783,7 @@
 {"uk": "посилання: {0}", "en": "link: {0}", "de": "Link: {0}"}
 {"uk": "посилань немає", "en": "no links", "de": "keine Links"}
 {"uk": "посилань у картки лістингів", "en": "links to the listing cards", "de": "Links in die Listing-Karten"}
+{"uk": "посилань: {0}", "en": "links: {0}", "de": "Links: {0}"}
 {"uk": "посилка {0}", "en": "parcel {0}", "de": "Paket {0}"}
 {"uk": "посилка {0} з {1} — лише те, що лежить у ній; решта замовлення лишається відкритою", "en": "parcel {0} of {1} — only what it holds; the rest of the order stays open", "de": "Paket {0} von {1} — nur sein Inhalt; der Rest des Auftrags bleibt offen"}
 {"uk": "посилка з трек-номером {0} вже є (#{1})", "en": "a parcel with tracking number {0} already exists (#{1})", "de": "ein Paket mit Sendungsnummer {0} gibt es schon (#{1})"}
@@ -22891,6 +22904,7 @@
 {"uk": "файлів", "en": "files", "de": "Dateien"}
 {"uk": "файлів разом більше {0} МБ — приберіть зайві", "en": "files together exceed {0} MB — remove unneeded ones", "de": "Dateien zusammen über {0} MB — überflüssige entfernen"}
 {"uk": "файлів тут", "en": "files here", "de": "Dateien hier"}
+{"uk": "файлів: {0}", "en": "files: {0}", "de": "Dateien: {0}"}
 {"uk": "файлів: {0} — дивіться в DigiKey", "en": "files: {0} — see DigiKey", "de": "Dateien: {0} — siehe DigiKey"}
 {"uk": "форма з даними замовлення → DOCX/PDF у документи замовлення", "en": "a form with the order data → DOCX/PDF into the order documents", "de": "Formular mit den Auftragsdaten → DOCX/PDF in die Auftragsdokumente"}
 {"uk": "формат «кількість: ціна», напр. «10: 4.52»", "en": "format “quantity: price”, e.g. “10: 4.52”", "de": "Format „Menge: Preis“, z. B. „10: 4.52“"}

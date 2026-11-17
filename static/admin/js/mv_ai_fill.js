@@ -5,7 +5,10 @@
    adapter — сторінка: read(key) / readAttr(key) — що зараз у формі, apply({fields, attrs, files}, sources) →
    скільки вставлено, необов'язково: open (розгорнуто), key (запам'ятати останній результат), extra() →
    {product_id, listing_id}, files {pdf: 'назва поля', image: 'назва поля'} + canFile(kind), skip — ключі полів,
-   яких на сторінці немає, applyLabel — напис кнопки.
+   яких на сторінці немає, applyLabel — напис кнопки, jobField — назва прихованого поля форми з номером запуску
+   (сервер прив'язує запуск до збереженого товару / лістингу).
+   Кожен запуск зберігається в базі (inventory.AIFillRun): cfg.history — «🕘 Попередні заповнення» цієї картки;
+   останній результат показується сам після оновлення сторінки, в іншій вкладці й після оновлення сервера.
    Нічого не зберігає: записує кнопка «Зберегти» форми. Поля панелі — без name (у форму не потрапляють). */
 (function () {
   'use strict';
@@ -49,7 +52,8 @@
     if (ad.open) root.open = true;
     root.innerHTML =
       '<summary><span class="mvaf-t">🤖 AI: заповнити з даташита, посилань і тексту</span>' +
-        '<span class="mvaf-sub">— завантажте, що маєте; AI знайде решту в інтернеті й заповнить поля (перевірите перед «Зберегти»)</span></summary>' +
+        '<span class="mvaf-sub">— завантажте, що маєте; AI знайде решту в інтернеті й заповнить поля (перевірите перед «Зберегти»)</span>' +
+        '<span class="mvaf-last"></span></summary>' +
       '<div class="mvaf-body">' +
         (cfg.ready ? '' : '<div class="mvaf-warn">Немає ключа AI — додайте його в <a href="/admin/strategy/aisettings/">⚙️ Налаштування AI</a>.</div>') +
         '<div class="mvaf-grid">' +
@@ -68,6 +72,7 @@
           '<label>Модель <select class="mvaf-model">' + models + '</select></label>' +
           '<button type="button" class="mvaf-go">🤖 Згенерувати</button>' +
         '</div>' +
+        '<div class="mvaf-hist" hidden></div>' +
         '<div class="mvaf-progress" hidden></div>' +
         '<div class="mvaf-result" hidden></div>' +
       '</div>';
@@ -80,6 +85,56 @@
     web.addEventListener('change', function () { store('mvaf-web', web.checked ? '1' : '0'); });
     model.addEventListener('change', function () { store('mvaf-model', model.value); });
     if (!cfg.ready || cfg.can === false) go.disabled = true;
+    var jobInp = null;
+    if (ad.jobField) {                        // у формі сторінки: «Зберегти» прив'яже запуск до картки
+      jobInp = document.createElement('input');
+      jobInp.type = 'hidden'; jobInp.name = ad.jobField;
+      root.appendChild(jobInp);
+    }
+
+    // ── 🕘 Попередні заповнення (з бази) ──
+    var hist = (cfg.history || []).slice();
+    function histLabel(h) {
+      return h.at + ' · ' + h.model + ' · ' + (h.status === 'done' ? '✓ ' + h.fields + ' пол. · ' + h.attrs + ' пар.'
+        : h.status === 'running' ? '⏳ працює' : '⚠ помилка') + (h.cost ? ' · ' + money(h.cost) : '');
+    }
+    function drawHist() {
+      var box = $('.mvaf-hist');
+      box.hidden = !hist.length;
+      box.innerHTML = hist.length ? '<span class="mvaf-muted">🕘 Попередні заповнення:</span> ' + hist.map(function (h) {
+        return '<button type="button" class="mvaf-h' + (h.id === job ? ' is-on' : '') + '" data-job="' + esc(h.id) +
+          '" title="' + esc([h.what, h.error].filter(Boolean).join(' · ')) + '">' + esc(histLabel(h)) + '</button>';
+      }).join('') : '';
+      var last = root.querySelector('.mvaf-last'), done = hist.filter(function (h) { return h.status === 'done'; })[0];
+      if (last) last.textContent = done ? '· 🕘 останній результат ' + done.at : '';
+    }
+    function remember(d) {                    // щойно завершене — на початок історії
+      var r = d.result || {};
+      hist = hist.filter(function (h) { return h.id !== d.id; });
+      hist.unshift({ id: d.id, status: d.status, at: (d.at || '').replace(/^(\d\d\.\d\d)\.\d{4}/, '$1'),
+                     model: d.model_label || '', cost: d.cost_usd || 0, fields: (r.fields || []).length,
+                     attrs: (r.attributes || []).length, what: '', error: d.error || '' });
+      hist = hist.slice(0, 6);
+      drawHist();
+    }
+    function open(id, restoring) {
+      job = id;
+      fetch(url(id), { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.ok) { if (skey) sstore(skey, null); return; }
+          if (skey) sstore(skey, id);
+          drawHist();
+          if (d.status === 'running') { go.disabled = true; root.open = true; follow(d); }
+          else if (d.status === 'done') { progress(''); render(d, restoring); }
+          else if (!restoring) progress('<div class="mvaf-err">❌ ' + esc(d.error) + '</div>' + costLine(d));
+        })
+        .catch(function () {});
+    }
+    $('.mvaf-hist').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-job]');
+      if (b) open(b.dataset.job, false);
+    });
 
     // Enter у полях панелі не відправляє форму сторінки; у «Партномер» — запускає «🤖 Згенерувати»
     root.addEventListener('keydown', function (e) {
@@ -184,6 +239,7 @@
       }
       stopTimers();
       go.disabled = !cfg.ready;
+      remember(d);
       if (d.status === 'error') {
         progress('<div class="mvaf-err">❌ ' + esc(d.error) + '</div>' + costLine(d));
         if (skey) sstore(skey, null);
@@ -227,7 +283,8 @@
       var fields = (r.fields || []).filter(function (f) { return !f.follow && skip.indexOf(f.key) < 0; });
       (r.fields || []).forEach(function (f) { byKey['f:' + f.key] = f; });
       (r.attributes || []).forEach(function (a) { byKey['a:' + a.key] = a; });
-      var html = '<div class="mvaf-head"><b>🤖 AI пропонує</b> <span class="mvaf-muted">— галочка = вставити у форму; що вже заповнено, ' +
+      var html = '<div class="mvaf-head"><b>🤖 AI пропонує</b>' + (d.at ? ' <span class="mvaf-at">· ' + esc(d.at) + '</span>' : '') +
+        ' <span class="mvaf-muted">— галочка = вставити у форму; що вже заповнено, ' +
         'за замовчуванням не чіпаємо</span> <button type="button" class="mvaf-hide" title="Сховати">✕</button></div>';
       if (r.summary) html += '<p class="mvaf-sum">' + esc(r.summary) + '</p>';
       if (r.exists) html += '<div class="mvaf-warn">⚠ Товар з артикулом <b>' + esc(r.exists.sku) + '</b> уже є на складі — <a href="' +
@@ -295,23 +352,16 @@
         });
       });
       var n = ad.apply ? ad.apply(out, sources) : 0;
+      if (n && jobInp && job) jobInp.value = job;
       var done = box.querySelector('.mvaf-done');
       if (done) done.textContent = n ? '✓ Вставлено: ' + n + ' — перевірте підсвічені поля й натисніть «Зберегти»' : 'Нічого не вибрано';
     });
 
-    // ── Повернення після перезавантаження: останній результат цієї сторінки ──
-    var saved = skey && sload(skey);
-    if (saved) {
-      job = saved;
-      fetch(url(saved), { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-          if (!d.ok) { sstore(skey, null); return; }
-          if (d.status === 'running') { go.disabled = true; root.open = true; follow(d); }
-          else if (d.status === 'done') render(d, true);
-        })
-        .catch(function () {});
-    }
+    // ── Після оновлення сторінки: останній результат цієї вкладки, інакше — останній з бази ──
+    drawHist();
+    var latest = hist.filter(function (h) { return h.status !== 'error'; })[0];
+    var saved = (skey && sload(skey)) || (latest ? latest.id : '');
+    if (saved) open(saved, true);
     return { root: root };
   }
 

@@ -92,6 +92,20 @@ class DigiKeyFillTests(DkFillBase):
         self.assertIn('КАРТКА DIGIKEY ЗАРАЗ', fake.calls[0]['messages'][0]['content'][-1]['text'])
         self.assertEqual(r.json()['result']['attributes'][0]['value'], 'N-Type')
 
+    def test_history_of_listing_includes_its_product_runs(self):
+        from inventory.services.ai_fill import history, link
+        listing = DigiKeyListing.objects.get(product__sku='FT220401')
+        r1, _ = self.go([resp('tool_use', submit())], listing_id=str(listing.pk))
+        r2, _ = self.go([resp('tool_use', submit())], product_id=str(listing.product_id))   # «зі складу»
+        r3, _ = self.go([resp('tool_use', submit())], pn='NEW-1')                           # «Додати»
+        ids = [h['id'] for h in history(self.user, 'digikey', listing=listing)]
+        self.assertEqual(set(ids), {r1.json()['id'], r2.json()['id']})
+        self.assertEqual(link(r3.json()['id'], self.user, listing_id=listing.pk), 1)
+        self.assertEqual(len(history(self.user, 'digikey', listing=listing)), 3)
+        page = self.client.get(reverse('admin:bots_digikeylisting_change', args=[listing.pk]))
+        self.assertEqual(page.context['ai_fill']['listing_id'], listing.pk)
+        self.assertEqual(len(page.context['ai_fill']['history']), 3)
+
     def test_pages_show_panel(self):
         add = self.client.get(reverse('admin:bots_digikeylisting_add')).content.decode()
         self.assertIn('mvaf-config', add)

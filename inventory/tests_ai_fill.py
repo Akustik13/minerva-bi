@@ -203,6 +203,55 @@ class ProductFillTests(Base):
         self.assertIn('AN220214-01A', content[-1]['text'])                      # дані картки — у запиті
 
 
+class HistoryTests(Base):
+    """Кожен запуск — у базі (inventory.AIFillRun): результат після оновлення сервера, «🕘 Попередні заповнення»."""
+
+    def test_run_saved_and_read_back_after_cache_loss(self):
+        from inventory.models import AIFillRun
+        p = Product.objects.get(sku='AN220214-01A')
+        r, _ = self.go([resp('tool_use', submit(fields=[{'key': 'manufacturer', 'value': 'Sevskiy', 'source': 'PDF'}]))],
+                       pn='AN220214-01A', product_id=str(p.pk), text='x' * 3000)
+        job = r.json()
+        run = AIFillRun.objects.get(job_id=job['id'])
+        self.assertEqual((run.status, run.product, run.owner), ('done', p, self.user))
+        self.assertEqual(run.inputs['pn'], 'AN220214-01A')
+        self.assertEqual(len(run.inputs['text']), 2000)                        # текст — лише початок
+        self.assertGreater(run.cost_usd, 0)
+        cache.clear()                                                          # оновлення сервера
+        status = reverse('admin:inventory_product_ai_fill_status', args=[job['id']])
+        back = self.client.get(status).json()
+        self.assertEqual(back['status'], 'done')
+        self.assertEqual(back['result']['fields'][0]['value'], 'Sevskiy')
+        self.client.force_login(User.objects.create_superuser('olena', 'o@x.y', 'p'))
+        self.assertEqual(self.client.get(status).status_code, 404)             # чуже — ні
+
+    def test_history_on_card_and_own_only(self):
+        p = Product.objects.get(sku='AN220214-01A')
+        self.go([resp('tool_use', submit(fields=[{'key': 'manufacturer', 'value': 'Sevskiy', 'source': 'x'}]))],
+                pn='AN220214-01A', product_id=str(p.pk))
+        self.go([resp('refusal')], pn='AN220214-01A', product_id=str(p.pk))
+        hist = ai_fill.history(self.user, 'product', product=p)
+        self.assertEqual([h['status'] for h in hist], ['error', 'done'])
+        self.assertEqual(hist[1]['fields'], 1)
+        self.assertIn('AN220214-01A', hist[1]['what'])
+        page = self.client.get(reverse('admin:inventory_product_change', args=[p.pk]))
+        self.assertEqual(len(page.context['ai_fill']['history']), 2)
+        other = User.objects.create_superuser('olena', 'o@x.y', 'p')
+        self.assertEqual(ai_fill.history(other, 'product', product=p), [])
+        self.assertEqual(ai_fill.history(self.user, 'product'), [])            # «Додати» — лише без товару
+
+    def test_add_page_run_linked_on_save(self):
+        r, _ = self.go([resp('tool_use', submit())], pn='AN999')
+        job = r.json()['id']
+        self.assertEqual(ai_fill.history(self.user, 'product')[0]['id'], job)   # видно на «Додати»
+        p = Product.objects.create(sku='AN999')
+        other = User.objects.create_superuser('olena', 'o@x.y', 'p')
+        self.assertEqual(ai_fill.link(job, other, product=p), 0)               # чужий запуск — ні
+        self.assertEqual(ai_fill.link(job, self.user, product=p), 1)
+        self.assertEqual(ai_fill.history(self.user, 'product', product=p)[0]['id'], job)
+        self.assertEqual(ai_fill.history(self.user, 'product'), [])
+
+
 class StaleJobTests(TestCase):
     def test_running_without_beat_becomes_error(self):
         import datetime
