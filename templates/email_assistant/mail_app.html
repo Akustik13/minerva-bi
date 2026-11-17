@@ -28,6 +28,11 @@
   .ma-tbl { border-collapse: collapse; width: 100%; }
   .ma-tbl td, .ma-tbl th { padding: 5px 8px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border, var(--hairline-color)); }
   .ma-feat { columns: 2 240px; margin: 4px 0 0 18px; padding: 0; }
+  .ma-paste { margin: 10px 0 8px; padding: 10px 12px; border: 1px dashed var(--border-strong, var(--hairline-color)); border-radius: 10px; }
+  .ma-h2 { font-weight: 700; margin-bottom: 4px; color: var(--text, var(--body-fg)); }
+  .ma-code-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0 4px; }
+  .ma-code-row code { flex: 1 1 260px; min-width: 0; padding: 8px 10px; border-radius: 8px; word-break: break-all;
+                      font-size: 13px; user-select: all; background: var(--bg-input, var(--darkened-bg)); color: var(--text, var(--body-fg)); }
   .ma-feat li { margin: 2px 0; }
 </style>
 <div class="ma">
@@ -59,15 +64,24 @@
       <div class="ma-h">2️⃣ Підключити телефон до вашої пошти</div>
       <div class="ma-muted">У додатку — «📷 Сканувати QR з Minerva». Телефон працюватиме від вашого імені
         (<b translate="no">{{ request.user.get_full_name|default:request.user.username }}</b>){% if account %} зі скринькою <b translate="no">{{ account.email_address }}</b>{% endif %}.</div>
-      <div class="ma-row"><button type="button" class="button default" id="ma-pair"{% if not account %} disabled{% endif %}>🔗 Показати QR для підключення</button>
+      <div class="ma-row"><button type="button" class="button default" id="ma-pair"{% if not account %} disabled{% endif %}>🔗 Показати QR і код для підключення</button>
         <span class="ma-muted" id="ma-msg"></span></div>
       <div id="ma-pair-box" hidden>
         <div class="ma-qr" id="ma-pair-qr" translate="no"></div>
         <div id="ma-pair-state" class="ma-muted"></div>
-        <details class="ma-muted" style="margin-top:6px"><summary>Камера не читає QR? Ввести вручну</summary>
-          У додатку «⌨ Ввести адресу й код вручну»: адреса <b translate="no" id="ma-manual-url"></b>, код <code translate="no" id="ma-manual-code" style="user-select:all"></code></details>
+        <div class="ma-paste" id="ma-paste-box">
+          <div class="ma-h2">📋 Без камери — скопіюйте код</div>
+          <div class="ma-muted">Камера не читає QR або Minerva відкрита на цьому ж телефоні? Скопіюйте код і в додатку натисніть
+            «⌨ Ввести або вставити код» — код підставиться сам.</div>
+          <div class="ma-code-row">
+            <code translate="no" id="ma-paste"></code>
+            <button type="button" class="button default" id="ma-copy">📋 Копіювати код</button>
+          </div>
+          <div class="ma-muted" id="ma-copy-msg" aria-live="polite"></div>
+          <div class="ma-muted">Ввести руками: адреса <b translate="no" id="ma-manual-url"></b>, код <code translate="no" id="ma-manual-code" style="user-select:all"></code></div>
+        </div>
       </div>
-      <div class="ma-muted">QR діє {{ pair_ttl }} хв і лише один раз. Не показуйте його іншим — хто відсканує, читатиме вашу пошту.
+      <div class="ma-muted">QR і код діють {{ pair_ttl }} хв і лише один раз. Не показуйте їх іншим — хто підключиться, читатиме вашу пошту.
         Адреса Minerva для телефона: <b translate="no">{{ base }}</b></div>
     </div>
   </div>
@@ -122,6 +136,21 @@
     box.innerHTML = q.createSvgTag({cellSize: 6, margin: 2, scalable: true});
   }
   drawQr(document.getElementById('ma-dl-qr'), JSON.parse(document.getElementById('ma-app-url').textContent));
+  // 📋 код у буфер: Clipboard API (HTTPS), інакше — виділити й execCommand (сторінка по http у локальній мережі)
+  document.getElementById('ma-copy').addEventListener('click', function(){
+    var code = document.getElementById('ma-paste'), out = document.getElementById('ma-copy-msg'), text = code.textContent;
+    function done(ok){ out.textContent = ok ? '✅ Скопійовано — вставте в додатку «⌨ Ввести або вставити код».'
+                                            : '⚠️ Не вдалося скопіювати — виділіть код і скопіюйте вручну.'; }
+    function fallback(){
+      var range = document.createRange(); range.selectNodeContents(code);
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+      var ok = false; try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      done(ok);
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function(){ done(true); }, fallback);
+    } else { fallback(); }
+  });
   var btn = document.getElementById('ma-pair'), msg = document.getElementById('ma-msg'),
       box = document.getElementById('ma-pair-box'), state = document.getElementById('ma-pair-state'),
       tok = '{{ csrf_token }}', timer = null, tick = null;
@@ -136,12 +165,15 @@
         drawQr(document.getElementById('ma-pair-qr'), j.qr);
         document.getElementById('ma-manual-url').textContent = j.url;
         document.getElementById('ma-manual-code').textContent = j.code;
+        document.getElementById('ma-paste').textContent = j.paste || (j.url + '#' + j.code);
+        document.getElementById('ma-paste-box').hidden = false;
+        document.getElementById('ma-copy-msg').textContent = '';
         var left = j.expires_in;
         function show(){ state.textContent = '⏳ Чекаю, поки телефон відсканує… ще ' + Math.floor(left / 60) + ':' + ('0' + (left % 60)).slice(-2); }
         show();
         tick = setInterval(function(){
           left -= 1;
-          if (left <= 0) { clearInterval(tick); clearInterval(timer); state.textContent = '⌛ QR застарів — покажіть новий.'; document.getElementById('ma-pair-qr').innerHTML = ''; return; }
+          if (left <= 0) { clearInterval(tick); clearInterval(timer); state.textContent = '⌛ QR і код застаріли — покажіть нові.'; document.getElementById('ma-pair-qr').innerHTML = ''; document.getElementById('ma-paste-box').hidden = true; return; }
           show();
         }, 1000);
         timer = setInterval(function(){
@@ -150,6 +182,7 @@
               if (!s.paired) return;
               clearInterval(timer); clearInterval(tick);
               document.getElementById('ma-pair-qr').innerHTML = '';
+              document.getElementById('ma-paste-box').hidden = true;
               state.innerHTML = '';
               var ok = document.createElement('span'); ok.className = 'ma-ok';
               ok.textContent = '✅ Підключено: ' + (s.device || 'телефон') + ' — пошта вже в телефоні. Оновіть сторінку, щоб побачити його в списку.';

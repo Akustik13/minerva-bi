@@ -5,7 +5,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
-const appVersion = '1.0.0';
+const appVersion = '1.0.1';
 
 class ApiException implements Exception {
   ApiException(this.status, this.message);
@@ -28,6 +28,30 @@ String normalizeBase(String raw) {
     s = s.substring(0, s.length - 1);
   }
   return s;
+}
+
+final _codeRe = RegExp(r'^[A-Za-z0-9_-]{16,64}$');
+
+/// Код підключення, скопійований зі сторінки «📱 Пошта на телефоні»: «адреса#код» (кнопка «📋 Копіювати код»),
+/// текст QR {"minerva": "mail", "url", "code"} або лише код → (адреса або '', код); інше — null.
+(String, String)? parsePairText(String raw) {
+  final s = raw.trim();
+  if (s.isEmpty) return null;
+  if (s.startsWith('{')) {
+    try {
+      final j = jsonDecode(s);
+      if (j is Map && j['code'] is String && _codeRe.hasMatch(j['code'] as String)) {
+        return ((j['url'] ?? '').toString(), j['code'] as String);
+      }
+    } catch (_) {}
+    return null;
+  }
+  final hash = s.lastIndexOf('#');
+  if (hash > 0) {
+    final code = s.substring(hash + 1).trim();
+    if (_codeRe.hasMatch(code)) return (s.substring(0, hash).trim(), code);
+  }
+  return _codeRe.hasMatch(s) ? ('', s) : null;
 }
 
 bool cleartextAllowed(String base) {

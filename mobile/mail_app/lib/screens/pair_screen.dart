@@ -1,7 +1,9 @@
-// Підключення телефону до Minerva: QR зі сторінки «📱 Пошта на телефоні» (/email/phone/) або адреса й код вручну.
+// Підключення телефону до Minerva: QR зі сторінки «📱 Пошта на телефоні» (/email/phone/) або код з неї — скопійований
+// («📋 Копіювати код») і вставлений, чи набраний руками.
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../api.dart';
@@ -55,31 +57,19 @@ class _PairScreenState extends State<PairScreen> {
         return;
       }
     } catch (_) {}
+    final p = parsePairText(text); // QR з текстом «адреса#код»
+    if (p != null && p.$1.isNotEmpty) {
+      await _connect(p.$1, p.$2);
+      return;
+    }
     setState(() => error = context.t('qr_wrong'));
   }
 
+  /// «⌨ Ввести або вставити код»: код, скопійований на сторінці Minerva («📋 Копіювати код»), підставляється з
+  /// буфера сам; адреса потрібна лише тоді, коли вставили сам код без неї.
   Future<void> _manual() async {
-    final url = TextEditingController(), code = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: Text(c.t('manual_title')),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(
-            controller: url,
-            keyboardType: TextInputType.url,
-            decoration: InputDecoration(labelText: c.t('manual_url'), hintText: 'https://minerva.example.com'),
-          ),
-          const SizedBox(height: 8),
-          TextField(controller: code, decoration: InputDecoration(labelText: c.t('manual_code'))),
-        ]),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(c.t('cancel'))),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(c.t('connect'))),
-        ],
-      ),
-    );
-    if (ok == true) await _connect(url.text, code.text);
+    final r = await showDialog<(String, String)>(context: context, builder: (_) => const PasteCodeDialog());
+    if (r != null) await _connect(r.$1, r.$2);
   }
 
   @override
@@ -149,6 +139,112 @@ class _PairScreenState extends State<PairScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class PasteCodeDialog extends StatefulWidget {
+  const PasteCodeDialog({super.key});
+
+  @override
+  State<PasteCodeDialog> createState() => _PasteCodeDialogState();
+}
+
+class _PasteCodeDialogState extends State<PasteCodeDialog> {
+  final code = TextEditingController();
+  final url = TextEditingController();
+  String hint = '';
+
+  (String, String)? get parsed => parsePairText(code.text);
+  bool get needUrl => parsed == null || parsed!.$1.isEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    code.addListener(() => setState(() {}));
+    url.addListener(() => setState(() {}));
+    _paste(quiet: true); // скопіювали код на сторінці Minerva — одразу в полі
+  }
+
+  @override
+  void dispose() {
+    code.dispose();
+    url.dispose();
+    super.dispose();
+  }
+
+  Future<void> _paste({bool quiet = false}) async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text ?? '';
+    if (!mounted) return;
+    if (parsePairText(text) != null) {
+      code.text = text.trim();
+      setState(() => hint = context.t('code_pasted'));
+    } else if (!quiet) {
+      setState(() => hint = context.t('clipboard_no_code'));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final p = parsed;
+    return AlertDialog(
+      title: Text(context.t('manual_title')),
+      content: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(context.t('manual_hint'), style: TextStyle(fontSize: 13.5, color: scheme.onSurfaceVariant)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: code,
+            autocorrect: false,
+            enableSuggestions: false,
+            maxLines: 3,
+            minLines: 1,
+            decoration: InputDecoration(
+              labelText: context.t('manual_code'),
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                tooltip: context.t('paste'),
+                icon: const Icon(Icons.content_paste),
+                onPressed: _paste,
+              ),
+            ),
+          ),
+          if (hint.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(hint, style: TextStyle(fontSize: 13, color: scheme.primary)),
+            ),
+          if (p != null && p.$1.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text('${context.t('manual_url')}: ${p.$1}', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+            ),
+          if (code.text.trim().isNotEmpty && needUrl) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: url,
+              keyboardType: TextInputType.url,
+              autocorrect: false,
+              decoration: InputDecoration(
+                labelText: context.t('manual_url'),
+                hintText: 'https://minerva.example.com',
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ]),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(context.t('cancel'))),
+        FilledButton(
+          onPressed: p == null || (p.$1.isEmpty && url.text.trim().isEmpty)
+              ? null
+              : () => Navigator.pop(context, (p.$1.isNotEmpty ? p.$1 : url.text.trim(), p.$2)),
+          child: Text(context.t('connect')),
+        ),
+      ],
     );
   }
 }

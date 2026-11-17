@@ -1919,6 +1919,9 @@
 {"uk": "QR прочитано", "en": "QR read", "de": "QR gelesen"}
 {"uk": "QR прочитано, але це не візитка (vCard / MeCard / посилання) — текст збережено біля фото.", "en": "QR read, but it is not a business card (vCard / MeCard / link) — the text is saved with the photo.", "de": "QR gelesen, aber keine Visitenkarte (vCard / MeCard / Link) — der Text ist beim Foto gespeichert."}
 {"uk": "QR уже прочитано — тепер «⏺ Зробити фото» всієї візитки.", "en": "QR already read — now «⏺ Take photo» of the whole card.", "de": "QR bereits gelesen — jetzt «⏺ Foto aufnehmen» der ganzen Karte."}
+{"uk": "QR і код діють {0} хв і лише один раз. Не показуйте їх іншим — хто підключиться, читатиме вашу пошту.", "en": "The QR code and the code are valid for {0} min and only once. Do not show them to others — whoever connects will read your mail.", "de": "QR-Code und Code gelten {0} Min. und nur einmal. Zeigen Sie sie niemandem — wer sich verbindet, liest Ihre Mails."}
+{"uk": "QR і код діють {0} хв і лише один раз. Не показуйте їх іншим — хто підключиться, читатиме вашу пошту. Адреса Minerva для телефона", "en": "The QR code and the code are valid for {0} min and only once. Do not show them to others — whoever connects will read your mail. Minerva address for the phone", "de": "QR-Code und Code gelten {0} Min. und nur einmal. Zeigen Sie sie niemandem — wer sich verbindet, liest Ihre Mails. Minerva-Adresse für das Telefon"}
+{"uk": "QR і код застаріли — покажіть нові.", "en": "The QR code and the code have expired — show new ones.", "de": "QR-Code und Code sind abgelaufen — zeigen Sie neue an."}
 {"uk": "QR-код", "en": "QR code", "de": "QR-Code"}
 {"uk": "QR-код (vCard, сайт) Minerva читає одразу — ці дані точні, AI лише доповнить решту. Не прочитався — «✂️ Обрізати» навколо коду або «🔳 Сканувати лише QR» і піднесіть телефон ближче.", "en": "Minerva reads the QR code (vCard, website) immediately — this data is exact, AI only adds the rest. Not read — «✂️ Crop» around the code or «🔳 Scan QR only» and hold the phone closer.", "de": "Minerva liest den QR-Code (vCard, Website) sofort — diese Daten sind exakt, die KI ergänzt nur den Rest. Nicht gelesen — «✂️ Zuschneiden» um den Code oder «🔳 Nur QR scannen» und das Handy näher halten."}
 {"uk": "QR-код недійсний або застарів — на сторінці «📱 Додаток на телефон» у Minerva покажіть новий.", "en": "The QR code is invalid or expired — show a new one on the «📱 Phone app» page in Minerva.", "de": "Der QR-Code ist ungültig oder abgelaufen — zeigen Sie auf der Seite «📱 Handy-App» in Minerva einen neuen."}
@@ -3490,6 +3493,7 @@
 {"uk": "«чого не вистачає» — порівнюй потрібні кількості з вільним залишком і тим, що очікується", "en": "“what is missing” — compare the required quantities with the available stock and with what is expected", "de": "„was fehlt“ — vergleichen Sie die benötigten Mengen mit dem verfügbaren Bestand und mit dem, was erwartet wird"}
 {"uk": "«шестерня»", "en": "“gear”", "de": "„Zahnrad“"}
 {"uk": "«↓» — до поля на цій сторінці (незбережені зміни тут ще не враховано), «→» — інша сторінка; дані сайту — з його останнього звіту.", "en": "«↓» — to the field on this page (unsaved changes are not reflected here yet), «→» — another page; site data — from its latest report.", "de": "«↓» — zum Feld auf dieser Seite (ungespeicherte Änderungen sind hier noch nicht berücksichtigt), «→» — andere Seite; Website-Daten — aus ihrem letzten Bericht."}
+{"uk": "«⌨ Ввести або вставити код» — код підставиться сам.", "en": "«⌨ Enter or paste the code» — the code is filled in automatically.", "de": "«⌨ Code eingeben oder einfügen» — der Code wird automatisch eingesetzt."}
 {"uk": "«⏱ Строки відвантаження DigiKey» (bots/admin_dk_tools.lead_view): вибрати лістинги → новий строк", "en": "“⏱ DigiKey lead times” (bots/admin_dk_tools.lead_view): select listings → new lead time", "de": "„⏱ DigiKey-Lieferzeiten“ (bots/admin_dk_tools.lead_view): Listings auswählen → neue Lieferzeit"}
 {"uk": "«⏱ Строки відвантаження DigiKey» (bots/admin_dk_tools.lead_view): вибрати лістинги → новий строк; «одразу на DigiKey» — лише leadTimeToShip (bots/services/dk_lead.py), хід — status/.", "en": "“⏱ DigiKey lead times” (bots/admin_dk_tools.lead_view): select listings → new lead time; “straight to DigiKey” — only leadTimeToShip (bots/services/dk_lead.py), progress — status/.", "de": "„⏱ DigiKey-Lieferzeiten“ (bots/admin_dk_tools.lead_view): Listings auswählen → neue Lieferzeit; „direkt an DigiKey“ — nur leadTimeToShip (bots/services/dk_lead.py), Fortschritt — status/."}
 {"uk": "«⛔ Не працювати» в запит не потрапляють.", "en": "«⛔ Do not work with» suppliers are not included in the request.", "de": "Lieferanten «⛔ Nicht zusammenarbeiten» kommen nicht in die Anfrage."}
@@ -4361,6 +4365,7 @@
 {"uk": "Без змін.", "en": "No changes.", "de": "Keine Änderungen."}
 {"uk": "Без зон сайт рахує доставку за власними налаштуваннями, а Minerva не перевіряє країну. «🌍 Створити базові зони» — Німеччина, Європа, США, світ; далі поправте ціни й терміни.", "en": "Without zones the site calculates shipping by its own settings, and Minerva does not check the country. “🌍 Create base zones” — Germany, Europe, USA, world; then adjust prices and lead times.", "de": "Ohne Zonen berechnet die Website den Versand nach eigenen Einstellungen, und Minerva prüft das Land nicht. „🌍 Basiszonen erstellen“ – Deutschland, Europa, USA, Welt; danach Preise und Lieferzeiten anpassen."}
 {"uk": "Без зон у Minerva сайт використовує власні правила з", "en": "Without zones in Minerva, the website uses its own rules from", "de": "Ohne Zonen in Minerva verwendet die Website ihre eigenen Regeln aus"}
+{"uk": "Без камери — скопіюйте код", "en": "No camera — copy the code", "de": "Ohne Kamera — Code kopieren"}
 {"uk": "Без ключа: підключає сайт одноразовим кодом — видає новий ключ API й вебхук.", "en": "Without a key: connects the website with a one-time code — issues a new API key and a webhook.", "de": "Ohne Schlüssel: verbindet die Website mit einem Einmalcode — stellt einen neuen API-Schlüssel und einen Webhook aus."}
 {"uk": "Без клієнта", "en": "No customer", "de": "Ohne Kunden"}
 {"uk": "Без клієнта CRM", "en": "Without CRM customer", "de": "Ohne CRM-Kunde"}
@@ -4736,6 +4741,7 @@
 {"uk": "Ввести orderId вручну", "en": "Enter the orderId manually", "de": "orderId manuell eingeben"}
 {"uk": "Ввести будь-який номер DHL Express → статус, місцезнаходження, історія подій. Тільки Express (10+ цифр). DHL Paket — не підтримується.", "en": "Enter any DHL Express number → status, location, event history. Express only (10+ digits). DHL Paket is not supported.", "de": "Beliebige DHL-Express-Nummer eingeben → Status, Standort, Ereignisverlauf. Nur Express (10+ Ziffern). DHL Paket wird nicht unterstützt."}
 {"uk": "Ввести номер вручну", "en": "Enter the number manually", "de": "Nummer manuell eingeben"}
+{"uk": "Ввести руками: адреса", "en": "Type it in: address", "de": "Von Hand eingeben: Adresse"}
 {"uk": "Вголос учасникам обіцяли обробку на наших серверах. Ставте галочку, лише якщо вони погодились і на хмару — це запишеться в протокол згоди.", "en": "The participants were told aloud that processing stays on our servers. Tick this only if they also agreed to the cloud — it is written to the consent record.", "de": "Den Teilnehmenden wurde mündlich die Verarbeitung auf unseren Servern zugesagt. Nur ankreuzen, wenn sie auch der Cloud zugestimmt haben — das wird im Einwilligungsprotokoll vermerkt."}
 {"uk": "Веб-міст RAG", "en": "RAG web bridge", "de": "RAG-Web-Bridge"}
 {"uk": "Веб-міст RAG (адреса й ключ нижче або з private/minerva-config.php; лише з локальної мережі)", "en": "RAG web bridge (address and key below or from private/minerva-config.php; local network only)", "de": "RAG-Webbridge (Adresse und Schlüssel unten oder aus private/minerva-config.php; nur aus dem lokalen Netz)"}
@@ -8577,6 +8583,8 @@
 {"uk": "Калькулятор інвойсу", "en": "Invoice calculator", "de": "Rechnungsrechner"}
 {"uk": "Камбоджа", "en": "Cambodia", "de": "Kambodscha"}
 {"uk": "Камера знімає на той бік, який вибрано", "en": "The camera captures the side that is selected", "de": "Die Kamera nimmt die gewählte Seite auf"}
+{"uk": "Камера не читає QR або Minerva відкрита на цьому ж телефоні? Скопіюйте код і в додатку натисніть", "en": "The camera does not read the QR code, or Minerva is open on this very phone? Copy the code and in the app press", "de": "Die Kamera liest den QR-Code nicht, oder Minerva ist auf genau diesem Telefon geöffnet? Code kopieren und in der App"}
+{"uk": "Камера не читає QR або Minerva відкрита на цьому ж телефоні? Скопіюйте код і в додатку натисніть «⌨ Ввести або вставити код» — код підставиться сам.", "en": "The camera does not read the QR code, or Minerva is open on this very phone? Copy the code and in the app press «⌨ Enter or paste the code» — the code is filled in automatically.", "de": "Die Kamera liest den QR-Code nicht, oder Minerva ist auf genau diesem Telefon geöffnet? Code kopieren und in der App «⌨ Code eingeben oder einfügen» drücken — der Code wird automatisch eingesetzt."}
 {"uk": "Камера не читає QR? Ввести вручну", "en": "Camera does not read the QR? Enter it manually", "de": "Kamera liest den QR nicht? Manuell eingeben"}
 {"uk": "Камера недоступна (", "en": "Camera unavailable (", "de": "Kamera nicht verfügbar ("}
 {"uk": "Камера шукає лише QR-код і сама зробить фото, щойно його прочитає", "en": "The camera looks only for the QR code and takes the photo itself as soon as it reads it", "de": "Die Kamera sucht nur den QR-Code und nimmt das Foto selbst auf, sobald sie ihn liest"}
@@ -9114,6 +9122,7 @@
 {"uk": "Копіювати «{0}»", "en": "Copy “{0}”", "de": "„{0}“ kopieren"}
 {"uk": "Копіювати адресу", "en": "Copy address", "de": "Adresse kopieren"}
 {"uk": "Копіювати відповідь", "en": "Copy response", "de": "Antwort kopieren"}
+{"uk": "Копіювати код", "en": "Copy code", "de": "Code kopieren"}
 {"uk": "Копіювати лог", "en": "Copy log", "de": "Protokoll kopieren"}
 {"uk": "Копіювати магазин", "en": "Copy shop", "de": "Shop kopieren"}
 {"uk": "Копіювати магазин (без ключів)", "en": "Copy shop (without keys)", "de": "Shop kopieren (ohne Schlüssel)"}
@@ -10804,6 +10813,7 @@
 {"uk": "Не вдалося прочитати: {0}", "en": "Could not read: {0}", "de": "Lesen fehlgeschlagen: {0}"}
 {"uk": "Не вдалося розібрати файл: {0}", "en": "Could not parse the file: {0}", "de": "Die Datei konnte nicht verarbeitet werden: {0}"}
 {"uk": "Не вдалося скопіювати", "en": "Could not copy", "de": "Kopieren fehlgeschlagen"}
+{"uk": "Не вдалося скопіювати — виділіть код і скопіюйте вручну.", "en": "Could not copy — select the code and copy it by hand.", "de": "Kopieren fehlgeschlagen — Code markieren und von Hand kopieren."}
 {"uk": "Не вдалося створити папку ({0}) — папка лише для читання або немає прав", "en": "Could not create the folder ({0}) — the folder is read-only or permissions are missing", "de": "Ordner konnte nicht erstellt werden ({0}) – der Ordner ist schreibgeschützt oder Berechtigungen fehlen"}
 {"uk": "Не вдалося створити папку — змініть назву", "en": "Could not create the folder — change the name", "de": "Ordner konnte nicht erstellt werden – ändern Sie den Namen"}
 {"uk": "Не вдалося створити папку: {0}", "en": "Could not create the folder: {0}", "de": "Ordner konnte nicht erstellt werden: {0}"}
@@ -13038,6 +13048,7 @@
 {"uk": "Показати / сховати", "en": "Show / hide", "de": "Anzeigen / Ausblenden"}
 {"uk": "Показати / сховати в інтернет-магазині, ціна в магазині — лише з ✓ людини", "en": "Show / hide in the web shop, shop price — only with a person's ✓", "de": "Im Webshop anzeigen / ausblenden, Preis im Shop – nur mit ✓ einer Person"}
 {"uk": "Показати QR для підключення", "en": "Show QR for connecting", "de": "QR zum Verbinden anzeigen"}
+{"uk": "Показати QR і код для підключення", "en": "Show QR and code to connect", "de": "QR und Code zum Verbinden anzeigen"}
 {"uk": "Показати canvas", "en": "Show canvas", "de": "Canvas anzeigen"}
 {"uk": "Показати без збереження", "en": "Show without saving", "de": "Ohne Speichern anzeigen"}
 {"uk": "Показати браузер (для debugging)", "en": "Show browser (for debugging)", "de": "Browser anzeigen (zum Debuggen)"}
@@ -15308,6 +15319,7 @@
 {"uk": "Скопійовано в «{0}»: {1}, пропущено (вже є): {2}", "en": "Copied to “{0}”: {1}, skipped (already exist): {2}", "de": "Nach „{0}“ kopiert: {1}, übersprungen (bereits vorhanden): {2}"}
 {"uk": "Скопійовано з", "en": "Copied from", "de": "Kopiert von"}
 {"uk": "Скопійовано з «", "en": "Copied from “", "de": "Kopiert von „"}
+{"uk": "Скопійовано — вставте в додатку «⌨ Ввести або вставити код».", "en": "Copied — paste it in the app via «⌨ Enter or paste the code».", "de": "Kopiert — in der App über «⌨ Code eingeben oder einfügen» einfügen."}
 {"uk": "Скопіювати Jumingo ID — вставте в пошук на порталі Jumingo", "en": "Copy Jumingo ID — paste it into the search on the Jumingo portal", "de": "Jumingo-ID kopieren — im Jumingo-Portal in die Suche einfügen"}
 {"uk": "Скопіювати атрибути DigiKey → Склад", "en": "Copy attributes DigiKey → Stock", "de": "Attribute DigiKey → Lager kopieren"}
 {"uk": "Скопіювати атрибути DigiKey → Склад для", "en": "Copy attributes DigiKey → Stock for", "de": "Attribute DigiKey → Lager kopieren für"}
@@ -22756,9 +22768,14 @@
 {"uk": "ℹ️ Хід виробництва недоступний для цього замовлення.", "en": "ℹ️ Production progress is not available for this order.", "de": "ℹ️ Der Fertigungsfortschritt ist für diese Bestellung nicht verfügbar."}
 {"uk": "ℹ️ Цю дію запускає кнопка на сторінці налаштувань JLCPCB.", "en": "ℹ️ This action is started by the button on the JLCPCB settings page.", "de": "ℹ️ Diese Aktion wird über die Schaltfläche auf der JLCPCB-Einstellungsseite gestartet."}
 {"uk": "ℹ️ у замовленні на DigiKey рахунок уже був", "en": "ℹ️ the order on DigiKey already had an invoice", "de": "ℹ️ der Auftrag bei DigiKey hatte bereits eine Rechnung"}
+{"uk": "⚠️ Не вдалося скопіювати — виділіть код і скопіюйте вручну.", "en": "⚠️ Could not copy — select the code and copy it by hand.", "de": "⚠️ Kopieren fehlgeschlagen — Code markieren und von Hand kopieren."}
+{"uk": "✅ Скопійовано — вставте в додатку «⌨ Ввести або вставити код».", "en": "✅ Copied — paste it in the app via «⌨ Enter or paste the code».", "de": "✅ Kopiert — in der App über «⌨ Code eingeben oder einfügen» einfügen."}
+{"uk": "📋 Без камери — скопіюйте код", "en": "📋 No camera — copy the code", "de": "📋 Ohne Kamera — Code kopieren"}
+{"uk": "📋 Копіювати код", "en": "📋 Copy code", "de": "📋 Code kopieren"}
 {"uk": "📱 Пошта на телефоні", "en": "📱 Mail on phone", "de": "📱 Mail auf dem Telefon"}
 {"uk": "📱 Підключити телефон", "en": "📱 Connect phone", "de": "📱 Telefon verbinden"}
 {"uk": "📱 Телефони з поштою Minerva", "en": "📱 Phones with Minerva mail", "de": "📱 Telefone mit Minerva-Mail"}
+{"uk": "🔗 Показати QR і код для підключення", "en": "🔗 Show QR and code to connect", "de": "🔗 QR und Code zum Verbinden anzeigen"}
 {"uk": "🪪 Візитка", "en": "🪪 Business card", "de": "🪪 Visitenkarte"}
 {"uk": "🪪 Візитки й флаєри", "en": "🪪 Business cards & flyers", "de": "🪪 Visitenkarten & Flyer"}
 {"uk": "🪪 Візитки й фото", "en": "🪪 Business cards and photos", "de": "🪪 Visitenkarten und Fotos"}

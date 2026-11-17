@@ -82,6 +82,7 @@ class PairingTests(Base):
         qr = json.loads(j['qr'])
         self.assertEqual(qr['minerva'], 'mail')
         self.assertEqual(qr['code'], j['code'])
+        self.assertEqual(j['paste'], f"{qr['url']}#{j['code']}")   # «📋 Копіювати код» — без камери
         self.assertFalse(self.client.get('/email/phone/', {'state': j['key']}).json()['paired'])
         r = self.app.post('/email/phone/api/pair/', json.dumps({'code': qr['code'], 'device': 'Pixel 8',
                                                               'version': '1.0.0'}), content_type='application/json')

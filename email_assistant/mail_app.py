@@ -36,7 +36,7 @@ PAIR_PER_HOUR = 20             # спроб підключення з одніє
 SEEN_EVERY = 60                # «востаннє на зв'язку» — не частіше
 PAGE = 30                      # листів на сторінку (як у скриньці)
 HTML_INLINE_MAX = 3 * 1024 * 1024   # картинки cid: усередині HTML листа для додатка — разом не більше
-APP_VERSION = '1.0.0'          # остання версія додатка — сторінка підключення й «є нова версія» в додатку
+APP_VERSION = '1.0.1'          # остання версія додатка — сторінка підключення й «є нова версія» в додатку
 APP_TAG = f'mail-app-v{APP_VERSION}'
 APP_URL = getattr(settings, 'MINERVA_MAIL_APP_URL',
                   f'https://github.com/Akustik13/minerva-bi/releases/download/{APP_TAG}/minerva-mail.apk')
@@ -84,7 +84,10 @@ def new_pairing(user, base_url) -> dict:
     cache.set(f'mail-app-pair:{key}', {'user': user.pk}, PAIR_TTL)
     qr = json.dumps({'minerva': 'mail', 'v': 1, 'url': base_url.rstrip('/'), 'code': code},
                     ensure_ascii=False, separators=(',', ':'))
-    return {'key': key[:16], 'qr': qr, 'code': code, 'expires_in': PAIR_TTL, 'url': base_url.rstrip('/')}
+    # paste — те саме одним рядком «адреса#код»: скопіювати й вставити в додатку, коли камера не може (або Minerva
+    # відкрита на цьому ж телефоні); код — лише літери, цифри, «-» і «_», тож «#» його не перетинає
+    return {'key': key[:16], 'qr': qr, 'code': code, 'expires_in': PAIR_TTL, 'url': base_url.rstrip('/'),
+            'paste': f'{base_url.rstrip("/")}#{code}'}
 
 
 def pair_state(user, key) -> dict:
