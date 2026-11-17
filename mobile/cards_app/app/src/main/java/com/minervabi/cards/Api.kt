@@ -120,13 +120,50 @@ object Api {
         val fields = mapOf(
             "uuid" to c.uuid, "kind" to c.kind, "role" to c.role, "event" to c.event, "note" to c.note,
             "marks" to c.marks.joinToString(","), "categories" to c.categories.joinToString(","),
-            "preset" to (c.presetId?.toString() ?: ""), "read_ai" to (if (c.readAi) "1" else ""),
+            // є ще фото групи — AI прочитає все разом, коли їх дошлемо (Capture.reread)
+            "preset" to (c.presetId?.toString() ?: ""), "read_ai" to (if (c.readAi && c.extras.isEmpty()) "1" else ""),
             "model" to c.model, "qr_front" to c.qrFront, "qr_back" to c.qrBack,
         )
         fields.forEach { (k, v) -> if (v.isNotEmpty()) b.addFormDataPart(k, v) }
         val body: RequestBody = b.build()
         return run(request("cards/").post(body).build())
     }
+
+    /** 🔄 Новий лицьовий / зворотний бік уже надісланої візитки. */
+    fun uploadSide(id: Int, side: String, path: String, qr: String): ServerCard {
+        val b = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("side", side)
+            .addFormDataPart("image", "$side.jpg", File(path).asRequestBody("image/jpeg".toMediaType()))
+        if (qr.isNotEmpty()) b.addFormDataPart("qr", qr)
+        return ServerCard(run(request("cards/$id/side/").post(b.build()).build()).getJSONObject("card"))
+    }
+
+    /** 🗑 Прибрати зворотний бік у Minerva. */
+    fun dropBack(id: Int): ServerCard {
+        val body = FormBody.Builder().add("side", "back").add("delete", "1").build()
+        return ServerCard(run(request("cards/$id/side/").post(body).build()).getJSONObject("card"))
+    }
+
+    /** 📎 Ще фото групи (той самий uuid удруге — те саме фото). */
+    fun addPhoto(id: Int, e: Extra): ServerCard {
+        val b = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("image", "photo.jpg", File(e.path).asRequestBody("image/jpeg".toMediaType()))
+            .addFormDataPart("uuid", e.uuid).addFormDataPart("kind", e.kind)
+        if (e.note.isNotEmpty()) b.addFormDataPart("note", e.note)
+        if (e.qr.isNotEmpty()) b.addFormDataPart("qr", e.qr)
+        return ServerCard(run(request("cards/$id/photos/").post(b.build()).build()).getJSONObject("card"))
+    }
+
+    /** 🗑 Прибрати ще фото в Minerva (уже немає — теж добре). → свіжа візитка або null. */
+    fun deletePhoto(id: Int, photoId: Int): ServerCard? {
+        val j = run(request("cards/$id/photos/$photoId/delete/").post(FormBody.Builder().build()).build())
+        return j.optJSONObject("card")?.let { ServerCard(it) }
+    }
+
+    /** 🧠 AI заново (без корутини — для UploadWorker). */
+    fun readNow(id: Int, model: String): ServerCard =
+        ServerCard(run(request("cards/$id/read/").post(JSONObject().put("model", model).toString()
+            .toRequestBody("application/json".toMediaType())).build()).getJSONObject("card"))
 
     suspend fun cards(params: Map<String, String>): Pair<List<ServerCard>, Boolean> {
         val j = get("cards/", params)

@@ -16,7 +16,11 @@ suppliers/app_api.py — JSON API для 📱 додатка «Minerva Візи�
   GET|POST cards/<id>/           — візитка / правка (note, event, title, kind, marks, categories);
   POST cards/<id>/read/          — 🧠 прочитати AI; cards/<id>/to-supplier/ — 🏭 у постачальники;
   POST cards/<id>/to-customer/   — 👤 у CRM (той самий email / фірма — до нього, немає — новий клієнт);
-  POST cards/<id>/delete/        — 🗑; GET cards/<id>/image/?side=front|back&size=thumb|full — фото.
+  POST cards/<id>/delete/        — 🗑; GET cards/<id>/image/?side=front|back|p<id>&size=thumb|full — фото;
+  POST cards/<id>/side/          — 🔄 перезняли лицьовий / зворотний бік (multipart: side, image, qr) або
+                                   прибрати зворотний (side=back, delete=1) — suppliers/services/card_photos.py;
+  POST cards/<id>/photos/        — 📎 ще фото групи (multipart: image, kind, uuid, note, qr; той самий uuid — те саме);
+  POST cards/<id>/photos/<pid>/delete/ — 🗑 прибрати ще фото. AI — окремо (cards/<id>/read/), раз після всіх змін.
 """
 import functools
 import json
@@ -308,12 +312,91 @@ def card_delete(request, pk):
     return JsonResponse({"ok": True})
 
 
+def _photo_upload(request):
+    """Фото з телефона: є, ≤ 15 МБ і справді картинка → (файл, ""); інакше — (None, текст помилки)."""
+    from suppliers.services import card_app
+    f = request.FILES.get("image")
+    if f is None:
+        return None, "Немає фото."
+    if f.size > PHOTO_MAX or not card_app.is_image(f):
+        return None, "Фото понад 15 МБ або не картинка."
+    return f, ""
+
+
+def _editable(request, pk):
+    from suppliers.services import card_app
+    m = _card(request, pk)
+    if m is not None and not card_app.can_edit(request.app_user, m):
+        raise PermissionError("Це фото іншої людини, а права змінювати постачальників у вас немає.")
+    return m
+
+
+@api(("POST",))
+def card_side(request, pk):
+    """🔄 Лицьовий / зворотний бік — нове фото (перезняли, дознімали зворотний) або 🗑 прибрати зворотний."""
+    from suppliers.services import card_app, card_photos
+    m = _editable(request, pk)
+    if m is None:
+        return _err("Візитки немає — можливо, її видалили в Minerva.", 404)
+    d = _data(request)
+    side = "back" if d.get("side") == "back" else "front"
+    if card_app._bool(d.get("delete")):
+        if side != "back":
+            return _err("Лицьовий бік не прибрати — зніміть його знову.")
+        if m.image_back:
+            card_photos.drop_back(m)
+    else:
+        f, error = _photo_upload(request)
+        if f is None:
+            return _err(error)
+        card_photos.set_side(m, side, f, d.get("qr") or "")
+    return JsonResponse({"card": card_app.card_json(_card(request, pk), request.app_user)})
+
+
+@api(("POST",))
+def card_photos_add(request, pk):
+    """📎 Ще фото до візитки: друга візитка (інша людина), флаєр, каталог, продукт, стенд."""
+    from suppliers.services import card_app, card_photos
+    m = _editable(request, pk)
+    if m is None:
+        return _err("Візитки немає — можливо, її видалили в Minerva.", 404)
+    d = _data(request)
+    uuid = str(d.get("uuid") or "")[:40]
+    p = m.photos.filter(client_uuid=uuid).first() if uuid else None
+    if p is None:
+        f, error = _photo_upload(request)
+        if f is None:
+            return _err(error)
+        try:
+            p = card_photos.add(m, f, d.get("kind"), request.app_user, uuid=uuid, note=d.get("note") or "",
+                                qr=d.get("qr") or "")
+        except ValueError as e:
+            return _err(e)
+    return JsonResponse({"photo": {"id": p.pk, "kind": p.kind, "uuid": p.client_uuid},
+                         "card": card_app.card_json(_card(request, pk), request.app_user)})
+
+
+@api(("POST",))
+def card_photo_delete(request, pk, photo_pk):
+    """🗑 Прибрати ще фото (уже немає — теж добре: телефон повторює після обриву зв'язку)."""
+    from suppliers.services import card_app, card_photos
+    m = _editable(request, pk)
+    if m is None:
+        return JsonResponse({"ok": True, "gone": True})
+    p = m.photos.filter(pk=photo_pk).first()
+    if p is not None:
+        card_photos.remove(p)
+    return JsonResponse({"ok": True, "card": card_app.card_json(_card(request, pk), request.app_user)})
+
+
 @api()
 def card_image(request, pk):
     from suppliers.services import card_app
     m = _card(request, pk)
-    side = "back" if request.GET.get("side") == "back" else "front"
-    field = None if m is None else (m.image_back if side == "back" else m.image)
+    side = str(request.GET.get("side") or "front")
+    if side not in ("front", "back") and not (side.startswith("p") and side[1:].isdigit()):
+        side = "front"
+    field = None if m is None else card_app.side_field(m, side)
     if not field:
         return _err("Фото немає", 404)
     if request.GET.get("size") != "full":

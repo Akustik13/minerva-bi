@@ -24,9 +24,14 @@ from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 
 from suppliers.models import (SupplierAnalysis, SupplierCardPreset, SupplierCategory, SupplierContact, SupplierEvent,
-                              SupplierMedia)
+                              SupplierMedia, SupplierMediaPhoto)
 
 VIEWER = "_sup_viewer"
+
+
+def _card_photos_max() -> int:
+    from suppliers.services import card_photos
+    return card_photos.MAX
 PANELS = ("sup_overview", "sup_mail", "sup_media", "sup_requests", "sup_ai", "sup_history")
 
 
@@ -1193,7 +1198,7 @@ class SupplierCardMixin:
                 return {"message": text}
             return JsonResponse({"job": jobs.start(user, f"cards read {scope}", run)})
         qs = SupplierMedia.objects.select_related("supplier", "customer", "created_by").prefetch_related(
-            "categories", "supplier__categories")
+            "categories", "supplier__categories", "photos")
         show = request.GET.get("show", "")
         if show == "new":
             qs = qs.filter(supplier=None, customer=None)
@@ -1368,6 +1373,59 @@ class SupplierCardMixin:
                           "🗑 Лицьову сторону прибрано — зворотна тепер перша", messages.SUCCESS)
         return redirect(url)
 
+    def _card_photos(self, request, m, url, action):
+        """📎 Ще фото до візитки (група): додати (зворотний бік, якщо його немає, або ще візитка, флаєр, каталог…),
+        прибрати, повернути, змінити «що це». Після додавання — за галочкою AI читає всі фото разом."""
+        from suppliers.services import ai, card_app, card_photos, jobs
+        if action == "add_photo":
+            uploads = request.FILES.getlist("photos")[:card_photos.MAX]
+            kind = request.POST.get("kind") or "card"
+            added, bad = 0, 0
+            for f in uploads:
+                if f.size > 15 * 1024 * 1024 or not card_app.is_image(f):
+                    bad += 1
+                    continue
+                try:
+                    if kind == "back" and not m.image_back:
+                        card_photos.set_side(m, "back", f)
+                        kind = "card"           # решта вибраних — ще фото
+                    else:
+                        card_photos.add(m, f, kind, request.user)
+                except ValueError as e:
+                    self.message_user(request, str(e), messages.ERROR)
+                    break
+                added += 1
+            if bad:
+                self.message_user(request, f"Не картинка або понад 15 МБ: {bad}", messages.ERROR)
+            if not added:
+                if not uploads:
+                    self.message_user(request, "Виберіть фото.", messages.ERROR)
+                return redirect(url)
+            self.message_user(request, f"📎 Додано фото: {added}", messages.SUCCESS)
+            if request.POST.get("read_ai"):
+                model, user = ai.model_of(request.POST.get("model")), request.user
+
+                def run():
+                    ai.card(m, user=user, model=model)
+                    return {"url": url, "message": "🧠 Прочитано"}
+                return redirect(url + "?job=" + jobs.start(user, f"card {m.pk}", run))
+            return redirect(url)
+        p = m.photos.filter(pk=request.POST.get("photo") if str(request.POST.get("photo") or "").isdigit() else 0).first()
+        if p is None:
+            return redirect(url)
+        if action == "photo_delete":
+            card_photos.remove(p)
+            self.message_user(request, "🗑 Фото прибрано", messages.INFO)
+        elif action == "photo_rotate":
+            try:
+                card_photos.rotate(p, -90 if request.POST.get("dir") == "left" else 90)
+            except Exception:  # noqa: BLE001 — не картинка / файлу немає
+                self.message_user(request, "Не вдалося повернути фото.", messages.ERROR)
+        elif action == "photo_kind":
+            p.kind = card_photos.clean_kind(request.POST.get("kind"))
+            p.save(update_fields=["kind"])
+        return redirect(url + "#cr-photos")
+
     def _card_edit(self, request, m, url):
         """POST multipart: side, image (JPEG з браузера), qr_front / qr_back (QR, які браузер знайшов після правки),
         read_ai, model → JSON {url}. Перша правка переносить знімок у *_original (файл не копіюється)."""
@@ -1537,6 +1595,10 @@ class SupplierCardMixin:
             return redirect(url)
         if action == "drop_side":                  # 🗑 прибрати одну сторону (двічі зняли той самий бік…)
             return self._card_drop_side(request, m, url)
+        if action in ("add_photo", "photo_delete", "photo_rotate", "photo_kind"):   # 📎 ще фото групи
+            if not can_edit:
+                raise Http404
+            return self._card_photos(request, m, url, action)
         if action == "delete":
             if not (_can(request, "change") or m.created_by_id == request.user.pk):
                 raise Http404
@@ -1562,6 +1624,8 @@ class SupplierCardMixin:
             can_change=_can(request, "change"), job=request.GET.get("job", ""),
             photo_sides=[{"key": k, "file": f, "original": o} for k, f, o in (
                 ("front", m.image, m.image_original), ("back", m.image_back, m.image_back_original)) if f],
+            extra_photos=list(m.photos.all()), photo_kinds=SupplierMediaPhoto.KINDS,
+            photo_max=_card_photos_max(), people=[p for p in (data.get("people") or []) if isinstance(p, dict)],
             qr_parts=[x for x in (m.qr_text or "").split(qr.SEPARATOR) if x.strip()],
             qr_kind=_qr_kind(qr.parse_all(m.qr_text).get("kind")),
             qr_from=qr.labels(data.get("from_qr")),

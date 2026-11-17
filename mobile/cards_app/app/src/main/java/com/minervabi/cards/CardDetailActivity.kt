@@ -17,7 +17,10 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Візитка з Minerva: фото, фірма, людина, контакти (📞 ✉️ 🌐 одним дотиком), AI, категорії, позначки, примітка. */
+/**
+ * Візитка з Minerva: фото групи (боки й 📎 ще фото), фірма, людина, ще люди з інших візиток, контакти (📞 ✉️ 🌐 одним
+ * дотиком), AI, категорії, позначки, примітка; «📷 Фото…» — перезняти, дознімати зворотний бік, ще фото.
+ */
 class CardDetailActivity : AppCompatActivity() {
     private lateinit var b: ActivityCardDetailBinding
     private var id = 0
@@ -72,18 +75,44 @@ class CardDetailActivity : AppCompatActivity() {
         b.toolbar.title = c.company.ifEmpty { c.title.ifEmpty { meta.kindLabel(c.kind) } }
         val body = b.body
         body.removeAllViews()
-        // фото
-        val photos = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        listOf("front" to true, "back" to c.hasBack).filter { it.second }.forEach { (side, _) ->
-            val img = ImageView(this).apply {
-                layoutParams = LinearLayout.LayoutParams(0, dp(150), 1f).apply { marginEnd = dp(6) }
-                scaleType = ImageView.ScaleType.FIT_CENTER
-                setOnClickListener { PhotoActivity.openServer(this@CardDetailActivity, id, side) }
+        // фото: боки, потім ще фото групи (по три в ряд)
+        val sides = listOf("front" to "", "back" to "").filter { it.first == "front" || c.hasBack }.map { it.first } +
+            c.photos.map { "p${it.id}" }
+        sides.chunked(if (sides.size <= 2) 2 else 3).forEachIndexed { n, chunk ->
+            val photos = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            chunk.forEach { side ->
+                val img = ImageView(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, dp(if (n == 0 && sides.size <= 2) 150 else 100), 1f)
+                        .apply { marginEnd = dp(6); bottomMargin = dp(6) }
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    contentDescription = when (side) {
+                        "front" -> "Лицьовий бік"
+                        "back" -> "Зворотний бік"
+                        else -> c.photos.firstOrNull { "p${it.id}" == side }?.label ?: "Фото"
+                    }
+                    setOnClickListener { PhotoActivity.openServer(this@CardDetailActivity, id, side) }
+                }
+                ImageLoader.server(this, lifecycleScope, img, id, side)
+                photos.addView(img)
             }
-            ImageLoader.server(this, lifecycleScope, img, id, side)
-            photos.addView(img)
+            repeat((if (sides.size <= 2) 2 else 3) - chunk.size) {
+                photos.addView(android.view.View(this), LinearLayout.LayoutParams(0, 1, 1f))
+            }
+            body.addView(photos)
         }
-        body.addView(photos)
+        if (c.photos.isNotEmpty()) {
+            body.addView(label("📎 Ще фото: " + c.photos.joinToString(", ") { it.label }, 13f, true))
+        }
+        if (c.editable) {
+            body.addView(button("📷 Фото: знову, зворотний бік, ще фото (візитка, флаєр…)") {
+                val cap = CaptureStore.adopt(c)
+                MainActivity.review(this, cap.uuid)
+                finish()
+            }.apply {
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                maxLines = 2
+            })
+        }
         // хто
         val who = listOf(c.person, c.position).filter { it.isNotEmpty() }.joinToString(" · ")
         if (who.isNotEmpty()) body.addView(label("👤 $who", 17f))
@@ -100,6 +129,20 @@ class CardDetailActivity : AppCompatActivity() {
         if (contacts.childCount > 0) body.addView(contacts)
         if (c.address.isNotEmpty()) body.addView(label("📍 ${c.address}", 14f, true))
         if (c.desc.isNotEmpty()) body.addView(label("🏭 ${c.desc}", 14f))
+        if (c.people.isNotEmpty()) {                     // люди з інших візиток групи
+            body.addView(label("👥 Ще люди з цієї фірми", 14f))
+            c.people.forEach { p ->
+                val chips = ChipGroup(this)
+                chips.addAction("👤 ${p.text}") {
+                    when {
+                        p.email.isNotEmpty() -> go(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:" + p.email)))
+                        p.mobile.isNotEmpty() || p.phone.isNotEmpty() ->
+                            go(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + p.mobile.ifEmpty { p.phone })))
+                    }
+                }
+                body.addView(chips)
+            }
+        }
         if (c.newCategory.isNotEmpty()) body.addView(label("💡 AI пропонує нову категорію: ${c.newCategory} — додайте її на комп'ютері або тут ↓", 13f, true))
         if (c.notes.isNotEmpty()) body.addView(label("ℹ️ ${c.notes}", 13f, true))
         body.addView(label("🎪 ${c.event.ifEmpty { "—" }} · ${c.createdAt.take(10)}${if (c.by.isNotEmpty()) " · ${c.by}" else ""}", 13f, true))
@@ -191,6 +234,7 @@ class CardDetailActivity : AppCompatActivity() {
                     try {
                         Api.deleteCard(id)
                         CaptureStore.all().filter { it.serverId == id }.forEach { CaptureStore.remove(it.uuid) }
+                        ImageLoader.forgetServer(this@CardDetailActivity, id)
                         toast("🗑 Видалено"); finish()
                     } catch (e: ApiException) { alert("Не видалено", e.message.orEmpty()) }
                 }
@@ -208,7 +252,9 @@ class CardDetailActivity : AppCompatActivity() {
             try {
                 val c = Api.updateCard(id, json)
                 card = c
-                CaptureStore.all().filter { it.serverId == id }.forEach { cap -> CaptureStore.update(cap.uuid) { it.server = c.json } }
+                CaptureStore.all().filter { it.serverId == id }.forEach { cap ->
+                    CaptureStore.update(cap.uuid) { CaptureStore.mergeServer(it, c.json) }
+                }
                 toast(ok)
                 render(c)
             } catch (e: ApiException) {

@@ -60,6 +60,8 @@ data class Meta(
     val marks: List<Pair<String, String>> = DEFAULT_MARKS,
     /** 👥 Хто це для нас — без «не вказано» (його показує відсутність вибору). */
     val roles: List<Pair<String, String>> = DEFAULT_ROLES,
+    /** 📎 Що ще можна дознімати до візитки (друга візитка, флаєр, каталог…). */
+    val photoKinds: List<Pair<String, String>> = DEFAULT_PHOTO_KINDS,
     val models: List<Pair<String, String>> = emptyList(),
     val defaultModel: String = "",
     val events: List<String> = emptyList(),
@@ -72,6 +74,7 @@ data class Meta(
     fun markLabel(k: String) = marks.firstOrNull { it.first == k }?.second ?: k
     fun roleLabel(k: String) = if (k.isEmpty()) "" else roles.firstOrNull { it.first == k }?.second ?: k
     fun roleIcon(k: String) = roleLabel(k).substringBefore(" ")
+    fun photoKindLabel(k: String) = photoKinds.firstOrNull { it.first == k }?.second ?: k
 
     companion object {
         val DEFAULT_KINDS = listOf("card" to "🪪 Візитка", "flyer" to "📄 Флаєр / каталог", "photo" to "📷 Фото",
@@ -80,6 +83,8 @@ data class Meta(
             "check" to "❗ Перевірити", "sample" to "📦 Попросити зразки", "price" to "💶 Чекаємо ціни",
             "cheap" to "💸 Дешево", "quality" to "🏅 Якість", "no" to "👎 Не підходить")
         val DEFAULT_ROLES = listOf("supplier" to "🏭 Постачальник", "customer" to "👤 Клієнт", "other" to "🤝 Інше")
+        val DEFAULT_PHOTO_KINDS = listOf("card" to "🪪 Ще візитка", "flyer" to "📄 Флаєр", "catalog" to "📚 Каталог / прайс",
+            "product" to "📦 Продукт / зразок", "stand" to "🎪 Стенд", "other" to "📷 Інше")
 
         fun parse(o: JSONObject?): Meta {
             if (o == null) return Meta()
@@ -93,6 +98,7 @@ data class Meta(
                 kinds = pairs(o.optJSONArray("kinds")).ifEmpty { DEFAULT_KINDS },
                 marks = pairs(o.optJSONArray("marks")).ifEmpty { DEFAULT_MARKS },
                 roles = pairs(o.optJSONArray("roles")).filter { it.first.isNotEmpty() }.ifEmpty { DEFAULT_ROLES },
+                photoKinds = pairs(o.optJSONArray("photo_kinds")).ifEmpty { DEFAULT_PHOTO_KINDS },
                 models = pairs(o.optJSONArray("models")),
                 defaultModel = o.str("default_model"),
                 events = o.optJSONArray("events").strings(),
@@ -103,6 +109,15 @@ data class Meta(
             )
         }
     }
+}
+
+/** Ще фото групи в Minerva (друга візитка, флаєр…). */
+data class ServerPhoto(val id: Int, val kind: String, val label: String, val note: String, val uuid: String)
+
+/** Людина з іншої візитки групи (прочитав AI). */
+data class Person(val name: String, val position: String, val email: String, val phone: String, val mobile: String) {
+    val text get() = listOf(name, position, email, listOf(phone, mobile).filter { it.isNotEmpty() }.joinToString(", "))
+        .filter { it.isNotEmpty() }.joinToString(" · ")
 }
 
 /** Візитка в Minerva (suppliers/services/card_app.py card_json). */
@@ -143,6 +158,20 @@ data class ServerCard(val json: JSONObject) {
     val supplierName get() = json.optJSONObject("supplier")?.str("name") ?: ""
     val customerName get() = json.optJSONObject("customer")?.str("name") ?: ""
     val newCategory get() = json.optJSONObject("new_category")?.str("name") ?: ""
+    val photos: List<ServerPhoto>
+        get() {
+            val arr = json.optJSONArray("photos") ?: return emptyList()
+            return (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.map {
+                ServerPhoto(it.optInt("id"), it.str("kind"), it.str("label"), it.str("note"), it.str("uuid"))
+            }
+        }
+    val people: List<Person>
+        get() {
+            val arr = json.optJSONArray("people") ?: return emptyList()
+            return (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.map {
+                Person(it.str("name"), it.str("position"), it.str("email"), it.str("phone"), it.str("mobile"))
+            }
+        }
 
     /** Стан AI одним рядком: 🧠 читає / прочитано / не вдалося / ще не читав. */
     fun aiText(): String = when {

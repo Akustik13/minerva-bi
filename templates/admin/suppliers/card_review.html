@@ -43,6 +43,33 @@
           {% endif %}
         </div>
         {% endfor %}
+        <div id="cr-photos" class="cr-xph">
+          {% if extra_photos %}<div class="spf-h">📎 Ще фото цієї групи ({{ extra_photos|length }})</div>
+          <div class="cr-xph-grid">{% for p in extra_photos %}
+            <div class="cr-xph-item">
+              <a href="{{ p.image.url }}" target="_blank"><img class="cr-xph-img" src="{{ p.image.url }}" alt="" loading="lazy"></a>
+              {% if can_edit %}
+              <form method="post" class="cr-xph-kind">{% csrf_token %}<input type="hidden" name="action" value="photo_kind"><input type="hidden" name="photo" value="{{ p.pk }}">
+                <select name="kind" onchange="this.form.submit()" title="Що на фото">{% for v, n in photo_kinds %}<option value="{{ v }}" {% if v == p.kind %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></form>
+              <div class="cr-xph-tools">
+                <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="photo_rotate"><input type="hidden" name="photo" value="{{ p.pk }}"><input type="hidden" name="dir" value="left"><button type="submit" class="button" title="Повернути ліворуч">⟲</button></form>
+                <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="photo_rotate"><input type="hidden" name="photo" value="{{ p.pk }}"><button type="submit" class="button" title="Повернути праворуч">⟳</button></form>
+                <form method="post" style="display:inline" onsubmit="return confirm('Прибрати це фото? Воно видалиться назавжди.')">{% csrf_token %}<input type="hidden" name="action" value="photo_delete"><input type="hidden" name="photo" value="{{ p.pk }}"><button type="submit" class="button" title="Прибрати фото">🗑</button></form>
+              </div>
+              {% else %}<div class="spf-muted">{{ p.get_kind_display }}</div>{% endif %}
+              {% if p.note %}<div class="spf-muted" translate="no">{{ p.note }}</div>{% endif %}
+            </div>{% endfor %}
+          </div>{% endif %}
+          {% if can_edit and extra_photos|length < photo_max %}
+          <form method="post" enctype="multipart/form-data" class="spf-row cr-xph-add">{% csrf_token %}<input type="hidden" name="action" value="add_photo">
+            <select name="kind" title="Що на фото">{% if not m.image_back %}<option value="back">↩ Зворотний бік</option>{% endif %}{% for v, n in photo_kinds %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
+            <input type="file" name="photos" accept="image/*" multiple required>
+            <label class="spf-muted"><input type="checkbox" name="read_ai" value="1"> 🧠 Прочитати AI всі фото разом</label>
+            <button type="submit" class="button">📎 Додати фото</button>
+          </form>
+          <div class="spf-muted">Дві візитки від однієї фірми, флаєр, каталог, продукт, стенд — в одну групу: AI прочитає всі фото разом, людей з інших візиток внесе контактами.</div>
+          {% endif %}
+        </div>
         <div class="spf-muted" style="margin-top:6px">{{ m.get_kind_display }} · {{ m.created_at|date:"d.m.Y H:i" }}{% if m.created_by %} · {{ m.created_by.get_full_name|default:m.created_by.username }}{% endif %}
           {% if m.supplier %}<div>🏭 <a href="{% url 'admin:inventory_supplier_change' m.supplier.pk %}" translate="no">{{ m.supplier.name }}</a></div>{% endif %}
           {% if m.customer %}<div>👤 {% if crm_view %}<a href="{% url 'admin:crm_customer_change' m.customer.pk %}" translate="no">{{ m.customer.company|default:m.customer.name }}</a>{% else %}у CRM{% endif %}</div>{% endif %}</div>
@@ -83,6 +110,11 @@
           <span class="spf-job" id="cr-job"></span>
         </div>
         <div class="spf-muted">🌐 — коли на візитці мало даних (лише сайт чи назва): AI знайде фірму в інтернеті й допише порожні поля, підкаже категорію.</div>
+        {% endif %}
+        {% if people %}
+        <div class="spf-h" style="margin-top:8px">👥 Ще люди з інших візиток групи</div>
+        {% for p in people %}<div class="cr-person" translate="no"><b>{{ p.name }}</b>{% if p.position %} · {{ p.position }}{% endif %}{% if p.email %} · <a href="mailto:{{ p.email }}">{{ p.email }}</a>{% endif %}{% if p.phone %} · {{ p.phone }}{% endif %}{% if p.mobile %} · {{ p.mobile }}{% endif %}</div>{% endfor %}
+        <div class="spf-muted">«🏭 Створити постачальника» / «➕ Додати до наявного» внесе їх контактними особами разом з людиною з візитки.</div>
         {% endif %}
       </div>
       {% if web %}
@@ -156,6 +188,13 @@
 <style>
   .cr-customer { display: flex; flex-direction: column; }
   .cr-webbox { border-left: 4px solid var(--primary, #5b8def); }
+  .cr-xph { margin-top: 10px; }
+  .cr-xph-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cr-xph-item { width: 150px; }
+  .cr-xph-img { width: 150px; height: 110px; object-fit: contain; border-radius: 6px; background: #fff; border: 1px solid var(--border-strong, #ccc); }
+  .cr-xph-kind select { width: 100%; margin-top: 3px; }
+  .cr-xph-tools { display: flex; gap: 4px; margin-top: 3px; }
+  .cr-xph-add { margin-top: 8px; }
   .cr-person { font-size: 13px; margin: 2px 0; }
   #spf-form label.cr-from-web > input, #spf-form label.cr-from-web > textarea { outline: 2px solid rgba(91, 141, 239, .55); }
   #spf-form label.cr-from-web::after { content: " 🌐"; font-size: 11px; }

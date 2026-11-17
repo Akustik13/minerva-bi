@@ -20,10 +20,21 @@ object ImageLoader {
         load(scope, view, "f:$path") { ImageUtils.thumb(path) }
     }
 
+    private fun key(id: Int, side: String, full: Boolean) = "s:${Prefs.server}:$id:$side:${if (full) "full" else "thumb"}"
+
+    private fun diskFile(context: Context, key: String) =
+        File(context.cacheDir, "img-" + key.hashCode().toUInt().toString(16) + ".jpg")
+
+    /** Фото в Minerva змінилось (перезняли бік) — забути мініатюри цієї візитки (пам'ять і диск). */
+    fun forgetServer(context: Context, id: Int) {
+        forget(id)
+        for (side in listOf("front", "back")) for (full in listOf(true, false)) diskFile(context, key(id, side, full)).delete()
+    }
+
     fun server(context: Context, scope: LifecycleCoroutineScope, view: ImageView, id: Int, side: String = "front",
                full: Boolean = false) {
-        val key = "s:${Prefs.server}:$id:$side:${if (full) "full" else "thumb"}"
-        val disk = File(context.cacheDir, "img-" + key.hashCode().toUInt().toString(16) + ".jpg")
+        val key = key(id, side, full)
+        val disk = diskFile(context, key)
         load(scope, view, key) {
             val bytes = if (disk.exists() && System.currentTimeMillis() - disk.lastModified() < 7L * 86400_000) disk.readBytes()
             else Api.image(id, side, full)?.also { runCatching { disk.writeBytes(it) } }

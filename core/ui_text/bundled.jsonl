@@ -641,6 +641,7 @@
 {"uk": "1 / true / yes → активний 0 / false / no → неактивний", "en": "1 / true / yes → active 0 / false / no → inactive", "de": "1 / true / yes → aktiv 0 / false / no → inaktiv"}
 {"uk": "1 : N — один до багатьох", "en": "1 : N — one to many", "de": "1 : N — eins zu viele"}
 {"uk": "1 = ті самі ціни, 1.15 = на 15 % дорожче, 0.9 = на 10 % дешевше", "en": "1 = same prices, 1.15 = 15 % more expensive, 0.9 = 10 % cheaper", "de": "1 = gleiche Preise, 1.15 = 15 % teurer, 0.9 = 10 % günstiger"}
+{"uk": "1 бік", "en": "1 side", "de": "1 Seite"}
 {"uk": "1 год", "en": "1 h", "de": "1 Std."}
 {"uk": "1 день", "en": "1 day", "de": "1 Tag"}
 {"uk": "1 замовлення", "en": "1 order", "de": "1 Auftrag"}
@@ -698,6 +699,7 @@
 {"uk": "1️⃣ Встановити додаток (Android)", "en": "1️⃣ Install the app (Android)", "de": "1️⃣ App installieren (Android)"}
 {"uk": "1️⃣ Ручне перевизначення", "en": "1️⃣ Manual override", "de": "1️⃣ Manuelle Überschreibung"}
 {"uk": "2 аркуші", "en": "2 sheets", "de": "2 Blätter"}
+{"uk": "2 боки", "en": "2 sides", "de": "2 Seiten"}
 {"uk": "2 год", "en": "2 h", "de": "2 Std."}
 {"uk": "2 дні", "en": "2 days", "de": "2 Tage"}
 {"uk": "2 знаки (за замовч.)", "en": "2 decimals (default)", "de": "2 Nachkommastellen (Standard)"}
@@ -1578,6 +1580,7 @@
 {"uk": "ID тарифу Jumingo", "en": "Jumingo rate ID", "de": "Jumingo-Tarif-ID"}
 {"uk": "ID товару (альтернатива sku)", "en": "Product ID (alternative to sku)", "de": "Artikel-ID (Alternative zu sku)"}
 {"uk": "ID транзакції PayPal/Stripe або призначення платежу", "en": "PayPal/Stripe transaction ID or payment reference", "de": "PayPal/Stripe-Transaktions-ID oder Verwendungszweck"}
+{"uk": "ID фото в додатку", "en": "Photo ID in the app", "de": "Foto-ID in der App"}
 {"uk": "ID цього чату: `{0}", "en": "This chat's ID: `{0}", "de": "ID dieses Chats: `{0}"}
 {"uk": "ID чату, групи або каналу. Для каналу: @mychannel або -100xxxxxxxxxx. Для особистого чату: числовий ID (дізнатись через @userinfobot).", "en": "ID of a chat, group or channel. For a channel: @mychannel or -100xxxxxxxxxx. For a personal chat: the numeric ID (find it via @userinfobot).", "de": "ID eines Chats, einer Gruppe oder eines Kanals. Für einen Kanal: @mychannel oder -100xxxxxxxxxx. Für einen persönlichen Chat: die numerische ID (über @userinfobot ermitteln)."}
 {"uk": "ID чернетки DigiKey (staged)", "en": "DigiKey draft ID (staged)", "de": "ID des DigiKey-Entwurfs (staged)"}
@@ -3604,6 +3607,7 @@
 {"uk": "«＋ Запит постачальникам» — один запит (PCB, PCBA, кабелі, корпуси…) кільком постачальникам; відповіді Minerva знайде в пошті, а тут буде видно, кому писали, хто що запропонував, кого обрали на яку партію і кого не взяли.", "en": "«＋ Supplier request» — one request (PCB, PCBA, cables, housings…) to several suppliers; Minerva finds the replies in the mail, and here you see whom you wrote to, who offered what, who was chosen for which batch and who was not taken.", "de": "«＋ Lieferantenanfrage» — eine Anfrage (PCB, PCBA, Kabel, Gehäuse…) an mehrere Lieferanten; Minerva findet die Antworten in der Mail, und hier sehen Sie, wen Sie angeschrieben haben, wer was angeboten hat, wer für welche Charge gewählt und wer nicht genommen wurde."}
 {"uk": "«🌍 Вибрати країни» відкриває список за регіонами (ЄС, Європа поза ЄС, Північна, Центральна й Південна Америка, Азія, Близький Схід, Африка, Океанія): повна назва і код, напр. «Швейцарія (CH)».", "en": "“🌍 Select countries” opens a list by region (EU, Europe outside the EU, North, Central and South America, Asia, Middle East, Africa, Oceania): full name and code, e.g. “Switzerland (CH)”.", "de": "„🌍 Länder auswählen“ öffnet eine Liste nach Regionen (EU, Europa außerhalb der EU, Nord-, Mittel- und Südamerika, Asien, Naher Osten, Afrika, Ozeanien): vollständiger Name und Code, z. B. „Schweiz (CH)“."}
 {"uk": "«🌍 Вибрати країни» відкриває список за регіонами (ЄС, Європа поза ЄС, Північна, Центральна й Південна Америка, Азія, Близький Схід, Африка, Океанія): повна назва і код, напр. «Швейцарія (CH)». Регіон — «✓ усі» / «✕ жодної», потім зняти галочки з країн, куди не відправляємо. Пошук — за назвою (uk/de/en) або кодом. «Усі інші країни (*)» — решта світу.", "en": "“🌍 Select countries” opens a list by region (EU, Europe outside the EU, North, Central and South America, Asia, Middle East, Africa, Oceania): full name and code, e.g. “Switzerland (CH)”. Region — “✓ all” / “✕ none”, then untick the countries we do not ship to. Search — by name (uk/de/en) or code. “All other countries (*)” — the rest of the world.", "de": "„🌍 Länder auswählen“ öffnet eine Liste nach Regionen (EU, Europa außerhalb der EU, Nord-, Mittel- und Südamerika, Asien, Naher Osten, Afrika, Ozeanien): vollständiger Name und Code, z. B. „Schweiz (CH)“. Region — „✓ alle“ / „✕ keines“, danach Häkchen bei den Ländern entfernen, in die wir nicht liefern. Suche — nach Name (uk/de/en) oder Code. „Alle übrigen Länder (*)“ — der Rest der Welt."}
+{"uk": "«🏭 Створити постачальника» / «➕ Додати до наявного» внесе їх контактними особами разом з людиною з візитки.", "en": "«🏭 Create supplier» / «➕ Add to existing» adds them as contact persons together with the person from the card.", "de": "«🏭 Lieferant anlegen» / «➕ Zu vorhandenem hinzufügen» trägt sie zusammen mit der Person von der Karte als Ansprechpartner ein."}
 {"uk": "«👁 Як бачить Minerva", "en": "“👁 Minerva as they see it", "de": "„👁 Minerva aus Sicht der Person"}
 {"uk": "«💲 Налаштування цін DigiKey»", "en": "“💲 DigiKey price settings”", "de": "„💲 DigiKey-Preiseinstellungen“"}
 {"uk": "«💲 Ціни DigiKey ← Minerva», параметри з технічних атрибутів. Чого бракує — впишіть нижче: це збережеться", "en": "“💲 DigiKey prices ← Minerva”, parameters from the technical attributes. Enter what is missing below: it will be saved", "de": "„💲 DigiKey-Preise ← Minerva“, Parameter aus den technischen Attributen. Was fehlt, tragen Sie unten ein: Es wird gespeichert"}
@@ -4939,6 +4943,7 @@
 {"uk": "Виберіть файл тут — Minerva завантажить його на DigiKey, передасть разом із трек-номером і перевірить, чи", "en": "Choose a file here — Minerva uploads it to DigiKey, sends it with the tracking number and checks whether", "de": "Wählen Sie hier eine Datei — Minerva lädt sie zu DigiKey hoch, sendet sie mit der Sendungsnummer und prüft, ob"}
 {"uk": "Виберіть файли або папку — назва джерела підставиться сама (назва папки). Поле «Папка» лишіть", "en": "Choose files or a folder — the source name will be filled in automatically (the folder name). Leave the “Folder” field", "de": "Wählen Sie Dateien oder einen Ordner – der Name der Quelle wird automatisch eingesetzt (Ordnername). Lassen Sie das Feld „Ordner“"}
 {"uk": "Виберіть файли або папку — назва джерела підставиться сама (назва папки). Поле «Папка» лишіть порожнім: Minerva створить свою. Після «Зберегти» Minerva створить джерело й завантажить вибране. Типи: {0} · до {1} МБ на файл.", "en": "Choose files or a folder — the source name will be filled in automatically (the folder name). Leave the “Folder” field empty: Minerva will create its own. After “Save” Minerva will create the source and upload the selection. Types: {0} · up to {1} MB per file.", "de": "Wählen Sie Dateien oder einen Ordner – der Name der Quelle wird automatisch eingesetzt (Ordnername). Lassen Sie das Feld „Ordner“ leer: Minerva erstellt einen eigenen. Nach „Speichern“ erstellt Minerva die Quelle und lädt die Auswahl hoch. Typen: {0} · bis zu {1} MB pro Datei."}
+{"uk": "Виберіть фото.", "en": "Choose photos.", "de": "Fotos auswählen."}
 {"uk": "Виберіть хоча б один файл", "en": "Choose at least one file", "de": "Wählen Sie mindestens eine Datei"}
 {"uk": "Виберіть шаблон", "en": "Choose a template", "de": "Wählen Sie eine Vorlage"}
 {"uk": "Виберіть, куди додати пункт", "en": "Choose where to add the item", "de": "Wählen Sie, wohin der Punkt hinzugefügt wird"}
@@ -6346,6 +6351,7 @@
 {"uk": "Два утеплюючих email. Реакція є → завершення (клієнт готовий); немає → Пауза 60 дн. і новий цикл.", "en": "Two warm-up emails. Response → finish (customer is ready); none → Pause 60 d and a new cycle.", "de": "Zwei Aufwärm-E-Mails. Reaktion vorhanden → Abschluss (Kunde ist bereit); keine → Pause 60 Tage und neuer Zyklus."}
 {"uk": "Двобуквений код: DE, UA, PL, US...", "en": "Two-letter code: DE, UA, PL, US...", "de": "Zweibuchstabiger Code: DE, UA, PL, US..."}
 {"uk": "Двобуквений код: UA, PL, DE, US...", "en": "Two-letter code: UA, PL, DE, US...", "de": "Zweistelliger Code: UA, PL, DE, US..."}
+{"uk": "Дві візитки від однієї фірми, флаєр, каталог, продукт, стенд — в одну групу: AI прочитає всі фото разом, людей з інших візиток внесе контактами.", "en": "Two business cards from one company, a flyer, catalogue, product, stand — into one group: AI reads all photos together and adds the people from the other cards as contacts.", "de": "Zwei Visitenkarten einer Firma, Flyer, Katalog, Produkt, Stand — in eine Gruppe: AI liest alle Fotos zusammen und trägt die Personen von den anderen Karten als Kontakte ein."}
 {"uk": "Де", "en": "Where", "de": "Wo"}
 {"uk": "Де в коді", "en": "Where in the code", "de": "Wo im Code"}
 {"uk": "Де взяли", "en": "Where obtained", "de": "Woher"}
@@ -6558,6 +6564,7 @@
 {"uk": "До нарад", "en": "To meetings", "de": "Zu den Besprechungen"}
 {"uk": "До нас", "en": "Incoming", "de": "Eingehend"}
 {"uk": "До нас — посилка від постачальника", "en": "Incoming — parcel from a supplier", "de": "Eingehend — Paket vom Lieferanten"}
+{"uk": "До однієї візитки — не більше {0} фото.", "en": "No more than {0} photos per business card.", "de": "Höchstens {0} Fotos pro Visitenkarte."}
 {"uk": "До переведення, {0}", "en": "Before conversion, {0}", "de": "Vor der Umrechnung, {0}"}
 {"uk": "До порівняння", "en": "To the comparison", "de": "Zum Vergleich"}
 {"uk": "До поштомату — ти везеш самостійно", "en": "To a parcel locker — you bring it yourself", "de": "Zum Paketautomaten — Sie bringen es selbst hin"}
@@ -6646,6 +6653,7 @@
 {"uk": "Додано нових", "en": "New added", "de": "Neu hinzugefügt"}
 {"uk": "Додано сторін: {0}", "en": "Parties added: {0}", "de": "Beteiligte hinzugefügt: {0}"}
 {"uk": "Додано у вашу базу знань {0} — бачите лише ви.", "en": "Added to your knowledge base {0} — only you can see it.", "de": "Zu Ihrer Wissensdatenbank hinzugefügt: {0} — nur Sie sehen es."}
+{"uk": "Додано фото: {0}", "en": "Photos added: {0}", "de": "Fotos hinzugefügt: {0}"}
 {"uk": "Додано! У кошику", "en": "Added! In the cart", "de": "Hinzugefügt! Im Bestellkorb"}
 {"uk": "Додано: {0}", "en": "Added: {0}", "de": "Hinzugefügt: {0}"}
 {"uk": "Додані нові замовлення ({0})", "en": "New orders added ({0})", "de": "Neu hinzugefügte Aufträge ({0})"}
@@ -6705,6 +6713,7 @@
 {"uk": "Додати файл чи скріншот до цього пункту (або перетягніть файл на пункт)", "en": "Add a file or screenshot to this item (or drag a file onto the item)", "de": "Datei oder Screenshot zu diesem Punkt hinzufügen (oder Datei auf den Punkt ziehen)"}
 {"uk": "Додати файли", "en": "Add files", "de": "Dateien hinzufügen"}
 {"uk": "Додати файли агенди вкладеннями ({0})", "en": "Attach the agenda files ({0})", "de": "Dateien der Tagesordnung anhängen ({0})"}
+{"uk": "Додати фото", "en": "Add photos", "de": "Fotos hinzufügen"}
 {"uk": "Додати фото / візитку", "en": "Add photo / business card", "de": "Foto / Visitenkarte hinzufügen"}
 {"uk": "Додати фото й контакт", "en": "Add photo and contact", "de": "Foto und Kontakt hinzufügen"}
 {"uk": "Додати шаблон", "en": "Add template", "de": "Vorlage hinzufügen"}
@@ -8804,6 +8813,7 @@
 {"uk": "Кастомні інтеграції (Shopify/Etsy)", "en": "Custom integrations (Shopify/Etsy)", "de": "Individuelle Integrationen (Shopify/Etsy)"}
 {"uk": "Кат.", "en": "Cat.", "de": "Kat."}
 {"uk": "Каталог", "en": "Catalog", "de": "Katalog"}
+{"uk": "Каталог / прайс", "en": "Catalogue / price list", "de": "Katalog / Preisliste"}
 {"uk": "Каталог DigiKey недоступний (ProductSearch). Наші категорії лістингів", "en": "The DigiKey catalog is unavailable (ProductSearch). Our listing categories", "de": "Der DigiKey-Katalog ist nicht verfügbar (ProductSearch). Unsere Eintragskategorien"}
 {"uk": "Каталог DigiKey недоступний, наших лістингів з категорією ще немає.", "en": "The DigiKey catalog is unavailable, and we have no listings with a category yet.", "de": "Der DigiKey-Katalog ist nicht verfügbar, und wir haben noch keine Einträge mit Kategorie."}
 {"uk": "Каталог DigiKey — {0}", "en": "DigiKey catalog — {0}", "de": "DigiKey-Katalog — {0}"}
@@ -9764,6 +9774,7 @@
 {"uk": "Лицьовий бік", "en": "Front side", "de": "Vorderseite"}
 {"uk": "Лицьовий бік відскановано — можна зняти зворотний.", "en": "Front side scanned — you can capture the back.", "de": "Vorderseite gescannt — Sie können die Rückseite aufnehmen."}
 {"uk": "Лицьовий бік знято — можна зняти зворотний (виберіть «зворотний»).", "en": "Front side captured — you can capture the back (select «back»).", "de": "Vorderseite aufgenommen — Sie können die Rückseite aufnehmen (wählen Sie «Rückseite»)."}
+{"uk": "Лицьовий бік не прибрати — зніміть його знову.", "en": "The front side cannot be removed — take it again.", "de": "Die Vorderseite lässt sich nicht entfernen — neu aufnehmen."}
 {"uk": "Лицьову сторону прибрано — зворотна тепер перша", "en": "Front side removed — the back side is now the first one", "de": "Vorderseite entfernt — die Rückseite ist jetzt die erste"}
 {"uk": "Лише Chrome або Edge.", "en": "Chrome or Edge only.", "de": "Nur Chrome oder Edge."}
 {"uk": "Лише Minerva — без звернень до RAG", "en": "Minerva only — no RAG requests", "de": "Nur Minerva — keine Anfragen an RAG"}
@@ -11019,6 +11030,7 @@
 {"uk": "Не вдалося перевірити розшифровку — спробуйте ще раз.", "en": "Could not check the transcript — please try again.", "de": "Das Transkript konnte nicht geprüft werden — bitte erneut versuchen."}
 {"uk": "Не вдалося перерахувати — спробуйте ще раз.", "en": "Could not recalculate — please try again.", "de": "Neuberechnung nicht möglich — bitte erneut versuchen."}
 {"uk": "Не вдалося перечитати день в askDANTE: {0}", "en": "Could not re-read the day in askDANTE: {0}", "de": "Der Tag konnte in askDANTE nicht neu gelesen werden: {0}"}
+{"uk": "Не вдалося повернути фото.", "en": "Could not rotate the photo.", "de": "Das Foto konnte nicht gedreht werden."}
 {"uk": "Не вдалося повідомити", "en": "Could not notify", "de": "Benachrichtigung fehlgeschlagen"}
 {"uk": "Не вдалося показати цей блок.", "en": "Could not show this block.", "de": "Dieser Block konnte nicht angezeigt werden."}
 {"uk": "Не вдалося прочитати «{0}» з пошти — завантажте файл з ПК.", "en": "Could not read «{0}» from the mail — upload the file from your PC.", "de": "«{0}» konnte nicht aus der E-Mail gelesen werden — laden Sie die Datei vom PC hoch."}
@@ -11101,6 +11113,7 @@
 {"uk": "Не знайшов «", "en": "Could not find “", "de": "Nicht gefunden: „"}
 {"uk": "Не знаєте цю фірму — видаліть акаунт", "en": "Don't know this company — delete the account", "de": "Firma unbekannt — Konto löschen"}
 {"uk": "Не знижувати статус при синхронізації (наприклад «В дорозі» → «Етикетка готова» буде ігноровано). Рекомендовано: увімкнено.", "en": "Do not lower the status on synchronization (for example “In transit” → “Label ready” will be ignored). Recommended: enabled.", "de": "Status bei der Synchronisierung nicht senken (z. B. „Unterwegs“ → „Etikett bereit“ wird ignoriert). Empfohlen: aktiviert."}
+{"uk": "Не картинка або понад 15 МБ: {0}", "en": "Not an image or over 15 MB: {0}", "de": "Kein Bild oder über 15 MB: {0}"}
 {"uk": "Не копіюється", "en": "Not copied", "de": "Wird nicht kopiert"}
 {"uk": "Не може увійти в Minerva (неактивний або не співробітник).", "en": "Cannot sign in to Minerva (inactive or not an employee).", "de": "Kann sich nicht bei Minerva anmelden (inaktiv oder kein Mitarbeiter)."}
 {"uk": "Не можна запустити: {0}", "en": "Cannot start: {0}", "de": "Start nicht möglich: {0}"}
@@ -14105,6 +14118,7 @@
 {"uk": "Прибрати сторону «", "en": "Remove the party «", "de": "Beteiligten entfernen «"}
 {"uk": "Прибрати фазу (її кроки лишаться без фази)", "en": "Remove the phase (its steps stay without a phase)", "de": "Phase entfernen (ihre Schritte bleiben ohne Phase)"}
 {"uk": "Прибрати файл з агенди", "en": "Remove the file from the agenda", "de": "Datei von der Tagesordnung entfernen"}
+{"uk": "Прибрати фото", "en": "Remove photo", "de": "Foto entfernen"}
 {"uk": "Прибрати цей важливий момент?", "en": "Remove this key moment?", "de": "Diesen wichtigen Moment entfernen?"}
 {"uk": "Прибрати цей проєкт з наради? Його 🏷 позначки в розшифровці теж зникнуть. Уже додане в проєкт лишиться там.", "en": "Remove this project from the meeting? Its 🏷 marks in the transcript go too. What was already added to the project stays there.", "de": "Dieses Projekt aus der Besprechung entfernen? Seine 🏷 Markierungen im Transkript verschwinden ebenfalls. Bereits ins Projekt Übernommenes bleibt dort."}
 {"uk": "Прибрати цю кількість", "en": "Remove this quantity", "de": "Diese Menge entfernen"}
@@ -14320,6 +14334,7 @@
 {"uk": "Продовжити індексацію", "en": "Resume indexing", "de": "Indexierung fortsetzen"}
 {"uk": "Продовжити?", "en": "Continue?", "de": "Fortfahren?"}
 {"uk": "Продукт '{0}' не знайдено в DigiKey Products API. Перевір Supplier SKU — він має точно співпадати з PartNumber в DigiKey.", "en": "Product '{0}' not found in the DigiKey Products API. Check the Supplier SKU — it must match the PartNumber in DigiKey exactly.", "de": "Artikel '{0}' wurde in der DigiKey Products API nicht gefunden. Prüfen Sie die Supplier SKU — sie muss exakt mit der PartNumber in DigiKey übereinstimmen."}
+{"uk": "Продукт / зразок", "en": "Product / sample", "de": "Produkt / Muster"}
 {"uk": "Продукт в черзі на перевірку DigiKey. Після затвердження натисніть 📦 Створити Offer.", "en": "The product is in the DigiKey review queue. After approval, click 📦 Create Offer.", "de": "Der Artikel befindet sich in der DigiKey-Prüfwarteschlange. Klicken Sie nach der Freigabe auf 📦 Offer erstellen."}
 {"uk": "Продукт у каталозі складу, що відповідає цьому замовленню", "en": "The product in the stock catalog that corresponds to this order", "de": "Der Artikel im Lagerkatalog, der dieser Bestellung entspricht"}
 {"uk": "Продукти що очікують перевірки DigiKey недоступні через API — тільки через веб-портал.", "en": "Products awaiting DigiKey review are not available via the API — only via the web portal.", "de": "Artikel, die auf die DigiKey-Prüfung warten, sind über die API nicht verfügbar — nur über das Webportal."}
@@ -14434,6 +14449,7 @@
 {"uk": "Прочитані AI листи", "en": "Emails read by AI", "de": "Von der KI gelesene E-Mails"}
 {"uk": "Прочитані сторінки", "en": "Pages read", "de": "Gelesene Seiten"}
 {"uk": "Прочитати AI", "en": "Read with AI", "de": "Mit AI lesen"}
+{"uk": "Прочитати AI всі фото разом", "en": "Read all photos together with AI", "de": "Alle Fotos zusammen mit AI lesen"}
 {"uk": "Прочитати AI заново", "en": "Read with AI again", "de": "Erneut mit KI lesen"}
 {"uk": "Прочитати QR з фото", "en": "Read QR from photo", "de": "QR vom Foto lesen"}
 {"uk": "Прочитати з DigiKey і перевірити", "en": "Read from DigiKey and check", "de": "Von DigiKey lesen und prüfen"}
@@ -16070,6 +16086,7 @@
 {"uk": "Створіть магазин", "en": "Create a shop", "de": "Shop anlegen"}
 {"uk": "Стежимо", "en": "Watching", "de": "Beobachten"}
 {"uk": "Стекап", "en": "Stack-up", "de": "Lagenaufbau"}
+{"uk": "Стенд", "en": "Stand", "de": "Stand"}
 {"uk": "Стиль, мова, на чому наголошувати — напр. «Відповідай німецькою, коротко, суми в EUR». Minerva AI (WebChat, вікно 🏛️, Telegram, ранковий брифінг) додає це до своїх правил як побажання користувача: правил, ролі в AI й доступу до даних воно не змінює. До 2000 символів.", "en": "Style, language, what to emphasize — e.g. “Answer in German, briefly, amounts in EUR”. Minerva AI (WebChat, the 🏛️ window, Telegram, the morning briefing) adds this to its rules as the user’s preference: it does not change the rules, the AI role or access to data. Up to 2000 characters.", "de": "Stil, Sprache, Schwerpunkte — z. B. „Antworten Sie auf Deutsch, kurz, Beträge in EUR“. Minerva AI (WebChat, Fenster 🏛️, Telegram, Morgenbriefing) fügt dies ihren Regeln als Wunsch des Benutzers hinzu: Regeln, KI-Rolle und Datenzugriff ändert es nicht. Bis zu 2000 Zeichen."}
 {"uk": "Стисло (4-6 параграфів), практично, без зайвої теорії. Markdown дозволено.", "en": "Concise (4-6 paragraphs), practical, without unnecessary theory. Markdown allowed.", "de": "Kurz gefasst (4–6 Absätze), praxisnah, ohne überflüssige Theorie. Markdown ist erlaubt."}
 {"uk": "Сторона", "en": "Party", "de": "Beteiligter"}
@@ -17454,6 +17471,7 @@
 {"uk": "Фактично сплачено", "en": "Actually paid", "de": "Tatsächlich bezahlt"}
 {"uk": "Фактично є зараз, шт", "en": "Actually on hand now, pcs", "de": "Jetzt tatsächlich vorhanden, Stk"}
 {"uk": "Фактичної упаковки", "en": "Of the actual packaging", "de": "Der tatsächlichen Verpackung"}
+{"uk": "Флаєр", "en": "Flyer", "de": "Flyer"}
 {"uk": "Флаєр / каталог", "en": "Flyer / catalogue", "de": "Flyer / Katalog"}
 {"uk": "Фон картки (--bg-card)", "en": "Card background (--bg-card)", "de": "Kartenhintergrund (--bg-card)"}
 {"uk": "Фон картки-2 (--bg-card-2)", "en": "Card background 2 (--bg-card-2)", "de": "Kartenhintergrund 2 (--bg-card-2)"}
@@ -17489,6 +17507,7 @@
 {"uk": "Фото {0}", "en": "Photo {0}", "de": "Foto {0}"}
 {"uk": "Фото артикулів", "en": "Product photos", "de": "Artikelfotos"}
 {"uk": "Фото артикулів на етикетці замовлення", "en": "SKU photos on the order label", "de": "Artikelfotos auf dem Auftragsetikett"}
+{"uk": "Фото в групі", "en": "Photos in the group", "de": "Fotos in der Gruppe"}
 {"uk": "Фото видалено", "en": "Photo deleted", "de": "Foto gelöscht"}
 {"uk": "Фото з камери", "en": "Photo from camera", "de": "Foto mit Kamera"}
 {"uk": "Фото з картки лістингу Minerva — на DigiKey його ще не бачили", "en": "Photo from the Minerva listing card — DigiKey has not seen it yet", "de": "Foto aus der Minerva-Listing-Karte — DigiKey hat es noch nicht gesehen"}
@@ -17511,6 +17530,7 @@
 {"uk": "Фото немає", "en": "No photo", "de": "Kein Foto"}
 {"uk": "Фото понад 15 МБ або не картинка.", "en": "Photo over 15 MB or not an image.", "de": "Foto über 15 MB oder kein Bild."}
 {"uk": "Фото понад 15 МБ.", "en": "Photo over 15 MB.", "de": "Foto über 15 MB."}
+{"uk": "Фото прибрано", "en": "Photo removed", "de": "Foto entfernt"}
 {"uk": "Фото товару", "en": "Product photo", "de": "Artikelfoto"}
 {"uk": "Фото товарів у Telegram", "en": "Product photos in Telegram", "de": "Artikelfotos in Telegram"}
 {"uk": "Фото — мініатюра з посиланням, даташит — «📄 відкрити»; під ними адреса (media.html). Лише http(s).", "en": "Photo — a thumbnail with a link, datasheet — “📄 open”; the address is below them (media.html). http(s) only.", "de": "Foto — Vorschaubild mit Link, Datenblatt — „📄 öffnen“; darunter die Adresse (media.html). Nur http(s)."}
@@ -18227,6 +18247,8 @@
 {"uk": "Ще зарано — до наступної перевірки {0} хв.", "en": "Too early — {0} min until the next check.", "de": "Noch zu früh — bis zur nächsten Prüfung {0} Min."}
 {"uk": "Ще зарано: наступне оновлення через {0} хв (інтервал: {1} хв)", "en": "Too early: next update in {0} min (interval: {1} min)", "de": "Noch zu früh: nächste Aktualisierung in {0} Min. (Intervall: {1} Min.)"}
 {"uk": "Ще зв’язків: {0}", "en": "{0} more relations", "de": "Weitere Verknüpfungen: {0}"}
+{"uk": "Ще люди з цієї фірми", "en": "More people from this company", "de": "Weitere Personen dieser Firma"}
+{"uk": "Ще люди з інших візиток групи", "en": "More people from the other cards in the group", "de": "Weitere Personen von den anderen Karten der Gruppe"}
 {"uk": "Ще на перевірці: {0}", "en": "Still under review: {0}", "de": "Noch in Prüfung: {0}"}
 {"uk": "Ще не було запусків. Створіть профіль і натисніть ▶ Запустити зараз.", "en": "There have been no runs yet. Create a profile and click ▶ Run now.", "de": "Es gab noch keine Läufe. Erstellen Sie ein Profil und klicken Sie auf ▶ Jetzt starten."}
 {"uk": "Ще не в жодній посилці: {0}", "en": "Not in any parcel yet: {0}", "de": "Noch in keinem Paket: {0}"}
@@ -18281,6 +18303,9 @@
 {"uk": "Ще рано (остання синхронізація {0} хв тому, інтервал {1} хв). Наступна через ~{2} хв.", "en": "Too early (last sync {0} min ago, interval {1} min). Next in ~{2} min.", "de": "Noch zu früh (letzte Synchronisierung vor {0} Min., Intervall {1} Min.). Nächste in ca. {2} Min."}
 {"uk": "Ще рано — інтервал перевірки не минув.", "en": "Too early — the check interval has not passed.", "de": "Zu früh — das Prüfintervall ist noch nicht abgelaufen."}
 {"uk": "Ще розділи", "en": "More sections", "de": "Weitere Bereiche"}
+{"uk": "Ще фото до візитки", "en": "Extra photo for a business card", "de": "Zusatzfoto zur Visitenkarte"}
+{"uk": "Ще фото до візиток", "en": "Extra photos for business cards", "de": "Zusatzfotos zu Visitenkarten"}
+{"uk": "Ще фото цієї групи ({0})", "en": "More photos in this group ({0})", "de": "Weitere Fotos dieser Gruppe ({0})"}
 {"uk": "Ще хтось", "en": "Someone else", "de": "Weitere Person"}
 {"uk": "Що", "en": "What", "de": "Was"}
 {"uk": "Що Minerva востаннє отримала від ЄЦБ: дата й курси.", "en": "What Minerva last received from the ECB: date and rates.", "de": "Was Minerva zuletzt von der EZB erhalten hat: Datum und Kurse."}
@@ -18370,6 +18395,7 @@
 {"uk": "Що можна", "en": "What is allowed", "de": "Was erlaubt ist"}
 {"uk": "Що можна в адмінці", "en": "What you can do in the admin", "de": "Was im Admin-Bereich möglich ist"}
 {"uk": "Що можна зробити", "en": "What you can do", "de": "Was Sie tun können"}
+{"uk": "Що на фото", "en": "What is in the photo", "de": "Was ist auf dem Foto"}
 {"uk": "Що на цій сторінці й що тут можна зробити?", "en": "What is on this page and what can be done here?", "de": "Was ist auf dieser Seite und was kann man hier tun?"}
 {"uk": "Що надсилати", "en": "What to send", "de": "Was gesendet werden soll"}
 {"uk": "Що надсилає бот", "en": "What the bot sends", "de": "Was der Bot sendet"}

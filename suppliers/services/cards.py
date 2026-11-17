@@ -227,6 +227,12 @@ def mail_text(m, link="") -> str:
             ("Категорії", ", ".join(c.name for c in i["cats"])),
             ("Наші примітки", m.note), ("Позначки", m.marks_text())]
     body = [head, ""] + [f"{k}: {v}" for k, v in rows if v]
+    from suppliers.services import card_photos
+    people = card_photos.people(m)
+    if people:                                   # люди з інших візиток групи
+        body += ["", "Ще люди з цієї фірми:"] + ["  • " + " — ".join(x for x in (
+            p["name"], p["position"], p["email"], ", ".join(y for y in (p["phone"], p["mobile"]) if y)) if x)
+            for p in people]
     if link:
         body += ["", f"У Minerva: {link}"]
     return "\n".join(body)
@@ -256,11 +262,10 @@ def share_many(ms, user, links=None):
     links = links or {}
     many = len(ms) > 1
     items, used, skipped = [], 0, 0
+    from suppliers.services import card_photos
     for m in ms:
         stem = file_stem(m) + (f"-{m.pk}" if many else "")
-        for f, side in ((m.image, ""), (m.image_back, "-back")):
-            if not f:
-                continue
+        for f, side in card_photos.files(m):
             try:
                 with f.open("rb") as fh:
                     data = fh.read()
@@ -336,12 +341,12 @@ def customer_matches(data, limit=5) -> list:
 
 def _copy_photos(m, customer) -> list:
     """Фото візитки → media/customers/<pk>/ («📎 Документи» клієнта); уже скопійоване — не вдруге."""
+    from suppliers.services import card_photos
     folder = os.path.join(str(settings.MEDIA_ROOT), "customers", str(customer.pk))
     os.makedirs(folder, exist_ok=True)
     out = []
-    for f, side in ((m.image, ""), (m.image_back, "-зворот")):
-        if not f:
-            continue
+    for f, side in card_photos.files(m):
+        side = {"-back": "-зворот"}.get(side, side)
         ext = os.path.splitext(f.name)[1].lower() or ".jpg"
         name = f"Візитка-{m.pk}{side}{ext}"
         dest = os.path.join(folder, name)
@@ -507,7 +512,11 @@ def create(user, image, back=None, *, kind="card", title="", event="", note="", 
 # ── 🗑 Видалити ──
 
 def delete(m):
-    """Фото обох боків, оригінали до правок і саму візитку; постачальник / клієнт CRM, створені з неї, лишаються."""
+    """Фото обох боків, ще фото групи, оригінали до правок і саму візитку; постачальник / клієнт CRM, створені з
+    неї, лишаються."""
+    from suppliers.services import card_photos
+    for p in list(m.photos.all()):
+        card_photos.remove(p)
     for f in (m.image, m.image_back, m.image_original, m.image_back_original):
         if f:
             f.delete(save=False)
@@ -551,6 +560,8 @@ def attach(m, supplier, user=None) -> list:
         SupplierEvent.objects.create(supplier=supplier, kind=SupplierEvent.CARD, media=m, user=user,
                                      text=f"{m.get_kind_display()} додано" + (f" · {m.event}" if m.event else ""))
     draft.add_contact(supplier, d, source="card", user=user, media=m)
+    from suppliers.services import card_photos
+    card_photos.add_people(supplier, m, user)          # 👥 люди з інших візиток групи
     filled = draft.fill_empty(supplier, d, user=user, why="з візитки")
     cats = list(m.categories.all())
     if cats:
@@ -603,6 +614,8 @@ def to_suppliers(ms, user, can_add=True, can_change=True) -> dict:
         SupplierMedia.objects.filter(pk=m.pk).update(state=SupplierMedia.APPLIED, supplier=s,
                                                      role=SupplierMedia.R_SUPPLIER, role_ai=False)
         m.supplier, m.role = s, SupplierMedia.R_SUPPLIER
+        from suppliers.services import card_photos
+        card_photos.add_people(s, m, user)              # 👥 люди з інших візиток групи
         out["created"].append((m, s))
         idx = match.Index()                 # наступна візитка тієї самої фірми — уже до нього, без дубля
     return out

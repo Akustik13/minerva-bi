@@ -179,7 +179,7 @@ class AITests(Base):
                              "contact": {"name": "Tom", "email": "tom@cable-tech.de"}, "categories": ["Виробники плат"]})
         with mock.patch.object(ai, "call", return_value=(answer, Decimal("0.004"))) as call:
             data = ai.card(m, user=self.user)
-        self.assertEqual(call.call_args.args[1][0]["type"], "image")
+        self.assertEqual([b["type"] for b in call.call_args.args[1][:2]], ["text", "image"])   # підпис і фото
         m.refresh_from_db()
         self.assertEqual((m.state, data["name"], m.extracted["contact_email"]),
                          (SupplierMedia.READ, "Cable Tech GmbH", "tom@cable-tech.de"))

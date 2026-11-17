@@ -56,10 +56,17 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
+ * Що зняти для вже наявного знімка (з вікна приміток): slot — front / back (🔄 перезняти, дознімати зворотний),
+ * extra (📎 ще фото: друга візитка, флаєр…) або extra:<uuid> (перезняти ще фото); returnTab — куди повернутись.
+ */
+data class ShotTarget(val uuid: String, val slot: String, val kind: String = "card", val returnTab: Int = R.id.nav_capture)
+
+/**
  * 📷 Знімати: камера на весь екран з рамкою, велика кнопка (і кнопка гучності), лицьовий → зворотний бік → вікно
  * приміток. Режими над кнопкою: 🪪 Візитка · 📄 Флаєр · 🔳 QR · 📷 Фото. 📐 «по краях» — візитку / флаєр сам
  * знаходить у кадрі (зелений контур), обрізає по краях і вирівнює перспективу, не знайшов — обрізає по рамці;
- * утримати 📐 — скан Google. QR на візитці бачить ще в видошукачі. 🖼 — з галереї.
+ * утримати 📐 — скан Google. QR на візитці бачить ще в видошукачі. 🖼 — з галереї. Знімок для наявного (ShotTarget) —
+ * одне фото, далі знову вікно приміток цього знімка.
  */
 class CaptureFragment : Fragment() {
     private var _b: FragmentCaptureBinding? = null
@@ -78,6 +85,9 @@ class CaptureFragment : Fragment() {
     private var busy = false
     private var pendingReview: (() -> Unit)? = null
     private val queueListener: () -> Unit = { queueChip() }
+    private var target: ShotTarget? = null
+    private var savedFrame: String? = null
+    private var returnTab: Int? = null
 
     companion object {
         /** Знайдене займає ≥ 22 % ділянки пошуку (≈ третина рамки): менше — це логотип / QR на візитці, не вона. */
@@ -117,8 +127,13 @@ class CaptureFragment : Fragment() {
             hint("📷 Зворотний бік: наведіть рамку й натисніть ⭕")
         }
         b.btnDone.setOnClickListener { front?.let { review(it, frontAlt, null, null, frontQr, "") } }
-        b.frontThumb.setOnClickListener {
+        b.frontBox.setOnClickListener {
             requireContext().confirm("Зняти знову?", "Цей знімок лицьового боку прибрати й зняти заново.", "🔄 Знову") { resetShot(true) }
+        }
+        b.btnTargetCancel.setOnClickListener {
+            val t = target ?: return@setOnClickListener
+            endTarget()
+            openReview(t.uuid)
         }
         b.chipPreset.setOnClickListener {
             Dialogs.choosePreset(requireContext(), viewLifecycleOwner.lifecycleScope) {
@@ -151,7 +166,12 @@ class CaptureFragment : Fragment() {
         b.bottomPanel.addOnLayoutChangeListener(insets)
         childFragmentManager.setFragmentResultListener("review", viewLifecycleOwner) { _, r ->
             resetShot(false)
-            if (r.getString("action") == "save") (activity as? MainActivity)?.select(R.id.nav_queue)
+            val back = returnTab
+            returnTab = null
+            when {
+                back != null && back != R.id.nav_capture -> (activity as? MainActivity)?.select(back)
+                r.getString("action") == "save" -> (activity as? MainActivity)?.select(R.id.nav_queue)
+            }
         }
         CaptureStore.listen(queueListener)
         chips()
@@ -236,6 +256,88 @@ class CaptureFragment : Fragment() {
         if (front == null && !bb.backStrip.isShown) idleHint()
     }
 
+    // ---------------------------------------------------------------- знімок для наявного (ShotTarget)
+
+    private fun frameFor(t: ShotTarget, c: Capture) = when {
+        t.slot == "front" || t.slot == "back" -> frameForKind(c.kind)
+        t.kind == "card" -> "card"
+        t.kind == "flyer" || t.kind == "catalog" -> "flyer"
+        else -> "free"
+    }
+
+    private fun targetLabel(t: ShotTarget, c: Capture): String {
+        val meta = Prefs.meta()
+        val name = c.card?.company?.ifEmpty { null } ?: c.event.ifEmpty { meta.kindLabel(c.kind) }
+        return when {
+            t.slot == "back" && !c.hasBack -> "↩ Зворотний бік · $name"
+            t.slot == "back" -> "🔄 Зворотний бік знову · $name"
+            t.slot == "front" -> "🔄 Лицьовий бік знову · $name"
+            t.slot.startsWith("extra:") -> "🔄 ${meta.photoKindLabel(t.kind)} знову · $name"
+            else -> "📎 ${meta.photoKindLabel(t.kind)} · $name"
+        }
+    }
+
+    /** Зняти одне фото для наявного знімка (з вікна приміток) — і назад у це вікно. */
+    fun shootFor(t: ShotTarget) {
+        val bb = _b ?: return
+        val c = CaptureStore.get(t.uuid) ?: return
+        front?.let { f ->                     // лицьовий бік, знятий щойно, не губиться — чернеткою
+            CaptureStore.newDraft(f.absolutePath, "", frontAlt?.absolutePath.orEmpty(), "", frontQr, "")
+            context?.toast("✏️ Щойно знятий лицьовий бік — у «📤 Мої знімки» чернеткою")
+            front = null; frontAlt = null; frontQr = ""
+        }
+        if (savedFrame == null) savedFrame = Prefs.frame
+        target = t
+        // вікно відкрили з картки / «Мої знімки» — повертатись туди, навіть якщо знімати пішли вже з камери
+        if (t.returnTab != R.id.nav_capture || returnTab == null) returnTab = t.returnTab
+        Prefs.frame = frameFor(t, c)
+        clearQuad()
+        bb.backStrip.show(false)
+        bb.modes.visibility = View.INVISIBLE
+        bb.targetText.text = targetLabel(t, c)
+        bb.targetStrip.show(true)
+        chips()
+    }
+
+    private fun endTarget() {
+        target = null
+        savedFrame?.let { Prefs.frame = it }
+        savedFrame = null
+        _b?.targetStrip?.show(false)
+        _b?.modes?.visibility = View.VISIBLE
+        clearQuad()
+        chips()
+    }
+
+    private fun applyTarget(file: File, alt: File?, qr: String) {
+        val t = target ?: return
+        if (CaptureStore.get(t.uuid) == null) {            // знімок тим часом прибрали
+            file.delete(); alt?.delete(); endTarget(); return
+        }
+        when {
+            t.slot == "front" || t.slot == "back" ->
+                CaptureEdit.setSide(t.uuid, t.slot, file.absolutePath, qr, alt?.absolutePath.orEmpty())
+            t.slot.startsWith("extra:") -> {
+                alt?.delete(); CaptureEdit.replaceExtra(t.uuid, t.slot.removePrefix("extra:"), file.absolutePath, qr)
+            }
+            else -> { alt?.delete(); CaptureEdit.addExtra(t.uuid, file.absolutePath, t.kind, qr) }
+        }
+        endTarget()
+        openReview(t.uuid)
+    }
+
+    /** Вікно приміток знімка (чернетка чи правка); returnTab — куди повернутись після «Зберегти» / «Закрити». */
+    fun openReview(uuid: String, returnTab: Int? = null) {
+        if (returnTab != null) this.returnTab = returnTab
+        if (_b == null) return
+        if (childFragmentManager.isStateSaved) {           // повернулись зі сканера, а екран ще не відновився
+            pendingReview = { openReview(uuid) }
+            return
+        }
+        if (childFragmentManager.findFragmentByTag("review") != null) return
+        ReviewSheet.forEdit(uuid).show(childFragmentManager, "review")
+    }
+
     private fun styleMode(v: TextView, on: Boolean) {
         if (on) v.setBackgroundResource(R.drawable.mode_on) else v.background = null
         v.setTextColor(if (on) 0xFF101820.toInt() else 0xFFFFFFFF.toInt())
@@ -244,6 +346,7 @@ class CaptureFragment : Fragment() {
     }
 
     private fun idleHint() {
+        if (target != null) { hint("⭕ — зняти · 🖼 — з галереї"); return }
         hint(when {
             Prefs.frame == "qr" -> "🔳 Наведіть на QR-код — фото буде всього кадру"
             Prefs.frame == "free" -> "📷 Знімаю весь кадр"
@@ -448,7 +551,7 @@ class CaptureFragment : Fragment() {
             _b?.shutter?.animate()?.scaleX(1f)?.scaleY(1f)?.setDuration(90)
         }
         hint("⏳ Знімаю…")
-        val side = if (front == null) "front" else "back"
+        val side = if (target != null) "extra" else if (front == null) "front" else "back"
         val raw = File(requireContext().cacheDir, "raw-${System.currentTimeMillis()}.jpg")
         val frame = bb.overlay.frame()
         val vw = bb.preview.width
@@ -517,6 +620,7 @@ class CaptureFragment : Fragment() {
 
     private fun shot(file: File, alt: File?, qr: String) {
         val bb = _b ?: return
+        if (target != null) { applyTarget(file, alt, qr); return }
         val f = front
         if (f == null) {
             front = file
@@ -534,17 +638,15 @@ class CaptureFragment : Fragment() {
         }
     }
 
+    /** Знято (лицьовий і, може, зворотний бік) → чернетка в «📤 Мої знімки» (не загубиться) → вікно приміток. */
     private fun review(f: File, fAlt: File?, back: File?, bAlt: File?, qrF: String, qrB: String) {
         val bb = _b ?: return
-        if (childFragmentManager.isStateSaved) {           // повернулись зі сканера, а екран ще не відновився
-            pendingReview = { review(f, fAlt, back, bAlt, qrF, qrB) }
-            return
-        }
+        val c = CaptureStore.newDraft(f.absolutePath, back?.absolutePath.orEmpty(), fAlt?.absolutePath.orEmpty(),
+            bAlt?.absolutePath.orEmpty(), qrF, qrB)
+        front = null; frontAlt = null; frontQr = ""
         bb.backStrip.show(false)
         bb.modes.visibility = View.VISIBLE
-        if (childFragmentManager.findFragmentByTag("review") != null) return
-        ReviewSheet.forNew(f.absolutePath, back?.absolutePath.orEmpty(), qrF, qrB,
-            fAlt?.absolutePath.orEmpty(), bAlt?.absolutePath.orEmpty()).show(childFragmentManager, "review")
+        openReview(c.uuid)
     }
 
     private fun resetShot(deleteFront: Boolean) {
@@ -560,7 +662,7 @@ class CaptureFragment : Fragment() {
     private fun importUri(uri: Uri) {
         val ctx = context ?: return
         viewLifecycleOwner.lifecycleScope.launch {
-            val side = if (front == null) "front" else "back"
+            val side = if (target != null) "extra" else if (front == null) "front" else "back"
             val out = CaptureStore.newFile(side)
             val qr = withContext(Dispatchers.IO) {
                 val bmp = runCatching { ImageUtils.fromUri(ctx, uri, out, Prefs.maxPx) }.getOrNull()
@@ -616,6 +718,11 @@ class CaptureFragment : Fragment() {
             }
             if (files.isEmpty()) {
                 ctx.alert("Скан не вдалося прочитати", "Сторінку зі сканера не відкрито: $error. Сфотографуйте ⭕ з 📐 «по краях».")
+                return@launch
+            }
+            if (target != null) {                          // знімок для наявного — лише перша сторінка
+                files.drop(1).forEach { it.first.delete() }
+                shot(files[0].first, null, files[0].second)
                 return@launch
             }
             resetShot(true)

@@ -149,6 +149,35 @@ class SupplierMedia(models.Model):
         return " ".join(names[m] for m in (self.marks or []) if m in names)
 
 
+class SupplierMediaPhoto(models.Model):
+    """📎 Ще фото до тієї самої візитки (група): друга візитка тієї самої фірми (інша людина), флаєр, каталог,
+    продукт, стенд — AI читає їх разом з візиткою (suppliers/services/card_photos.py, ai.card)."""
+    CARD, FLYER, CATALOG, PRODUCT, STAND, OTHER = "card", "flyer", "catalog", "product", "stand", "other"
+    KINDS = [(CARD, "🪪 Ще візитка"), (FLYER, "📄 Флаєр"), (CATALOG, "📚 Каталог / прайс"),
+             (PRODUCT, "📦 Продукт / зразок"), (STAND, "🎪 Стенд"), (OTHER, "📷 Інше")]
+
+    media = models.ForeignKey(SupplierMedia, on_delete=models.CASCADE, related_name="photos",
+                              verbose_name="Візитка / флаєр")
+    kind = models.CharField("Що це", max_length=8, choices=KINDS, default=CARD)
+    image = models.FileField("Фото", upload_to=_media_path)
+    note = models.CharField("Підпис", max_length=300, blank=True, default="")
+    qr_text = models.TextField("QR-код", blank=True, default="")
+    order = models.PositiveIntegerField(default=0)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="+")
+    created_at = models.DateTimeField("Додано", default=timezone.now)
+    # 📱 id фото на телефоні — повтор після обриву зв'язку не додає другого
+    client_uuid = models.CharField("ID фото в додатку", max_length=40, blank=True, default="", db_index=True)
+
+    class Meta:
+        ordering = ["order", "pk"]
+        verbose_name = "Ще фото до візитки"
+        verbose_name_plural = "Ще фото до візиток"
+
+    def __str__(self):
+        return self.get_kind_display()
+
+
 class SupplierCardPreset(models.Model):
     """📌 Пресет візиток: «electronica 2026, хол B3» — що підставити в кожне нове фото (де взяли, вид, позначки,
     примітка, категорії, AI). Свій або спільний для всіх (колеги на тій самій виставці); за замовчуванням —
