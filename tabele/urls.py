@@ -61,6 +61,7 @@ urlpatterns = [
     # ─────────────────────────────────────────────────────────────────────────
     path("", root_views.landing_view, name="landing"),
     path("contact/", root_views.contact_view, name="contact"),
+    path("privacy/", root_views.privacy_view, name="privacy"),   # публічна: її вимагає застосунок Google OAuth
     path("theme-profiles/", theme_profiles_list, name="theme_profiles_list"),
     path("theme-profiles/<str:name>/", theme_profiles_load, name="theme_profiles_load"),
     path("register/",         root_views.register_view,         name="register"),

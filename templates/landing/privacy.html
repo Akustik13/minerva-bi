@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Privacy · Minerva · {{ company_name }}</title>
+<style>
+:root { --bg:#f6f4ee; --fg:#1d1b16; --muted:#5b564a; --line:#ddd6c4; --accent:#7a5a0e; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#0d1117; --fg:#efe8d4; --muted:#b3ab95; --line:#2c2a24; --accent:#e0c27a; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width:760px; margin:0 auto; padding:32px 16px 64px; }
+h1 { font-size:1.6rem; margin:0 0 4px; }
+h2 { font-size:1.15rem; margin:28px 0 6px; color:var(--accent); }
+p, li { margin:6px 0; }
+ul { padding-left:20px; }
+.meta { color:var(--muted); font-size:.9rem; }
+hr { border:0; border-top:1px solid var(--line); margin:40px 0; }
+a { color:var(--accent); }
+nav { font-size:.9rem; margin-bottom:24px; }
+</style>
+</head>
+<body>
+<main>
+<nav><a href="#en">English</a> · <a href="#de">Deutsch</a></nav>
+
+<section id="en" lang="en">
+<h1>Privacy notice — Minerva</h1>
+<p class="meta">Operator: {{ company_name }}{% if company_email %} · <a href="mailto:{{ company_email }}">{{ company_email }}</a>{% endif %} · Last updated {{ updated }}</p>
+
+<p>Minerva is the internal business system of {{ company_name }}. It runs on the company's own server and is used
+only by the company's employees. This notice describes what Minerva does with data from Google Calendar and
+Microsoft Outlook calendars that an employee connects in Minerva («Calendars»).</p>
+
+<h2>What Minerva accesses</h2>
+<ul>
+<li>Google: your e-mail address (to show which account is connected) and your calendars and events
+(scope <code>https://www.googleapis.com/auth/calendar</code>).</li>
+<li>Microsoft: your basic profile and your calendars and events (<code>User.Read</code>, <code>Calendars.ReadWrite</code>,
+<code>offline_access</code>).</li>
+</ul>
+
+<h2>How the data is used</h2>
+<ul>
+<li>To show your events in the Minerva calendar.</li>
+<li>To copy events between Minerva, Google and Outlook according to rules that you create yourself
+(“from → to”), and to add an event to your calendar when you choose to (for example a deadline found in an
+e-mail). Minerva changes or deletes only events it created itself.</li>
+<li>For Minerva features you start yourself, for example recording working time for a meeting. If you explicitly
+use an AI feature, the event titles needed for that request may be processed by the AI service the company uses
+for Minerva, only to answer that request.</li>
+</ul>
+<p>Data from Google and Microsoft is not sold, not used for advertising and not passed on to third parties beyond
+what is described above. Minerva's use of information received from Google APIs adheres to the
+<a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google API Services User
+Data Policy</a>, including the Limited Use requirements.</p>
+
+<h2>Storage</h2>
+<ul>
+<li>Access tokens and the events Minerva shows are stored only on the company's Minerva server.</li>
+<li>Events are refreshed regularly; events that disappear from your calendar are removed from Minerva's copy.</li>
+</ul>
+
+<h2>Disconnecting</h2>
+<p>You can disconnect an account at any time in Minerva («Calendars» → disconnect). Minerva then deletes its access
+tokens, the list of your calendars and the rules for that account; copies that were already created remain where
+they are. You can also revoke access in your
+<a href="https://myaccount.google.com/permissions" rel="noopener">Google account</a> or
+<a href="https://account.live.com/consent/Manage" rel="noopener">Microsoft account</a>.</p>
+
+<h2>Contact</h2>
+<p>Questions about this notice: {{ company_name }}{% if company_email %},
+<a href="mailto:{{ company_email }}">{{ company_email }}</a>{% endif %}.</p>
+</section>
+
+<hr>
+
+<section id="de" lang="de">
+<h1>Datenschutzhinweis — Minerva</h1>
+<p class="meta">Betreiber: {{ company_name }}{% if company_email %} · <a href="mailto:{{ company_email }}">{{ company_email }}</a>{% endif %} · Stand {{ updated }}</p>
+
+<p>Minerva ist das interne Geschäftssystem von {{ company_name }}. Es läuft auf dem eigenen Server des
+Unternehmens und wird nur von dessen Mitarbeitenden genutzt. Dieser Hinweis beschreibt, was Minerva mit Daten aus
+Google Kalender und Microsoft-Outlook-Kalendern macht, die Mitarbeitende in Minerva verbinden («Kalender»).</p>
+
+<h2>Worauf Minerva zugreift</h2>
+<ul>
+<li>Google: Ihre E-Mail-Adresse (um das verbundene Konto anzuzeigen) sowie Ihre Kalender und Termine
+(Bereich <code>https://www.googleapis.com/auth/calendar</code>).</li>
+<li>Microsoft: Ihr Basisprofil sowie Ihre Kalender und Termine (<code>User.Read</code>, <code>Calendars.ReadWrite</code>,
+<code>offline_access</code>).</li>
+</ul>
+
+<h2>Wofür die Daten genutzt werden</h2>
+<ul>
+<li>Um Ihre Termine im Minerva-Kalender anzuzeigen.</li>
+<li>Um Termine zwischen Minerva, Google und Outlook nach Regeln zu kopieren, die Sie selbst anlegen
+(„von → nach“), und um einen Termin in Ihren Kalender einzutragen, wenn Sie das wählen (z. B. eine Frist aus einer
+E-Mail). Minerva ändert oder löscht nur Termine, die es selbst erstellt hat.</li>
+<li>Für Minerva-Funktionen, die Sie selbst starten, z. B. die Erfassung von Arbeitszeit für einen Termin. Wenn Sie
+ausdrücklich eine KI-Funktion nutzen, können die dafür nötigen Terminbezeichnungen von dem KI-Dienst verarbeitet
+werden, den das Unternehmen für Minerva nutzt — nur zur Beantwortung dieser Anfrage.</li>
+</ul>
+<p>Daten von Google und Microsoft werden nicht verkauft, nicht für Werbung genutzt und nicht über das Beschriebene
+hinaus an Dritte weitergegeben. Die Nutzung von Informationen aus Google-APIs durch Minerva entspricht der
+<a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google API Services User
+Data Policy</a>, einschließlich der Limited-Use-Anforderungen.</p>
+
+<h2>Speicherung</h2>
+<ul>
+<li>Zugriffstoken und die von Minerva angezeigten Termine werden nur auf dem Minerva-Server des Unternehmens
+gespeichert.</li>
+<li>Termine werden regelmäßig aktualisiert; Termine, die aus Ihrem Kalender verschwinden, werden aus der Kopie in
+Minerva entfernt.</li>
+</ul>
+
+<h2>Verbindung trennen</h2>
+<p>Sie können ein Konto jederzeit in Minerva trennen («Kalender» → trennen). Minerva löscht dann seine Zugriffstoken,
+die Liste Ihrer Kalender und die Regeln für dieses Konto; bereits erstellte Kopien bleiben, wo sie sind. Den Zugriff
+können Sie auch in Ihrem <a href="https://myaccount.google.com/permissions" rel="noopener">Google-Konto</a> oder
+<a href="https://account.live.com/consent/Manage" rel="noopener">Microsoft-Konto</a> widerrufen.</p>
+
+<h2>Kontakt</h2>
+<p>Fragen zu diesem Hinweis: {{ company_name }}{% if company_email %},
+<a href="mailto:{{ company_email }}">{{ company_email }}</a>{% endif %}.</p>
+</section>
+</main>
+</body>
+</html>

@@ -11,6 +11,7 @@ EXEMPT_PREFIXES = [
     "/favicon.ico",
     "/api/",
     "/api-auth/",
+    "/privacy/",   # публічна сторінка конфіденційності (застосунок Google OAuth)
 ]
 
 

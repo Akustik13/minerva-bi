@@ -12,6 +12,21 @@ from django.views.decorators.http import require_http_methods
 logger = logging.getLogger(__name__)
 
 
+@require_http_methods(["GET", "HEAD"])
+def privacy_view(request):
+    """Публічна сторінка конфіденційності цієї Minerva (/privacy/, без входу): що робиться з даними календарів
+    Google / Outlook, підключених у «🔗 Календарі». Її адреса — «Application privacy policy link» застосунку
+    Google OAuth (без неї Google не переводить застосунок у «In production»). Назва й адреса фірми —
+    SystemSettings."""
+    from config.models import SystemSettings
+    s = SystemSettings.get()
+    return render(request, 'landing/privacy.html', {
+        'company_name':  s.company_name,
+        'company_email': s.company_email,
+        'updated':       '17.11.2026',
+    })
+
+
 def landing_view(request):
     """
     Головна сторінка — лендінг Minerva.
