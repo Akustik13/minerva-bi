@@ -3,6 +3,62 @@
 
 {% block extrahead %}
 {{ block.super }}
+{% if ai_fill %}<link rel="stylesheet" href="/static/admin/css/mv_ai_fill.css?v=1"><script src="/static/admin/js/mv_ai_fill.js?v=3"></script>
+<script>
+/* 🤖 AI-заповнення картки товару (inventory/services/ai_fill.py): пропозиції → поля форми, параметри → таблиця
+   «Технічні атрибути», PDF / фото з панелі → поля файлів. Записує «Зберегти». */
+document.addEventListener('DOMContentLoaded', function () {
+  var cfgEl = document.getElementById('mvaf-config'), host = document.getElementById('mvaf-host');
+  if (!cfgEl || !host || !window.MVAiFill) return;
+  var cfg = {}; try { cfg = JSON.parse(cfgEl.textContent) || {}; } catch (e) { return; }
+  function field(k) { return document.getElementById('id_' + k) || document.querySelector('[name="' + k + '"]'); }
+  function attrsNow() {
+    var ta = document.querySelector('[name="tech_attributes"]');
+    try { return JSON.parse(ta && ta.value || '{}') || {}; } catch (e) { return {}; }
+  }
+  function attrKey(obj, name) {
+    return Object.keys(obj).filter(function (x) { return x.toLowerCase() === String(name).toLowerCase(); })[0];
+  }
+  function reveal(el) {                     // поле в згорнутій групі — розгорнути, щоб людина бачила
+    var d = el && el.closest('details'); if (d) d.open = true;
+    var fs = el && el.closest('fieldset.collapsed'); if (fs) fs.classList.remove('collapsed');
+  }
+  MVAiFill.mount(host, cfg, {
+    open: !cfg.product_id,
+    key: 'product:' + (cfg.product_id || 'new'),
+    read: function (k) { var el = field(k); return el ? el.value : ''; },
+    readAttr: function (k) { var a = attrsNow(), hit = attrKey(a, k); return hit ? a[hit] : ''; },
+    files: { pdf: 'Datasheet (PDF файл)', image: 'Зображення (файл)' },
+    canFile: function (k) {
+      var el = field(k === 'pdf' ? 'datasheet_file' : 'image');
+      return !!el && !(el.files && el.files.length) && !el.closest('.file-upload');
+    },
+    apply: function (out) {
+      var n = 0;
+      Object.keys(out.fields).forEach(function (k) {
+        var el = field(k);
+        if (MVAiFill.setValue(el, out.fields[k])) { reveal(el); n++; }
+      });
+      var names = Object.keys(out.attrs);
+      if (names.length && typeof _invAddRow === 'function' && _invATbody) {
+        names.forEach(function (name) {
+          var row = Array.prototype.filter.call(_invATbody.querySelectorAll('tr'), function (tr) {
+            var k = tr.querySelector('.inv-key-inp'); return k && k.value.trim().toLowerCase() === name.toLowerCase();
+          })[0];
+          if (row) row.querySelector('.inv-val-inp').value = out.attrs[name];
+          else _invAddRow(name, out.attrs[name]);
+          n++;
+        });
+        _invSync(); _invUpdateEmpty();
+        MVAiFill.mark(_invATbody.closest('.inv-attrs-wrap'));
+      }
+      if (out.files.pdf && MVAiFill.setFile(field('datasheet_file'), out.files.pdf)) { reveal(field('datasheet_file')); n++; }
+      if (out.files.image && MVAiFill.setFile(field('image'), out.files.image)) { reveal(field('image')); n++; }
+      return n;
+    }
+  });
+});
+</script>{% endif %}
 <style>
 /* Hide raw tech_attributes textarea, keep container visible */
 .field-tech_attributes > .flex-container,
@@ -719,6 +775,7 @@ document.addEventListener('DOMContentLoaded', function(e) {
 
 {% block form_top %}
 {{ block.super }}
+{% if ai_fill %}<div id="mvaf-host"></div>{{ ai_fill|json_script:"mvaf-config" }}{% endif %}
 {% if original %}{% include "admin/rag_assistant/entity_help.html" with eh_kind="product" eh_id=original.pk eh_review=True %}{% endif %}
 {% if product_report %}{% include "admin/inventory/product/_report_card.html" with pr=product_report %}{% endif %}
 {% endblock %}

@@ -2432,6 +2432,14 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         except Exception:
             extra_context['price_currency'] = 'EUR'
         extra_context['sku_check_url'] = reverse('admin:bots_digikeylisting_sku_check')
+        if self._ai_fill_can(request):          # «🤖 AI: заповнити з даташита…» (і після помилки форми)
+            from inventory.services.ai_fill import config as ai_fill_config
+            listing = DigiKeyListing.objects.filter(pk=object_id).select_related('product').first()                 if str(object_id or '').isdigit() else None
+            extra_context['ai_fill'] = dict(ai_fill_config(
+                'digikey', start_url=reverse('admin:bots_digikeylisting_ai_fill'),
+                status_url=reverse('admin:bots_digikeylisting_ai_fill_status', args=['JOB']),
+                product=listing.product if listing is not None and listing.product_id else None),
+                listing_id=listing.pk if listing is not None else None)
         if object_id:
             extra_context['publish_url'] = reverse(
                 'admin:bots_digikeylisting_publish', args=[object_id]
@@ -2565,8 +2573,14 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             return redirect(reverse("admin:bots_digikeylisting_change", args=[one.pk]))
         return redirect(reverse("admin:bots_digikeylisting_changelist"))
 
+    @staticmethod
+    def _ai_fill_can(request):
+        return (request.user.has_perm('bots.add_digikeylisting')
+                or request.user.has_perm('bots.change_digikeylisting'))
+
     def get_urls(self):
-        urls = super().get_urls()
+        from inventory.admin_ai_fill import urls as ai_fill_urls   # «🤖 AI: заповнити з даташита…»
+        urls = ai_fill_urls(self.admin_site, 'bots_digikeylisting', 'digikey', self._ai_fill_can) + super().get_urls()
         custom = [
             path('from-stock/',
                  self.admin_site.admin_view(self.from_stock_view),

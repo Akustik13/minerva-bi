@@ -324,16 +324,18 @@ def default_packaging() -> str:
     return common.most_common(1)[0][0] if common else DEFAULT_PACKAGING
 
 
-def autofill(product, rows, given=None) -> tuple:
+def autofill(product, rows, given=None, ai_sources=None) -> tuple:
     """(values {code: value}, sources {code: звідки}, missing [row + hint]) для шаблону rows.
-    given — {code: value}, які людина вже дописала (мають пріоритет)."""
+    given — {code: value}, які людина вже дописала (мають пріоритет); ai_sources — {code: звідки} для тих, що
+    вставив «🤖 AI: заповнити» (inventory/services/ai_fill.py) — показуються «🤖 AI · звідки»."""
     given = {k: _value_text(v) for k, v in (given or {}).items() if _value_text(v)}
+    ai_sources = ai_sources or {}
     stock = _stock_attrs(product)
     values, sources, missing = {}, {}, []
     for row in rows:
         code, value, source = row["code"], None, ""
         if code in given:
-            value, source = given[code], "вписано вручну"
+            value, source = given[code], ("🤖 AI · " + ai_sources[code] if code in ai_sources else "вписано вручну")
         elif code == "productLifecycleStatus":
             value, source = LIFECYCLE.get(product.lifecycle_status or "active", "Active"), "життєвий цикл товару"
         elif code == "packaging":
@@ -469,7 +471,7 @@ def parse_prices(text) -> list:
     return tiers_json(sorted(tiers.items()))
 
 
-def build_draft(product, given=None, overrides=None) -> dict:
+def build_draft(product, given=None, overrides=None, ai_sources=None) -> dict:
     """Чернетка картки DigiKey з товару складу: {fields, attrs, sources, missing, notes, category, rows}."""
     from bots.models import DigiKeyListing
     overrides = {k: v for k, v in (overrides or {}).items() if str(v or "").strip()}
@@ -505,7 +507,7 @@ def build_draft(product, given=None, overrides=None) -> dict:
     if price_note:
         notes.append(price_note)
     rows = template(cat["dk_category_id"])
-    values, sources, missing = autofill(product, rows, given)
+    values, sources, missing = autofill(product, rows, given, ai_sources)
     from bots.services.dk_media import target as media_target   # «🖼 Фото й даташити для DigiKey»
     image = media_target(product, "image", product.sku)
     datasheet = media_target(product, "datasheet", product.sku)

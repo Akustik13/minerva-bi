@@ -39,6 +39,20 @@ def _inputs(request, pk) -> tuple:
     return given, overrides
 
 
+def _ai_sources(request, pk, given) -> dict:
+    """{code: звідки} значень, які вставив «🤖 AI: заповнити» (приховане поле p<pk>-aisrc) — лише ті, що досі
+    в полях (людина могла їх змінити — тоді «вписано вручну»)."""
+    import json
+    try:
+        raw = json.loads(request.POST.get(f"p{pk}-aisrc") or "{}")
+    except ValueError:
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    return {str(c): " ".join(str(s.get("source") or "").split())[:200] or "AI" for c, s in raw.items()
+            if isinstance(s, dict) and c in given and str(s.get("value") or "").strip() == given[c]}
+
+
 def _picker(request, model_admin):
     from inventory.models import Product
     q = (request.GET.get("q") or "").strip()
@@ -53,8 +67,8 @@ def _picker(request, model_admin):
     })
 
 
-def _card(product, given, overrides):
-    draft = svc.build_draft(product, given, overrides)
+def _card(product, given, overrides, ai_sources=None):
+    draft = svc.build_draft(product, given, overrides, ai_sources)
     required = [m for m in draft["missing"] if m["required"]]
     optional = [m for m in draft["missing"] if not m["required"]]
     common = {"packaging": draft["fields"]["dk_packaging"],
@@ -66,8 +80,10 @@ def _card(product, given, overrides):
     todo = ([f"{len(required)} пол." if len(required) > 1 else required[0]["name"]] if required else []) + \
         (["категорія"] if not f["dk_category_id"] else []) + (["ціни"] if not f["dk_prices"] else [])
     listed_ids = {o["id"] for o in svc.category_choices()["ours"]}
+    now = {**{c: str(v) for c, v in draft["attrs"].items()}, "packaging": f["dk_packaging"],
+           "productLifecycleStatus": f["dk_lifecycle_status"]}
     return {"product": product, "draft": draft, "fields": f, "required": required, "optional": optional,
-            "filled": filled, "given": given, "ready": not todo, "todo": todo,
+            "filled": filled, "given": given, "ready": not todo, "todo": todo, "ai_now": now,
             "prices_text": overrides.get("dk_prices", ""), "cat_listed": f["dk_category_id"] in listed_ids}
 
 
@@ -132,7 +148,8 @@ def view(request, model_admin):
             listed.append({"product": product, "listing": listing, "roadmap": dk_publish.roadmap(listing)})
             continue
         given, overrides = _inputs(request, pk) if action == "preview" else ({}, {})
-        cards.append(_card(product, given, overrides))
+        cards.append(_card(product, given, overrides, _ai_sources(request, pk, given) if action == "preview" else None))
+        cards[-1]["aisrc"] = request.POST.get(f"p{pk}-aisrc", "") if action == "preview" else ""
     return TemplateResponse(request, "admin/bots/digikeylisting/from_stock.html", {
         **model_admin.admin_site.each_context(request), "opts": DigiKeyListing._meta,
         "title": "🔷 На DigiKey зі складу", "cards": cards, "listed": listed, "ids": ",".join(map(str, ids)),
@@ -140,7 +157,18 @@ def view(request, model_admin):
         "can_add": can_add,
         "title_max": svc.TITLE_MAX, "desc_max": svc.DESC_MAX, "mfr_max": svc.MANUFACTURER_MAX,
         "dk_currency": _dk_currency(),
+        "ai_fill": _ai_fill(request, model_admin) if cards and can_add else None,
+        "ai_now": {str(c["product"].pk): c["ai_now"] for c in cards},
+        "ai_ds": {str(c["product"].pk): bool(c["product"].datasheet_url or c["product"].datasheet_file)
+                  for c in cards},
     })
+
+
+def _ai_fill(request, model_admin):
+    """«🤖 AI: заповнити» для кожної картки (inventory/services/ai_fill.py, ціль digikey)."""
+    from inventory.services.ai_fill import config
+    return config("digikey", start_url=reverse("admin:bots_digikeylisting_ai_fill"),
+                  status_url=reverse("admin:bots_digikeylisting_ai_fill_status", args=["JOB"]))
 
 
 def _dk_currency():

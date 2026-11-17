@@ -2626,6 +2626,12 @@ class ProductAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
         from .admin_currency import card_config
         from .admin_prices import editor_config
         extra_context["bp_config"] = {**editor_config(), **card_config(object_id)}
+        if self._ai_fill_can(request):          # «🤖 AI: заповнити з даташита…» (і після помилки форми)
+            from .services.ai_fill import config as ai_fill_config
+            obj = Product.objects.filter(pk=object_id).first() if str(object_id or "").isdigit() else None
+            extra_context["ai_fill"] = ai_fill_config(
+                "product", start_url=reverse("admin:inventory_product_ai_fill"),
+                status_url=reverse("admin:inventory_product_ai_fill_status", args=["JOB"]), product=obj)
         if object_id:
             try:
                 from bots.models import DigiKeyListing
@@ -3459,7 +3465,13 @@ class ProductAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
                  name='inventory_product_dk_sync_cancel'),
         ]
         from .admin_weight import urls as weight_urls
-        return weight_urls(self.admin_site) + custom + urls
+        from .admin_ai_fill import urls as ai_fill_urls     # «🤖 AI: заповнити з даташита…» (services/ai_fill.py)
+        return (weight_urls(self.admin_site) + ai_fill_urls(self.admin_site, "inventory_product", "product",
+                                                            self._ai_fill_can) + custom + urls)
+
+    @staticmethod
+    def _ai_fill_can(request):
+        return request.user.has_perm("inventory.add_product") or request.user.has_perm("inventory.change_product")
 
     def _thumb_view(self, request, pk):
         from django.core.exceptions import PermissionDenied

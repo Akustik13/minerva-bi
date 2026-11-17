@@ -6,7 +6,7 @@ where: 🛒 DigiKey → Лістинги (підключення — 🛒 DigiKe
 urls: /admin/bots/digikeylisting/, /admin/bots/digikeylisting/add/, /admin/bots/digikeylisting/from-stock/, /admin/bots/digikeylisting/dk-diff/, /admin/bots/digikeylisting/lead-times/, /admin/bots/digikeyconfig/
 roles: адміністратор, менеджер
 keywords: DigiKey, Marketplace, лістинг, listing, що бачить DigiKey, звірка, не дійшло, строк відвантаження, lead time, leadTimeToShip, зі складу, обов'язкові поля, RoHS, етапи з DigiKey, офер, offer, Supplier SKU, опублікувати, staged, затвердження, стягнути з DigiKey, залишок на DigiKey, атрибути DigiKey, additionalFields, MOQ, Excel, OAuth
-related: digikey/prices, digikey/media, digikey/orders, inventory/products, shop/catalog-prices
+related: inventory/ai-fill, digikey/prices, digikey/media, digikey/orders, inventory/products, shop/catalog-prices
 ---
 
 ## Що це
@@ -100,6 +100,9 @@ DigiKey Marketplace — майданчик, де ваші товари прод�
 6. **«✓ Створити картки»** — лістинги створено (на DigiKey ще нічого не пішло); з галочкою **«🚀 одразу надіслати
    на DigiKey»** — ще й надіслано. Те, що ви вписали, Minerva запам'ятає в технічних атрибутах товару —
    наступного разу вже не питатиме.
+
+> 💡 Бракує параметрів чи опису — розгорніть у картці товару **«🤖 AI: заповнити…»**: AI прочитає даташит, знайде
+> категорію й параметри DigiKey і вставить їх (позначка «🤖 AI · звідки») — [AI заповнює картку](guide:inventory/ai-fill).
 
 > 💡 **«🔄 Запитати поля й категорії в DigiKey»** — Minerva запитує в DigiKey, які поля товару обов'язкові й які
 > значення допустимі (раз на добу це відбувається само), і каталог категорій (раз на тиждень). Каталог і параметри

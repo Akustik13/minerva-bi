@@ -4,7 +4,7 @@
 
 {% block title %}На DigiKey зі складу — Minerva{% endblock %}
 
-{% block extrastyle %}{{ block.super }}
+{% block extrastyle %}{{ block.super }}{% if ai_fill %}<link rel="stylesheet" href="/static/admin/css/mv_ai_fill.css?v=1"><script src="/static/admin/js/mv_ai_fill.js?v=3"></script>{% endif %}
 <style>
   .fs-wrap { max-width: 1100px; }
   .fs-box { margin: 0 0 14px; padding: 14px 18px; border: 1px solid var(--border-strong, #243347);
@@ -124,6 +124,8 @@
         {% if c.ready %}<span class="fs-badge fs-ok">✓ можна надсилати</span>
         {% else %}<span class="fs-badge fs-todo">ще потрібно: {{ c.todo|join:", " }}</span>{% endif %}
       </div>
+      {% if ai_fill %}<div class="fs-ai" data-pk="{{ pk }}"></div>
+      <input type="hidden" name="p{{ pk }}-aisrc" value="{{ c.aisrc }}">{% endif %}
 
       <div class="fs-grid">
         <div><label for="p{{ pk }}-title">Назва на DigiKey (до {{ title_max }})</label>
@@ -226,6 +228,57 @@
         });
       });
     })();
+    document.addEventListener('DOMContentLoaded', function () {   // 🤖 AI-заповнення кожної картки (inventory/services/ai_fill.py, ціль digikey)
+      var cfgEl = document.getElementById('mvaf-config'), form = document.getElementById('fs-form');
+      if (!cfgEl || !form || !window.MVAiFill) return;
+      function json(id) { var e = document.getElementById(id); try { return JSON.parse(e ? e.textContent : '{}') || {}; } catch (x) { return {}; } }
+      var base = json('mvaf-config'), now = json('fs-ai-now'), ds = json('fs-ai-ds');
+      var INPUT = { dk_title: 'title', dk_description: 'desc', dk_manufacturer: 'mfr' };
+      var COMMON = { dk_packaging: 'packaging', dk_lifecycle_status: 'productLifecycleStatus' };
+      document.querySelectorAll('.fs-ai').forEach(function (host) {
+        var pk = host.dataset.pk, cfg = Object.assign({}, base, { product_id: +pk, has_datasheet: !!ds[pk] });
+        var srcInp = form.querySelector('[name="p' + pk + '-aisrc"]');
+        function attrInp(code) { return form.querySelector('[name="p' + pk + '-f-' + code + '"]'); }
+        function readAttr(code) { var el = attrInp(code); return (el && el.value) || (now[pk] || {})[code] || ''; }
+        function own(k) { return document.getElementById('p' + pk + '-' + k); }
+        MVAiFill.mount(host, cfg, {
+          key: 'dkfs:' + pk,
+          skip: ['category_type', 'dk_datasheet_url', 'dk_image_url', 'dk_supplier_sku'],
+          applyLabel: 'Вставити й перерахувати картку',
+          read: function (k) {
+            if (INPUT[k]) { var el = own(INPUT[k]); return el ? el.value : ''; }
+            if (k === 'dk_category_id') { var c = own('cat'); return c ? c.value : ''; }
+            return COMMON[k] ? readAttr(COMMON[k]) : '';
+          },
+          readAttr: readAttr,
+          apply: function (out, sources) {
+            var n = 0, src = {};
+            try { src = JSON.parse(srcInp.value || '{}') || {}; } catch (x) {}
+            function setAttr(code, value, source) {
+              var el = attrInp(code);
+              if (!el) { el = document.createElement('input'); el.type = 'hidden'; el.name = 'p' + pk + '-f-' + code; host.appendChild(el); }
+              MVAiFill.setValue(el, value); src[code] = { value: value, source: source || '' }; n++;
+            }
+            Object.keys(out.fields).forEach(function (k) {
+              if (INPUT[k]) { if (MVAiFill.setValue(own(INPUT[k]), out.fields[k])) n++; }
+              else if (COMMON[k]) setAttr(COMMON[k], out.fields[k], sources['f:' + k]);
+            });
+            var cat = own('cat'), cid = out.fields.dk_category_id;
+            if (cat && cid) {           // без події change — інакше сторінка перерахується раніше, ніж усе вставлено
+              if (!Array.prototype.some.call(cat.options, function (o) { return o.value === cid; })) {
+                var o = document.createElement('option'); o.value = cid; o.textContent = out.fields.dk_category_name || cid; cat.appendChild(o);
+              }
+              cat.value = cid; MVAiFill.mark(cat); n++;
+            }
+            Object.keys(out.attrs).forEach(function (c) { setAttr(c, out.attrs[c], sources['a:' + c]); });
+            if (srcInp) srcInp.value = JSON.stringify(src);
+            var b = form.querySelector('button[value=preview]');
+            if (n && b) setTimeout(function () { b.click(); }, 400);
+            return n;
+          }
+        });
+      });
+    });
     (function () {
       var btn = document.getElementById('fs-create'), pub = document.getElementById('fs-publish');
       if (!btn) return;
@@ -238,6 +291,7 @@
       });
     })();
   </script>
+  {% if ai_fill %}{{ ai_fill|json_script:"mvaf-config" }}{{ ai_now|json_script:"fs-ai-now" }}{{ ai_ds|json_script:"fs-ai-ds" }}{% endif %}
   {% elif not listed %}
     <p class="fs-muted">Товари не знайдено.</p>
   {% endif %}

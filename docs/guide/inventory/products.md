@@ -6,7 +6,7 @@ where: 📦 Склад → Товари
 urls: /admin/inventory/product/, /admin/inventory/product/add/, /admin/inventory/product/import-excel/, /admin/inventory/productcategory/
 roles: адміністратор, складник
 keywords: товар, товари, артикул, SKU, product, Artikel, картка товару, категорія, BOM, компоненти, життєвий цикл, NRND, EOL, імпорт Excel, аліас, технічні атрибути, масові дії
-related: inventory/product-report, inventory/stock, inventory/prices, inventory/media, inventory/param-search, inventory/reorder, labels/product-labels, shop/catalog-prices, digikey/listings
+related: inventory/ai-fill, inventory/product-report, inventory/stock, inventory/prices, inventory/media, inventory/param-search, inventory/reorder, labels/product-labels, shop/catalog-prices, digikey/listings
 ---
 
 ## Що це
@@ -15,6 +15,9 @@ related: inventory/product-report, inventory/stock, inventory/prices, inventory/
 картці не вводиться — Minerva рахує його з рухів складу ([Залишки й рухи](guide:inventory/stock)).
 
 Список — [📦 Товари](/admin/inventory/product/), новий товар — [Додати](/admin/inventory/product/add/).
+
+> 💡 Новий товар з даташита чи партномера — панель **«🤖 AI: заповнити з даташита, посилань і тексту»** угорі
+> форми: AI заповнить поля й параметри, ви перевіряєте й зберігаєте ([AI заповнює картку](guide:inventory/ai-fill)).
 
 ## Список товарів
 

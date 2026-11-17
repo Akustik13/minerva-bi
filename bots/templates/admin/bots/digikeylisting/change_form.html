@@ -2222,4 +2222,65 @@ var _SKU_CHECK_URL = '{{ sku_check_url|default:"" }}';
   if (_skuFld.value.trim()) _dkCheckSku(_skuFld.value.trim(), false);
 })();
 </script>
+{% if ai_fill %}{{ ai_fill|json_script:"mvaf-config" }}
+<link rel="stylesheet" href="/static/admin/css/mv_ai_fill.css?v=1"><script src="/static/admin/js/mv_ai_fill.js?v=3"></script>
+<script>
+/* 🤖 AI-заповнення картки DigiKey (inventory/services/ai_fill.py, ціль digikey — bots/services/dk_ai_fill.py):
+   поля → форма (DK_FIELD_MAP), параметри — кодами в «Технічні атрибути DigiKey», фільтр — ще й у поля fa_*.
+   Записує «Зберегти». */
+document.addEventListener('DOMContentLoaded', function () {
+  var cfgEl = document.getElementById('mvaf-config');
+  if (!cfgEl || !window.MVAiFill) return;
+  var cfg = {}; try { cfg = JSON.parse(cfgEl.textContent) || {}; } catch (e) { return; }
+  var FA = { '139': 'fa_frequency', '398': 'fa_bandwidth', '21': 'fa_filter_type', '428': 'fa_ripple',
+             '327': 'fa_insertion_loss', '69': 'fa_mounting_type', '16': 'fa_package_case',
+             '46': 'fa_size_dimension', '966': 'fa_height_max' };
+  var anchor = document.getElementById('dkCopyPanel') || document.getElementById('dkPreviewCard') ||
+               document.querySelector('.module.aligned') || document.querySelector('fieldset');
+  if (!anchor) return;
+  var host = document.createElement('div');
+  anchor.parentNode.insertBefore(host, anchor);
+  function field(k) {
+    return document.getElementById((typeof DK_FIELD_MAP !== 'undefined' && DK_FIELD_MAP[k]) || ('id_' + k)) ||
+           document.querySelector('[name="' + k + '"]');
+  }
+  function attrsNow() {
+    var ta = document.querySelector('[name="dk_attributes"]');
+    try { return JSON.parse(ta && ta.value || '{}') || {}; } catch (e) { return {}; }
+  }
+  MVAiFill.mount(host, cfg, {
+    open: !cfg.listing_id,
+    key: 'dk:' + (cfg.listing_id || 'new'),
+    extra: function () {
+      var p = document.getElementById('id_product');
+      return { product_id: p && /^\d+$/.test(p.value) ? p.value : cfg.product_id, listing_id: cfg.listing_id };
+    },
+    read: function (k) {                    // «Інше» — значення за замовчуванням, не вибір людини
+      var el = field(k), v = el ? el.value : '';
+      return k === 'category_type' && v === 'other' ? '' : v;
+    },
+    readAttr: function (k) { var v = attrsNow()[k]; return v == null ? '' : String(v); },
+    apply: function (out) {
+      var n = 0;
+      if (document.body.classList.contains('dk-view') && typeof dkEnterEdit === 'function') dkEnterEdit();
+      document.querySelectorAll('.dk-view-val').forEach(function (el) { el.remove(); });
+      Object.keys(out.fields).forEach(function (k) { if (MVAiFill.setValue(field(k), out.fields[k])) n++; });
+      var codes = Object.keys(out.attrs);
+      if (codes.length && typeof dkAttrsRebuild === 'function') {
+        var merged = attrsNow();
+        codes.forEach(function (c) {
+          merged[c] = out.attrs[c]; n++;
+          if (FA[c]) MVAiFill.setValue(field(FA[c]), String(out.attrs[c]).slice(0, 100));
+        });
+        dkAttrsRebuild(merged);
+        var aw = document.querySelector('.dk-attrs-wrap');
+        if (aw) { if (typeof dkMarkAutofillWrap === 'function') dkMarkAutofillWrap(aw); MVAiFill.mark(aw); }
+      }
+      if (typeof dkAdaptToCategory === 'function') dkAdaptToCategory();
+      if (n) _formDirty = true;
+      return n;
+    }
+  });
+});
+</script>{% endif %}
 {% endblock %}
