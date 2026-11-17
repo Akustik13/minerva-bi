@@ -7,7 +7,9 @@
  *       тоді el = null. Елемент з aria-haspopup отримує aria-expanded.
  *       opts: title, titleData (true — заголовок без перекладу; рядок — дані після заголовка), label (назва для
  *       читачів екрана), returnFocus (куди повернути фокус; false — нікуди), onClose(причина), className,
- *       focus (first / checked / none).
+ *       focus (first / checked / none), container (куди додати меню; без нього — відкрите вікно <dialog>, з якого
+ *       меню відкрили (кнопка, подія миші чи фокус у ньому), інакше <body>: над модальним вікном меню з <body>
+ *       не видно й не натиснути).
  *   MVMenu.close(), MVMenu.isOpen(), MVMenu.refresh() — перемалювати відкриті рівні (змінився порядок чи пункти).
  *   MVMenu.toast(text, {undo, action: {label, run}, ms}) → {close} — повідомлення внизу по центру, одне за раз;
  *       «↶ Скасувати» — ще й Ctrl Z; наведення чи фокус зупиняють відлік.
@@ -61,6 +63,12 @@
     return undefined;
   }
   function focusOn(e) { if (e && typeof e.focus === 'function') e.focus({ preventScroll: true }); }
+  function hostFor(anchor, at) {
+    // меню з відкритого вікна (<dialog>) — у самому вікні: модальне вікно робить решту сторінки недоступною
+    var from = anchor || (at && at.target && at.target.nodeType === 1 ? at.target : null) || document.activeElement;
+    var dlg = from && from.closest ? from.closest('dialog[open]') : null;
+    return dlg || document.body;
+  }
   function inside(t) {
     if (!state || !t || t.nodeType !== 1) return false;
     for (var i = 0; i < state.levels.length; i++) if (state.levels[i].el.contains(t)) return true;
@@ -289,7 +297,10 @@
     box.style.minWidth = Math.floor(Math.min(MIN_W, room / z)) + 'px';
     box.style.left = '0px';
     box.style.top = '0px';
-    return box.getBoundingClientRect();
+    var r = box.getBoundingClientRect();
+    box._ox = r.left;                // left 0 у вікні з transform — не край екрана: put() віднімає цей зсув
+    box._oy = r.top;
+    return r;
   }
   function shrink(box, room, z) {
     box.style.maxHeight = Math.max(60, Math.floor(room / z)) + 'px';
@@ -298,8 +309,8 @@
   function put(box, x, y, w, h, z) {
     x = Math.max(EDGE, Math.min(x, innerWidth - EDGE - w));
     y = Math.max(EDGE, Math.min(y, innerHeight - EDGE - h));
-    box.style.left = (x / z) + 'px';
-    box.style.top = (y / z) + 'px';
+    box.style.left = ((x - (box._ox || 0)) / z) + 'px';
+    box.style.top = ((y - (box._oy || 0)) / z) + 'px';
   }
   function placeRoot(lv) {
     var st = lv.st, box = lv.el, z = zoom(), r = bounds(box, z), w = r.width, h = r.height;
@@ -368,11 +379,12 @@
       else if (at && at.x != null) pt = { x: +at.x || 0, y: +at.y || 0 };
       else pt = { x: Math.max(EDGE, innerWidth / 2 - 120), y: 80 };
     }
-    var st = { anchor: anchor, at: pt, opts: opts, back: back, levels: [], born: Date.now() };
+    var st = { anchor: anchor, at: pt, opts: opts, back: back, levels: [], born: Date.now(),
+               host: opts.container || hostFor(anchor, at) };
     state = st;
     var lv = level(st, 0, items, undefined, null);
     render(lv);
-    document.body.appendChild(lv.el);
+    st.host.appendChild(lv.el);
     placeRoot(lv);
     listen(true);
     if (anchor && anchor.hasAttribute('aria-haspopup')) anchor.setAttribute('aria-expanded', 'true');
@@ -439,7 +451,7 @@
     var lv = level(st, parent.depth + 1, it.items, it, trig);
     lv.el.setAttribute('aria-labelledby', trig._mvm.text.id);
     render(lv);
-    document.body.appendChild(lv.el);
+    (st.host || document.body).appendChild(lv.el);
     placeSub(lv);
     trig.setAttribute('aria-expanded', 'true');
     trig.setAttribute('aria-controls', lv.el.id);

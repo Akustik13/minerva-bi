@@ -119,8 +119,8 @@ class SettingsPageTests(TestCase):
 
     def test_page_loads_menu_component_and_rail_antiflash(self):
         html = self.client.get("/admin/").content.decode()
-        self.assertIn('/static/admin/js/mv_menu.js?v=2', html)
-        self.assertIn('/static/admin/css/mv_menu.css?v=2', html)
+        self.assertIn('/static/admin/js/mv_menu.js?v=3', html)
+        self.assertIn('/static/admin/css/mv_menu.css?v=3', html)
         self.assertIn("root.classList.add('mvd-rail')", html)          # значки ще до першого малювання
         self.assertIn("attrs['data-mv-sidebar']", html)
         self.assertIn('/static/admin/js/mv_desktop.js?v=6', html)

@@ -381,6 +381,7 @@
 {"uk": "(поточний статус)", "en": "(current status)", "de": "(aktueller Status)"}
 {"uk": "(поточний)", "en": "(current)", "de": "(aktuell)"}
 {"uk": "(потрібні 2 літери ISO, напр. DE)", "en": "(2 ISO letters required, e.g. DE)", "de": "(2 ISO-Buchstaben erforderlich, z. B. DE)"}
+{"uk": "(правий клік на 🎤 → «🔓 Відкрити RAG-ПК»)", "en": "(right-click 🎤 → “🔓 Open the RAG PC”)", "de": "(Rechtsklick auf 🎤 → „🔓 RAG-PC öffnen“)"}
 {"uk": "(правий клік — налаштування)", "en": "(right-click — settings)", "de": "(Rechtsklick — Einstellungen)"}
 {"uk": "(правий клік — інша)", "en": "(right-click — another)", "de": "(Rechtsklick — eine andere)"}
 {"uk": "(пропустити дублі) або", "en": "(skip duplicates) or", "de": "(Duplikate überspringen) oder"}
@@ -2002,6 +2003,7 @@
 {"uk": "RAG-ПК не відповів вчасно.", "en": "The RAG PC did not answer in time.", "de": "Der RAG-PC hat nicht rechtzeitig geantwortet."}
 {"uk": "RAG-ПК не відповів: {0}", "en": "The RAG PC did not respond: {0}", "de": "Der RAG-PC hat nicht geantwortet: {0}"}
 {"uk": "RAG-ПК не відповідає (вимкнений, інша мережа або браузер ще не прийняв його сертифікат)", "en": "the RAG PC does not answer (switched off, another network, or the browser has not accepted its certificate yet)", "de": "der RAG-PC antwortet nicht (ausgeschaltet, anderes Netz oder der Browser hat sein Zertifikat noch nicht akzeptiert)"}
+{"uk": "RAG-ПК не відповідає: вимкнений, ви не в мережі офісу або браузер ще не прийняв його сертифікат", "en": "the RAG PC does not answer: switched off, you are not in the office network, or the browser has not accepted its certificate yet", "de": "der RAG-PC antwortet nicht: ausgeschaltet, Sie sind nicht im Büronetz oder der Browser hat sein Zertifikat noch nicht akzeptiert"}
 {"uk": "RAG-ПК не налаштовано («⚙️ Налаштування нарад»)", "en": "RAG PC not set up (“⚙️ Meeting settings”)", "de": "RAG-PC nicht eingerichtet („⚙️ Besprechungseinstellungen“)"}
 {"uk": "RAG-ПК не повідомив результат за добу", "en": "The RAG PC did not report a result within a day", "de": "Der RAG-PC hat innerhalb eines Tages kein Ergebnis gemeldet"}
 {"uk": "RAG-ПК не розпізнав.", "en": "The RAG PC could not recognise it.", "de": "Der RAG-PC hat nichts erkannt."}
@@ -3432,6 +3434,7 @@
 {"uk": "«Доставлено» (номер у тілі)", "en": "“Delivered” (number in the body)", "de": "„Geliefert“ (Nummer im Body)"}
 {"uk": "«Доставлено» — оприбуткування закупівлі", "en": "“Delivered” — receiving a purchase order into stock", "de": "„Geliefert“ — Wareneingang einer Bestellung"}
 {"uk": "«Доставлено»: оприбутковує товар на склад (або лише позначає «прибуло» — за налаштуваннями складу).", "en": "“Delivered”: receives the goods into stock (or only marks them as “arrived”, depending on the stock settings).", "de": "„Geliefert“: bucht die Ware ins Lager ein (oder markiert sie nur als „angekommen“ — gemäß den Lagereinstellungen)."}
+{"uk": "«Доступ до локальної мережі» → Дозволити, потім оновіть сторінку", "en": "“Local network access” → Allow, then reload the page", "de": "„Zugriff auf lokales Netzwerk“ → Zulassen, dann die Seite neu laden"}
 {"uk": "«Друковані плати», «корпуси», «модулі U3, U101», «складання й тест»", "en": "«Printed circuit boards», «housings», «modules U3, U101», «assembly and test»", "de": "«Leiterplatten», «Gehäuse», «Module U3, U101», «Bestückung und Test»"}
 {"uk": "«З якої адреси» і «Кому» — змініть тут (адреси й Telegram-чати — «＋ з Minerva» або своя, Enter) і натисніть «Зберегти» внизу сторінки. «↓» — до поля на цій сторінці, «→» — інша сторінка; дані сайту — з його останнього звіту. Решта сповіщень — {0}.", "en": "Change «From which address» and «To whom» here (addresses and Telegram chats — «＋ from Minerva» or your own, Enter) and click «Save» at the bottom of the page. «↓» — to the field on this page, «→» — another page; site data — from its latest report. Other notifications — {0}.", "de": "«Von welcher Adresse» und «An wen» hier ändern (Adressen und Telegram-Chats — «＋ aus Minerva» oder eigene, Enter) und unten auf der Seite «Speichern» klicken. «↓» — zum Feld auf dieser Seite, «→» — andere Seite; Website-Daten — aus ihrem letzten Bericht. Weitere Benachrichtigungen — {0}."}
 {"uk": "«З якої адреси» — виберіть скриньку для кожного листа й натисніть «Зберегти» внизу сторінки. «↓» — до поля на цій сторінці, «→» — інша сторінка; дані сайту — з його останнього звіту.", "en": "«З якої адреси» — choose a mailbox for each e-mail and click «Save» at the bottom of the page. «↓» — to the field on this page, «→» — another page; site data — from its latest report.", "de": "«З якої адреси» — Postfach für jede E-Mail wählen und unten auf der Seite «Speichern» klicken. «↓» — zum Feld auf dieser Seite, «→» — andere Seite; Website-Daten — aus ihrem letzten Bericht."}
@@ -4461,6 +4464,7 @@
 {"uk": "Браузер не дозволив мікрофон — дозвольте його (значок 🔒 або 🎤 в адресному рядку).", "en": "The browser did not allow the microphone — allow it (🔒 or 🎤 icon in the address bar).", "de": "Der Browser hat das Mikrofon nicht erlaubt — erlauben Sie es (Symbol 🔒 oder 🎤 in der Adressleiste)."}
 {"uk": "Браузер не дозволив розпізнавання голосу на цій сторінці.", "en": "The browser did not allow speech recognition on this page.", "de": "Der Browser hat die Spracherkennung auf dieser Seite nicht erlaubt."}
 {"uk": "Браузер не розпізнає цю мову — правий клік на 🎤, щоб вибрати іншу.", "en": "The browser does not recognise this language — right-click 🎤 to choose another.", "de": "Der Browser erkennt diese Sprache nicht — Rechtsklick auf 🎤, um eine andere zu wählen."}
+{"uk": "Браузер питає дозвіл на доступ до пристроїв у локальній мережі (там RAG-ПК)", "en": "The browser is asking for permission to access devices on the local network (the RAG PC is there)", "de": "Der Browser fragt nach der Erlaubnis für Geräte im lokalen Netzwerk (dort steht der RAG-PC)"}
 {"uk": "Браузер показує сторінку як на ПК. Щоб повернути вигляд телефону: поверніть телефон вертикально або вимкніть «Версія для ПК» у меню браузера (Chrome: ⋮ → «Версія для ПК»; Safari: «аА» → «Запит мобільного вебсайту»).", "en": "The browser shows the page like on a PC. To get the phone view back: hold the phone upright or turn off «Desktop site» in the browser menu (Chrome: ⋮ → «Desktop site»; Safari: «aA» → «Request Mobile Website»).", "de": "Der Browser zeigt die Seite wie am PC. So bekommen Sie die Handy-Ansicht zurück: Handy hochkant halten oder im Browsermenü «Desktopversion» ausschalten (Chrome: ⋮ → «Desktopversion»; Safari: «aA» → «Mobile Website anfordern»)."}
 {"uk": "Бриф", "en": "Brief", "de": "Briefing"}
 {"uk": "Бриф (AI)", "en": "Brief (AI)", "de": "Briefing (KI)"}
@@ -8106,6 +8110,7 @@
 {"uk": "Зворотні втрати", "en": "Return loss", "de": "Rückflussdämpfung"}
 {"uk": "Зворотній зв'язок", "en": "Feedback", "de": "Feedback"}
 {"uk": "Звук наради: програма Teams — «Весь екран» + «Поділитися системним звуком»; Teams або Zoom у браузері — вкладка + «Поділитися звуком вкладки»; очна зустріч — «Лише мікрофон».", "en": "Meeting audio: Teams app — “Entire screen” + “Share system audio”; Teams or Zoom in the browser — the tab + “Share tab audio”; in-person meeting — “Microphone only”.", "de": "Besprechungston: Teams-App — „Gesamter Bildschirm“ + „Systemaudio teilen“; Teams oder Zoom im Browser — Tab + „Tab-Audio teilen“; Präsenztermin — „Nur Mikrofon“."}
+{"uk": "Звук іде до Google / Microsoft; мікрофон — з «🎙 Мікрофон» (старіший браузер бере мікрофон Windows за замовчуванням).", "en": "The sound goes to Google / Microsoft; the microphone is the one in “🎙 Microphone” (an older browser uses the Windows default microphone).", "de": "Der Ton geht an Google / Microsoft; das Mikrofon ist das unter „🎙 Mikrofon“ (ein älterer Browser nutzt das Windows-Standardmikrofon)."}
 {"uk": "Звідки", "en": "Source", "de": "Quelle"}
 {"uk": "Звідки (порожньо — календар Minerva)", "en": "From (empty — Minerva calendar)", "de": "Von (leer — Minerva-Kalender)"}
 {"uk": "Звідки / що робити", "en": "Source / what to do", "de": "Herkunft / was tun"}
@@ -10927,6 +10932,7 @@
 {"uk": "Не потрібно обговорювати", "en": "No need to discuss", "de": "Muss nicht besprochen werden"}
 {"uk": "Не потрібні терміни", "en": "Unwanted deadlines", "de": "Nicht benötigte Fristen"}
 {"uk": "Не почув — браузер слухає мікрофон Windows «за замовчуванням». Говоріть ближче або виберіть RAG-ПК і свій мікрофон (правий клік на 🎤).", "en": "Heard nothing — the browser listens to the Windows “default” microphone. Speak closer or choose the RAG PC and your microphone (right-click 🎤).", "de": "Nichts gehört — der Browser hört auf das Windows-„Standard“-Mikrofon. Sprechen Sie näher oder wählen Sie den RAG-PC und Ihr Mikrofon (Rechtsklick auf 🎤)."}
+{"uk": "Не почув — говоріть ближче або виберіть свій мікрофон: правий клік на 🎤 → «🎙 Мікрофон».", "en": "Heard nothing — speak closer or choose your microphone: right-click 🎤 → “🎙 Microphone”.", "de": "Nichts gehört — sprechen Sie näher oder wählen Sie Ihr Mikrofon: Rechtsklick auf 🎤 → „🎙 Mikrofon“."}
 {"uk": "Не почув — говоріть ближче до мікрофона й клікніть 🎤 ще раз.", "en": "Didn't hear anything — speak closer to the microphone and click 🎤 again.", "de": "Nichts gehört — sprechen Sie näher am Mikrofon und klicken Sie erneut auf 🎤."}
 {"uk": "Не працювати", "en": "Do not work with", "de": "Nicht zusammenarbeiten"}
 {"uk": "Не працюють", "en": "Not working", "de": "Funktionieren nicht"}
@@ -18554,6 +18560,8 @@
 {"uk": "бракує даних чи погодження. probability і impact — 1 (мало) … 3 (дуже).", "en": "missing data or approval. probability and impact — 1 (low) … 3 (high).", "de": "fehlende Daten oder Freigabe. probability und impact — 1 (gering) … 3 (hoch)."}
 {"uk": "бракує прав", "en": "missing rights", "de": "fehlende Rechte"}
 {"uk": "браузер", "en": "browser", "de": "Browser"}
+{"uk": "браузер не дозволив Minerva доступ до локальної мережі, де RAG-ПК: 🔒 ліворуч від адреси сайту", "en": "the browser did not allow Minerva to access the local network where the RAG PC is: 🔒 left of the site address", "de": "der Browser hat Minerva den Zugriff auf das lokale Netzwerk mit dem RAG-PC nicht erlaubt: 🔒 links neben der Adresse"}
+{"uk": "браузер так і не отримав дозволу на доступ до локальної мережі", "en": "the browser never got permission to access the local network", "de": "der Browser hat keine Erlaubnis für das lokale Netzwerk erhalten"}
 {"uk": "бренд", "en": "brand", "de": "Marke"}
 {"uk": "бриф", "en": "brief", "de": "Briefing"}
 {"uk": "бриф — {0}", "en": "brief — {0}", "de": "Briefing — {0}"}
@@ -20343,6 +20351,7 @@
 {"uk": "наступний крок — кнопкою нижче", "en": "next step — with the button below", "de": "nächster Schritt — mit der Schaltfläche unten"}
 {"uk": "наступного разу клік друкує одразу, поки дані на складі й DigiKey не зміняться.", "en": "next time a click prints immediately, until the data in stock and DigiKey changes.", "de": "beim nächsten Mal druckt ein Klick sofort, bis sich die Daten im Lager und bei DigiKey ändern."}
 {"uk": "натисніть", "en": "click", "de": "klicken Sie auf"}
+{"uk": "натисніть «Дозволити» вгорі, біля адреси сайту.", "en": "click “Allow” at the top, next to the site address.", "de": "klicken Sie oben neben der Adresse auf „Zulassen“."}
 {"uk": "натисніть «＋» і увійдіть", "en": "click “＋” and sign in", "de": "auf „＋“ klicken und anmelden"}
 {"uk": "націнка за замовчуванням", "en": "default markup", "de": "Standardaufschlag"}
 {"uk": "наш", "en": "ours", "de": "unsere"}

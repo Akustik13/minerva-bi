@@ -32,6 +32,9 @@
   };
   var KEY = 'mvv-lang', MODE_KEY = 'mvv-mode', MIC_KEY = 'mvv-mic', SEEN = 'mvv-seen', SIZE = 28, RESTARTS = 30;
   var PING_OK_MS = 60000, PING_FAIL_MS = 15000, PING_TIMEOUT = 3000, SEND_TIMEOUT = 180000, MAX_REC_S = 180;
+  // Chrome «доступ до локальної мережі» (Local Network Access): сайт з інтернету -> RAG-ПК у мережі офісу лише з дозволу;
+  // поки Chrome питає, запит чекає на відповідь людини
+  var LNA_WAIT = 60000;
   // слова → розділові знаки (ціле слово; «новий рядок» у однорядковому полі — пробіл)
   var WORDS = {
     uk: [['новий абзац', '\n\n'], ['новий рядок', '\n'], ['знак питання', '?'], ['знак оклику', '!'],
@@ -218,16 +221,34 @@
   }
 
   // ── RAG-ПК: чи доступний ──
-  function ragCheck(force) {
+  function lnaState() {
+    // '' — браузер такого дозволу не має (старіший Chrome, Firefox, Safari) або сторінка в тій самій мережі
+    if (!navigator.permissions || !navigator.permissions.query) return Promise.resolve('');
+    return navigator.permissions.query({name: 'local-network-access'})
+      .catch(function () { return navigator.permissions.query({name: 'local-network'}); })
+      .then(function (p) { return p && p.state || ''; }, function () { return ''; });
+  }
+  function ragCheck(force, onAsk) {
     if (!BENCH) return Promise.resolve(false);
     var age = Date.now() - rag.at;
     if (!force && rag.state === 'ok' && age < PING_OK_MS) return Promise.resolve(true);
-    if (!force && rag.state === 'down' && age < PING_FAIL_MS) return Promise.resolve(false);
+    if (!force && rag.state === 'down' && rag.why !== 'lna_denied' && age < PING_FAIL_MS) return Promise.resolve(false);
     if (rag.pending) return rag.pending;
+    rag.pending = lnaState().then(function (lna) {
+      // «заборонено» блокує лише сайт з інтернету -> локальна мережа (Minerva за адресою в мережі офісу пускає),
+      // тож спершу пробуємо; не вийшло й заборонено — ping скаже «дозвольте доступ до локальної мережі»
+      rag.lna = lna;
+      if (lna === 'prompt' && onAsk) onAsk();
+      return ping(lna === 'prompt' ? LNA_WAIT : PING_TIMEOUT);
+    }).then(function (good) { rag.at = Date.now(); rag.pending = null; return good; },
+            function () { rag.at = Date.now(); rag.pending = null; return false; });
+    return rag.pending;
+  }
+  function ping(wait) {
     var ctl = window.AbortController ? new AbortController() : null;
-    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, PING_TIMEOUT);
-    rag.pending = fetch(BENCH + '/api/dictate/ping', {mode: 'cors', credentials: 'omit', cache: 'no-store',
-                                                      signal: ctl ? ctl.signal : undefined})
+    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, wait);
+    return fetch(BENCH + '/api/dictate/ping', {mode: 'cors', credentials: 'omit', cache: 'no-store',
+                                               signal: ctl ? ctl.signal : undefined})
       .then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (d) {
           if (r.ok && d.ok) { rag.state = 'ok'; rag.why = ''; rag.info = d; return true; }
@@ -236,9 +257,15 @@
           rag.ip = d.ip || '';
           return false;
         });
-      }, function () { rag.state = 'down'; rag.why = 'unreachable'; return false; })
-      .then(function (good) { clearTimeout(timer); rag.at = Date.now(); rag.pending = null; return good; });
-    return rag.pending;
+      }, function () {
+        rag.state = 'down';
+        rag.why = rag.lna === 'prompt' ? 'lna_waiting' : 'unreachable';
+        return lnaState().then(function (now) {             // людина могла саме натиснути «Блокувати»
+          if (now === 'denied') rag.why = 'lna_denied';
+          return false;
+        });
+      })
+      .then(function (good) { clearTimeout(timer); return good; });
   }
   function warm() {
     // людина почала говорити — RAG-ПК вантажить модель уже зараз (після паузи це ~12 с), а не після «стоп»
@@ -250,7 +277,13 @@
   function ragProblem() {
     if (rag.why === 'not_allowed') return 'цей ПК' + (rag.ip ? ' (' + rag.ip + ')' : '') + ' не в списку дозволених на RAG-ПК';
     if (rag.why === 'error') return 'RAG-ПК відповів помилкою';
-    return 'RAG-ПК не відповідає (вимкнений, інша мережа або браузер ще не прийняв його сертифікат)';
+    if (rag.why === 'lna_denied') {
+      return 'браузер не дозволив Minerva доступ до локальної мережі, де RAG-ПК: 🔒 ліворуч від адреси сайту → ' +
+        '«Доступ до локальної мережі» → Дозволити, потім оновіть сторінку';
+    }
+    if (rag.why === 'lna_waiting') return 'браузер так і не отримав дозволу на доступ до локальної мережі';
+    return 'RAG-ПК не відповідає: вимкнений, ви не в мережі офісу або браузер ще не прийняв його сертифікат ' +
+      '(правий клік на 🎤 → «🔓 Відкрити RAG-ПК»)';
   }
   function ragStatus() {
     if (!BENCH) return 'RAG-ПК не налаштовано («⚙️ Налаштування нарад»)';
@@ -280,8 +313,8 @@
     }).catch(function () { return []; });
   }
   function menu(e) {
-    if (!(window.MVMenu && window.MVMenu.open && host(target) === document.body)) {
-      // над відкритим вікном (dialog) меню Minerva не видно — мова по колу, як раніше
+    if (!(window.MVMenu && window.MVMenu.open)) {
+      // без спільного меню Minerva — мова по колу
       var all = ['auto'].concat(LANGS.map(function (l) { return l[0]; }));
       var i = all.indexOf(langPick());
       set(KEY, all[(i + 1) % all.length]);
@@ -290,7 +323,9 @@
       return;
     }
     var at = {x: e.clientX, y: e.clientY};
-    var opened = window.MVMenu.open(at, items(), {title: '🎤 Голосовий набір', returnFocus: false});
+    // у вікні (<dialog>) — меню в самому вікні, інакше його не видно над вікном
+    var opened = window.MVMenu.open(at, items(), {title: '🎤 Голосовий набір', returnFocus: false,
+                                                 container: host(target)});
     var redraw = function () { if (opened && opened.refresh && window.MVMenu.isOpen()) opened.refresh(); };
     ragCheck(true).then(redraw);
     loadMics().then(redraw);
@@ -305,7 +340,7 @@
                 disabled: !can, onSelect: function () { pickMode(m); }});
     });
     out.push({type: 'hint', label: function () {
-      if (mode() === 'browser') return 'Браузер бере мікрофон Windows «за замовчуванням»; звук іде до Google / Microsoft.';
+      if (mode() === 'browser') return 'Звук іде до Google / Microsoft; мікрофон — з «🎙 Мікрофон» (старіший браузер бере мікрофон Windows за замовчуванням).';
       return ragStatus() + (rag.state === 'down' && SR ? ' — поки що розпізнає браузер' : '');
     }});
     if (BENCH) {
@@ -320,7 +355,7 @@
                 close: true, onSelect: function () { pickLang(x[0]); }};
       }).concat([{type: 'hint', label: 'Автоматично: RAG-ПК визначає мову сам; браузер — мовою інтерфейсу.'}]);
     }});
-    out.push({type: 'submenu', label: '🎙 Мікрофон', hint: micLabel, disabled: function () { return !isRag(mode()); },
+    out.push({type: 'submenu', label: '🎙 Мікрофон', hint: micLabel, disabled: function () { return !CAN_REC; },
               items: function () {
       var list = [{type: 'radio', group: 'mvv-mic', label: 'За замовчуванням Windows', checked: function () { return !(get(MIC_KEY) || ''); },
                    close: true, onSelect: function () { set(MIC_KEY, ''); title(); }}];
@@ -334,7 +369,7 @@
       return list;
     }});
     out.push({type: 'hint', label: 'Не чує? «🎙 Мікрофон» — той, у який ви говорите.',
-              hidden: function () { return !isRag(mode()) || !!get(MIC_KEY); }});
+              hidden: function () { return !CAN_REC || !!get(MIC_KEY); }});
     return out;
   }
 
@@ -420,9 +455,12 @@
     if (!isRag(m)) { browserStart(el); return; }
     btn.classList.add('wait');
     say([['', '🎤 Перевіряю RAG-ПК…']]);
-    ragCheck(false).then(function (good) {
+    ragCheck(false, function () {
+      say([['', '🔐 Браузер питає дозвіл на доступ до пристроїв у локальній мережі (там RAG-ПК) — ' +
+                'натисніть «Дозволити» вгорі, біля адреси сайту.']]);
+    }).then(function (good) {
       btn.classList.remove('wait');
-      if (target !== el && document.activeElement !== el) { say(null); return; }
+      if (target !== el) { say(null); return; }                // людина вже в іншому полі
       if (good) { ragStart(el, m === 'rag_clean'); return; }
       if (SR) {
         fallback = true;
@@ -597,7 +635,7 @@
     'audio-capture': 'Мікрофон не знайдено — під’єднайте його або виберіть у налаштуваннях Windows.',
     'network': 'Немає зв’язку із сервісом розпізнавання браузера — перевірте інтернет.',
     'language-not-supported': 'Браузер не розпізнає цю мову — правий клік на 🎤, щоб вибрати іншу.',
-    'no-speech': 'Не почув — браузер слухає мікрофон Windows «за замовчуванням». Говоріть ближче або виберіть RAG-ПК і свій мікрофон (правий клік на 🎤).'
+    'no-speech': 'Не почув — говоріть ближче або виберіть свій мікрофон: правий клік на 🎤 → «🎙 Мікрофон».'
   };
   function useLocal(r, l) {
     // Chrome: розпізнавання на самому ПК, якщо мовна модель уже є (інакше — сервіс браузера)
@@ -633,22 +671,41 @@
       say((note ? [note] : []).concat([['', '⚠️ ' + (ERRORS[lastError] || 'Голос не розпізнано (' + lastError + ').')]]),
           9000);
     };
+    var micStream = null, micTrack = null;
+    function begin() {
+      // новіші Chrome / Edge: розпізнавання з вибраного мікрофона (start(MediaStreamTrack)); старіші — мікрофон
+      // Windows за замовчуванням
+      if (micTrack && micTrack.readyState === 'live') {
+        try { r.start(micTrack); return; } catch (x) { micTrack = null; }
+      }
+      r.start();
+    }
+    function freeMic() {
+      if (micStream) { try { micStream.getTracks().forEach(function (x) { x.stop(); }); } catch (e) { /* уже */ } }
+      micStream = micTrack = null;
+    }
     r.onend = function () {
       // Chrome сам зупиняється після паузи — поки людина не натиснула «стоп», слухаємо далі
       if (!stopping && !lastError && listening && target === el && document.activeElement === el && restarts++ < RESTARTS) {
-        try { r.start(); return; } catch (x) { /* далі — зупинка */ }
+        try { begin(); return; } catch (x) { /* далі — зупинка */ }
       }
+      freeMic();
       listening = false;
       rec = null;
       if (btn) { btn.classList.remove('on'); btn.classList.remove('fb'); title(); }
       if (!lastError) say(null);
     };
     rec = r;
-    useLocal(r, l).then(function () {
-      if (rec !== r) return;
+    var chosen = CAN_REC && get(MIC_KEY) ? getStream(false).then(function (s) {
+      micStream = s;
+      micTrack = s.getAudioTracks()[0] || null;
+    }, function () { micStream = micTrack = null; }) : Promise.resolve();
+    Promise.all([useLocal(r, l), chosen]).then(function () {
+      if (rec !== r) { freeMic(); return; }
       try {
-        r.start();
+        begin();
       } catch (x) {
+        freeMic();
         rec = null;
         say([['', '⚠️ Не вдалося ввімкнути мікрофон.']], 5000);
         return;
