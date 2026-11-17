@@ -29,6 +29,9 @@ class RsvpTests(TestCase):
         self.user = User.objects.create_superuser('slava', 's@x.y', 'p')
         self.account = EmailAccount.objects.create(user=self.user, email_address='viacheslav.pryimak@sevskiy.de',
                                                    display_name='Viacheslav Pryimak')
+        from email_assistant.models import EmailSettings
+        EmailSettings.objects.filter(pk=EmailSettings.get_for_user(self.user).pk).update(
+            mark_read_on_server=False)   # прев'ю позначає лист прочитаним — без справжнього IMAP-сервера
         self.msg = EmailMessage.objects.create(account=self.account, folder='inbox', imap_folder_name='INBOX',
                                                imap_uid=1, subject='Einladung: Online meeting', body_text=ICS,
                                                from_email='sergey@sevskiy.de', sent_at=timezone.now())

@@ -37,11 +37,15 @@ WINDOWS_TZ = {
     "China Standard Time": "Asia/Shanghai", "Tokyo Standard Time": "Asia/Tokyo",
     "India Standard Time": "Asia/Kolkata", "UTC": "UTC", "Coordinated Universal Time": "UTC",
 }
-JOIN_RE = re.compile(r"https://(?:teams\.microsoft\.com/l/meetup-join|teams\.live\.com/meet|[\w.-]*zoom\.us/[jw]/"
-                     r"|meet\.google\.com/|[\w.-]*webex\.com/)[^\s<>\"')\]]+", re.I)
-INVITE_HINT = re.compile(r"teams\.microsoft\.com/l/meetup-join|zoom\.us/j/|meet\.google\.com/|webex\.com/"
+# Teams: старе посилання …/l/meetup-join/…, нове (з 2025) — teams.microsoft.com/meet/<id>?p=…
+JOIN_RE = re.compile(r"https://(?:teams\.microsoft\.com/(?:l/meetup-join|meet/)|teams\.live\.com/meet"
+                     r"|[\w.-]*zoom\.us/[jw]/|meet\.google\.com/|[\w.-]*webex\.com/)[^\s<>\"')\]]+", re.I)
+INVITE_HINT = re.compile(r"teams\.microsoft\.com/(?:l/meetup-join|meet/)|teams\.live\.com/meet|zoom\.us/j/"
+                         r"|meet\.google\.com/|webex\.com/"
                          r"|^(?:einladung|invitation|updated invitation|aktualisierte einladung|abgesagt|canceled"
                          r"|cancelled|besprechung|meeting|termin)\b", re.I | re.M)
+FETCH_TRIES = 3     # запрошення, яке не вдалося взяти з IMAP, пробуємо ще стільки разів (не при кожному прев'ю)
+PREVIEW_FETCH = 2   # листів з IMAP за одне відкриття прев'ю
 NOT_INVITES = ("REPLY", "COUNTER", "DECLINECOUNTER", "REFRESH")
 
 
@@ -180,7 +184,77 @@ def calendars_of(message) -> list[str]:
 
 
 def looks_like_invite(message) -> bool:
-    return bool(INVITE_HINT.search(f"{message.subject or ''}\n{(message.body_text or '')[:20000]}"))
+    return has_calendar(message) or bool(INVITE_HINT.search(f"{message.subject or ''}\n"
+                                                             f"{(message.body_text or '')[:20000]}"))
+
+
+def has_calendar(message) -> bool:
+    """У листа є запрошення-вкладення (.ics / invite.ics з блоку text/calendar) — збережене чи ні."""
+    from email_assistant.imap_client import is_calendar
+    return any(is_calendar(a) for a in message.attachments or [])
+
+
+def _missing(message) -> list[int]:
+    """Індекси вкладень-запрошень без файлу, які ще варто взяти з IMAP (лист є на сервері, спроб < FETCH_TRIES)."""
+    from email_assistant.imap_client import is_calendar
+    if not message.imap_uid or (message.imap_folder_name or "").startswith(("minerva:", "eml:")):
+        return []
+    return [i for i, a in enumerate(message.attachments or []) if is_calendar(a) and not a.get("file_path")
+            and int(a.get("cal_fail") or 0) < FETCH_TRIES]
+
+
+def _save_from_imap(message) -> bool:
+    """Запрошення-вкладення, якого немає на диску (до 17.11.2026 щохвилинна синхронізація зберігала лише
+    документи), — з IMAP на диск, file_path — у лист (UPDATE без сигналу). Невдача — лічильник cal_fail,
+    після FETCH_TRIES більше не пробуємо."""
+    from email_assistant.attachments import fetch_documents
+    from email_assistant.models import EmailMessage
+    atts = [dict(a) for a in message.attachments or []]
+    wanted = _missing(message)
+    if not wanted:
+        return False
+    try:
+        paths = fetch_documents(message, wanted)
+    except Exception as e:  # noqa: BLE001 — пошта недоступна: спробуємо наступного разу
+        logger.info("invite imap fetch %s: %s", message.pk, e)
+        paths = {}
+    for i in wanted:
+        if i in paths:
+            atts[i]["file_path"] = paths[i]
+            atts[i].pop("cal_fail", None)
+        else:
+            atts[i]["cal_fail"] = int(atts[i].get("cal_fail") or 0) + 1
+    EmailMessage.objects.filter(pk=message.pk).update(attachments=atts)
+    message.attachments = atts
+    return bool(paths)
+
+
+def load_calendars(message, imap=True) -> list[str]:
+    """Тексти iCalendar листа: збережені; немає — вкладення-запрошення з IMAP (і на диск, щоб не питати вдруге);
+    лист без вкладення, але схожий на запрошення (INVITE_HINT), — блок text/calendar з IMAP."""
+    texts = calendars_of(message)
+    if texts or not imap:
+        return texts
+    if has_calendar(message):
+        return calendars_of(message) if _save_from_imap(message) else []
+    return fetch_calendar_from_imap(message) if looks_like_invite(message) else []
+
+
+def catch_up(user, messages, limit: int = PREVIEW_FETCH) -> int:
+    """Прев'ю листа: лист із запрошенням-вкладенням, для якого ще немає MeetingInvite (прийшов, поки синхронізація
+    не зберігала .ics), — розпізнати зараз. З IMAP — не більше `limit` листів. → скільки запрошень знайдено."""
+    found = fetched = 0
+    for msg in messages:
+        account = getattr(msg, "account", None)
+        if getattr(account, "user_id", None) != getattr(user, "pk", None) or not has_calendar(msg):
+            continue
+        texts = calendars_of(msg)
+        if not texts and fetched < limit and _missing(msg):
+            fetched += 1
+            texts = load_calendars(msg)
+        if texts:
+            found += len(detect(msg, texts))
+    return found
 
 
 def fetch_calendar_from_imap(message) -> list[str]:
@@ -198,7 +272,8 @@ def fetch_calendar_from_imap(message) -> list[str]:
     except Exception as e:  # noqa: BLE001 — пошта недоступна: просто без цього листа
         logger.info("invite imap fetch %s: %s", message.pk, e)
         return []
-    raw = next((part[1] for part in data or [] if isinstance(part, tuple) and len(part) > 1), None)
+    from email_assistant.attachments import message_bytes
+    raw = message_bytes(data)   # сервер може спершу надіслати чужу відповідь (FLAGS)
     if status != "OK" or not raw:
         return []
     out = []
@@ -523,9 +598,7 @@ def scan(user, since: datetime.date, progress=None, imap=True, trash: bool = Fal
     total, seen, found = qs.count(), 0, 0
     for msg in qs.iterator(chunk_size=200):
         seen += 1
-        texts = calendars_of(msg)
-        if not texts and imap and looks_like_invite(msg):
-            texts = fetch_calendar_from_imap(msg)
+        texts = load_calendars(msg, imap=imap)
         if texts:
             found += len(detect(msg, texts))
         if progress and seen % 100 == 0:

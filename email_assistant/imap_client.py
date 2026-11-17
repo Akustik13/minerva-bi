@@ -259,6 +259,19 @@ def is_document(att) -> bool:
     return not att.get('is_inline') and '.' in name and name.rsplit('.', 1)[-1] in DOCUMENT_EXTS
 
 
+def is_calendar(att) -> bool:
+    """Запрошення на зустріч (.ics / блок text/calendar Outlook і Teams — `invite.ics`): його читає календар
+    (calendar_app/invites.py) ще сигналом нового листа, тож синхронізація зберігає його одразу, як документи."""
+    name = (att.get('name') or '').lower()
+    ctype = (att.get('content_type') or '').lower()
+    return not att.get('is_inline') and (ctype == 'text/calendar' or name.endswith('.ics'))
+
+
+def keeps_file(att) -> bool:
+    """Щохвилинна синхронізація кладе на диск одразу: документи (номер замовлення) і запрошення (календар)."""
+    return is_document(att) or is_calendar(att)
+
+
 def _attachment_dir(account_pk, imap_uid, folder_name) -> str:
     import hashlib
     return f'email_attachments/{account_pk}/{imap_uid}_{hashlib.md5(folder_name.encode()).hexdigest()[:8]}'
@@ -296,14 +309,14 @@ def persist_attachments(account_pk, imap_uid, folder_name, attachments: list) ->
 
 
 def persist_documents(account_pk, imap_uid, folder_name, attachments: list) -> list:
-    """Лише документи (is_document), що прийшли з даними, — на диск (file_path); решта полів вкладень лишається
-    як була (is_inline, content_id), _data прибирається з усіх."""
+    """Лише документи й запрошення (keeps_file), що прийшли з даними, — на диск (file_path); решта полів вкладень
+    лишається як була (is_inline, content_id), _data прибирається з усіх."""
     rel_dir = _attachment_dir(account_pk, imap_uid, folder_name)
     saved = []
     for i, att in enumerate(attachments):
         att = dict(att)
         data = att.pop('_data', None)
-        if data and is_document(att) and not att.get('file_path'):
+        if data and keeps_file(att) and not att.get('file_path'):
             path = _write_attachment(rel_dir, i, att.get('name') or 'file', data)
             if path:
                 att['file_path'] = path
@@ -558,8 +571,8 @@ class IMAPClient:
     def fetch_messages(self, folder: str = 'INBOX', days_back: int = 30,
                        since_uid: int = 0, limit=200, keep_documents=False) -> list:
         """Fetch messages as a list. Attachment _data is stripped (use fetch_by_uids_iter for raw).
-        keep_documents — дані документів (is_document, ≤ KEEP_DOCUMENT_MB, разом ≤ KEEP_DOCUMENTS_TOTAL_MB)
-        лишаються: sync_email зберігає їх одразу (sync.save_message persist_files='documents')."""
+        keep_documents — дані документів і запрошень (keeps_file, ≤ KEEP_DOCUMENT_MB, разом ≤
+        KEEP_DOCUMENTS_TOTAL_MB) лишаються: sync_email зберігає їх одразу (sync.save_message persist_files='documents')."""
         uids = self.search_uids(folder, days_back, since_uid, limit)
         if not uids:
             return []
@@ -567,7 +580,7 @@ class IMAPClient:
         for m in self.fetch_by_uids_iter(uids):
             for att in m.get('attachments', []):
                 size = len(att.get('_data') or b'')
-                if (keep_documents and size and is_document(att) and size <= KEEP_DOCUMENT_MB * 1024 * 1024
+                if (keep_documents and size and keeps_file(att) and size <= KEEP_DOCUMENT_MB * 1024 * 1024
                         and kept + size <= KEEP_DOCUMENTS_TOTAL_MB * 1024 * 1024):
                     kept += size
                     continue

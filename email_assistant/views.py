@@ -945,11 +945,16 @@ def _followups_for(emails) -> list:
 def _meeting_invites(user, emails) -> list:
     """Блок «📅 Запрошення» у прев'ю: ✅ Буду / ❔ Можливо / ✕ Відхилити (calendar_app/invites.py respond)."""
     try:
-        from calendar_app.invites import for_messages
+        from calendar_app.invites import catch_up, for_messages
         found = for_messages(user, emails)
     except Exception as e:  # noqa: BLE001 — прев'ю відкривається й без календаря
         logger.warning('meeting invites for preview: %s', e)
         return []
+    try:   # лист з invite.ics, який синхронізація ще не зберігала (до 17.11.2026), — розпізнати зараз
+        if catch_up(user, [m for m in emails if m.pk not in found]):
+            found = for_messages(user, emails)
+    except Exception as e:  # noqa: BLE001
+        logger.warning('meeting invite catch-up for preview: %s', e)
     return [found[m.pk] for m in emails if m.pk in found]
 
 

@@ -191,3 +191,118 @@ class ViewTests(Base):
         cfg = CalendarSettings.for_user(self.user)
         self.assertTrue(cfg.invites_auto)
         self.assertEqual(cfg.invites_since, datetime.date(2026, 10, 1))
+
+
+# ── листи з .ics, які синхронізація не зберігала (17.11.2026) ───────────────────
+TEAMS_NEW = "https://teams.microsoft.com/meet/35067592779530?p=ERTecKgPwgKibAuB9"
+
+
+def teams_ics(uid="040000008200E00074C5B7101A82E008-pieter"):
+    """Запрошення Outlook / Teams з новим посиланням teams.microsoft.com/meet/… (як у листі Pieter)."""
+    return ics(uid=uid, summary="Indoor positioning - next steps").replace(
+        "https://teams.microsoft.com/l/meetup-join/\r\n 19%3ameeting_abc%40thread.v2/0?context=x",
+        TEAMS_NEW).replace("LOCATION:Microsoft Teams-Besprechung",
+                           "LOCATION:Microsoft Teams-vergadering\r\nX-MICROSOFT-SKYPETEAMSMEETINGURL:" + TEAMS_NEW)
+
+
+def outlook_raw(uid=7, calendar=None) -> bytes:
+    """Лист Outlook із запрошенням: текст, HTML і блок text/calendar без імені файлу."""
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    m = MIMEMultipart("alternative")
+    m["Subject"] = "Indoor positioning - next steps"
+    m["From"] = '"Pieter Oosthoek" <pieter@wireless.example>'
+    m["To"] = ME
+    m["Message-ID"] = f"<teams{uid}@wireless.example>"
+    m["Date"] = "Mon, 16 Nov 2026 17:43:00 +0100"
+    m.attach(MIMEText(f"Regards, Pieter\n\nMicrosoft Teams-vergadering\nDeelnemen: {TEAMS_NEW}", "plain", "utf-8"))
+    m.attach(MIMEText(f"<p>Microsoft Teams-vergadering <a href='{TEAMS_NEW}'>Deelnemen</a></p>", "html", "utf-8"))
+    cal = MIMEText(calendar or teams_ics(), "calendar", "utf-8")
+    cal.set_param("method", "REQUEST")
+    m.attach(cal)
+    return m.as_bytes()
+
+
+class NotSavedIcsTests(Base):
+    """Щохвилинна синхронізація (sync_email) клала на диск лише PDF / DOCX / TXT / CSV — invite.ics листа Outlook
+    не зберігався, і календар запрошення не бачив; нове посилання Teams (…/meet/…) не впізнавалось."""
+
+    def setUp(self):
+        super().setUp()
+        self.media = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.media, ignore_errors=True)
+        over = override_settings(MEDIA_ROOT=self.media)
+        over.enable()
+        self.addCleanup(over.disable)
+
+    def fake_imap(self, mails):
+        from unittest.mock import patch
+        from email_assistant.tests_attachment_links import FakeConn, FakeIMAPClient
+        conn = FakeConn(mails)
+        return conn, patch("email_assistant.imap_client.IMAPClient", FakeIMAPClient(conn))
+
+    def old_mail(self, uid=7):
+        """Лист, збережений без файлу invite.ics (як до виправлення)."""
+        from email_assistant.models import EmailMessage
+        return EmailMessage.objects.create(
+            account=self.account, folder=EmailMessage.FOLDER_INBOX, imap_folder_name="INBOX", imap_uid=uid,
+            subject="Indoor positioning - next steps", from_email="pieter@wireless.example", to_emails=[ME],
+            body_text=f"Regards, Pieter\n\nMicrosoft Teams-vergadering\nDeelnemen: {TEAMS_NEW}",
+            attachments=[{"name": "invite.ics", "content_type": "text/calendar", "size": 3000}],
+            sent_at=datetime.datetime(2026, 11, 16, 16, 43, tzinfo=dt_tz.utc))
+
+    def test_new_teams_link(self):
+        [e] = invites.parse_ics(teams_ics())
+        self.assertEqual(e["join_url"], TEAMS_NEW)
+        self.assertTrue(invites.INVITE_HINT.search(f"Deelnemen: {TEAMS_NEW}"))
+
+    def test_cron_sync_saves_the_ics_and_finds_the_invite(self):
+        from io import StringIO
+        from django.core.management import call_command
+        from email_assistant.models import EmailMessage
+        conn, imap = self.fake_imap({7: outlook_raw()})
+        with imap:
+            call_command("sync_email", stdout=StringIO())
+        msg = EmailMessage.objects.get(imap_uid=7, imap_folder_name="INBOX")
+        [att] = msg.attachments
+        self.assertEqual(att["name"], "invite.ics")
+        self.assertTrue(att["file_path"] and os.path.isfile(os.path.join(self.media, att["file_path"])))
+        inv = MeetingInvite.objects.get()
+        self.assertEqual((inv.email_message, inv.title, inv.join_url),
+                         (msg, "Indoor positioning - next steps", TEAMS_NEW))
+        self.assertEqual(inv.status, MeetingInvite.NEW)
+
+    def test_preview_of_an_old_letter_takes_the_ics_from_imap_once(self):
+        from email_assistant.views import _meeting_invites
+        msg = self.old_mail()
+        self.assertFalse(MeetingInvite.objects.exists())   # сигнал не мав файлу
+        conn, imap = self.fake_imap({7: outlook_raw()})
+        with imap:
+            [inv] = _meeting_invites(self.user, [msg])
+            self.assertEqual(conn.fetched, 1)
+            msg.refresh_from_db()
+            self.assertTrue(msg.attachments[0]["file_path"])
+            self.assertEqual(_meeting_invites(self.user, [msg]), [inv])
+            other = get_user_model().objects.create_user("bob", "b@x.y", "p", is_staff=True)
+            self.assertEqual(_meeting_invites(other, [msg]), [])   # чужий лист — не розпізнаємо за власника
+        self.assertEqual(conn.fetched, 1)                         # файл уже на диску — IMAP не питаємо
+        self.assertEqual(inv.user, self.user)
+
+    def test_imap_unavailable_is_tried_a_few_times_only(self):
+        from unittest.mock import patch
+        from email_assistant.views import _meeting_invites
+        msg = self.old_mail()
+        with patch("email_assistant.attachments.fetch_documents", side_effect=OSError("down")) as fetch:
+            for _ in range(invites.FETCH_TRIES + 2):
+                self.assertEqual(_meeting_invites(self.user, [msg]), [])
+        self.assertEqual(fetch.call_count, invites.FETCH_TRIES)
+        msg.refresh_from_db()
+        self.assertEqual(msg.attachments[0]["cal_fail"], invites.FETCH_TRIES)
+
+    def test_history_scan_finds_letters_with_unsaved_ics(self):
+        self.old_mail()
+        conn, imap = self.fake_imap({7: outlook_raw()})
+        with imap:
+            seen, found = invites.scan(self.user, datetime.date(2026, 11, 1))
+        self.assertEqual((seen, found), (1, 1))
+        self.assertEqual(MeetingInvite.objects.get().join_url, TEAMS_NEW)

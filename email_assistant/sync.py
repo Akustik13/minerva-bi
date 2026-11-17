@@ -162,7 +162,8 @@ def timezone_now():
     return timezone.now()
 
 
-DOCUMENTS = 'documents'   # save_message(persist_files=DOCUMENTS) — на диск лише документи (imap_client.persist_documents)
+DOCUMENTS = 'documents'   # save_message(persist_files=DOCUMENTS) — на диск лише документи й запрошення .ics
+#                          (imap_client.persist_documents / keeps_file)
 
 
 def save_message(account, msg_data, imap_folder, folder_type=None, persist_files=False):
