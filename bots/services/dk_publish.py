@@ -425,12 +425,15 @@ def step_details(listing, steps, events, todo, error, current):
                 actions.append({"label": "🔗 Звірити офери й записати ID",
                                 "url": reverse("admin:bots_digikeypricerun_offers") + f"?q={listing.get_supplier_sku()}"})
             if s["state"] in ("current", "error"):
-                from bots.services.dk_marketplace import qty_alert
-                alert = qty_alert(listing.dk_qty_alert, listing.dk_min_order_qty)
+                from bots.services.dk_marketplace import listing_moq, qty_alert
+                moq = listing_moq(listing)
+                alert = qty_alert(listing.dk_qty_alert, moq)
                 s["text"] = ("Товар затверджено — Minerva створить офер з цінами, залишком (зараз "
-                             f"{listing.get_dk_quantity()} шт), MOQ {listing.dk_min_order_qty} і строком "
+                             f"{listing.get_dk_quantity()} шт), MOQ {moq} і строком "
                              f"{listing.dk_lead_time_days} дн"
-                             + (f", алерт залишку ≤ {alert} шт." if alert else ", без алерту залишку."))
+                             + (f", алерт залишку ≤ {alert} шт." if alert else ", без алерту залишку.")
+                             + (f" MOQ у картці {listing.dk_min_order_qty}, але ціни лише від {moq} шт. — "
+                                f"на DigiKey піде MOQ {moq}." if moq > (listing.dk_min_order_qty or 1) else ""))
                 actions.append({"label": "📦 Створити Offer", "url": url("create_offer"), "post": True,
                                 "confirm": "Створити офер на DigiKey з поточними цінами й залишком?"})
                 actions.append(sync)

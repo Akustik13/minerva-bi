@@ -286,8 +286,37 @@ def qty_alert(alert, moq) -> int | None:
     return None if alert <= 0 else max(alert, moq)
 
 
+def effective_moq(moq, prices) -> int:
+    """MOQ для DigiKey: не менший за найменшу кількість у цінах. Ціни лише від 4000 шт. → MOQ 4000: менше купити
+    нема за якою ціною, і DigiKey порівнює «Min Quantity Alert» саме з цим мінімумом (MOQ 1 + алерт 3 + ціни від
+    4000 → 400 «Min Quantity Alert must be greater than or equal to Min Order Quantity»).
+    prices — [{quantityBreak, price}] (API) або [{qty, price}] (лістинг)."""
+    try:
+        moq = max(1, int(moq or 1))
+    except (TypeError, ValueError):
+        moq = 1
+    breaks = []
+    for p in prices or []:
+        if isinstance(p, dict):
+            try:
+                q = int(p.get("quantityBreak", p.get("qty")) or 0)
+            except (TypeError, ValueError):
+                continue
+            if q > 0:
+                breaks.append(q)
+    return max([moq] + ([min(breaks)] if breaks else []))
+
+
+def listing_moq(listing) -> int:
+    """MOQ, який Minerva надсилає на DigiKey для лістингу (effective_moq)."""
+    return effective_moq(listing.dk_min_order_qty, listing.dk_prices)
+
+
 def fix_qty_alert(payload: dict) -> dict:
-    """Тіло POST / PUT офера: minQuantityAlert за qty_alert (після злиття з GET-офером чи вибраними полями)."""
+    """Тіло POST / PUT офера: MOQ — не менший за перший ступінь ціни (effective_moq), minQuantityAlert — за
+    qty_alert (після злиття з GET-офером чи вибраними полями)."""
+    if payload.get("prices") is not None or payload.get("minOrderQuantity") is not None:
+        payload["minOrderQuantity"] = effective_moq(payload.get("minOrderQuantity"), payload.get("prices"))
     alert = qty_alert(payload.get("minQuantityAlert"), payload.get("minOrderQuantity"))
     if alert is None:
         payload.pop("minQuantityAlert", None)

@@ -1343,6 +1343,7 @@
 {"uk": "DigiKey прийняв нові ціни (відповідь на оновлення)", "en": "DigiKey accepted the new prices (update response)", "de": "DigiKey hat die neuen Preise akzeptiert (Antwort auf die Aktualisierung)"}
 {"uk": "DigiKey прийняв підтвердження, але рахунку в замовленні не показує", "en": "DigiKey accepted the confirmation but does not show the invoice in the order", "de": "DigiKey hat die Bestätigung angenommen, zeigt die Rechnung im Auftrag aber nicht an"}
 {"uk": "DigiKey підтверджується через DigiKey Marketplace API; інші джерела — замовлення позначається як «Відправлено» в Minerva.", "en": "DigiKey is confirmed via the DigiKey Marketplace API; for other sources the order is marked as “Shipped” in Minerva.", "de": "DigiKey wird über die DigiKey Marketplace API bestätigt; bei anderen Quellen wird der Auftrag in Minerva als „Versendet“ markiert."}
+{"uk": "DigiKey рахує мінімальне замовлення від першого ступеня ціни — Minerva надішле MOQ {0}. Поставте MOQ {1} або додайте ціну для меншої кількості.", "en": "DigiKey counts the minimum order from the first price break — Minerva will send MOQ {0}. Set MOQ {1} or add a price for a smaller quantity.", "de": "DigiKey rechnet die Mindestbestellung ab der ersten Preisstaffel — Minerva sendet MOQ {0}. Setzen Sie MOQ {1} oder fügen Sie einen Preis für eine kleinere Menge hinzu."}
 {"uk": "DigiKey рахує ціни за курсом 1", "en": "DigiKey calculates prices at the rate 1", "de": "DigiKey berechnet die Preise zum Kurs 1"}
 {"uk": "DigiKey синхронізація", "en": "DigiKey sync", "de": "DigiKey-Synchronisierung"}
 {"uk": "DigiKey синхронізація: +{0} замовлень, +{1} рядків", "en": "DigiKey sync: +{0} orders, +{1} lines", "de": "DigiKey-Synchronisierung: +{0} Aufträge, +{1} Zeilen"}
@@ -1695,7 +1696,9 @@
 {"uk": "ML-сегментація клієнтів RFM + поведінкові патерни", "en": "ML segmentation of customers by RFM + behavioral patterns", "de": "ML-Segmentierung von Kunden nach RFM + Verhaltensmuster"}
 {"uk": "MOQ (мін. кількість)", "en": "MOQ (min. quantity)", "de": "MOQ (Mindestmenge)"}
 {"uk": "MOQ = {0} шт. — може відлякувати", "en": "MOQ = {0} pcs — may put buyers off", "de": "MOQ = {0} Stk. — kann abschreckend wirken"}
+{"uk": "MOQ {0} шт., а ціни лише від {1} шт.", "en": "MOQ {0} pcs, but prices only from {1} pcs", "de": "MOQ {0} Stk., aber Preise erst ab {1} Stk."}
 {"uk": "MOQ має бути щонайменше 1", "en": "MOQ must be at least 1", "de": "MOQ muss mindestens 1 betragen"}
+{"uk": "MOQ у картці {0}, але ціни лише від {1} шт. — на DigiKey піде MOQ {2}.", "en": "MOQ in the card is {0}, but prices start at {1} pcs — DigiKey gets MOQ {2}.", "de": "MOQ in der Karte ist {0}, die Preise beginnen aber erst bei {1} Stk. — an DigiKey geht MOQ {2}."}
 {"uk": "MOQ — ціле число від 1", "en": "MOQ — a whole number from 1", "de": "MOQ — ganze Zahl ab 1"}
 {"uk": "MRN {0} — як у посилки {1}", "en": "MRN {0} — same as parcel {1}", "de": "MRN {0} — wie bei Paket {1}"}
 {"uk": "MRN {0} — як у цієї посилки", "en": "MRN {0} — same as this parcel", "de": "MRN {0} — wie bei diesem Paket"}

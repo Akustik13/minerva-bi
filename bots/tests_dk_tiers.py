@@ -115,3 +115,27 @@ class QtyAlertTests(PriceBase):
         dk_view.push_offer_fields(l, ["minOrderQuantity"])
         sent = self.dk.puts[-1][1]
         self.assertEqual((sent["minOrderQuantity"], sent["minQuantityAlert"]), (1000, 1000))
+
+
+class MoqFromPricesTests(PriceBase):
+    """Лістинг 969: MOQ 1, алерт 3, ціни лише від 4000 шт. → DigiKey 400 «Min Quantity Alert must be ≥ Min Order
+    Quantity» — DigiKey рахує мінімум від першого ступеня ціни. Minerva надсилає MOQ 4000 і алерт 4000."""
+
+    def test_effective_moq(self):
+        from bots.services.dk_marketplace import effective_moq
+        self.assertEqual(effective_moq(1, [{"quantityBreak": 4000, "price": 0.007}]), 4000)
+        self.assertEqual(effective_moq(1, [{"qty": 1, "price": 1}, {"qty": 10, "price": 0.9}]), 1)
+        self.assertEqual(effective_moq(100, [{"qty": 1, "price": 1}]), 100)
+        self.assertEqual(effective_moq(None, []), 1)
+
+    def test_lot_listing_payload(self):
+        from bots.services.dk_marketplace import _offer_payload
+        l = self.listing(self.product("LOT-1", [(1, 1)]), "lot1", [(4000, 0.007)], dk_qty_alert=3, dk_min_order_qty=1)
+        body = _offer_payload(l)
+        self.assertEqual((body["minOrderQuantity"], body["minQuantityAlert"]), (4000, 4000))
+
+    def test_quality_check_and_roadmap_say_so(self):
+        l = self.listing(self.product("LOT-2", [(1, 1)]), "lot2", [(4000, 0.007)], dk_min_order_qty=1)
+        hits = [i for i in _local_quality_checks(l) if i.get("field") == "dk_min_order_qty"]
+        self.assertTrue(hits and "ціни лише від 4000" in hits[0]["issue"])
+        self.assertEqual(hits[0]["suggested_value"], 4000)

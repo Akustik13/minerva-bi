@@ -2044,7 +2044,13 @@ def _local_quality_checks(listing, ignored_fields=None) -> list:
         issue('dk_manufacturer', 'warning', 'Виробник не вказаний', 'Вкажіть назву виробника')
 
     moq = listing.dk_min_order_qty or 1
-    if moq > 50:
+    from .services.dk_marketplace import listing_moq
+    sent_moq = listing_moq(listing)
+    if sent_moq > moq:
+        issue('dk_min_order_qty', 'warning', f'MOQ {moq} шт., а ціни лише від {sent_moq} шт.',
+              f'DigiKey рахує мінімальне замовлення від першого ступеня ціни — Minerva надішле MOQ {sent_moq}. '
+              f'Поставте MOQ {sent_moq} або додайте ціну для меншої кількості.', suggested_value=sent_moq)
+    elif moq > 50:
         issue('dk_min_order_qty', 'warning', f'MOQ = {moq} шт. — може відлякувати', 'Розгляньте зниження до 1–10 шт.')
 
     if not listing.dk_image_url:
