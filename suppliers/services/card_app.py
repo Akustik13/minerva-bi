@@ -314,15 +314,24 @@ def card_json(m, user, cats=None) -> dict:
         "customer": {"id": m.customer_id, "name": m.customer.company or m.customer.name}
         if m.customer_id else None,
         "has_back": bool(m.image_back), "created_at": m.created_at.isoformat(),
+        # 📎 ще фото групи (друга візитка, флаєр, каталог…) і люди з інших візиток
+        "photos": [{"id": p.pk, "kind": p.kind, "label": p.get_kind_display(), "note": p.note, "uuid": p.client_uuid}
+                   for p in m.photos.all()],
+        "people": card_photos_people(m),
         "by": _person(m.created_by), "mine": m.created_by_id == user.pk, "editable": can_edit(user, m),
         "preset": m.preset_id,
     }
 
 
+def card_photos_people(m) -> list:
+    from suppliers.services import card_photos
+    return card_photos.people(m)
+
+
 def cards_qs():
     from suppliers.models import SupplierMedia
     return SupplierMedia.objects.select_related("supplier", "customer", "created_by").prefetch_related(
-        "categories", "supplier__categories")
+        "categories", "supplier__categories", "photos")
 
 
 def search(user, params) -> tuple:
@@ -405,7 +414,7 @@ def recent_events(limit=20) -> list:
 
 
 def meta(user) -> dict:
-    from suppliers.models import SupplierCategory, SupplierMedia
+    from suppliers.models import SupplierCategory, SupplierMedia, SupplierMediaPhoto
     from suppliers.services.ai import DEFAULT_MODEL, MODELS
     return {
         "user": {"name": _person(user), "email": user.email},
@@ -418,6 +427,7 @@ def meta(user) -> dict:
         "categories": [category_json(c) for c in SupplierCategory.objects.filter(is_active=True)],
         "presets": presets_for(user), "default_preset": default_preset(user),
         "kinds": [[k, v] for k, v in SupplierMedia.KINDS], "marks": [[k, v] for k, v in SupplierMedia.MARKS],
+        "photo_kinds": [[k, v] for k, v in SupplierMediaPhoto.KINDS],
         "models": [[k, v] for k, v in MODELS], "default_model": DEFAULT_MODEL,
         "events": recent_events(), "app_url": APP_URL,
     }
@@ -425,9 +435,19 @@ def meta(user) -> dict:
 
 # ── 🖼 Мініатюри ──
 
+def side_field(m, side):
+    """front / back / p<id> (ще фото групи) → FieldFile або None."""
+    side = str(side or "front")
+    if side.startswith("p") and side[1:].isdigit():
+        p = m.photos.filter(pk=int(side[1:])).first()
+        return p.image if p is not None and p.image else None
+    field = m.image_back if side == "back" else m.image
+    return field or None
+
+
 def thumb(m, side="front"):
     """Мініатюра THUMB_PX (JPEG) для списку додатка → шлях до файлу або None (немає фото / не картинка)."""
-    field = m.image_back if side == "back" else m.image
+    field = side_field(m, side)
     if not field:
         return None
     try:

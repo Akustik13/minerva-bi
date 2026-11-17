@@ -91,7 +91,7 @@ class QueueFragment : Fragment() {
 
     private fun render() {
         val bb = _b ?: return
-        val all = CaptureStore.all()
+        val all = CaptureStore.mine()
         val c = CaptureStore.counts()
         bb.summary.text = when {
             !Prefs.paired -> "🔗 Minerva не підключено — фото чекають на телефоні. «⚙ Налаштування → Підключити»."
@@ -106,7 +106,7 @@ class QueueFragment : Fragment() {
             when (filter) {
                 "waiting" -> it.waiting
                 "done" -> it.status == Capture.UPLOADED
-                "failed" -> it.status == Capture.FAILED
+                "failed" -> it.failed
                 else -> true
             }
         }
@@ -119,6 +119,7 @@ class QueueFragment : Fragment() {
     private fun statusText(c: Capture): String {
         val card = c.card
         return when (c.status) {
+            Capture.DRAFT -> "✏️ Чернетка — торкніться, щоб дописати й зберегти"
             Capture.PENDING -> if (c.error.isNotEmpty()) "⏳ Чекає інтернету · ${c.error}" else "⏳ Чекає інтернету"
             Capture.UPLOADING -> "⬆ Надсилається…"
             Capture.FAILED -> "⚠️ ${c.error.ifEmpty { "Minerva не прийняла" }} — торкніться, щоб виправити"
@@ -128,7 +129,11 @@ class QueueFragment : Fragment() {
                     card?.customerName?.isNotEmpty() == true -> " · 👤 ${card.customerName}"
                     else -> ""
                 }
-                "✅ У Minerva · ${card?.aiText() ?: ""}$where"
+                when {
+                    c.pushError.isNotEmpty() -> "⚠️ Зміни фото не дійшли: ${c.pushError} — торкніться й утримуйте"
+                    c.dirty -> "⏳ Зміни фото чекають інтернету · ✅ У Minerva$where"
+                    else -> "✅ У Minerva · ${card?.aiText() ?: ""}$where"
+                }
             }
         }
     }
@@ -139,16 +144,24 @@ class QueueFragment : Fragment() {
         if (c.status == Capture.UPLOADED && c.serverId > 0) {
             labels += "🪪 Відкрити в Minerva"; acts += { CardDetailActivity.open(requireContext(), c.serverId) }
         }
-        labels += "✏️ Примітка, позначки, категорії"; acts += { ReviewSheet.forEdit(c.uuid).show(childFragmentManager, "edit") }
-        labels += "🖼 Фото"; acts += { PhotoActivity.openFile(requireContext(), c.front) }
-        if (c.status == Capture.FAILED) {
+        labels += "✏️ Фото (знову, зворотний бік, ще фото), примітка, позначки"
+        acts += { ReviewSheet.forEdit(c.uuid).show(childFragmentManager, "edit") }
+        if (c.front.isNotEmpty()) { labels += "🖼 Фото на весь екран"; acts += { PhotoActivity.openFile(requireContext(), c.front) } }
+        if (c.failed) {
             labels += "⬆ Надіслати ще раз"; acts += {
-                CaptureStore.update(c.uuid) { it.status = Capture.PENDING; it.error = "" }
+                CaptureStore.update(c.uuid) {
+                    if (it.status == Capture.FAILED) it.status = Capture.PENDING
+                    it.error = ""; it.pushError = ""
+                }
                 Sync.uploadNow(requireContext())
             }
         }
         labels += "🗑 Прибрати з телефона"; acts += {
-            val text = if (c.status == Capture.UPLOADED) "Фото лишиться в Minerva." else "Це фото ще НЕ в Minerva — воно зникне зовсім."
+            val text = when {
+                c.dirty -> "Знімок у Minerva, але зміни фото ще не дійшли — вони зникнуть."
+                c.status == Capture.UPLOADED -> "Фото лишиться в Minerva."
+                else -> "Це фото ще НЕ в Minerva — воно зникне зовсім."
+            }
             requireContext().confirm("Прибрати знімок?", text, "🗑 Прибрати") { CaptureStore.remove(c.uuid) }
         }
         MaterialAlertDialogBuilder(requireContext())
@@ -168,21 +181,23 @@ class QueueFragment : Fragment() {
             val c = items[pos]
             val card = c.card
             val meta = Prefs.meta()
-            ImageLoader.local(viewLifecycleOwner.lifecycleScope, h.v.thumb, c.front)
+            if (c.front.isNotEmpty() || c.serverId == 0) ImageLoader.local(viewLifecycleOwner.lifecycleScope, h.v.thumb, c.front)
+            else ImageLoader.server(requireContext(), viewLifecycleOwner.lifecycleScope, h.v.thumb, c.serverId)
             val name = listOf(card?.company.orEmpty(), card?.person.orEmpty()).filter { it.isNotEmpty() }.joinToString(" · ")
             h.v.line1.text = name.ifEmpty { listOf(meta.kindLabel(c.kind), c.event).filter { it.isNotEmpty() }.joinToString(" · ") }
             h.v.line2.text = statusText(c)
             val bits = mutableListOf<String>()
             bits += shortDate(c.createdAt)
             meta.roleIcon(card?.role ?: c.role).takeIf { it.isNotEmpty() }?.let { bits += it }
-            if (c.back.isNotEmpty()) bits += "2 боки"
+            if (c.hasBack) bits += "2 боки"
+            if (c.extras.isNotEmpty()) bits += "📎 +${c.extras.size}"
             if (c.qrFront.isNotEmpty() || c.qrBack.isNotEmpty()) bits += "🔳 QR"
             c.marks.mapTo(bits) { meta.markLabel(it).take(2) }
             c.categories.mapNotNullTo(bits) { meta.category(it)?.icon }
             if (c.note.isNotEmpty()) bits += "📝 ${c.note.take(60)}"
             h.v.line3.text = bits.joinToString(" ")
             h.v.root.setOnClickListener {
-                if (c.status == Capture.UPLOADED && c.serverId > 0) CardDetailActivity.open(requireContext(), c.serverId)
+                if (c.status == Capture.UPLOADED && c.serverId > 0 && c.pushError.isEmpty()) CardDetailActivity.open(requireContext(), c.serverId)
                 else ReviewSheet.forEdit(c.uuid).show(childFragmentManager, "edit")
             }
             h.v.root.setOnLongClickListener { options(c); true }

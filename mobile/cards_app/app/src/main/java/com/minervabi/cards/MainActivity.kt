@@ -32,6 +32,28 @@ class MainActivity : AppCompatActivity() {
         if (!Prefs.paired && savedInstanceState == null) startActivity(Intent(this, PairActivity::class.java))
         CaptureStore.listen(badgeListener)
         badge()
+        if (savedInstanceState == null) handle(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handle(intent)
+    }
+
+    /** Картка візитки → «📷 Фото…»: вікно приміток цього знімка (фото, зворотний бік, ще фото). */
+    private fun handle(intent: Intent?) {
+        val uuid = intent?.getStringExtra(EXTRA_REVIEW) ?: return
+        intent.removeExtra(EXTRA_REVIEW)
+        select(R.id.nav_capture)
+        (tabs[R.id.nav_capture] as? CaptureFragment)?.openReview(uuid, intent.getIntExtra(EXTRA_RETURN, R.id.nav_browse))
+    }
+
+    val currentTab get() = current
+
+    /** З вікна приміток: зняти фото для цього знімка — камера, потім знову вікно. */
+    fun shootFor(t: ShotTarget) {
+        select(R.id.nav_capture)
+        (tabs[R.id.nav_capture] as? CaptureFragment)?.shootFor(t)
     }
 
     override fun onDestroy() {
@@ -81,6 +103,18 @@ class MainActivity : AppCompatActivity() {
         val bd = b.nav.getOrCreateBadge(R.id.nav_queue)
         bd.isVisible = n > 0
         bd.number = n
+    }
+
+    companion object {
+        const val EXTRA_REVIEW = "review_uuid"
+        const val EXTRA_RETURN = "return_tab"
+
+        /** Відкрити вікно приміток знімка з іншого екрана (картка візитки). */
+        fun review(context: android.content.Context, uuid: String) {
+            context.startActivity(Intent(context, MainActivity::class.java).putExtra(EXTRA_REVIEW, uuid)
+                .putExtra(EXTRA_RETURN, R.id.nav_browse)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+        }
     }
 
     /** Кнопка гучності — теж знімок (зручно однією рукою). */

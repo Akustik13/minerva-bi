@@ -18,6 +18,8 @@
 .spc-pick{flex:none;width:18px;height:18px;margin:0;cursor:pointer;accent-color:var(--primary,#5b8def)}
 .spc.spc-sel{outline:2px solid var(--primary,#5b8def);outline-offset:1px}
 .spc-top{display:flex;justify-content:space-between;gap:4px;align-items:baseline}
+.spc-imgbox{display:block;position:relative}
+.spc-nph{position:absolute;right:4px;bottom:4px;background:rgba(0,0,0,.65);color:#fff;font-size:11px;border-radius:8px;padding:0 6px}
 .spc-top a{text-decoration:none;color:inherit}
 .spc-ai{font-size:11px;white-space:nowrap;border-radius:8px;padding:0 5px;border:1px solid var(--border-strong,#ccc)}
 .spc-ai-ai{color:var(--ok,#2e7d32);border-color:currentColor}.spc-ai-failed{color:var(--warning-fg,#b06d00);border-color:currentColor}
@@ -114,7 +116,7 @@
   <div class="sp-cards" id="spc-list" data-desc="{{ prefs.desc }}">
     {% for m in items %}{% with i=m.info %}{% url 'admin:inventory_supplier_card_review' m.pk as review %}
     <div class="sp-card spc" data-pk="{{ m.pk }}">
-      <a href="{{ review }}">{% if m.image %}<img src="{{ m.image.url }}" alt="" loading="lazy">{% endif %}</a>
+      <a href="{{ review }}" class="spc-imgbox">{% if m.image %}<img src="{{ m.image.url }}" alt="" loading="lazy">{% endif %}{% with n=m.photos.all|length %}{% if n or m.image_back %}<span class="spc-nph" title="Фото в групі: {% if m.image_back %}2 боки{% else %}1 бік{% endif %}{% if n %} + ще {{ n }}{% endif %}">{% if m.image_back %}2 боки{% endif %}{% if n %} 📎 +{{ n }}{% endif %}</span>{% endif %}{% endwith %}</a>
       <div class="spc-top"><span class="spc-head"><input type="checkbox" class="spc-pick" value="{{ m.pk }}" title="Вибрати — поділитись разом з іншими" aria-label="Вибрати">
         <a href="{{ review }}"><b>{{ m.get_kind_display }}</b> <span translate="no">{{ m.title }}</span></a></span>
         <span class="spc-ai spc-ai-{{ i.ai.key }} spc-f-ai" title="{{ i.ai.title }}">{{ i.ai.label }}</span></div>

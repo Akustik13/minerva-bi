@@ -279,30 +279,71 @@ def _us_text() -> str:
     return (" Ми — " + (name or "наша фірма") + (", продаємо: " + ", ".join(cats) if cats else "") + ".")
 
 
+GROUP_HINT = (" Фото підписано («Фото 1 — …»). contact — людина з основної візитки (лицьовий / зворотний бік); люди "
+              "з інших візиток групи («ще одна візитка цієї фірми») — у people (ім'я, посада, email, телефон, "
+              "мобільний), кожна людина один раз. Флаєр, каталог, продукт, стенд — для опису, продукції й категорій; "
+              "дані фірми (сайт, адреса, телефон) бери з будь-якого фото. Додай до JSON поле \"people\": "
+              "[{\"name\": \"\", \"position\": \"\", \"email\": \"\", \"phone\": \"\", \"mobile\": \"\"}].")
+
+
+def _group_blocks(media) -> list:
+    """Фото групи (card_photos.for_ai) → [підпис, фото, …]; лицьовий бік завеликий — помилка, ще фото — пропуск."""
+    from suppliers.services import card_photos
+    out, used = [], 0
+    for n, (label, field) in enumerate(card_photos.for_ai(media)):
+        try:
+            block = _image_block(field)
+        except AIError:
+            if n == 0:
+                raise
+            continue
+        if not block:
+            continue
+        size = len(block["source"]["data"])
+        if n and used + size > card_photos.AI_BYTES:
+            continue
+        used += size
+        out += [{"type": "text", "text": label}, block]
+    return out
+
+
 def card(media, user=None, model=DEFAULT_MODEL) -> dict:
-    """📷 Візитка / флаєр → поля постачальника. Пише media.extracted / state / cost_usd."""
+    """📷 Візитка / флаєр (разом з усіма фото групи — card_photos) → поля постачальника. Пише media.extracted /
+    state / cost_usd. Знайдене в інтернеті (🌐) лишається, якщо на фото цього немає; внесена візитка лишається
+    «внесено», а нові люди з інших візиток групи — контактами її постачальника."""
     from suppliers.models import SupplierMedia
-    from suppliers.services import qr
-    blocks = [b for b in (_image_block(media.image), _image_block(media.image_back)) if b]
+    from suppliers.services import card_photos, qr
+    blocks = _group_blocks(media)
     if not blocks:
         raise AIError("Немає фото.")
+    group = len(blocks) > 4 or card_photos.has_more_cards(media)
+    qr_text = qr.join(media.qr_text or "", *media.photos.exclude(qr_text="").values_list("qr_text", flat=True))
     qr_fields = qr.parse_all(media.qr_text)
     qr_note = ""
-    if media.qr_text:      # браузер уже розшифрував QR — точні дані, AI лише доповнює
-        qr_note = "\nQR-код з цієї візитки (точні дані, бери їх як є):\n" + media.qr_text[:2000]
+    if qr_text:            # браузер / телефон уже розшифрував QR — точні дані, AI лише доповнює
+        qr_note = ("\nQR-код з цих фото" if group else "\nQR-код з цієї візитки") + \
+            " (точні дані, бери їх як є):\n" + qr_text[:3000]
+    shape = SUPPLIER_JSON[:-1] + ', "people": []}' if group else SUPPLIER_JSON
     system = ("Ти читаєш візитки, флаєри й каталоги постачальників для системи закупівель. " + DATA_NOTE +
-              CARD_HINT + _us_text() + ROLE_HINT + " Відповідай лише JSON такої форми: " + SUPPLIER_JSON +
-              " Категорії — лише з переліку: " + _categories_text() + ".")
+              CARD_HINT + (GROUP_HINT if group else "") + _us_text() + ROLE_HINT +
+              " Відповідай лише JSON такої форми: " + shape + " Категорії — лише з переліку: " + _categories_text() + ".")
     content = blocks + [{"type": "text", "text": f"<<<ДАНІ: {media.get_kind_display()}"
                          + (f", де взяли: {media.event}" if media.event else "") + qr_note + "\nДАНІ>>>\n"
-                         "Прочитай усе з фото (обидва боки, якщо їх два) і поверни JSON."}]
+                         + ("Прочитай усі фото групи й поверни JSON." if group else
+                            "Прочитай усе з фото (обидва боки, якщо їх два) і поверни JSON.")}]
     try:
-        text, price = call(system, content, model=model_of(model), user=user, effort="low", max_tokens=4000)
+        text, price = call(system, content, model=model_of(model), user=user, effort="low",
+                           max_tokens=6000 if group else 4000)
         raw = parse_json(text)
         data = qr.merge(qr_fields, clean_supplier(raw))
         role = _s(raw.get("role"), 10).lower() if isinstance(raw, dict) else ""
         if role in ("supplier", "customer", "other"):
             data["role_ai"], data["role_why"] = role, _s(raw.get("role_why"), 200)
+        people = card_photos.clean_people(raw.get("people")) if group and isinstance(raw, dict) else []
+        if people:
+            main = (data.get("contact_name") or "").lower(), (data.get("contact_email") or "").lower()
+            data["people"] = [p for p in people if (p["name"].lower(), p["email"].lower()) != main
+                              and not (p["email"] and p["email"].lower() == main[1])]
     except AIError as e:
         SupplierMedia.objects.filter(pk=media.pk).update(state=SupplierMedia.FAILED, error=str(e)[:500])
         raise
@@ -310,9 +351,18 @@ def card(media, user=None, model=DEFAULT_MODEL) -> dict:
         logger.warning("suppliers card AI failed: %s", e)
         SupplierMedia.objects.filter(pk=media.pk).update(state=SupplierMedia.FAILED, error=str(e)[:500])
         raise AIError(f"AI не відповів: {e}") from e
-    SupplierMedia.objects.filter(pk=media.pk).update(
-        extracted=data, state=SupplierMedia.READ, error="", cost_usd=price)
-    media.extracted, media.state, media.cost_usd = data, SupplierMedia.READ, price
+    old = media.extracted or {}
+    if isinstance(old.get("web"), dict):         # 🌐 знайдене в інтернеті не губиться після нового читання
+        data["web"] = old["web"]
+        kept = [k for k in (old.get("from_web") or []) if isinstance(k, str) and not data.get(k) and old.get(k)]
+        for k in kept:
+            data[k] = old[k]
+        if kept:
+            data["from_web"] = kept
+    state = SupplierMedia.APPLIED if media.state == SupplierMedia.APPLIED else SupplierMedia.READ
+    total = (media.cost_usd or Decimal(0)) + price
+    SupplierMedia.objects.filter(pk=media.pk).update(extracted=data, state=state, error="", cost_usd=total)
+    media.extracted, media.state, media.cost_usd = data, state, total
     if data.get("role_ai") and (not media.role or media.role_ai):    # 👥 підказка — лише якщо людина не вибрала
         SupplierMedia.objects.filter(pk=media.pk).update(role=data["role_ai"], role_ai=True)
         media.role, media.role_ai = data["role_ai"], True
@@ -321,6 +371,8 @@ def card(media, user=None, model=DEFAULT_MODEL) -> dict:
         found = match_categories(data.get("categories"))
         if found:
             media.categories.set(found)
+    if media.supplier_id and data.get("people"):     # дознімали ще візитку до внесеної — люди в контакти
+        card_photos.add_people(media.supplier, media, user)
     return data
 
 
