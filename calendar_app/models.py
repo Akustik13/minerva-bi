@@ -101,6 +101,9 @@ class CalendarSettings(models.Model):
 
     default_remind_minutes = models.PositiveIntegerField(
         default=60, verbose_name='Нагадувати за N хвилин (за замовчуванням)')
+    team_letter = models.CharField(max_length=3, blank=True, default='',
+                                   verbose_name='Моя буква в календарі команди',
+                                   help_text='«V» у назві «V, S: Telco …»; порожньо — перша літера імені')
 
     # Optional overrides — leave blank to use system NotificationSettings values
     email_to         = models.EmailField(blank=True, verbose_name='Email для сповіщень',
@@ -372,12 +375,17 @@ class RemoteCalendar(models.Model):
 
 class SyncRule(models.Model):
     """Правило «звідки → куди». Двосторонньо — два правила; копії ніколи не копіюються назад (SyncLink)."""
-    ALL, MEETINGS, MAIL = 'all', 'meetings', 'mail'
+    ALL, MEETINGS, MAIL, TEAM = 'all', 'meetings', 'mail', 'team'
     WHAT = [(ALL, 'Усі події'), (MEETINGS, 'Лише зустрічі (з учасниками або посиланням Teams / Zoom)'),
-            (MAIL, 'Лише з пошти (у Minerva: запрошення й терміни з листів)')]
-    FULL, BUSY, PREFIX = 'full', 'busy', 'prefix'
+            (MAIL, 'Лише з пошти (у Minerva: запрошення й терміни з листів)'),
+            (TEAM, 'Лише спільні зустрічі (з запрошення: крім мене — ще хтось із наших)')]
+    FULL, BUSY, PREFIX = 'full', 'busy', 'prefix'   # + TEAM — календар команди (calendar_app/team.py)
     MODES = [(FULL, 'Повністю (назва, час, місце, опис)'), (BUSY, 'Лише «Зайнято» (без деталей)'),
-             (PREFIX, 'Повністю, з позначкою джерела в назві')]
+             (PREFIX, 'Повністю, з позначкою джерела в назві'),
+             (TEAM, 'Для календаря команди: «V, S: Telco Компанія» + учасники')]
+    PEOPLE_OURS, PEOPLE_ALL, PEOPLE_NONE = 'ours', 'all', 'none'
+    PEOPLE = [(PEOPLE_OURS, 'Учасники: лише наші (адреси нашого домену)'), (PEOPLE_ALL, 'Учасники: усі із запрошення'),
+              (PEOPLE_NONE, 'Учасників не вписувати')]
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sync_rules')
     enabled = models.BooleanField(default=True, verbose_name='Увімкнено')
     source = models.ForeignKey(RemoteCalendar, null=True, blank=True, on_delete=models.CASCADE, related_name='+',
@@ -387,6 +395,11 @@ class SyncRule(models.Model):
     what = models.CharField(max_length=10, choices=WHAT, default=ALL, verbose_name='Що')
     keyword = models.CharField(max_length=100, blank=True, default='', verbose_name='Лише зі словом у назві')
     mode = models.CharField(max_length=10, choices=MODES, default=FULL, verbose_name='Як')
+    title_template = models.CharField(max_length=120, blank=True, default='{who}: Telco {company}',
+                                      verbose_name='Назва для календаря команди',
+                                      help_text='{who} — букви наших учасників, {company} — компанія, {title} — назва')
+    participants = models.CharField(max_length=10, choices=PEOPLE, default=PEOPLE_OURS,
+                                    verbose_name='Учасники в описі (календар команди)')
     days_back = models.PositiveSmallIntegerField(default=7, verbose_name='Днів назад')
     days_ahead = models.PositiveSmallIntegerField(default=90, verbose_name='Днів уперед')
     propagate_delete = models.BooleanField(default=True, verbose_name='Видаляти копію, коли оригінал видалено')

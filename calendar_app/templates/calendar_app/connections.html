@@ -252,7 +252,7 @@ details.cn-help summary{cursor:pointer;font-size:12px;color:#1a73e8}
     {% if rules %}
     <div class="cn-scroll"><table class="cn-table">
       {% for r in rules %}
-      <tr><td><b>{{ r }}</b><div class="cn-muted">{{ r.get_what_display }} · {{ r.get_mode_display }}{% if r.keyword %} · «{{ r.keyword }}»{% endif %} · −{{ r.days_back }}…+{{ r.days_ahead }} {% trans "дн." %}{% if r.propagate_delete %} · {% trans "видалення теж" %}{% endif %}</div>
+      <tr><td><b>{{ r }}</b><div class="cn-muted">{{ r.get_what_display }} · {{ r.get_mode_display }}{% if r.mode == 'team' %} · «{{ r.title_template }}» · {{ r.get_participants_display }}{% endif %}{% if r.keyword %} · «{{ r.keyword }}»{% endif %} · −{{ r.days_back }}…+{{ r.days_ahead }} {% trans "дн." %}{% if r.propagate_delete %} · {% trans "видалення теж" %}{% endif %}</div>
           {% if r.last_run %}<div class="cn-muted">{{ r.last_run|date:"d.m H:i" }} — {{ r.last_result }}</div>{% endif %}</td>
         <td><form method="post" action="{% url 'calendar_app:sync_action' %}" style="display:flex;flex-wrap:wrap;gap:4px">{% csrf_token %}<input type="hidden" name="rule" value="{{ r.pk }}">
           <button class="cn-btn2" name="action" value="rule_preview">👁 {% trans "Перегляд" %}</button>
@@ -273,11 +273,18 @@ details.cn-help summary{cursor:pointer;font-size:12px;color:#1a73e8}
       <label>{% trans "Куди" %}<select name="target"><option value="">Minerva</option>{% for c in remote_calendars %}{% if c.can_write %}<option value="{{ c.pk }}" {% if forloop.first %}selected{% endif %}>{{ c }}</option>{% endif %}{% endfor %}</select></label>
       <label>{% trans "Що" %}<select name="what">{% for k, l in rule_what %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select></label>
       <label>{% trans "Як" %}<select name="mode">{% for k, l in rule_modes %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select></label>
+      <label title="{% trans '{who} — букви наших учасників, {company} — компанія (клієнт CRM або домен), {title} — назва зустрічі' %}">{% trans "Назва для календаря команди" %}<input type="text" name="title_template" value="{who}: Telco {company}" maxlength="120" style="min-width:170px"></label>
+      <label>{% trans "Учасники в описі" %}<select name="participants">{% for k, l in rule_people %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select></label>
       <label>{% trans "Слово в назві" %}<input type="text" name="keyword" placeholder="{% trans 'необов’язково' %}" style="min-width:110px"></label>
       <label>{% trans "Днів назад" %}<input type="number" name="days_back" value="7" min="0" max="365" style="width:70px"></label>
       <label>{% trans "уперед" %}<input type="number" name="days_ahead" value="90" min="1" max="730" style="width:70px"></label>
       <label style="flex-direction:row;gap:6px;align-items:center;color:inherit"><input type="checkbox" name="propagate_delete" value="1" checked> {% trans "видаляти копію разом з оригіналом" %}</label>
       <button class="cn-btn">＋ {% trans "Правило" %}</button>
+    </form>
+    <form method="post" action="{% url 'calendar_app:sync_action' %}" class="cn-row" style="margin-top:6px">{% csrf_token %}<input type="hidden" name="action" value="team_letter">
+      <label title="{% trans 'У назві події календаря команди: «V, S: Telco …». Порожньо — перша літера імені.' %}">{% trans "Моя буква в календарі команди" %}<input type="text" name="team_letter" value="{{ team_letter.value }}" placeholder="{{ team_letter.auto }}" maxlength="3" style="width:60px"></label>
+      <button class="cn-btn2">💾 {% trans "Зберегти" %}</button>
+      <span class="cn-muted">{% trans "Зараз" %}: <b>{{ team_letter.now }}</b> · {% trans "літери колег — з їхніх налаштувань у Minerva" %}</span>
     </form>
     {% endif %}
 

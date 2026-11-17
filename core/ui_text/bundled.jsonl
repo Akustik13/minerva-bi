@@ -3380,6 +3380,7 @@
 {"uk": "«OAuth consent screen»: External, додати свою пошту; потім «Publish app» → «In production» (у режимі Testing Google відкликає доступ кожні 7 днів; попередження «неперевірений застосунок» — нормально для власного).", "en": "“OAuth consent screen”: External, add your own e-mail; then “Publish app” → “In production” (in Testing mode Google revokes access every 7 days; the “unverified app” warning is normal for your own app).", "de": "„OAuth consent screen“: External, eigene E-Mail-Adresse hinzufügen; dann „Publish app“ → „In production“ (im Modus Testing widerruft Google den Zugriff alle 7 Tage; die Warnung „nicht verifizierte App“ ist bei einer eigenen App normal)."}
 {"uk": "«Void» — лише для відправлень UPS.", "en": "“Void” is only for UPS shipments.", "de": "„Void“ gilt nur für UPS-Sendungen."}
 {"uk": "«Von:» пересланого листа", "en": "“Von:” of the forwarded e-mail", "de": "„Von:“ der weitergeleiteten E-Mail"}
+{"uk": "«V» у назві «V, S: Telco …»; порожньо — перша літера імені", "en": "«V» in the title «V, S: Telco …»; empty — first letter of the first name", "de": "«V» im Titel «V, S: Telco …»; leer — erster Buchstabe des Vornamens"}
 {"uk": "«Willkommen», «Zahlung erhalten», пароль змінено, акаунт видалено", "en": "«Willkommen», «Zahlung erhalten», password changed, account deleted", "de": "«Willkommen», «Zahlung erhalten», Passwort geändert, Konto gelöscht"}
 {"uk": "«sku:AMP-100», «order_number:WS-1001», «code:PO-12», «id:5» — кожен запис, який ключ отримав (до 2000; більше — лише кількість у «Записів»)", "en": "“sku:AMP-100”, “order_number:WS-1001”, “code:PO-12”, “id:5” — every record the key received (up to 2000; beyond that only the count in “Records”)", "de": "„sku:AMP-100“, „order_number:WS-1001“, „code:PO-12“, „id:5“ — jeder Datensatz, den der Schlüssel erhalten hat (bis zu 2000; darüber hinaus nur die Anzahl unter „Datensätze“)"}
 {"uk": "«{0}» ({1}) вже є в основного клієнта, а без клієнта цей запис існувати не може. Злиття не виконано.", "en": "“{0}” ({1}) already exists for the primary customer, and this record cannot exist without a customer. Merge not performed.", "de": "„{0}“ ({1}) ist beim Hauptkunden bereits vorhanden, und dieser Datensatz kann ohne Kunden nicht existieren. Zusammenführung nicht durchgeführt."}
@@ -4711,6 +4712,7 @@
 {"uk": "Ваш календар — сьогодні подій: {0}", "en": "Your calendar — events today: {0}", "de": "Ihr Kalender — Termine heute: {0}"}
 {"uk": "Ваш календар: події й дедлайни на сьогодні й наступні days днів, невиконані прострочені дедлайни, запрошення на зустрічі, що чекають вашої відповіді.", "en": "Ваш календар: події й дедлайни на сьогодні й наступні days днів, невиконані прострочені дедлайни, запрошення на зустрічі, що чекають вашої відповіді.", "de": "Ваш календар: події й дедлайни на сьогодні й наступні days днів, невиконані прострочені дедлайни, запрошення на зустрічі, що чекають вашої відповіді."}
 {"uk": "Ваш результат", "en": "Your result", "de": "Ihr Ergebnis"}
+{"uk": "Ваша буква в календарі команди: {0}.", "en": "Your letter in the team calendar: {0}.", "de": "Ihr Buchstabe im Teamkalender: {0}."}
 {"uk": "Ваша відповідь…", "en": "Your reply…", "de": "Ihre Antwort…"}
 {"uk": "Ваша компанія", "en": "Your company", "de": "Ihr Unternehmen"}
 {"uk": "Ваша пошта — за останню добу {0} листів, непрочитаних {1}", "en": "Your mail — {0} emails in the last 24 hours, {1} unread", "de": "Ihre Post — {0} E-Mails in den letzten 24 Stunden, ungelesen {1}"}
@@ -6396,6 +6398,7 @@
 {"uk": "Для зовнішнього монтажу", "en": "For outdoor mounting", "de": "Für die Außenmontage"}
 {"uk": "Для зовнішніх агентів (Claude Code, Claude Desktop): адреса", "en": "For external agents (Claude Code, Claude Desktop): address", "de": "Für externe Agenten (Claude Code, Claude Desktop): Adresse"}
 {"uk": "Для зростаючого бізнесу", "en": "For a growing business", "de": "Für wachsende Unternehmen"}
+{"uk": "Для календаря команди: «V, S: Telco Компанія» + учасники", "en": "For the team calendar: «V, S: Telco Company» + participants", "de": "Für den Teamkalender: «V, S: Telco Firma» + Teilnehmer"}
 {"uk": "Для каналу", "en": "For a channel", "de": "Für einen Kanal"}
 {"uk": "Для ключа не налаштовано магазин.", "en": "No shop is configured for the key.", "de": "Für den Schlüssel ist kein Shop konfiguriert."}
 {"uk": "Для ключів API, не прив'язаних до магазину.", "en": "For API keys not bound to a shop.", "de": "Für API-Schlüssel, die keinem Shop zugeordnet sind."}
@@ -9682,6 +9685,7 @@
 {"uk": "Лише продажі: тип «Sale», не скасовані, «Впливає на склад» (без запитів пропозицій, зразків і тестового магазину). Сер. ціна — виручка рядків з ціною ÷ їхні штуки.", "en": "Sales only: type “Sale”, not cancelled, “Affects stock” (excluding quote requests, samples and the test shop). Avg. price — revenue of lines with a price ÷ their pieces.", "de": "Nur Verkäufe: Typ „Sale“, nicht storniert, „Wirkt sich auf den Bestand aus“ (ohne Angebotsanfragen, Muster und Testshop). Ø Preis — Umsatz der Positionen mit Preis ÷ deren Stückzahl."}
 {"uk": "Лише рядок наприкінці «Цей лист написав наш AI-помічник»", "en": "Only a line at the end: “This email was written by our AI assistant”", "de": "Nur eine Zeile am Ende: „Diese E-Mail hat unser KI-Assistent verfasst“"}
 {"uk": "Лише склад Minerva", "en": "Minerva stock only", "de": "Nur Minerva-Lager"}
+{"uk": "Лише спільні зустрічі (з запрошення: крім мене — ще хтось із наших)", "en": "Only shared meetings (from the invitation: besides me, someone else from our team)", "de": "Nur gemeinsame Besprechungen (aus der Einladung: außer mir noch jemand von uns)"}
 {"uk": "Лише текст тіла листа: без теми, без прощання й підпису (додаються самі), без Markdown.", "en": "Only the body text of the e-mail: no subject, no sign-off and signature (they are added automatically), no Markdown.", "de": "Nur der Text des E-Mail-Körpers: ohne Betreff, ohne Grußformel und Signatur (werden automatisch hinzugefügt), ohne Markdown."}
 {"uk": "Лише терміни дій або подій. Не бери дати минулих подій, дати в підписах, номери документів. Немає — [].", "en": "Only deadlines of actions or events. Do not take dates of past events, dates in signatures, document numbers. None — [].", "de": "Nur Fristen von Aktionen oder Terminen. Keine Daten vergangener Ereignisse, keine Daten in Signaturen, keine Dokumentnummern übernehmen. Keine — []."}
 {"uk": "Лише тим, у кого в «👥 Працівники askDANTE» заповнено «Email для звіту».", "en": "Only to those who have “Report email” filled in under “👥 askDANTE employees”.", "de": "Nur an diejenigen, bei denen unter „👥 askDANTE-Mitarbeiter“ die „E-Mail für Bericht“ ausgefüllt ist."}
@@ -10082,6 +10086,7 @@
 {"uk": "Моніторинг дефіциту по ринку — не потрібен", "en": "Market shortage monitoring — not needed", "de": "Marktüberwachung auf Engpässe — nicht erforderlich"}
 {"uk": "Моніторинг після зміни", "en": "Monitoring after the change", "de": "Überwachung nach der Änderung"}
 {"uk": "Морський термін, для кур'єра не підходить", "en": "Maritime term, not suitable for courier", "de": "Seefracht-Klausel, für Kurier nicht geeignet"}
+{"uk": "Моя буква в календарі команди", "en": "My letter in the team calendar", "de": "Mein Buchstabe im Teamkalender"}
 {"uk": "Моя компанія", "en": "My company", "de": "Meine Firma"}
 {"uk": "Моя мова (мікрофон)", "en": "My language (microphone)", "de": "Meine Sprache (Mikrofon)"}
 {"uk": "Мої", "en": "Mine", "de": "Meine"}
@@ -10425,6 +10430,7 @@
 {"uk": "Назва вкладки Excel. Порожньо = перший лист. Для CSV не застосовується.", "en": "Excel sheet name. Empty = first sheet. Not applicable to CSV.", "de": "Name des Excel-Blatts. Leer = erstes Blatt. Gilt nicht für CSV."}
 {"uk": "Назва відсутня", "en": "Name is missing", "de": "Name fehlt"}
 {"uk": "Назва для документів", "en": "Name for documents", "de": "Bezeichnung für Dokumente"}
+{"uk": "Назва для календаря команди", "en": "Title for the team calendar", "de": "Titel für den Teamkalender"}
 {"uk": "Назва для покупців", "en": "Name for customers", "de": "Name für Kunden"}
 {"uk": "Назва довша за {0} символів ({1})", "en": "The name is longer than {0} characters ({1})", "de": "Der Name ist länger als {0} Zeichen ({1})"}
 {"uk": "Назва з JLC, наприклад: AN120202-01H_2L_FR4_0.8x160x77.5mm_", "en": "Name from JLC, for example: AN120202-01H_2L_FR4_0.8x160x77.5mm_", "de": "Name von JLC, zum Beispiel: AN120202-01H_2L_FR4_0.8x160x77.5mm_"}
@@ -17037,7 +17043,12 @@
 {"uk": "Учасники", "en": "Participants", "de": "Teilnehmer"}
 {"uk": "Учасники (email)", "en": "Participants (e-mail)", "de": "Teilnehmer (E-Mail)"}
 {"uk": "Учасники (з листування — автоматично; роль можна виправити)", "en": "Participants (from correspondence — automatic; the role can be corrected)", "de": "Teilnehmer (aus der Korrespondenz — automatisch; die Rolle kann korrigiert werden)"}
+{"uk": "Учасники в описі (календар команди)", "en": "Participants in the description (team calendar)", "de": "Teilnehmer in der Beschreibung (Teamkalender)"}
 {"uk": "Учасники, що прийняли запрошення, і організатор потраплять у протокол згоди самі.", "en": "Participants who accepted the invitation and the organiser are added to the consent record automatically.", "de": "Teilnehmer, die die Einladung angenommen haben, und der Organisator kommen automatisch ins Einwilligungsprotokoll."}
+{"uk": "Учасники: {0}", "en": "Participants: {0}", "de": "Teilnehmer: {0}"}
+{"uk": "Учасники: лише наші (адреси нашого домену)", "en": "Participants: only ours (addresses of our domain)", "de": "Teilnehmer: nur unsere (Adressen unserer Domain)"}
+{"uk": "Учасники: усі із запрошення", "en": "Participants: everyone from the invitation", "de": "Teilnehmer: alle aus der Einladung"}
+{"uk": "Учасників не вписувати", "en": "Do not list participants", "de": "Teilnehmer nicht eintragen"}
 {"uk": "ФІЗИЧНІ ПАРАМЕТРИ", "en": "PHYSICAL PARAMETERS", "de": "PHYSISCHE PARAMETER"}
 {"uk": "ФІНАНСИ", "en": "FINANCE", "de": "FINANZEN"}
 {"uk": "ФІНЛЯНДІЯ", "en": "FINLAND", "de": "FINNLAND"}
@@ -21056,6 +21067,7 @@
 {"uk": "переходимо на Дзвінок.", "en": "we move on to the Call.", "de": "wir gehen zum Anruf über."}
 {"uk": "переходимо на Паузу 90 днів.", "en": "we move on to a 90-day Pause.", "de": "wir gehen zu einer Pause von 90 Tagen über."}
 {"uk": "перехідник", "en": "adapter", "de": "Adapter"}
+{"uk": "перша літера імені", "en": "first letter of the first name", "de": "erster Buchstabe des Vornamens"}
 {"uk": "перше джерело продажів і товар. Увімкнені лишаються всі модулі — вимкнути модуль для всіх можна пізніше", "en": "the first sales source and product. All modules stay enabled — you can disable a module for everyone later", "de": "die erste Verkaufsquelle und den ersten Artikel vor. Alle Module bleiben aktiviert — ein Modul für alle zu deaktivieren ist später möglich"}
 {"uk": "перший запуск без запису в БД — побачиш результат без ризику.", "en": "the first run without writing to the DB — you'll see the result without risk.", "de": "der erste Lauf ohne Schreiben in die Datenbank — Sie sehen das Ergebnis ohne Risiko."}
 {"uk": "перший зі списку", "en": "first in the list", "de": "erster in der Liste"}

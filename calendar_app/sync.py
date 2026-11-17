@@ -415,11 +415,16 @@ def _fingerprint(ev: dict) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def _shape(rule: SyncRule, ev: dict, source_name: str) -> dict:
+def _shape(rule: SyncRule, ev: dict, source_name: str, team=None) -> dict:
     if rule.mode == SyncRule.BUSY or ev.get("private"):
         return {**ev, "title": "Зайнято", "description": "", "location": ""}
     if rule.mode == SyncRule.PREFIX:
         return {**ev, "title": f"[{source_name}] {ev['title']}"}
+    if rule.mode == SyncRule.TEAM and team is not None:   # календар команди: «V, S: Telco Wirelessworks»
+        line = team.participants_line(rule.participants)
+        desc = ev.get("description") or ""
+        return {**ev, "title": team.title(rule.title_template, ev["title"]),
+                "description": f"{line}\n\n{desc}".strip() if line else desc}
     return ev
 
 
@@ -435,6 +440,8 @@ def run(rule: SyncRule, dry_run: bool = False) -> dict:
     links = {l.source_key: l for l in SyncLink.objects.filter(rule=rule)}
     plan = {"create": [], "update": [], "delete": [], "errors": []}
     seen = set()
+    wants_team = isinstance(src, MinervaSide) and SyncRule.TEAM in (rule.what, rule.mode)
+    resolver = None
     for ev in src.events(start, end):
         key = src.key_prefix + ev["id"]
         if key in copies:
@@ -445,8 +452,15 @@ def run(rule: SyncRule, dry_run: bool = False) -> dict:
             continue
         if rule.keyword and rule.keyword.lower() not in ev["title"].lower():
             continue
+        team = None
+        if wants_team and (rule.what == SyncRule.TEAM or ev.get("from_mail")):
+            from .team import Resolver
+            resolver = resolver or Resolver(rule.user)
+            team = resolver.team_for_event(int(ev["id"]))
+        if rule.what == SyncRule.TEAM and (team is None or len(team.ours) < 2):
+            continue   # не з запрошення або з наших лише я
         seen.add(key)
-        shaped = _shape(rule, ev, src.name)
+        shaped = _shape(rule, ev, src.name, team)
         fp = _fingerprint(shaped)
         link = links.get(key)
         label = f"{timezone.localtime(ev['start']):%d.%m %H:%M} {shaped['title']}"
@@ -516,6 +530,13 @@ def _int(value, default: int) -> int:
         return default
 
 
+def _team_letter(user) -> dict:
+    from .models import CalendarSettings
+    from .team import clean_letter, letter_of
+    own = CalendarSettings.objects.filter(user=user).values_list("team_letter", flat=True).first() or ""
+    return {"value": own, "auto": clean_letter((user.first_name or user.username or "?")[:1]), "now": letter_of(user)}
+
+
 def page_context(request) -> dict:
     from core.secrets import placeholder
     from worktime.services import is_manager
@@ -530,7 +551,8 @@ def page_context(request) -> dict:
         "ms_redirect": redirect_uri(request, CalendarAccount.MICROSOFT),
         "accounts": accounts, "remote_calendars": cals,
         "rules": list(SyncRule.objects.filter(user=request.user).select_related("source__account", "target__account")),
-        "rule_what": SyncRule.WHAT, "rule_modes": SyncRule.MODES,
+        "rule_what": SyncRule.WHAT, "rule_modes": SyncRule.MODES, "rule_people": SyncRule.PEOPLE,
+        "team_letter": _team_letter(request.user),
         "preview": request.session.pop("cal_sync_preview", None),
         "roadmap": roadmap(request),
     }
@@ -615,15 +637,27 @@ def sync_action(request):
         v = p.get(name) or ""
         return own.get(int(v)) if v.isdigit() else None
 
+    if action == "team_letter":   # «V» у назві «V, S: Telco …» календаря команди
+        from .models import CalendarSettings
+        from .team import clean_letter
+        cfg = CalendarSettings.for_user(user)
+        cfg.team_letter = clean_letter(p.get("team_letter") or "")
+        cfg.save(update_fields=["team_letter"])
+        messages.success(request, f"Ваша буква в календарі команди: {cfg.team_letter or 'перша літера імені'}.")
+        return back
     if action == "rule_add":
         source, target = pick("source"), pick("target")
         if source == target:
             messages.error(request, "«Звідки» і «куди» мають бути різними календарями.")
             return back
+        from .team import DEFAULT_TEMPLATE
         rule = SyncRule.objects.create(
             user=user, source=source, target=target,
             what=p.get("what") if p.get("what") in dict(SyncRule.WHAT) else SyncRule.ALL,
             mode=p.get("mode") if p.get("mode") in dict(SyncRule.MODES) else SyncRule.FULL,
+            title_template=(p.get("title_template") or "").strip()[:120] or DEFAULT_TEMPLATE,
+            participants=p.get("participants") if p.get("participants") in dict(SyncRule.PEOPLE)
+            else SyncRule.PEOPLE_OURS,
             keyword=(p.get("keyword") or "").strip()[:100],
             days_back=max(0, min(365, _int(p.get("days_back"), 7))),
             days_ahead=max(1, min(730, _int(p.get("days_ahead"), 90))),
