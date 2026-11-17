@@ -69,3 +69,16 @@ class EditorPageTests(PriceBase):
         self.assertContains(page, "Сума за кількість, ")
         self.assertContains(page, "DK_PCUR = 'USD'")             # валюта — з «💲 Налаштувань цін DigiKey»
         self.assertEqual([r["qty"] for r in page.context["minerva_ref"]], [1, 1000])
+
+
+class RoundingNoteTests(PriceBase):
+    def test_rounding_shift_on_cheap_part_is_noted(self):
+        new, notes = svc.compute([(1, D("0.006"))], None, svc.Rules(), D("1.1"))
+        self.assertEqual(new, [(1, D("0.01"))])                         # 0,0066 → 0,01
+        self.assertTrue(any("округлення змінює ціну" in n and "Без округлення" in n for n in notes))
+        new, notes = svc.compute([(1, D("0.006"))], None, svc.Rules(rounding="none"), D("1.1"))
+        self.assertFalse(any("округлення" in n for n in notes))
+
+    def test_normal_price_no_note(self):
+        _, notes = svc.compute([(1, D("10"))], None, svc.Rules(), D("1.1"))
+        self.assertFalse(any("округлення" in n for n in notes))

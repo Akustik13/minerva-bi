@@ -314,12 +314,18 @@ def _price_at(tiers, qty: int) -> Decimal:
 
 
 SUSPECT_FACTOR = 5           # ціна за 1 шт. у стільки разів більша за ціну Minerva — схоже на суму за всю кількість
+ROUND_WARN = Decimal("0.05")  # округлення зрушило ціну більше ніж на 5 % — дешевий товар, варто «Без округлення»
 
 
 def minerva_ref(listing, s=None) -> list[tuple[int, Decimal]]:
     """Ціни Minerva товару лістингу у валюті DigiKey (лише × курс, без надбавки й округлення) — довідка для
     редактора тирів і перевірки «схоже на суму». Немає товару / цін / курсу — []."""
     product = listing.product if getattr(listing, "product_id", None) else None
+    return product_ref(product, s)
+
+
+def product_ref(product, s=None) -> list[tuple[int, Decimal]]:
+    """Те саме для товару складу (сторінка «🔷 Зі складу на DigiKey» — лістингу ще немає)."""
     if product is None:
         return []
     s = s or settings()
@@ -380,13 +386,15 @@ def compute(minerva, dk, rules: Rules, rate: Decimal, moq: int = 1,
     floor = None
     if rules.min_margin_pct is not None and purchase and purchase_rate is not None:
         floor = Decimal(purchase) * purchase_rate * (100 + rules.min_margin_pct) / 100
-    out, raised = [], False
+    out, raised, shifted = [], False, None
     one = _price_at(minerva, 1)
     for q in breaks:
         base = one * (100 - discount.get(q, Decimal(0))) / 100 if rules.tiers_mode == "template" \
             else _price_at(minerva, q)
-        price = base * rate * (100 + rules.adjust_pct) / 100 + rules.adjust_fixed
-        price = _round(price, rules.rounding)
+        raw = base * rate * (100 + rules.adjust_pct) / 100 + rules.adjust_fixed
+        price = _round(raw, rules.rounding)
+        if shifted is None and raw > 0 and price > 0 and abs(price / raw - 1) > ROUND_WARN:
+            shifted = (q, raw, price)
         if floor is not None and price < floor:
             price, raised = floor.quantize(Decimal("0.01"), rounding=ROUND_CEILING), True
         if price <= 0:
@@ -394,6 +402,10 @@ def compute(minerva, dk, rules: Rules, rate: Decimal, moq: int = 1,
         out.append((q, price))
     if raised:
         notes.append(f"піднято до закупівельної + {fmt_num(rules.min_margin_pct)} %")
+    if shifted:
+        q, raw, price = shifted
+        notes.append(f"округлення змінює ціну {q} шт. з {fmt_price(raw.quantize(Decimal('0.0001')))} до {fmt_price(price)} "
+                     f"({fmt_signed((price / raw - 1) * 100)} %) — для дешевого товару виберіть «Без округлення»")
     if any(b[1] > a[1] for a, b in zip(out, out[1:])):
         notes.append("більша кількість дорожча за меншу")
     return out, notes

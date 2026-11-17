@@ -1696,6 +1696,7 @@
 {"uk": "MOQ (мін. кількість)", "en": "MOQ (min. quantity)", "de": "MOQ (Mindestmenge)"}
 {"uk": "MOQ = {0} шт. — може відлякувати", "en": "MOQ = {0} pcs — may put buyers off", "de": "MOQ = {0} Stk. — kann abschreckend wirken"}
 {"uk": "MOQ має бути щонайменше 1", "en": "MOQ must be at least 1", "de": "MOQ muss mindestens 1 betragen"}
+{"uk": "MOQ — ціле число від 1", "en": "MOQ — a whole number from 1", "de": "MOQ — ganze Zahl ab 1"}
 {"uk": "MRN {0} — як у посилки {1}", "en": "MRN {0} — same as parcel {1}", "de": "MRN {0} — wie bei Paket {1}"}
 {"uk": "MRN {0} — як у цієї посилки", "en": "MRN {0} — same as this parcel", "de": "MRN {0} — wie bei diesem Paket"}
 {"uk": "MRN має бути рівно {0} знаків (зараз {1}).", "en": "The MRN must be exactly {0} characters (currently {1}).", "de": "Die MRN muss genau {0} Zeichen lang sein (derzeit {1})."}
@@ -3170,6 +3171,7 @@
 {"uk": "{0} шт.", "en": "{0} pcs.", "de": "{0} Stk."}
 {"uk": "{0} шт. {1} додано на склад.", "en": "{0} pcs {1} added to stock.", "de": "{0} Stk. {1} ins Lager gebucht."}
 {"uk": "{0} шт. · позицій: {1}", "en": "{0} pcs · items: {1}", "de": "{0} Stk. · Positionen: {1}"}
+{"uk": "{0} шт. — {1}", "en": "{0} pcs — {1}", "de": "{0} Stk. — {1}"}
 {"uk": "{0} шт: {1}", "en": "{0} pcs: {1}", "de": "{0} Stk.: {1}"}
 {"uk": "{0} шт: {1} {2}", "en": "{0} pcs: {1} {2}", "de": "{0} Stk.: {1} {2}"}
 {"uk": "{0} шт: {1} {2} · {3}", "en": "{0} pcs: {1} {2} · {3}", "de": "{0} Stk.: {1} {2} · {3}"}
@@ -3418,6 +3420,7 @@
 {"uk": "{0}:{1} від {2} — {3}", "en": "{0}:{1} from {2} — {3}", "de": "{0}:{1} vom {2} — {3}"}
 {"uk": "{0}:{1} не відповідає за {2} с", "en": "{0}:{1} did not answer within {2} s", "de": "{0}:{1} antwortet nicht innerhalb {2} s"}
 {"uk": "{0}; бракує прав: {1}. Додайте їх у картці ключа. {2}.", "en": "{0}; missing permissions: {1}. Add them on the key card. {2}.", "de": "{0}; fehlende Berechtigungen: {1}. Fügen Sie sie in der Schlüsselkarte hinzu. {2}."}
+{"uk": "{0}; ціни менших кількостей DigiKey не покаже", "en": "{0}; DigiKey will not show prices for smaller quantities", "de": "{0}; Preise für kleinere Mengen zeigt DigiKey nicht"}
 {"uk": "{0}HTML виправлено: {1}, нових подій у CRM: {2}, оновлено/привʼязано: {3}, видалено дублів: {4}, без клієнта: {5}", "en": "{0}HTML fixed: {1}, new events in CRM: {2}, updated/linked: {3}, duplicates removed: {4}, without customer: {5}", "de": "{0}HTML korrigiert: {1}, neue Ereignisse im CRM: {2}, aktualisiert/verknüpft: {3}, Duplikate entfernt: {4}, ohne Kunde: {5}"}
 {"uk": "{0}{1} · листи команді йдуть з", "en": "{0}{1} · team mail is sent from", "de": "{0}{1} · E-Mails ans Team gehen von"}
 {"uk": "{0}{1} Підготуй лист-нагадування постачальнику {2} ({3}): попроси підтвердити дату відвантаження й трек-номер. Мова листа — як у нашому останньому листуванні з ним, інакше англійська. Лист лише запропонуй — надішлю я сам.", "en": "{0}{1} Prepare a reminder email to the supplier {2} ({3}): ask them to confirm the dispatch date and the tracking number. Language — as in our last correspondence with them, otherwise English. Only suggest the email — I will send it myself.", "de": "{0}{1} Bereite eine Erinnerungs-E-Mail an den Lieferanten {2} ({3}) vor: bitte um Bestätigung des Versanddatums und der Sendungsnummer. Sprache — wie in unserer letzten Korrespondenz mit ihm, sonst Englisch. Schlage die E-Mail nur vor — senden werde ich sie selbst."}
@@ -3687,6 +3690,7 @@
 {"uk": "Σ qty × unit price по всіх позиціях", "en": "Σ qty × unit price across all items", "de": "Σ Menge × Stückpreis über alle Positionen"}
 {"uk": "Σ {0} год", "en": "Σ {0} h", "de": "Σ {0} Std."}
 {"uk": "εr матеріалу субстрату", "en": "εr of the substrate material", "de": "εr des Substratmaterials"}
+{"uk": "Є {0}", "en": "There is {0}", "de": "Vorhanden: {0}"}
 {"uk": "Є в коді зараз", "en": "Currently in the code", "de": "Aktuell im Code vorhanden"}
 {"uk": "Є відповіді", "en": "Replies received", "de": "Antworten erhalten"}
 {"uk": "Є збої — див. вище.", "en": "There are failures — see above.", "de": "Es gibt Fehler – siehe oben."}
@@ -5668,6 +5672,7 @@
 {"uk": "Відбір листів…", "en": "Selecting e-mails…", "de": "E-Mails werden ausgewählt…"}
 {"uk": "Відвантаження", "en": "Shipping", "de": "Versand"}
 {"uk": "Відвантаження й доставка", "en": "Shipping and delivery", "de": "Versand und Lieferung"}
+{"uk": "Відвантаження, днів", "en": "Shipping, days", "de": "Versand, Tage"}
 {"uk": "Віддавати сайту фото й даташити з Minerva", "en": "Provide photos and datasheets from Minerva to the site", "de": "Fotos und Datenblätter aus Minerva an die Website liefern"}
 {"uk": "Віддалити", "en": "Zoom out", "de": "Herauszoomen"}
 {"uk": "Віддалити (Ctrl + коліщатко)", "en": "Zoom out (Ctrl + wheel)", "de": "Herauszoomen (Strg + Mausrad)"}
@@ -5763,6 +5768,7 @@
 {"uk": "Відкрити фото", "en": "Open photo", "de": "Foto öffnen"}
 {"uk": "Відкрити це місце в розшифровці наради (бачите лише ви — нараду записали ви)", "en": "Open this spot in the meeting transcript (only you can see it — you recorded the meeting)", "de": "Diese Stelle im Besprechungstranskript öffnen (nur Sie sehen sie — Sie haben die Besprechung aufgenommen)"}
 {"uk": "Відкрити як чернетку", "en": "Open as draft", "de": "Als Entwurf öffnen"}
+{"uk": "Відкрити — перевірити, що це той файл", "en": "Open — check that it is the right file", "de": "Öffnen — prüfen, ob es die richtige Datei ist"}
 {"uk": "Відкритий", "en": "Open", "de": "Offen"}
 {"uk": "Відкритих Angebote", "en": "Open Angebote", "de": "Offene Angebote"}
 {"uk": "Відкритих замовлень з цим товаром немає.", "en": "There are no open orders with this product.", "de": "Es gibt keine offenen Aufträge mit diesem Artikel."}
@@ -6363,6 +6369,7 @@
 {"uk": "Дата: {0}", "en": "Date: {0}", "de": "Datum: {0}"}
 {"uk": "Датасіт та фото товару", "en": "Datasheet and product photo", "de": "Datenblatt und Artikelfoto"}
 {"uk": "Даташит", "en": "Datasheet", "de": "Datenblatt"}
+{"uk": "Даташит (URL)", "en": "Datasheet (URL)", "de": "Datenblatt (URL)"}
 {"uk": "Даташит ({0}, {1} стор.) без текстового шару — це скан, прочитати не можна.", "en": "The datasheet ({0}, {1} p.) has no text layer — it is a scan and cannot be read.", "de": "Das Datenblatt ({0}, {1} S.) hat keine Textebene – es ist ein Scan und kann nicht gelesen werden."}
 {"uk": "Даташит {0}", "en": "Datasheet {0}", "de": "Datenblatt {0}"}
 {"uk": "Даташит {0} — {1}, сторінок: {2}", "en": "Datasheet {0} — {1}, pages: {2}", "de": "Datenblatt {0} – {1}, Seiten: {2}"}
@@ -9646,6 +9653,7 @@
 {"uk": "Кількість відправлень по кур'єрах (по роках)", "en": "Number of shipments by courier (by year)", "de": "Anzahl der Sendungen nach Kurier (nach Jahren)"}
 {"uk": "Кількість для DigiKey", "en": "Quantity for DigiKey", "de": "Menge für DigiKey"}
 {"uk": "Кількість для DigiKey — не задано (заповни поле нижче)", "en": "Quantity for DigiKey — not set (fill in the field below)", "de": "Menge für DigiKey — nicht festgelegt (füllen Sie das Feld unten aus)"}
+{"uk": "Кількість для DigiKey, шт.", "en": "Quantity for DigiKey, pcs", "de": "Menge für DigiKey, Stk."}
 {"uk": "Кількість днів вперед (0=сьогодні, 7=тиждень, 30=місяць). Default 7.", "en": "Number of days ahead (0=today, 7=week, 30=month). Default 7.", "de": "Anzahl der Tage im Voraus (0=heute, 7=Woche, 30=Monat). Standard: 7."}
 {"uk": "Кількість днів від замовлення до відправки", "en": "Number of days from order to shipment", "de": "Anzahl der Tage vom Auftrag bis zum Versand"}
 {"uk": "Кількість днів постачання", "en": "Number of delivery days", "de": "Anzahl der Liefertage"}
@@ -10376,6 +10384,7 @@
 {"uk": "Мін. доріжка / зазор", "en": "Min. track / space", "de": "Min. Leiterbahn / Abstand"}
 {"uk": "Мін. залишок (алерт)", "en": "Min. stock (alert)", "de": "Mindestbestand (Warnung)"}
 {"uk": "Мін. замовлення", "en": "Minimum order", "de": "Mindestbestellmenge"}
+{"uk": "Мін. замовлення (MOQ), шт.", "en": "Minimum order (MOQ), pcs", "de": "Mindestbestellung (MOQ), Stk."}
 {"uk": "Мін. замовлення / крок / лише ці кількості…", "en": "Minimum order / step / only these quantities…", "de": "Mindestbestellmenge / Schritt / nur diese Mengen…"}
 {"uk": "Мін. замовлення в магазинах, шт.", "en": "Minimum order in shops, pcs", "de": "Mindestbestellmenge in Shops, Stk."}
 {"uk": "Мін. замовлення, шт.", "en": "Minimum order, pcs", "de": "Mindestbestellmenge, Stk."}
@@ -10492,8 +10501,10 @@
 {"uk": "На складі", "en": "In stock", "de": "Auf Lager"}
 {"uk": "На складі (точно)", "en": "In stock (exact)", "de": "Auf Lager (exakt)"}
 {"uk": "На складі Minerva ціни немає", "en": "No price in Minerva stock", "de": "Im Minerva-Lager ist kein Preis hinterlegt"}
+{"uk": "На складі {0} шт.", "en": "In stock {0} pcs", "de": "Im Lager {0} Stk."}
 {"uk": "На складі інший статус, у цьому магазині — активний", "en": "Different status in stock, active in this shop", "de": "Im Lager anderer Status, in diesem Shop aktiv"}
 {"uk": "На складі, шт", "en": "In stock, pcs", "de": "Auf Lager, Stk"}
+{"uk": "На складі: {0}", "en": "In stock: {0}", "de": "Im Lager: {0}"}
 {"uk": "На сторінці відправлення з етикеткою/трекінгом показувати банер «Підтвердити відправлення», поки замовлення не позначене як відправлене.", "en": "On a shipment page with a label/tracking, show the “Confirm shipment” banner until the order is marked as shipped.", "de": "Auf der Sendungsseite mit Etikett/Sendungsnummer das Banner „Sendung bestätigen“ anzeigen, bis der Auftrag als versendet markiert ist."}
 {"uk": "На сторінці відправлення кнопка", "en": "On the shipment page, the button", "de": "Auf der Sendungsseite die Schaltfläche"}
 {"uk": "На сторінці замовлення з'являється кнопка для надсилання клієнту повідомлення про відправку.", "en": "A button appears on the order page for sending the customer a shipping notice.", "de": "Auf der Auftragsseite erscheint eine Schaltfläche, um dem Kunden eine Versandbenachrichtigung zu senden."}
@@ -16379,6 +16390,7 @@
 {"uk": "Сума без ПДВ", "en": "Amount excl. VAT", "de": "Betrag ohne MwSt."}
 {"uk": "Сума брутто", "en": "Gross total", "de": "Bruttosumme"}
 {"uk": "Сума ваг митних артикулів", "en": "Sum of customs item weights", "de": "Summe der Gewichte der Zollartikel"}
+{"uk": "Сума за {0} шт.: {1} {2}", "en": "Total for {0} pcs: {1} {2}", "de": "Summe für {0} Stk.: {1} {2}"}
 {"uk": "Сума за всю кількість — ціна за 1 шт. порахується сама", "en": "Total for the whole quantity — the price per 1 pc is calculated", "de": "Summe für die ganze Menge — der Stückpreis wird berechnet"}
 {"uk": "Сума за кількість", "en": "Total for the quantity", "de": "Summe für die Menge"}
 {"uk": "Сума замовлення", "en": "Order total", "de": "Auftragssumme"}
@@ -17997,6 +18009,8 @@
 {"uk": "Ціни відсутні в БД", "en": "Prices missing in the DB", "de": "Preise fehlen in der Datenbank"}
 {"uk": "Ціни для DigiKey не рахуються: {0}.", "en": "DigiKey prices are not calculated: {0}.", "de": "DigiKey-Preise werden nicht berechnet: {0}."}
 {"uk": "Ціни для DigiKey, {0} (MOQ {1}, відвантаження {2} дн)", "en": "Prices for DigiKey, {0} (MOQ {1}, lead time {2} d)", "de": "Preise für DigiKey, {0} (MOQ {1}, Lieferzeit {2} Tg.)"}
+{"uk": "Ціни для DigiKey, {0} за 1 шт.", "en": "Prices for DigiKey, {0} per 1 pc", "de": "Preise für DigiKey, {0} pro Stk."}
+{"uk": "Ціни для DigiKey, {0} за 1 шт. (MOQ {1}, відвантаження {2} дн)", "en": "Prices for DigiKey, {0} per 1 pc (MOQ {1}, shipping {2} days)", "de": "Preise für DigiKey, {0} pro Stk. (MOQ {1}, Versand {2} Tage)"}
 {"uk": "Ціни з", "en": "Prices from", "de": "Preise aus"}
 {"uk": "Ціни з Minerva", "en": "Prices from Minerva", "de": "Preise aus Minerva"}
 {"uk": "Ціни з Minerva (порівняти й оновити)…", "en": "Prices from Minerva (compare and update)…", "de": "Preise aus Minerva (vergleichen und aktualisieren)…"}
@@ -19331,7 +19345,10 @@
 {"uk": "востаннє {0}", "en": "last {0}", "de": "zuletzt {0}"}
 {"uk": "востаннє бачили на DigiKey · щоб оновити — «🔍 Прочитати з DigiKey»", "en": "last seen on DigiKey · to refresh — “🔍 Read from DigiKey”", "de": "zuletzt bei DigiKey gesehen · zum Aktualisieren — „🔍 Von DigiKey lesen“"}
 {"uk": "впевненість", "en": "confidence", "de": "Sicherheit"}
+{"uk": "вписана адреса довша за {0} символів — DigiKey не прийме", "en": "the entered address is longer than {0} characters — DigiKey will not accept it", "de": "die eingegebene Adresse ist länger als {0} Zeichen — DigiKey nimmt sie nicht an"}
+{"uk": "вписане не схоже на адресу https://… — лишаю знайдене", "en": "what was entered does not look like an https://… address — keeping the one found", "de": "die Eingabe sieht nicht wie eine https://…-Adresse aus — die gefundene bleibt"}
 {"uk": "вписано вручну", "en": "entered manually", "de": "manuell eingetragen"}
+{"uk": "вписано вручну — ціна за 1 шт.; «= …» — сума за всю кількість", "en": "entered by hand — price per 1 pc; «= …» — total for the whole quantity", "de": "von Hand eingetragen — Stückpreis; «= …» — Summe für die ganze Menge"}
 {"uk": "вплив на строк і гроші", "en": "impact on deadline and money", "de": "Auswirkung auf Termin und Geld"}
 {"uk": "впливає лише на нові замовлення. Ідемпотентність: якщо транзакції для замовлення вже існують — повторне списання не відбувається.", "en": "affects new orders only. Idempotency: if transactions for the order already exist, the write-off is not repeated.", "de": "wirkt sich nur auf neue Aufträge aus. Idempotenz: Wenn für den Auftrag bereits Transaktionen existieren, wird nicht erneut ausgebucht."}
 {"uk": "впливів: {0}", "en": "impacts: {0}", "de": "Auswirkungen: {0}"}
@@ -19493,6 +19510,7 @@
 {"uk": "візиток — фото, примітки й позначки? Постачальники й клієнти CRM, створені з них, лишаться.", "en": "business cards — photos, notes and marks? Suppliers and CRM customers created from them will stay.", "de": "Visitenkarten — Fotos, Notizen und Markierungen? Daraus angelegte Lieferanten und CRM-Kunden bleiben."}
 {"uk": "вікно {0}–{1}", "en": "window {0}–{1}", "de": "Fenster {0}–{1}"}
 {"uk": "вікно запису застаріло (не той ключ надсилання)", "en": "recording window outdated (wrong push key)", "de": "Aufnahmefenster veraltet (falscher Sendeschlüssel)"}
+{"uk": "вільний залишок: {0}", "en": "free stock: {0}", "de": "freier Bestand: {0}"}
 {"uk": "вільно {0}", "en": "free {0}", "de": "frei {0}"}
 {"uk": "вільно {0}{1}", "en": "available {0}{1}", "de": "verfügbar {0}{1}"}
 {"uk": "вільного немає, резерв {0}", "en": "none free, reserved {0}", "de": "nichts frei, reserviert {0}"}
@@ -19573,6 +19591,7 @@
 {"uk": "даташит товару: {0}", "en": "product datasheet: {0}", "de": "Artikeldatenblatt: {0}"}
 {"uk": "даташит із картки товару", "en": "datasheet from the product record", "de": "Datenblatt aus dem Artikel"}
 {"uk": "даташит — скан без тексту, ваги не знайдено", "en": "datasheet is a scan without text, no weight found", "de": "Datenblatt ist ein Scan ohne Text, kein Gewicht gefunden"}
+{"uk": "даташита", "en": "datasheet", "de": "Datenblatt"}
 {"uk": "даташита немає", "en": "there is no datasheet", "de": "kein Datenblatt vorhanden"}
 {"uk": "даташити", "en": "datasheets", "de": "Datenblätter"}
 {"uk": "даташити, наявність.", "en": "datasheets, availability.", "de": "Datenblätter, Verfügbarkeit."}
@@ -19883,6 +19902,7 @@
 {"uk": "за назвою файлу", "en": "by file name", "de": "nach Dateiname"}
 {"uk": "за планом", "en": "on plan", "de": "planmäßig"}
 {"uk": "за посиланням", "en": "via link", "de": "per Link"}
+{"uk": "за правилами «💲 Ціни DigiKey ← Minerva»; щоб інакше — впишіть «кількість: ціна за 1 шт.; …»", "en": "by the rules of «💲 DigiKey prices ← Minerva»; to override, enter «quantity: price per 1 pc; …»", "de": "nach den Regeln «💲 DigiKey-Preise ← Minerva»; für andere Preise «Menge: Stückpreis; …» eintragen"}
 {"uk": "за правилами «💲 Ціни DigiKey ← Minerva»; щоб інакше — впишіть «кількість: ціна; …»", "en": "by the rules of “💲 DigiKey prices ← Minerva”; to do it differently, enter “quantity: price; …”", "de": "nach den Regeln von „💲 DigiKey-Preise ← Minerva“; für eine andere Preisgestaltung „Menge: Preis; …“ eintragen"}
 {"uk": "за правилами можна передати", "en": "can be sent according to the rules", "de": "nach den Regeln übertragbar"}
 {"uk": "за правилом", "en": "by rule", "de": "nach Regel"}
@@ -20299,6 +20319,7 @@
 {"uk": "картка CRM", "en": "CRM card", "de": "CRM-Karte"}
 {"uk": "картка DigiKey Marketplace", "en": "DigiKey Marketplace listing", "de": "DigiKey-Marketplace-Eintrag"}
 {"uk": "картка клієнта", "en": "customer card", "de": "Kundenkarte"}
+{"uk": "картка товару або впишіть адресу тут", "en": "product card, or enter the address here", "de": "Artikelkarte oder Adresse hier eintragen"}
 {"uk": "картка товару складу", "en": "stock product record", "de": "Lagerartikel"}
 {"uk": "картка: {0}", "en": "card: {0}", "de": "Karte: {0}"}
 {"uk": "картку {0} «{1}»", "en": "card {0} “{1}”", "de": "Karte {0} „{1}“"}
@@ -20525,6 +20546,7 @@
 {"uk": "кількість має бути > 0 (позиції", "en": "quantity must be > 0 (items", "de": "die Menge muss > 0 sein (Positionen"}
 {"uk": "кількість має бути більша за 0", "en": "the quantity must be greater than 0", "de": "Menge muss größer als 0 sein"}
 {"uk": "кількість не за кроком лоту", "en": "quantity does not match the lot step", "de": "Menge passt nicht zum Losschritt"}
+{"uk": "кількість — ціле число від 0; лишаю вільний залишок складу", "en": "quantity — a whole number from 0; keeping the free stock", "de": "Menge — ganze Zahl ab 0; der freie Lagerbestand bleibt"}
 {"uk": "кількість — ціле число від 1", "en": "quantity — a whole number from 1", "de": "Menge — ganze Zahl ab 1"}
 {"uk": "кількість — число", "en": "quantity — a number", "de": "Menge – eine Zahl"}
 {"uk": "кінець", "en": "end", "de": "Ende"}
@@ -20760,6 +20782,7 @@
 {"uk": "мій моя моє мої ти ви ваш ваша вас нам нас від по за так вже ще все усі всі цей ця ці той та ті там тут коли чому", "en": "мій моя моє мої ти ви ваш ваша вас нам нас від по за так вже ще все усі всі цей ця ці той та ті там тут коли чому", "de": "мій моя моє мої ти ви ваш ваша вас нам нас від по за так вже ще все усі всі цей ця ці той та ті там тут коли чому"}
 {"uk": "мікрофон + звук наради", "en": "microphone + meeting audio", "de": "Mikrofon + Besprechungston"}
 {"uk": "мікрофон мовчав", "en": "microphone was silent", "de": "Mikrofon war stumm"}
+{"uk": "мін. замовлення в магазинах", "en": "minimum order in shops", "de": "Mindestbestellung in den Shops"}
 {"uk": "мін. замовлення: {0} шт.", "en": "min. order: {0} pcs", "de": "Mindestbestellmenge: {0} Stk."}
 {"uk": "мін.залишок", "en": "min. stock", "de": "Mindestbestand"}
 {"uk": "міняє їх або вписує свою; Telegram — так / ні.", "en": "changes them or enters their own; Telegram — yes / no.", "de": "ändert sie oder trägt eine eigene ein; Telegram — ja / nein."}
@@ -20782,6 +20805,8 @@
 {"uk": "на DigiKey вже ці ціни", "en": "DigiKey already has these prices", "de": "auf DigiKey gelten bereits diese Preise"}
 {"uk": "на DigiKey немає цін — порівняти неможливо", "en": "no prices on DigiKey — comparison impossible", "de": "auf DigiKey sind keine Preise vorhanden — Vergleich nicht möglich"}
 {"uk": "на DigiKey нічого не надіслано.", "en": "nothing was sent to DigiKey.", "de": "an DigiKey wurde nichts gesendet."}
+{"uk": "на DigiKey піде {0} шт. — вписано вручну, далі не оновлюється", "en": "DigiKey gets {0} pcs — entered by hand, not updated later", "de": "an DigiKey gehen {0} Stk. — von Hand eingetragen, wird nicht aktualisiert"}
+{"uk": "на DigiKey піде вільний залишок і далі оновлюватиметься сам", "en": "DigiKey gets the free stock and it keeps updating itself", "de": "an DigiKey geht der freie Bestand, er aktualisiert sich danach selbst"}
 {"uk": "на DigiKey підуть перші", "en": "the first ones go to DigiKey:", "de": "an DigiKey gehen die ersten"}
 {"uk": "на DigiKey ще не читали — натисніть «🔍 Прочитати з DigiKey і перевірити»", "en": "not read from DigiKey yet — click “🔍 Read from DigiKey and check”", "de": "noch nicht von DigiKey gelesen — auf „🔍 Von DigiKey lesen und prüfen“ klicken"}
 {"uk": "на DigiKey є, у Minerva лістингу немає", "en": "exists on DigiKey, no listing in Minerva", "de": "auf DigiKey vorhanden, in Minerva gibt es kein Listing"}
@@ -20826,6 +20851,7 @@
 {"uk": "на складі {0} шт · мінімум {1} шт", "en": "{0} pcs in stock · minimum {1} pcs", "de": "{0} Stk auf Lager · Minimum {1} Stk"}
 {"uk": "на складі {0}, резерв {1}, вільно {2}", "en": "in stock {0}, reserved {1}, available {2}", "de": "auf Lager {0}, reserviert {1}, verfügbar {2}"}
 {"uk": "на складі мають бути в", "en": "in stock they must be in", "de": "im Lager müssen sie in"}
+{"uk": "на складі цін немає (ні базових, ні «Ціни продажу») — впишіть «кількість: ціна за 1 шт.; …»", "en": "no prices in stock (neither base prices nor «Sale price») — enter «quantity: price per 1 pc; …»", "de": "keine Preise im Lager (weder Basispreise noch «Verkaufspreis») — tragen Sie «Menge: Stückpreis; …» ein"}
 {"uk": "на складі цін немає — впишіть «кількість: ціна; …»", "en": "no prices in stock — enter “quantity: price; …”", "de": "im Lager gibt es keine Preise — „Menge: Preis; …“ eintragen"}
 {"uk": "на сторінку гіда — [назва](/guide/розділ/сторінка/). Лише адреси, що є в наданих сторінках або змісті гіда.", "en": "to a guide page — [name](/guide/section/page/). Only addresses that appear in the provided pages or the guide contents.", "de": "auf eine Leitfaden-Seite — [Name](/guide/bereich/seite/). Nur Adressen, die in den bereitgestellten Seiten oder im Inhalt des Leitfadens vorkommen."}
 {"uk": "на сторінці", "en": "on the page", "de": "auf der Seite"}
@@ -21422,6 +21448,7 @@
 {"uk": "окремі рядки-маркери над і під рядком товару.", "en": "separate marker rows above and below the product row.", "de": "eigene Markierungszeilen über und unter der Artikelzeile."}
 {"uk": "окремі рядки-маркери над і під рядком товару. Рядок «Packaging and shipping costs» обгорнутий", "en": "separate marker rows above and below the product row. The “Packaging and shipping costs” row is wrapped in", "de": "eigene Markierungszeilen über und unter der Artikelzeile. Die Zeile „Packaging and shipping costs“ ist eingefasst in"}
 {"uk": "округлення «{0}»", "en": "rounding “{0}”", "de": "Rundung „{0}“"}
+{"uk": "округлення змінює ціну {0} шт. з {1} до {2} ({3} %) — для дешевого товару виберіть «Без округлення»", "en": "rounding changes the price for {0} pcs from {1} to {2} ({3} %) — for a cheap product choose «No rounding»", "de": "die Rundung ändert den Preis für {0} Stk. von {1} auf {2} ({3} %) — für günstige Artikel «Ohne Rundung» wählen"}
 {"uk": "округлено до центів", "en": "rounded to the cent", "de": "auf Cent gerundet"}
 {"uk": "онлайн ЄЦБ на {0}", "en": "online ECB as of {0}", "de": "Online-EZB-Kurs vom {0}"}
 {"uk": "онлайн ЄЦБ — ще не отримано", "en": "online ECB — not received yet", "de": "Online-EZB-Kurs — noch nicht abgerufen"}
@@ -21841,6 +21868,7 @@
 {"uk": "посилання", "en": "link", "de": "Link"}
 {"uk": "посилання Minerva додає кнопкою. Лист підтвердження замовлення з сайту поки надсилає сам сайт (не з цього списку).", "en": "Minerva adds links as a button. The order confirmation e-mail from the site is still sent by the site itself (not from this list).", "de": "Minerva fügt Links als Schaltfläche hinzu. Die Auftragsbestätigung von der Website sendet vorerst die Website selbst (nicht aus dieser Liste)."}
 {"uk": "посилання {0}", "en": "link {0}", "de": "Link {0}"}
+{"uk": "посилання довше {0} символів — DigiKey не прийме", "en": "the link is longer than {0} characters — DigiKey will not accept it", "de": "der Link ist länger als {0} Zeichen — DigiKey nimmt ihn nicht an"}
 {"uk": "посилання з картки", "en": "link from the card", "de": "Link aus der Karte"}
 {"uk": "посилання має починатися з http:// або https://", "en": "the link must start with http:// or https://", "de": "der Link muss mit http:// oder https:// beginnen"}
 {"uk": "посилання на PDF документацію та фото товару.", "en": "links to PDF documentation and the product photo.", "de": "Links zur PDF-Dokumentation und zum Artikelfoto."}
@@ -22477,6 +22505,7 @@
 {"uk": "строк", "en": "lead time", "de": "Lieferzeit"}
 {"uk": "строк {0}", "en": "lead time {0}", "de": "Lieferzeit {0}"}
 {"uk": "строк відвантаження", "en": "lead time", "de": "Lieferzeit"}
+{"uk": "строк відвантаження — ціле число днів від 0 до 365", "en": "shipping time — whole number of days from 0 to 365", "de": "Versandzeit — ganze Zahl an Tagen von 0 bis 365"}
 {"uk": "строк відправки минув", "en": "shipping deadline passed", "de": "Versandfrist abgelaufen"}
 {"uk": "строк відправки минув {0}", "en": "shipping deadline passed {0}", "de": "Versandfrist abgelaufen {0}"}
 {"uk": "строк відправки скоро", "en": "shipping deadline soon", "de": "Versandfrist bald"}
@@ -22491,6 +22520,7 @@
 {"uk": "строк на DigiKey інакше, ніж у Minerva: {0}", "en": "the lead time on DigiKey differs from Minerva: {0}", "de": "die Lieferzeit bei DigiKey weicht von Minerva ab: {0}"}
 {"uk": "строк поставки {0}", "en": "delivery time {0}", "de": "Lieferzeit {0}"}
 {"uk": "строк поставки {0} дн.", "en": "delivery time {0} days", "de": "Lieferzeit {0} Tage"}
+{"uk": "строк поставки товару", "en": "product lead time", "de": "Lieferzeit des Artikels"}
 {"uk": "строк — від 0 до 365 днів", "en": "lead time — from 0 to 365 days", "de": "Lieferzeit – von 0 bis 365 Tage"}
 {"uk": "строк — дата YYYY-MM-DD", "en": "deadline — a date YYYY-MM-DD", "de": "Frist – Datum YYYY-MM-DD"}
 {"uk": "строк — ціле число днів", "en": "lead time — a whole number of days", "de": "Lieferzeit – ganze Zahl in Tagen"}
@@ -22759,6 +22789,7 @@
 {"uk": "у «Налаштування → Сповіщення» немає бота Telegram", "en": "no Telegram bot in «Settings → Notifications»", "de": "kein Telegram-Bot in «Einstellungen → Benachrichtigungen»"}
 {"uk": "у «Налаштування → Сповіщення» немає бота або чату Telegram", "en": "no Telegram bot or chat in \"Settings → Notifications\"", "de": "kein Telegram-Bot oder -Chat in „Einstellungen → Benachrichtigungen“"}
 {"uk": "у «⚙️ Налаштування помічника» (Minerva AI) не задано адресу RAG API", "en": "the RAG API address is not set in “⚙️ Assistant settings” (Minerva AI)", "de": "die RAG-API-Adresse ist in „⚙️ Assistenten-Einstellungen“ (Minerva AI) nicht festgelegt"}
+{"uk": "у «🖼 Фото й даташити для DigiKey» вибрано правило DigiKey, а для {0} його немає", "en": "«🖼 Photos and datasheets for DigiKey» uses the DigiKey rule, but there is none for the {0}", "de": "In «🖼 Fotos und Datenblätter für DigiKey» ist die DigiKey-Regel gewählt, für {0} gibt es aber keine"}
 {"uk": "у базі знань", "en": "in the knowledge base", "de": "in der Wissensdatenbank"}
 {"uk": "у базі: {0}", "en": "in the database: {0}", "de": "in der Datenbank: {0}"}
 {"uk": "у будні", "en": "on weekdays", "de": "werktags"}
@@ -22818,6 +22849,7 @@
 {"uk": "у працівника askDANTE немає логіна й табельного номера", "en": "the askDANTE employee has no login or personnel number", "de": "der askDANTE-Mitarbeiter hat weder Login noch Personalnummer"}
 {"uk": "у підвалі картки або колонці таблиці. Натисніть — розкривається поле вводу.", "en": "in the footer of the card or the table column. Click — an input field expands.", "de": "in der Fußzeile der Karte oder in der Tabellenspalte. Klicken Sie darauf — ein Eingabefeld klappt auf."}
 {"uk": "у режимі «окремо для кожного товару» листів не готуємо", "en": "in the “separately for each product” mode we do not prepare e-mails", "de": "im Modus „einzeln für jeden Artikel“ bereiten wir keine E-Mails vor"}
+{"uk": "у резерві {0}", "en": "reserved {0}", "de": "reserviert {0}"}
 {"uk": "у реєстр ризиків проєкту", "en": "into the project risk register", "de": "ins Risikoregister des Projekts"}
 {"uk": "у розмові ще немає повідомлень", "en": "the conversation has no messages yet", "de": "das Gespräch hat noch keine Nachrichten"}
 {"uk": "у рядках таблиці, а не «", "en": "in the table rows, not “", "de": "in den Tabellenzeilen, nicht „"}
@@ -22846,6 +22878,7 @@
 {"uk": "у теці Minerva на NAS (", "en": "in the Minerva folder on the NAS (", "de": "im Minerva-Ordner auf dem NAS ("}
 {"uk": "у товар", "en": "into the product", "de": "in den Artikel"}
 {"uk": "у товару немає базових цін", "en": "the product has no base prices", "de": "der Artikel hat keine Basispreise"}
+{"uk": "у товару немає ні посилання, ні файлу {0}", "en": "the product has neither a link nor a file for the {0}", "de": "der Artikel hat weder Link noch Datei für {0}"}
 {"uk": "у товару немає цін у Minerva", "en": "the product has no prices in Minerva", "de": "der Artikel hat in Minerva keine Preise"}
 {"uk": "у товарів цього замовлення немає фото", "en": "the products in this order have no photos", "de": "die Artikel dieses Auftrags haben keine Fotos"}
 {"uk": "у фазі {0} дн.", "en": "{0} days in the phase", "de": "{0} Tage in der Phase"}

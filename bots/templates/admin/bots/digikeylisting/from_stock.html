@@ -40,6 +40,11 @@
             background: var(--bg-card, #1a2535); box-shadow: 0 -4px 12px rgba(0, 0, 0, .25); }
   .fs-bar label { float: none; width: auto; padding: 0; display: flex; gap: 6px; align-items: center; }
   .fs-pick td { padding: 5px 8px; }
+  .fs-terms { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px 16px; }
+  .fs-warn { display: block; color: #f5a524; font-weight: 600; }
+  .fs-link { display: flex; gap: 6px; align-items: center; }
+  .fs-link input { flex: 1; min-width: 0; }
+  .fs-link a, .fs-sugg button { white-space: nowrap; font-size: 12px; }
   @media (max-width: 760px) { .fs-grid { grid-template-columns: 1fr; } }
 </style>
 {% endblock %}
@@ -111,6 +116,15 @@
   {% endfor %}
 
   {% if cards %}
+  {% include "admin/bots/digikeypricerun/_fx_fix.html" %}
+  {% include "admin/bots/digikeypricerun/_fx_form.html" %}
+  <script>
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-fs-fill]'); if (!b) return;
+    var inp = document.getElementById(b.getAttribute('data-fs-fill'));
+    if (inp) { inp.value = b.getAttribute('data-fs-url'); inp.focus(); }
+  });
+  </script>
   <form method="post" id="fs-form">{% csrf_token %}
     <input type="hidden" name="ids" value="{{ ids }}">
     {% for c in cards %}
@@ -146,18 +160,48 @@
           <small class="fs-muted">{{ c.draft.category.reason }}{% if f.dk_category_id %} · ID {{ f.dk_category_id }}{% endif %}</small></div>
         <div><label for="p{{ pk }}-mfr">Виробник (до {{ mfr_max }})</label>
           <input type="text" id="p{{ pk }}-mfr" name="p{{ pk }}-mfr" maxlength="{{ mfr_max }}" value="{{ f.dk_manufacturer }}"></div>
-        <div><label for="p{{ pk }}-prices">Ціни для DigiKey, {{ dk_currency }} (MOQ {{ f.dk_min_order_qty }}, відвантаження {{ f.dk_lead_time_days }} дн)</label>
-          <div class="fs-tiers">{% for t in f.dk_prices %}<span>{{ t.qty }}+ · {{ t.price }}</span>{% empty %}<span style="color:#f5a524">немає</span>{% endfor %}</div>
+        {% with pr=c.draft.price %}
+        <div><label for="p{{ pk }}-prices">Ціни для DigiKey, {{ dk_currency }} за 1 шт.</label>
+          <div class="fs-tiers">{% for t in pr.rows %}<span title="Сума за {{ t.qty }} шт.: {{ t.total }} {{ dk_currency }}">{{ t.qty }}+ · {{ t.price }} <small class="fs-muted">= {{ t.total }}</small></span>{% empty %}<span style="color:#f5a524">немає</span>{% endfor %}</div>
           <input type="text" id="p{{ pk }}-prices" name="p{{ pk }}-prices" value="{{ c.prices_text }}"
                  placeholder="{% if f.dk_prices %}інакше: {% endif %}1: 12,50; 10: 11,20; 50: 9,90" style="width:100%;box-sizing:border-box">
-          <small class="fs-muted">{% if c.prices_text %}вписано вручну{% elif f.dk_prices %}за правилами «💲 Ціни DigiKey ← Minerva»; щоб інакше — впишіть «кількість: ціна; …»{% else %}на складі цін немає — впишіть «кількість: ціна; …»{% endif %}</small></div>
+          <small class="fs-muted">{% if pr.state == "manual" %}вписано вручну — ціна за 1 шт.; «= …» — сума за всю кількість{% elif f.dk_prices %}за правилами «💲 Ціни DigiKey ← Minerva»; щоб інакше — впишіть «кількість: ціна за 1 шт.; …»{% else %}<span style="color:#f5a524">{{ pr.reason }}</span>{% endif %}</small>
+          {% if pr.state == "ok" and pr.reason %}<small class="fs-warn">{{ pr.reason }}</small>{% endif %}
+          {% if pr.stock %}<small class="fs-muted" style="display:block">На складі: {{ pr.stock }}</small>{% endif %}
+          {% for t in pr.suspects %}<small style="display:block;color:#f5a524;font-weight:600">⚠ {{ t }}</small>{% endfor %}</div>
+        {% endwith %}
         <div class="fs-full"><label for="p{{ pk }}-desc">Опис (до {{ desc_max }})</label>
           <textarea id="p{{ pk }}-desc" name="p{{ pk }}-desc" maxlength="{{ desc_max }}">{{ f.dk_description }}</textarea></div>
-        <div class="fs-full fs-muted">
-          Фото: {% if f.dk_image_url %}<a href="{{ f.dk_image_url }}" target="_blank" rel="noopener">є</a>{% else %}немає{% endif %} ·
-          даташит: {% if f.dk_datasheet_url %}<a href="{{ f.dk_datasheet_url }}" target="_blank" rel="noopener">є</a>{% else %}немає{% endif %} ·
-          Supplier SKU: {{ f.dk_supplier_sku }}
+        {% with st=c.draft.stock tm=c.draft.terms %}
+        <div class="fs-full fs-terms">
+          <div><label for="p{{ pk }}-moq">Мін. замовлення (MOQ), шт.</label>
+            <input type="text" inputmode="numeric" id="p{{ pk }}-moq" name="p{{ pk }}-moq" value="{{ f.dk_min_order_qty }}">
+            <small class="fs-muted">{{ tm.moq_source }}; ціни менших кількостей DigiKey не покаже</small></div>
+          <div><label for="p{{ pk }}-lead">Відвантаження, днів</label>
+            <input type="text" inputmode="numeric" id="p{{ pk }}-lead" name="p{{ pk }}-lead" value="{{ f.dk_lead_time_days }}">
+            <small class="fs-muted">{{ tm.lead_source }}</small></div>
+          <div><label for="p{{ pk }}-qty">Кількість для DigiKey, шт.</label>
+            <input type="text" inputmode="numeric" id="p{{ pk }}-qty" name="p{{ pk }}-qty" value="{{ st.override|default_if_none:'' }}"
+                   placeholder="вільний залишок: {{ st.available }}">
+            <small class="fs-muted">На складі {{ st.on_hand }} шт.{% if st.reserved %}, у резерві {{ st.reserved }}{% endif %}, вільно {{ st.available }} ·
+              {% if st.override is not None %}на DigiKey піде {{ st.override }} шт. — вписано вручну, далі не оновлюється{% else %}на DigiKey піде вільний залишок і далі оновлюватиметься сам{% endif %}</small>
+            {% if st.reason %}<small class="fs-warn">{{ st.reason }}</small>{% endif %}</div>
         </div>
+        {% endwith %}
+        {% for kind, m in c.draft.media.items %}
+        <div class="fs-full"><label for="p{{ pk }}-{% if kind == 'image' %}img{% else %}ds{% endif %}">{% if kind == 'image' %}Фото (URL){% else %}Даташит (URL){% endif %}</label>
+          <div class="fs-link">
+            <input type="text" id="p{{ pk }}-{% if kind == 'image' %}img{% else %}ds{% endif %}" name="p{{ pk }}-{% if kind == 'image' %}img{% else %}ds{% endif %}"
+                   value="{{ m.url }}" placeholder="https://…" maxlength="300">
+            {% if m.url %}<a href="{{ m.url }}" target="_blank" rel="noopener noreferrer" title="Відкрити — перевірити, що це той файл">↗ відкрити</a>{% endif %}
+          </div>
+          {% if m.url %}<small class="fs-muted">{{ m.source }}</small>{% endif %}
+          {% if m.reason %}<small class="fs-warn">{{ m.reason }}</small>{% endif %}
+          {% if m.suggest %}<small class="fs-muted fs-sugg">Є {{ m.suggest_source }}: <a href="{{ m.suggest }}" target="_blank" rel="noopener noreferrer">{{ m.suggest|truncatechars:80 }}</a>
+            <button type="button" class="button" data-fs-fill="p{{ pk }}-{% if kind == 'image' %}img{% else %}ds{% endif %}" data-fs-url="{{ m.suggest }}">⇢ підставити</button></small>{% endif %}
+        </div>
+        {% endfor %}
+        <div class="fs-full fs-muted">Supplier SKU: {{ f.dk_supplier_sku }}{% for e in c.draft.terms.errors %} · <span class="fs-warn" style="display:inline">{{ e }}</span>{% endfor %}</div>
       </div>
 
       {% if c.required %}

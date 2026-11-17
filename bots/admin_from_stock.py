@@ -22,7 +22,9 @@ from bots.services import dk_publish
 PICK_LIMIT = 60
 MAX_PRODUCTS = 30
 ID_FIELDS = (("dk_title", "title"), ("dk_description", "desc"), ("dk_manufacturer", "mfr"),
-             ("dk_category_id", "cat"), ("dk_prices", "prices"))
+             ("dk_category_id", "cat"), ("dk_prices", "prices"), ("dk_image_url", "img"),
+             ("dk_datasheet_url", "ds"), ("dk_quantity_override", "qty"), ("dk_min_order_qty", "moq"),
+             ("dk_lead_time_days", "lead"))
 
 
 def _ids(request) -> list:
@@ -150,9 +152,14 @@ def view(request, model_admin):
         given, overrides = _inputs(request, pk) if action == "preview" else ({}, {})
         cards.append(_card(product, given, overrides, _ai_sources(request, pk, given) if action == "preview" else None))
         cards[-1]["aisrc"] = request.POST.get(f"p{pk}-aisrc", "") if action == "preview" else ""
+    fx_fix = None
+    if any(c["draft"]["price"]["state"] == "no_rate" for c in cards):   # курсу немає — кнопка «🌐 онлайн-курс ЄЦБ»
+        from bots.admin_prices import fx_fix as _fx_fix
+        fx_fix = _fx_fix(request, f"{request.path}?ids={','.join(map(str, ids))}")
     return TemplateResponse(request, "admin/bots/digikeylisting/from_stock.html", {
         **model_admin.admin_site.each_context(request), "opts": DigiKeyListing._meta,
         "title": "🔷 На DigiKey зі складу", "cards": cards, "listed": listed, "ids": ",".join(map(str, ids)),
+        "fx_fix": fx_fix,
         "fields_state": svc.fields_state(), "catalog": svc.catalog_state(), "choices": svc.category_choices(),
         "can_add": can_add,
         "title_max": svc.TITLE_MAX, "desc_max": svc.DESC_MAX, "mfr_max": svc.MANUFACTURER_MAX,

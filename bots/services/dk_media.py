@@ -69,10 +69,11 @@ def _public(url) -> str:
     return public(url)
 
 
-def candidates(product, kind, sku: str = "", cfg=None) -> tuple[list[str], str]:
-    """Можливі посилання для DigiKey і звідки: (['https://…'], 'правило DigiKey' / 'товар' / 'правило складу')."""
+def candidates(product, kind, sku: str = "", cfg=None, stock_only: bool = False) -> tuple[list[str], str]:
+    """Можливі посилання для DigiKey і звідки: (['https://…'], 'правило DigiKey' / 'товар' / 'правило складу').
+    stock_only — без правила DigiKey (підказка «🔷 Зі складу на DigiKey», коли правило для цього виду порожнє)."""
     cfg = cfg or config()
-    if cfg.media_source == cfg.MEDIA_RULE:
+    if cfg.media_source == cfg.MEDIA_RULE and not stock_only:
         template = (cfg.media_image_template if kind == IMAGE else cfg.media_datasheet_template) or ""
         key = media_links.key_for(product, kind) if product else (sku or "")
         found = media_links.candidates(template.strip(), key, kind)
@@ -80,6 +81,8 @@ def candidates(product, kind, sku: str = "", cfg=None) -> tuple[list[str], str]:
     if product is not None:
         rule = media_links.candidates(media_links.templates()[kind], media_links.key_for(product, kind), kind)
         link = ((product.image_url if kind == IMAGE else product.datasheet_url) or "").strip()
+        if link.startswith("/"):                       # «/media/…» — повна адреса цієї Minerva
+            link = _public(link)
         if link.startswith("http"):
             return [link], ("правило складу" if link in rule else "посилання товару")
         if rule:

@@ -292,3 +292,124 @@ class CatalogTests(FromStockBase):
         listing = DigiKeyListing.objects.get(product=self.adapter)
         self.assertEqual((listing.dk_category_id, listing.dk_category_name), ("855", "RF Filters"))
         self.assertEqual(listing.dk_prices, [{"qty": 1, "price": "8.5"}, {"qty": 10, "price": "7.9"}])
+
+
+class PriceReasonTests(FromStockBase):
+    """Без цін — справжня причина (немає курсу, а не «на складі цін немає»), суми й «схоже на суму»."""
+
+    def setUp(self):
+        super().setUp()
+        from bots.models import DigiKeyPriceSettings
+        from shop.models import ShopSettings
+        s = DigiKeyPriceSettings.get()
+        s.currency = "USD"                                         # акаунт продавця DigiKey — у доларах
+        s.save()
+        ss = ShopSettings.get()
+        ss.fx_rates = {}                                           # долара в «Курсах валют» немає
+        ss.save()
+        self.lot = Product.objects.create(sku="AN-LOT", name="Antenna", base_price_currency="EUR",
+                                          base_prices=[{"min_qty": 1, "unit_price": "0.3"},
+                                                       {"min_qty": 1000, "unit_price": "0.24"}])
+
+    def test_no_rate_is_not_no_prices(self):
+        d = svc.build_draft(self.lot)
+        self.assertEqual(d["fields"]["dk_prices"], [])
+        self.assertEqual(d["price"]["state"], "no_rate")
+        self.assertIn("немає курсу EUR → USD", d["price"]["reason"])
+        self.assertIn("1000 шт. — 0.24", d["price"]["stock"])
+
+    def test_page_shows_reason_and_rate_button(self):
+        from config.models import SystemSettings
+        SystemSettings.objects.update_or_create(pk=1, defaults={"is_onboarding_complete": True})
+        self.client.force_login(User.objects.create_superuser("root", "r@x.y", "p"))
+        r = self.client.get(f"/admin/bots/digikeylisting/from-stock/?ids={self.lot.pk}")
+        self.assertContains(r, "немає курсу EUR → USD")
+        self.assertNotContains(r, "на складі цін немає")
+        self.assertContains(r, 'id="dkfx-form"')                 # «🌐 Брати онлайн-курс ЄЦБ»
+        self.assertContains(r, "На складі: 1 шт. — 0.30")
+
+    def test_with_rate_prices_come_from_stock(self):
+        from shop.models import ShopSettings
+        ss = ShopSettings.get()
+        ss.fx_rates = {"USD": "0.8"}                              # 1 USD = 0,8 EUR → 1 EUR = 1,25 USD
+        ss.save()
+        d = svc.build_draft(self.lot)
+        self.assertEqual(d["price"]["state"], "ok")
+        self.assertEqual(d["fields"]["dk_prices"], [{"qty": 1, "price": "0.38"}, {"qty": 1000, "price": "0.3"}])
+        self.assertEqual(d["price"]["rows"][1]["total"], "300,00")
+
+    def test_typed_total_is_flagged(self):
+        from shop.models import ShopSettings
+        ss = ShopSettings.get()
+        ss.fx_rates = {"USD": "0.8"}
+        ss.save()
+        d = svc.build_draft(self.lot, overrides={"dk_prices": "4000: 25"})
+        self.assertEqual(d["price"]["state"], "manual")
+        self.assertEqual(d["price"]["rows"][0]["total"], "100\u00a0000,00")
+        self.assertTrue(d["price"]["suspects"])
+        self.assertIn("схоже, вписано суму за всю кількість", d["price"]["suspects"][0])
+
+
+class CheckBeforeCreateTests(FromStockBase):
+    """Перед «✓ Створити»: фото й даташит (звідки, вписати, підказка), залишок і кількість, MOQ і строк."""
+
+    def test_datasheet_link_and_source(self):
+        self.product.datasheet_url = "https://docs.example.com/FT220407.pdf"
+        self.product.save()
+        m = svc.build_draft(self.product)["media"]["datasheet"]
+        self.assertEqual(m["url"], "https://docs.example.com/FT220407.pdf")
+        self.assertEqual(m["source"], "посилання товару")
+
+    def test_rule_without_datasheet_template_suggests_stock_link(self):
+        cfg = DigiKeyConfig.get()
+        cfg.media_source = DigiKeyConfig.MEDIA_RULE
+        cfg.media_image_template = "https://dk.example.com/img/{key}.jpg"
+        cfg.save()
+        self.product.datasheet_url = "https://docs.example.com/FT220407.pdf"
+        self.product.save()
+        m = svc.build_draft(self.product)["media"]["datasheet"]
+        self.assertEqual(m["url"], "")
+        self.assertIn("правило DigiKey, а для даташита його немає", m["reason"])
+        self.assertEqual(m["suggest"], "https://docs.example.com/FT220407.pdf")
+        d = svc.build_draft(self.product, overrides={"dk_datasheet_url": m["suggest"]})   # «⇢ підставити»
+        self.assertEqual(d["fields"]["dk_datasheet_url"], "https://docs.example.com/FT220407.pdf")
+        self.assertEqual(d["media"]["datasheet"]["source"], "вписано вручну")
+
+    def test_typed_link_must_be_https(self):
+        d = svc.build_draft(self.product, overrides={"dk_image_url": "photo.jpg"})
+        self.assertIn("не схоже на адресу", d["media"]["image"]["reason"])
+
+    def test_stock_and_quantity_override(self):
+        from inventory.models import Location
+        from inventory.services.stock import create_movement
+        Location.objects.get_or_create(code="MAIN", defaults={"name": "Main"})
+        create_movement(product=self.product, tx_type="Incoming", qty=4000, ref_doc="test")
+        st = svc.build_draft(self.product)["stock"]
+        self.assertEqual((st["on_hand"], st["available"], st["override"]), (4000, 4000, None))
+        d = svc.build_draft(self.product, overrides={"dk_quantity_override": "1000"})
+        self.assertEqual(d["fields"]["dk_quantity_override"], 1000)
+
+    def test_moq_from_shop_lot_and_typed(self):
+        self.product.shop_min_qty = 1000
+        self.product.save()
+        t = svc.build_draft(self.product)["terms"]
+        self.assertEqual((t["moq"], t["moq_source"]), (1000, "мін. замовлення в магазинах"))
+        d = svc.build_draft(self.product, overrides={"dk_min_order_qty": "4000", "dk_lead_time_days": "5"})
+        self.assertEqual((d["fields"]["dk_min_order_qty"], d["fields"]["dk_lead_time_days"]), (4000, 5))
+        self.assertEqual(d["terms"]["moq_source"], "вписано вручну")
+        same = svc.build_draft(self.product, overrides={"dk_min_order_qty": "1000"})["terms"]
+        self.assertEqual(same["moq_source"], "мін. замовлення в магазинах")      # передзаповнене — не «вручну»
+
+    def test_create_takes_the_checked_values(self):
+        from config.models import SystemSettings
+        SystemSettings.objects.update_or_create(pk=1, defaults={"is_onboarding_complete": True})
+        self.client.force_login(User.objects.create_superuser("root", "r@x.y", "p"))
+        pk = self.product.pk
+        self.client.post("/admin/bots/digikeylisting/from-stock/", {
+            "ids": str(pk), "action": "create", f"p{pk}-on": "1", f"p{pk}-cat": "855", f"p{pk}-prices": "4000: 0,007",
+            f"p{pk}-moq": "4000", f"p{pk}-lead": "5", f"p{pk}-qty": "4000",
+            f"p{pk}-ds": "https://docs.example.com/FT220407.pdf", f"p{pk}-f-rohsStatus": "Non-RoHS"})
+        listing = DigiKeyListing.objects.get(product=self.product)
+        self.assertEqual((listing.dk_min_order_qty, listing.dk_lead_time_days, listing.dk_quantity_override),
+                         (4000, 5, 4000))
+        self.assertEqual(listing.dk_datasheet_url, "https://docs.example.com/FT220407.pdf")

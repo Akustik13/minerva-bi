@@ -426,23 +426,141 @@ def guess_category(product) -> dict:
             "reason": "схожих товарів на DigiKey ще немає — виберіть категорію з каталогу DigiKey"}
 
 
+PRICE_STATES = ("ok", "manual", "no_prices", "no_rate", "bad")
+
+
 def _prices(product, moq=1) -> tuple:
-    """([{qty, price}], примітка) за правилами «💲 Ціни DigiKey ← Minerva»; без цін — ([], причина)."""
+    """([{qty, price}], примітка, стан PRICE_STATES) за правилами «💲 Ціни DigiKey ← Minerva»;
+    без цін — ([], причина, стан): немає цін на складі / немає курсу / правила не дали цін."""
     from bots.services import dk_prices
     rules = dk_prices.Rules.from_settings()
     home = dk_prices.home_currency()
     minerva, cur, _src = dk_prices.minerva_tiers(product, rules.source, home)
     if not minerva:
-        return [], "немає цін на складі (базових або ціни продажу) — вкажіть ціни в картці лістингу"
+        return [], "на складі цін немає (ні базових, ні «Ціни продажу») — впишіть «кількість: ціна за 1 шт.; …»", "no_prices"
     dk_cur = dk_prices.currency()
     rate = dk_prices.fx(cur, dk_cur)
     if rate is None:
-        return [], f"немає курсу {cur} → {dk_cur} («Налаштування цін магазину → Курси валют»)"
+        return [], dk_prices.no_rate_text(cur, dk_cur), "no_rate"
     purchase_rate = dk_prices.fx(home, dk_cur) if product.purchase_price else None
     new, notes = dk_prices.compute(minerva, None, rules, rate, moq, product.purchase_price, purchase_rate)
     if not new:
-        return [], "; ".join(notes)
-    return dk_prices.tiers_json(new), "; ".join(notes)
+        return [], "; ".join(notes), "bad"
+    return dk_prices.tiers_json(new), "; ".join(notes), "ok"
+
+
+def _money(value) -> str:
+    """240 → «240,00», 100000 → «100 000,00» (сума за кількість)."""
+    from decimal import Decimal
+    whole, cents = f"{Decimal(value):.2f}".split(".")
+    return f"{int(whole):,}".replace(",", "\u00a0") + "," + cents
+
+
+def price_info(product, prices, reason, state) -> dict:
+    """Що показати біля цін на сторінці: ціни складу, кожен тир із сумою за кількість, причина без цін,
+    «схоже на суму за всю кількість» (dk_prices.price_suspects)."""
+    from decimal import Decimal
+    from bots.services import dk_prices
+    s = dk_prices.settings()
+    minerva, cur, src = dk_prices.minerva_tiers(product, s.source or "base_or_sale", dk_prices.home_currency())
+    stock = " · ".join(f"{q} шт. — {dk_prices.fmt_price(p)}" for q, p in minerva)
+    rows = [{"qty": t["qty"], "price": t["price"], "total": _money(Decimal(str(t["price"])) * t["qty"])} for t in prices]
+    try:
+        ref = dk_prices.product_ref(product, s)
+    except Exception:  # noqa: BLE001 — лише довідка
+        ref = []
+    return {"state": state, "reason": reason, "rows": rows,
+            "stock": f"{stock} {cur} ({src})" if stock else "",
+            "suspects": dk_prices.price_suspects(prices, ref) if state == "manual" else []}
+
+
+MEDIA_KIND_TEXT = {"image": "фото", "datasheet": "даташита"}
+
+
+def media_info(product, kind, typed: str = "") -> dict:
+    """Фото / даташит для DigiKey на сторінці «Зі складу»: {url, source, reason, suggest, suggest_source}.
+    url — що піде в картку (вписане людиною або знайдене dk_media); без нього — reason і, якщо правило DigiKey
+    для цього виду порожнє, підказка зі складу (suggest). Лише https://… до dk_media.URL_MAX символів."""
+    from bots.services import dk_media
+    found, how = dk_media.candidates(product, kind, product.sku)
+    auto = dk_media.target(product, kind, product.sku)
+    info = {"url": auto, "source": how if auto else "", "reason": "", "suggest": "", "suggest_source": ""}
+    typed = (typed or "").strip()
+    if typed and typed != auto:
+        if not re.match(r"^https?://\S+$", typed):
+            info["reason"] = "вписане не схоже на адресу https://… — лишаю знайдене"
+        elif len(typed) > dk_media.URL_MAX:
+            info["reason"] = f"вписана адреса довша за {dk_media.URL_MAX} символів — DigiKey не прийме"
+        else:
+            info.update(url=typed, source="вписано вручну")
+    if info["url"]:
+        return info
+    typed_err = info["reason"]
+    cfg = dk_media.config()
+    if found:
+        info["reason"] = f"посилання довше {dk_media.URL_MAX} символів — DigiKey не прийме"
+    elif cfg.media_source == cfg.MEDIA_RULE:
+        info["reason"] = (f"у «🖼 Фото й даташити для DigiKey» вибрано правило DigiKey, а для {MEDIA_KIND_TEXT[kind]} "
+                          "його немає")
+    else:
+        info["reason"] = (f"у товару немає ні посилання, ні файлу {MEDIA_KIND_TEXT[kind]}"
+                          + (" (.pdf)" if kind == "datasheet" else "") + " — картка товару або впишіть адресу тут")
+    if typed_err:
+        info["reason"] = f"{typed_err}; {info['reason']}"
+    alt, alt_how = dk_media.candidates(product, kind, product.sku, stock_only=True)
+    alt = [a for a in alt if len(a) <= dk_media.URL_MAX]
+    if alt:
+        info.update(suggest=alt[0], suggest_source=alt_how)
+    return info
+
+
+def stock_info(product, typed: str = "") -> dict:
+    """Залишок складу й кількість для DigiKey: {on_hand, reserved, available, qty, override, reason}.
+    Порожньо — DigiKey отримує вільний залишок («Доступно») і далі оновлюється сам; число — «Кількість для
+    DigiKey» лістингу (dk_quantity_override)."""
+    from inventory.models import Product
+    from inventory.services.stock import annotate_stock
+    row = annotate_stock(Product.objects.filter(pk=product.pk)).first()
+    on_hand = int(row._on_hand) if row else 0
+    reserved = int(row._reserved) if row else 0
+    available = max(0, on_hand - reserved)
+    info = {"on_hand": on_hand, "reserved": reserved, "available": available, "qty": available,
+            "override": None, "reason": ""}
+    typed = (typed or "").strip().replace(" ", "")
+    if typed:
+        if typed.isdigit():
+            info.update(qty=int(typed), override=int(typed))
+        else:
+            info["reason"] = "кількість — ціле число від 0; лишаю вільний залишок складу"
+    return info
+
+
+def order_terms(product, overrides) -> dict:
+    """MOQ і строк відвантаження для картки DigiKey: {moq, moq_source, lead, lead_source, errors}.
+    MOQ — вписаний, інакше «Мін. замовлення в магазинах» товару (shop_min_qty), інакше 1;
+    строк — вписаний, інакше «Строк поставки» товару, інакше як у лістингу за замовчуванням."""
+    from bots.models import DigiKeyListing
+    lot = getattr(product, "shop_min_qty", 1) or 1
+    default_lead = DigiKeyListing._meta.get_field("dk_lead_time_days").default
+    out = {"moq": lot, "moq_source": "мін. замовлення в магазинах" if lot > 1 else "за замовчуванням",
+           "lead": product.lead_time_days or default_lead,
+           "lead_source": "строк поставки товару" if product.lead_time_days else "за замовчуванням",
+           "errors": []}
+    moq = str(overrides.get("dk_min_order_qty") or "").strip().replace(" ", "")
+    if moq:
+        if moq.isdigit() and int(moq) >= 1:
+            if int(moq) != out["moq"]:                 # поле передзаповнене — те саме число не «вручну»
+                out.update(moq=int(moq), moq_source="вписано вручну")
+        else:
+            out["errors"].append("MOQ — ціле число від 1")
+    lead = str(overrides.get("dk_lead_time_days") or "").strip().replace(" ", "")
+    if lead:
+        if lead.isdigit() and int(lead) <= 365:
+            if int(lead) != out["lead"]:
+                out.update(lead=int(lead), lead_source="вписано вручну")
+        else:
+            out["errors"].append("строк відвантаження — ціле число днів від 0 до 365")
+    return out
 
 
 def parse_prices(text) -> list:
@@ -498,26 +616,30 @@ def build_draft(product, given=None, overrides=None, ai_sources=None) -> dict:
         if common:
             manufacturer = common.most_common(1)[0][0]
             notes.append(f"виробник — як у наших лістингів ({manufacturer})")
-    prices, price_note = _prices(product)
+    terms = order_terms(product, overrides)
+    prices, price_note, price_state = _prices(product, terms["moq"])
     if overrides.get("dk_prices"):
         try:
-            prices, price_note = parse_prices(overrides["dk_prices"]), "ціни вписано вручну"
+            prices, price_note, price_state = parse_prices(overrides["dk_prices"]), "ціни вписано вручну", "manual"
         except ValueError as exc:
-            prices, price_note = [], f"ціни: {exc}"
-    if price_note:
+            prices, price_note, price_state = [], f"ціни: {exc}", "bad"
+    # примітки до цін (MOQ, округлення, причина «без цін») — під полем цін (price_info), не в загальних
+    if price_state == "manual":
         notes.append(price_note)
+    price = price_info(product, prices, price_note, price_state)
     rows = template(cat["dk_category_id"])
     values, sources, missing = autofill(product, rows, given, ai_sources)
-    from bots.services.dk_media import target as media_target   # «🖼 Фото й даташити для DigiKey»
-    image = media_target(product, "image", product.sku)
-    datasheet = media_target(product, "datasheet", product.sku)
+    media = {k: media_info(product, k, overrides.get(f"dk_{k}_url" if k == "image" else "dk_datasheet_url"))
+             for k in ("image", "datasheet")}           # «🖼 Фото й даташити для DigiKey» + вписане людиною
+    image, datasheet = media["image"]["url"], media["datasheet"]["url"]
+    stock = stock_info(product, overrides.get("dk_quantity_override"))
     fields = {
         "dk_supplier_sku": product.sku[:SKU_MAX], "dk_title": title, "dk_description": description,
         "dk_manufacturer": manufacturer[:MANUFACTURER_MAX], "dk_category_id": cat["dk_category_id"],
         "dk_category_name": cat["dk_category_name"], "category_type": cat["category_type"],
         "dk_image_url": image, "dk_datasheet_url": datasheet,
-        "dk_prices": prices, "dk_min_order_qty": 1,
-        "dk_lead_time_days": product.lead_time_days or DigiKeyListing._meta.get_field("dk_lead_time_days").default,
+        "dk_prices": prices, "dk_min_order_qty": terms["moq"], "dk_quantity_override": stock["override"],
+        "dk_lead_time_days": terms["lead"],
         "dk_packaging": values.get("packaging", DEFAULT_PACKAGING),
         "dk_lifecycle_status": values.get("productLifecycleStatus", "Active"),
     }
@@ -529,7 +651,7 @@ def build_draft(product, given=None, overrides=None, ai_sources=None) -> dict:
     if cat["category_type"] == "filter":                     # фільтр — ще й у поля fa_* картки
         fields.update({FILTER_FIELDS[c]: v[:100] for c, v in attrs.items() if c in FILTER_FIELDS})
     return {"fields": fields, "attrs": attrs, "sources": sources, "missing": missing, "notes": notes,
-            "category": cat, "rows": rows}
+            "category": cat, "rows": rows, "price": price, "media": media, "stock": stock, "terms": terms}
 
 
 class AlreadyListed(Exception):
