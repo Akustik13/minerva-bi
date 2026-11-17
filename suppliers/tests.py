@@ -43,6 +43,9 @@ class Base(TestCase):
         self.addCleanup(over.disable)
         jobs.BACKGROUND = False
         self.addCleanup(setattr, jobs, "BACKGROUND", True)
+        from suppliers.services import rfq_compare
+        rfq_compare.ONLINE_FX = False                # курс ЄЦБ — без мережі
+        self.addCleanup(setattr, rfq_compare, "ONLINE_FX", True)
         self.user = User.objects.create_superuser("slava", ME, "p")
         self.client.force_login(self.user)
         from email_assistant.models import EmailAccount

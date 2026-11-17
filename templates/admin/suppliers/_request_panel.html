@@ -24,10 +24,15 @@
     <div class="spf-h">💶 Пропозиція</div>
     {% if r.price is not None or r.tiers or r.total is not None or r.lead_days is not None or r.quote_note or ai.summary %}
     <table class="spf-table rwp-kv">
-      {% if r.price is not None %}<tr><th>Ціна за шт.</th><td><b>{{ row.price_text }} {{ r.currency }}</b>{% if row.price_home is not None and r.currency and r.currency != row.home %} <span class="spf-muted">≈ {{ row.price_home }} {{ row.home }}</span>{% endif %}</td></tr>{% endif %}
-      {% if r.tiers %}<tr><th>За кількістю</th><td><table class="rwp-tiers">{% for t in r.tiers %}<tr><td>{{ t.qty }} шт.</td><td>{{ t.unit_price }}</td><td class="spf-muted">{% if t.total %}= {{ t.total }}{% endif %} {{ r.currency }}</td></tr>{% endfor %}</table></td></tr>{% endif %}
-      {% if r.total is not None %}<tr><th>Сума{% if quantities %} ({{ quantities.0 }} шт.){% endif %}</th><td>{{ r.total }} {{ r.currency }}</td></tr>{% endif %}
-      {% if row.all_in is not None %}<tr><th>Разом у {{ row.home }}</th><td><b>{{ row.all_in }}</b>{% if row.cheapest %} <span class="rw-best spf-ok">найдешевше</span>{% endif %}</td></tr>{% elif row.no_rate %}<tr><th>У {{ row.home }}</th><td class="spf-warn">немає курсу {{ r.currency }} у «Курсах валют»</td></tr>{% endif %}
+      {% if row.gaps %}<tr><th>⚠️ Неповна</th><td class="spf-warn">{{ row.gaps|join:"; " }}</td></tr>{% endif %}
+      {% if row.priced %}<tr><th>У ціні</th><td>{{ row.includes_text|default:"не сказано" }}</td></tr>{% endif %}
+      {% if row.cells %}<tr><th>За кількістю</th><td><table class="rwp-tiers">
+        {% for c in row.cells %}<tr><td>{{ c.qty }} шт</td>
+          {% if c.missing %}<td colspan="2" class="spf-warn">немає ціни</td>{% else %}
+          <td><b>{% if c.eff_home_text %}{{ c.eff_home_text }} {{ row.home }}{% else %}{{ c.eff_text }} {{ r.currency }}{% endif %}</b>/шт{% if c.best %} 🥇{% elif c.over is not None %} <span class="spf-muted">+{{ c.over }} %</span>{% endif %}</td>
+          <td class="spf-muted" translate="no">{{ c.unit_text }} {{ r.currency|default:row.home }}{% if c.one_time_text %} + {{ c.one_time_text }} разово{% endif %} · разом {{ c.total_text }} {{ r.currency|default:row.home }}{% if not c.exact %} · ≈ ціна на {{ c.tier_qty }} шт{% endif %}{% if c.lead is not None %} · {{ c.lead }} дн.{% endif %}</td>{% endif %}</tr>{% endfor %}
+      </table></td></tr>{% endif %}
+      {% if row.one_time %}<tr><th>Разово</th><td translate="no">{% for it in row.one_time %}{{ it.name }}: {{ it.amount }} {{ r.currency }}{% if it.qty %} (лише {{ it.qty }} шт){% endif %}{% if not forloop.last %}; {% endif %}{% endfor %}</td></tr>{% endif %}
       {% if r.lead_days is not None %}<tr><th>Строк</th><td>{{ r.lead_days }} дн.{% if row.fastest %} <span class="rw-best spf-ok">найшвидше</span>{% endif %}</td></tr>{% endif %}
       {% if r.shipping is not None %}<tr><th>Доставка</th><td>{{ r.shipping }} {{ r.currency }}</td></tr>{% endif %}
       {% if ai.moq %}<tr><th>MOQ</th><td>{{ ai.moq }} шт.</td></tr>{% endif %}

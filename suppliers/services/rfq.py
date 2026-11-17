@@ -538,10 +538,23 @@ def _dec(value, places="0.0001"):
 
 
 def set_quote(recipient, data: dict):
-    """Пропозиція вручну: ціна, сума, валюта, строк, доставка, діє до, умови, стан."""
+    """Пропозиція вручну: ціна, сума, ціни за кількістю, разові витрати, що входить, валюта, строк, доставка, діє до,
+    умови, стан."""
     from suppliers.models import SupplierRequestRecipient as R
+    from suppliers.services import rfq_compare
     recipient.price = _dec(data.get("price"))
     recipient.total = _dec(data.get("total"), "0.01")
+    if "tiers_text" in data:
+        recipient.tiers = rfq_compare.parse_tiers(data.get("tiers_text"))
+        q = parse_quantities(recipient.request.quantities)
+        first = next((t for t in recipient.tiers if q and t["qty"] == q[0]), None)
+        if first and recipient.price is None:
+            recipient.price = Decimal(first["unit_price"])
+    if "one_time_text" in data:
+        recipient.one_time = rfq_compare.parse_one_time(data.get("one_time_text"))
+    if "includes_set" in data:
+        getter = data.getlist if hasattr(data, "getlist") else (lambda k: data.get(k) or [])
+        recipient.includes = rfq_compare.clean_includes(getter("includes"))
     recipient.shipping = _dec(data.get("shipping"), "0.01")
     recipient.currency = str(data.get("currency") or "").strip().upper()[:3]
     lead = str(data.get("lead_days") or "").strip()
@@ -564,15 +577,22 @@ def set_quote(recipient, data: dict):
 def apply_ai(recipient, data: dict, overwrite=False):
     """Результат ai.quote → поля пропозиції (лише порожні, якщо не overwrite) + стан."""
     from suppliers.models import SupplierRequestRecipient as R
+    from suppliers.services import rfq_compare
     recipient.ai = data
     tiers = data.get("tiers") or []
     if tiers and (overwrite or not recipient.tiers):
         recipient.tiers = tiers
+    if data.get("one_time") and (overwrite or not recipient.one_time):
+        recipient.one_time = rfq_compare.clean_one_time(data["one_time"])
+    if data.get("includes") and (overwrite or not recipient.includes):
+        recipient.includes = rfq_compare.clean_includes(data["includes"])
     qty = parse_quantities(recipient.request.quantities)
     first = next((t for t in tiers if qty and t["qty"] == qty[0]), tiers[0] if tiers else None)
     if first and (overwrite or recipient.price is None):
         recipient.price = Decimal(first["unit_price"])
-        recipient.total = Decimal(first["total"])
+        recipient.total = (Decimal(first["unit_price"]) * first["qty"] + sum(
+            (Decimal(it["amount"]) for it in rfq_compare.clean_one_time(recipient.one_time)
+             if not it.get("qty") or it["qty"] == first["qty"]), Decimal(0))).quantize(Decimal("0.01"))
     if data.get("currency") and (overwrite or not recipient.currency):
         recipient.currency = data["currency"]
     if data.get("lead_days") is not None and (overwrite or recipient.lead_days is None):
@@ -600,39 +620,9 @@ def _touch_answered(req):
 
 
 def comparison(req) -> list:
-    """Рядки порівняння: ціна за шт. і сума у валюті Minerva (за «Курсами валют»), строк, оцінка постачальника.
-    Найдешевший і найшвидший позначено."""
-    from sales.revenue import Rates, home_currency
-    from suppliers.models import SupplierRequestRecipient as R
-    from suppliers.services.overview import purchases, requests_stats, score
-    home = home_currency()
-    rates = Rates(home)
-    rows = []
-    for r in req.recipients.select_related("supplier", "contact", "reply_message").order_by("pk"):
-        rate = rates.rate(r.currency or home)
-        price_home = (r.price * rate).quantize(Decimal("0.01")) if r.price is not None and rate is not None else None
-        total = r.total if r.total is not None else None
-        if total is None and r.price is not None:
-            q = parse_quantities(req.quantities)
-            total = (r.price * q[0]).quantize(Decimal("0.01")) if q else None
-        total_home = (total * rate).quantize(Decimal("0.01")) if total is not None and rate is not None else None
-        ship_home = (r.shipping * rate).quantize(Decimal("0.01")) if r.shipping is not None and rate is not None else None
-        try:
-            sc = score(purchases(r.supplier), None, requests_stats(r.supplier)).get("value")
-        except Exception:  # noqa: BLE001
-            sc = None
-        rows.append({"recipient": r, "home": home, "price_home": price_home, "total_home": total_home,
-                     "price_text": price_text(r.price),
-                     "all_in": (total_home + ship_home) if total_home is not None and ship_home is not None
-                     else total_home, "no_rate": rate is None and bool(r.currency), "score": sc})
-    priced = [x for x in rows if x["all_in"] is not None and x["recipient"].state == R.QUOTED]
-    if priced:
-        cheapest = min(priced, key=lambda x: x["all_in"])
-        cheapest["cheapest"] = True
-    timed = [x for x in rows if x["recipient"].lead_days is not None and x["recipient"].state == R.QUOTED]
-    if timed:
-        min(timed, key=lambda x: x["recipient"].lead_days)["fastest"] = True
-    return rows
+    """Рядки порівняння — suppliers/services/rfq_compare.py (кількості колонками, разові витрати, неповні)."""
+    from suppliers.services import rfq_compare
+    return rfq_compare.comparison(req)
 
 
 def price_text(d) -> str:

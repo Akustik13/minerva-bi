@@ -368,6 +368,11 @@ class SupplierRequestRecipient(models.Model):
     total = models.DecimalField("Сума", max_digits=14, decimal_places=2, null=True, blank=True)
     currency = models.CharField("Валюта", max_length=3, blank=True, default="")
     tiers = models.JSONField("Ціни за кількістю", default=list, blank=True)
+    # для чесного порівняння (services/rfq_compare.py): разові витрати окремо від ціни за шт. і що входить у ціну
+    one_time = models.JSONField("Разові витрати", default=list, blank=True,
+                                help_text='[{"name": "Stencil", "amount": "30.00", "qty": null}] — qty: лише для цієї кількості')
+    includes = models.JSONField("Що входить у ціну", default=list, blank=True,
+                                help_text='["pcb", "assembly", "components"]; порожньо — невідомо')
     lead_days = models.PositiveIntegerField("Строк, днів", null=True, blank=True)
     shipping = models.DecimalField("Доставка", max_digits=12, decimal_places=2, null=True, blank=True)
     valid_until = models.DateField("Пропозиція діє до", null=True, blank=True)

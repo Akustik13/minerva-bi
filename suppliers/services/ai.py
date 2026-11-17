@@ -529,14 +529,33 @@ def evaluate(supplier, user, scan_result: dict, purchases: dict | None = None, m
 
 
 QUOTE_JSON = (
-    '{"declined": false, "currency": "EUR", "tiers": [{"qty": 100, "unit_price": 1.23, "total": 123.0}], '
+    '{"declined": false, "currency": "USD", "tiers": [{"qty": 100, "unit_price": 1.23, "lead_days": 14}], '
+    '"one_time": [{"name": "Stencil", "amount": 30, "qty": null}], "includes": ["pcb", "assembly", "components"], '
     '"lead_days": 0, "shipping": null, "valid_until": "YYYY-MM-DD або порожньо", "moq": null, '
-    '"conditions": "оплата, Incoterms, інструменти / оснастка, що не входить", '
+    '"conditions": "оплата, Incoterms, що не входить", '
     '"questions": ["що постачальник уточнює в нас"], "summary": "1–2 речення українською"}')
+QUOTE_RULES = (
+    " Ціни — рівно як у даних, валюта як у постачальника. tiers.unit_price — ціна за 1 шт. БЕЗ разових витрат; "
+    "постачальник дав лише суму за партію — unit_price = (сума − разові витрати цієї партії) ÷ кількість; разові вже "
+    "розкладені в ціну за шт. і окремо не названі — лиши як є. one_time — разові витрати за замовлення, не за шт. "
+    "(NRE, трафарет / stencil, оснастка / fixture / test jig, налаштування / setup, програмування, інженерія), сума "
+    "у тій самій валюті; qty — лише якщо ця витрата стосується тільки однієї кількості, інакше null. includes — що "
+    "входить у ціну: pcb — виготовлення друкованих плат, assembly — монтаж / складання (SMT, THT), components — "
+    "закупівля компонентів постачальником; не сказано — []. Кілька варіантів (покриття, матеріал) — бери той, що "
+    "відповідає нашому запиту, інші — у summary. lead_days і tiers.lead_days — у календарних днях (тижні × 7); "
+    "строк різний для зразків і серії — у кожному ступені свій. Відмова / «не робимо» — declined: true. Цін немає "
+    "(лише питання чи підтвердження) — tiers: [], у summary — що саме написали.")
+
+
+def _template_label(key) -> str:
+    from suppliers.services.rfq import TEMPLATES
+    return TEMPLATES.get(key or "", (key or "—",))[0]
 
 
 def quote(recipient, user=None, model=DEFAULT_MODEL) -> dict:
-    """💶 Відповідь постачальника на запит → ціни / строк / умови (у recipient.ai; поля — лише порожні)."""
+    """💶 Відповідь постачальника на запит → ціни за кількістю (без разових), разові витрати, що входить у ціну,
+    строк, умови (у recipient.ai; поля — лише порожні). Читає листи гілки й файли постачальника, збережені в запиті."""
+    from django.utils import timezone
     from email_assistant.models import EmailMessage
     from email_assistant.quotes import new_text
     from email_assistant.reply_brief import attachment_text
@@ -555,16 +574,34 @@ def quote(recipient, user=None, model=DEFAULT_MODEL) -> dict:
     for m in msgs:
         part = f"Лист {m.sent_at:%Y-%m-%d} від {m.from_email} · {m.subject}\n{new_text(m.body_text or '')[:4000]}"
         for att in (m.attachments or [])[:4]:
-            if isinstance(att, dict) and not att.get("is_inline"):
+            if isinstance(att, dict) and not att.get("is_inline") and not recipient.reply_files.filter(
+                    message=m, name=att.get("name")).exists():
                 t = attachment_text(att, limit=6000)
                 if t:
                     part += f"\n--- Вкладення {att.get('name')} ---\n{t}"
         parts.append(part)
-    asked = f"Ми запитували: {req.title}\nКількості: {req.quantities or '—'}\n{req.body[:2000]}"
-    system = ("Ти розбираєш відповідь постачальника на наш запит пропозиції (RFQ). " + DATA_NOTE +
-              " Ціни — рівно як у даних (за 1 шт., валюта як у постачальника). Строк — у календарних днях (тижні × 7). "
-              "Відмова / «не робимо» — declined: true. Відповідай лише JSON: " + QUOTE_JSON)
-    text, price = call(system, f"{asked}\n<<<ДАНІ\n" + "\n\n".join(parts)[:24000] + "\nДАНІ>>>",
+    # 📎 файли з листів постачальника, збережені в запиті (rfq_replies) — і таблиці xlsx, і PDF, і ZIP
+    from suppliers.services import rfq_files, rfq_replies
+    try:
+        rfq_replies.collect(recipient, fetch=True)
+    except Exception:  # noqa: BLE001 — без IMAP: що вже на диску
+        pass
+    shown, files_part = {str(a.get("name")) for m in msgs for a in (m.attachments or []) if isinstance(a, dict)}, []
+    for f in recipient.reply_files.all()[:8]:
+        try:
+            with f.file.open("rb") as fh:
+                t = rfq_files.read(f.name, fh.read(rfq_files.FILE_MAX + 1))
+        except OSError:
+            t = ""
+        if t:
+            files_part.append(f"--- Файл {f.name} ---\n{t}")
+    if files_part:
+        parts.append("Файли від постачальника:\n" + "\n".join(files_part))
+    asked = (f"Ми запитували: {req.title}\nКількості: {req.quantities or '—'}\nФорма запиту: "
+             f"{_template_label(req.template)}\n{req.body[:2000]}")
+    system = ("Ти розбираєш відповідь постачальника на наш запит пропозиції (RFQ). " + DATA_NOTE + QUOTE_RULES +
+              " Відповідай лише JSON: " + QUOTE_JSON)
+    text, price = call(system, f"{asked}\n<<<ДАНІ\n" + "\n\n".join(parts)[:40000] + "\nДАНІ>>>",
                        model=model_of(model), user=user, effort="low", max_tokens=6000)
     data = parse_json(text)
     tiers = []
@@ -577,10 +614,19 @@ def quote(recipient, user=None, model=DEFAULT_MODEL) -> dict:
         except Exception:  # noqa: BLE001
             continue
         if qty > 0 and unit is not None and unit >= 0:
-            tiers.append({"qty": qty, "unit_price": str(unit.quantize(Decimal("0.0001"))),
-                          "total": str((unit * qty).quantize(Decimal("0.01")))})
-    out = {"declined": bool(data.get("declined")), "currency": _s(data.get("currency"), 3).upper(),
-           "tiers": tiers[:10], "lead_days": data.get("lead_days") if isinstance(data.get("lead_days"), int) else None,
+            tier = {"qty": qty, "unit_price": str(unit.quantize(Decimal("0.0001")))}
+            if isinstance(t.get("lead_days"), int) and 0 <= t["lead_days"] <= 1000:
+                tier["lead_days"] = t["lead_days"]
+            tiers.append(tier)
+    from suppliers.services import rfq_compare
+    out = {"v": 2, "declined": bool(data.get("declined")), "currency": _s(data.get("currency"), 3).upper(),
+           "tiers": sorted(tiers, key=lambda t: t["qty"])[:10],
+           "one_time": rfq_compare.clean_one_time(data.get("one_time") if isinstance(data.get("one_time"), list)
+                                                  else []),
+           "includes": rfq_compare.clean_includes(data.get("includes") if isinstance(data.get("includes"), list)
+                                                  else []),
+           "at": timezone.now().isoformat(),
+           "lead_days": data.get("lead_days") if isinstance(data.get("lead_days"), int) else None,
            "shipping": data.get("shipping") if isinstance(data.get("shipping"), (int, float)) else None,
            "valid_until": _s(data.get("valid_until"), 10), "moq": data.get("moq") if isinstance(data.get("moq"), int)
            else None, "conditions": _s(data.get("conditions"), 800),
@@ -592,22 +638,20 @@ def quote(recipient, user=None, model=DEFAULT_MODEL) -> dict:
 
 def compare(request, user=None, model=DEFAULT_MODEL) -> dict:
     """🏆 Порівняння пропозицій запиту (з таблиці Minerva, без листів) → {summary, pick, reasons, risks}."""
-    from suppliers.services.rfq import comparison
-    rows = comparison(request)
-    lines = []
-    for r in rows:
-        rc = r["recipient"]
-        lines.append(f"- {rc.supplier.name}: стан {rc.get_state_display()}, ціна/шт {rc.price} {rc.currency} "
-                     f"(у {r['home']}: {r['price_home']}), сума {rc.total}, ступені {rc.tiers}, строк {rc.lead_days} дн., "
-                     f"доставка {rc.shipping}, діє до {rc.valid_until}, умови: {rc.quote_note[:300]}, "
-                     f"оцінка Minerva: {r.get('score')}")
+    from suppliers.services import rfq_compare
+    t, lines = rfq_compare.ai_lines(request)
     if not lines:
         raise AIError("Ще немає пропозицій для порівняння.")
-    system = ("Ти радиш відділу закупівель, яку пропозицію вибрати. Зважай на ціну в одній валюті, строк, умови, "
-              "надійність постачальника. Пиши українською. Відповідай лише JSON: "
+    system = ("Ти радиш відділу закупівель, яку пропозицію вибрати. Порівнюй лише ПОВНІ пропозиції (без «⚠️ "
+              "НЕПОВНА») за ціною за 1 шт. у " + t["home"] + " з разовими витратами — окремо для кожної кількості "
+              "(найдешевший для зразків і для серії може бути різний); зважай на строк, умови, що входить у ціну, "
+              "надійність. Неповні назви окремо й скажи, чого бракує. Рядки «ціни ще не розібрано» — це не «без "
+              "ціни»: порадь спершу 🧠 прочитати відповідь. Цифри — лише з даних, нічого не вигадуй. Пиши "
+              "українською. Відповідай лише JSON: "
               '{"summary": "2–4 речення", "pick": "назва постачальника або порожньо", "reasons": ["…"], '
               '"risks": ["…"], "ask": ["що ще уточнити"]}')
-    text, price = call(system, f"Запит: {request.title}\nКількості: {request.quantities}\n" + "\n".join(lines),
+    need = f"\nМає бути в ціні: {t['needed']}" if t["needed"] else ""
+    text, price = call(system, f"Запит: {request.title}\nКількості: {request.quantities}{need}\n" + "\n".join(lines),
                        model=model_of(model), user=user, effort="medium", max_tokens=4000)
     data = parse_json(text)
     out = {"summary": _s(data.get("summary"), 1500), "pick": _s(data.get("pick"), 200),

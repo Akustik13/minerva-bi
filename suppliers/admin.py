@@ -533,14 +533,15 @@ class SupplierRequestAdmin(admin.ModelAdmin):
     # ── сторінка запиту ──
     def work_view(self, request, pk):
         from suppliers.models import SupplierReplyFile
-        from suppliers.services import rfq_copy, rfq_replies
+        from suppliers.services import rfq_compare, rfq_copy, rfq_replies
         req = self._request(request, pk)
         for r in req.recipients.exclude(thread=None, reply_message=None):
             try:   # 📎 вкладення відповідей, що вже на диску (з пошти — панель рядка)
                 rfq_replies.collect(r)
             except Exception:  # noqa: BLE001
                 pass
-        rows = rfq.comparison(req)
+        cmp = rfq_compare.table(req)
+        rows = cmp["rows"]
         n_files = dict(SupplierReplyFile.objects.filter(recipient__request=req).values_list("recipient")
                        .annotate(n=Count("pk")).values_list("recipient", "n"))
         for row in rows:
@@ -551,6 +552,12 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                 r.reply_message.account.user_id == request.user.pk else None
             row["peek"] = rfq_replies.peek(r, request.user) if row["reply_link"] else None
             row["files_n"] = n_files.get(r.pk, 0)
+            r.tiers_text = rfq_compare.tiers_text(r.tiers)          # форма ✏️
+            r.one_time_text = rfq_compare.one_time_text(r.one_time)
+        try:
+            analysis_at = datetime.datetime.fromisoformat(str((req.analysis or {}).get("at") or ""))
+        except ValueError:
+            analysis_at = None
         from inventory.models import Supplier
         in_req = {row["recipient"].supplier_id for row in rows}
         more = Supplier.objects.exclude(pk__in=in_req).exclude(status=Supplier.STATUS_BLOCKED)
@@ -565,8 +572,22 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             copies=list(req.copies.order_by("-created_at").values("pk", "code", "status")[:10]),
             states=[s for s in SupplierRequestRecipient.STATES if s[0] != SupplierRequestRecipient.PLANNED],
             more=more.order_by("name")[:200], events=events, quantities=rfq.parse_quantities(req.quantities),
+            cmp=cmp, qtys=cmp["qtys"], ncols=max(len(cmp["qtys"]), 1) + 6, stale=rfq_compare.stale(req),
+            analysis_at=analysis_at,
+            reparse=len(self._to_parse(req, False)), scope_choices=rfq_compare.SCOPE,
             planned=sum(1 for row in rows if row["recipient"].state in (SupplierRequestRecipient.PLANNED,
                                                                           SupplierRequestRecipient.FAILED))))
+
+    @staticmethod
+    def _to_parse(req, overwrite) -> list:
+        """🧠 Кого розібрати разом: є відповідь, ще не розібрано (або розібрано до разових витрат і «що входить»);
+        overwrite — усіх, хто відповів."""
+        R = SupplierRequestRecipient
+        out = []
+        for r in req.recipients.exclude(thread=None, reply_message=None).filter(state__in=[R.REPLIED, R.QUOTED]):
+            if overwrite or not (r.ai or {}).get("summary") or (r.ai or {}).get("v") != 2:
+                out.append(r.pk)
+        return out
 
     def panel_view(self, request, pk, rid):
         """Панель праворуч: усе про пропозицію одного постачальника — ціни, вкладення, листування, історія.
@@ -623,12 +644,40 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                     rfq.apply_ai(r, data, overwrite=bool(request.POST.get("overwrite")))
                     return {"url": back, "message": "🧠 Розібрано"}
                 return JsonResponse({"job": jobs.start(user, f"quote {r.pk}", run)})
+            elif do == "ai_quote_all":      # 🧠 усі відповіді разом — по черзі, у фоні
+                from suppliers.services import ai as ai_mod
+                model, user = ai.model_of(request.POST.get("model")), request.user
+                over = bool(request.POST.get("overwrite"))
+                ids = self._to_parse(req, over)
+                if not ids:
+                    return JsonResponse({"error": "Нема що розбирати — усі відповіді вже прочитано."}, status=400)
+
+                def run(report):
+                    done, priced, failed = 0, 0, []
+                    for i, rid in enumerate(ids, 1):
+                        rr = SupplierRequestRecipient.objects.select_related("supplier", "request__account").get(pk=rid)
+                        report(f"🧠 {i} / {len(ids)} · {rr.supplier.name}")
+                        try:
+                            data = ai_mod.quote(rr, user=user, model=model)
+                            rfq.apply_ai(rr, data, overwrite=over)
+                        except Exception as e:  # noqa: BLE001 — один не вийшов, решта йдуть
+                            failed.append(f"{rr.supplier.name}: {str(e)[:120]}")
+                            continue
+                        done += 1
+                        priced += bool(data.get("tiers"))
+                    msg = f"🧠 Розібрано {done}: з цінами {priced}, без цін {done - priced}"
+                    if failed:
+                        msg += " · не вдалося: " + "; ".join(failed)
+                    return {"url": back, "message": msg}
+                return JsonResponse({"job": jobs.start(user, f"quotes {req.pk}", run, progress=True)})
             elif do == "compare_ai":
+                from suppliers.services import rfq_compare
                 model, user = ai.model_of(request.POST.get("model")), request.user
 
                 def run():
                     data = ai.compare(req, user=user, model=model)
-                    SupplierRequest.objects.filter(pk=req.pk).update(analysis={**data, "at": timezone.now().isoformat()})
+                    SupplierRequest.objects.filter(pk=req.pk).update(analysis={
+                        **data, "at": timezone.now().isoformat(), "fp": rfq_compare.fingerprint(req)})
                     return {"url": back, "message": "🏆 Готово"}
                 return JsonResponse({"job": jobs.start(user, f"compare {req.pk}", run)})
             elif do == "choose" and r is not None:
