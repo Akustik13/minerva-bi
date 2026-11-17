@@ -111,6 +111,7 @@
 {"uk": "% має бути числом", "en": "% must be a number", "de": "% muss eine Zahl sein"}
 {"uk": "% ширини тексту листа", "en": "% of the letter text width", "de": "% der Textbreite der E-Mail"}
 {"uk": "% — від 1 до 1000", "en": "% — from 1 to 1000", "de": "% — von 1 bis 1000"}
+{"uk": "% — перевірте й «Застосувати до позначених».", "en": "% — check it and click «Apply to marked».", "de": "% — prüfen und «Auf markierte anwenden» klicken."}
 {"uk": "&bull; {0} дн.", "en": "&bull; {0} days", "de": "&bull; {0} Tage"}
 {"uk": "&bull; {0} кг", "en": "&bull; {0} kg", "de": "&bull; {0} kg"}
 {"uk": "&bull; {0}×{1}×{2} см", "en": "&bull; {0}×{1}×{2} cm", "de": "&bull; {0}×{1}×{2} cm"}
@@ -461,6 +462,7 @@
 {"uk": ") для товарів з опублікованим офером", "en": ") for products with a published offer", "de": ") für Artikel mit veröffentlichtem Angebot"}
 {"uk": ") з вашими правами.", "en": ") with your permissions.", "de": ") mit Ihren Rechten."}
 {"uk": ") зникнуть.", "en": ") will be lost.", "de": ") gehen verloren."}
+{"uk": ") на згенеровані (", "en": ") with the generated ones (", "de": ") durch die erzeugten ("}
 {"uk": ") потім стоїть у кожному замовленні як «Джерело», за ним видно, звідки прийшов продаж.", "en": ") then appears in every order as “Source”, showing where the sale came from.", "de": ") steht anschließend in jedem Auftrag als „Quelle“, daran erkennt man, woher der Verkauf kam."}
 {"uk": ") прохань щодо відправки немає.", "en": ") no shipping requests.", "de": ") keine Versandwünsche."}
 {"uk": ") та обери потрібні scopes (чекбокси)", "en": ") and select the required scopes (checkboxes)", "de": ") und wählen Sie die benötigten Scopes (Kontrollkästchen)"}
@@ -1323,6 +1325,7 @@
 {"uk": "DigiKey повернув {0} полів товару ({1} обов'язкових).", "en": "DigiKey returned {0} product fields ({1} required).", "de": "DigiKey hat {0} Artikelfelder zurückgegeben ({1} Pflichtfelder)."}
 {"uk": "DigiKey повернув помилку: {0} — {1}", "en": "DigiKey returned an error: {0} — {1}", "de": "DigiKey hat einen Fehler zurückgegeben: {0} — {1}"}
 {"uk": "DigiKey показує офер покупцям (офер активний, причина «Active»).", "en": "DigiKey is showing the offer to buyers (the offer is active, reason “Active”).", "de": "DigiKey zeigt das Offer den Käufern an (Offer aktiv, Grund „Active“)."}
+{"uk": "DigiKey приймає до", "en": "DigiKey accepts up to", "de": "DigiKey akzeptiert bis zu"}
 {"uk": "DigiKey приймає до {0} ступенів", "en": "DigiKey accepts up to {0} price breaks", "de": "DigiKey akzeptiert bis zu {0} Staffelpreise"}
 {"uk": "DigiKey приймає лише все замовлення разом, а в посилках ще бракує", "en": "DigiKey accepts only the whole order at once, but the parcels are still missing", "de": "DigiKey akzeptiert nur den ganzen Auftrag auf einmal, in den Paketen fehlt aber noch"}
 {"uk": "DigiKey приймає лише всю кількість замовлення одним підтвердженням (частину — «Invalid Shipped Quantity»).", "en": "DigiKey accepts only the full order quantity in one confirmation (a part gives “Invalid Shipped Quantity”).", "de": "DigiKey akzeptiert nur die volle Auftragsmenge in einer Bestätigung (ein Teil ergibt „Invalid Shipped Quantity“)."}
@@ -4488,6 +4491,7 @@
 {"uk": "Без ліміту", "en": "No limit", "de": "Kein Limit"}
 {"uk": "Без ліміту.", "en": "No limit.", "de": "Kein Limit."}
 {"uk": "Без обліку", "en": "Not tracked", "de": "Ohne Bestandsführung"}
+{"uk": "Без окремої ціни (після округлення та сама, що в меншої кількості)", "en": "No separate price (after rounding the same as for the smaller quantity)", "de": "Kein eigener Preis (nach dem Runden gleich wie bei der kleineren Menge)"}
 {"uk": "Без округлення", "en": "No rounding", "de": "Ohne Rundung"}
 {"uk": "Без опису", "en": "Without a note", "de": "Ohne Beschreibung"}
 {"uk": "Без перекладу", "en": "Not translated", "de": "Ohne Übersetzung"}
@@ -4882,6 +4886,7 @@
 {"uk": "Велика Британія", "en": "United Kingdom", "de": "Vereinigtes Königreich"}
 {"uk": "Велика посилка — кур'єрські тарифи (Express) для неї дуже дорогі. Порівняйте з вантажною доставкою", "en": "Large shipment — courier (Express) rates are very expensive for it. Compare with freight", "de": "Große Sendung — Kurier-Tarife (Express) sind dafür sehr teuer. Vergleichen Sie mit Frachtversand"}
 {"uk": "Великий (18px)", "en": "Large (18px)", "de": "Groß (18px)"}
+{"uk": "Великі партії", "en": "Large batches", "de": "Große Losgrößen"}
 {"uk": "Вендор", "en": "Vendor", "de": "Anbieter"}
 {"uk": "Венесуела", "en": "Venezuela", "de": "Venezuela"}
 {"uk": "Вер", "en": "Sep", "de": "Sep"}
@@ -6104,6 +6109,8 @@
 {"uk": "Гватемала", "en": "Guatemala", "de": "Guatemala"}
 {"uk": "Гвінея", "en": "Guinea", "de": "Guinea"}
 {"uk": "Гвінея-Бісау", "en": "Guinea-Bissau", "de": "Guinea-Bissau"}
+{"uk": "Генератор ступенів", "en": "Tier generator", "de": "Staffelgenerator"}
+{"uk": "Генератор ступенів…", "en": "Tier generator…", "de": "Staffelgenerator…"}
 {"uk": "Генератори", "en": "Oscillators", "de": "Oszillatoren"}
 {"uk": "Генерація документів", "en": "Document generation", "de": "Dokumentenerzeugung"}
 {"uk": "Генерація документів з Word (.docx) шаблонів — зберігається на сервер та локально", "en": "Document generation from Word (.docx) templates — saved to the server and locally", "de": "Dokumentenerzeugung aus Word-Vorlagen (.docx) – wird auf dem Server und lokal gespeichert"}
@@ -6654,6 +6661,7 @@
 {"uk": "Додайте технічний опис", "en": "Add a technical description", "de": "Fügen Sie eine technische Beschreibung hinzu"}
 {"uk": "Додайте товари", "en": "Add products", "de": "Artikel hinzufügen"}
 {"uk": "Додайте товари: «Каталог → додати в магазин» (галочки, потім дія) або блок «🏪 Інтернет-магазини» в картці товару. Ціна — своя для магазину або від базових цін.", "en": "Add products: “Catalog → add to shop” (checkboxes, then the action) or the “🏪 Web shops” block on the product card. The price is the shop's own or based on the base prices.", "de": "Fügen Sie Artikel hinzu: „Katalog → zum Shop hinzufügen“ (Kontrollkästchen, dann die Aktion) oder den Block „🏪 Webshops“ in der Artikelkarte. Der Preis ist der eigene des Shops oder basiert auf den Basispreisen."}
+{"uk": "Додайте хоча б одну кількість, більшу за 1 шт.", "en": "Add at least one quantity above 1 pc.", "de": "Fügen Sie mindestens eine Menge über 1 Stk. hinzu."}
 {"uk": "Додайте хоча б одну позицію", "en": "Add at least one line", "de": "Fügen Sie mindestens eine Position hinzu"}
 {"uk": "Додайте хоча б одну позицію.", "en": "Add at least one item.", "de": "Fügen Sie mindestens eine Position hinzu."}
 {"uk": "Додайте хоча б одну ціну для публікації", "en": "Add at least one price to publish", "de": "Fügen Sie zum Veröffentlichen mindestens einen Preis hinzu"}
@@ -7717,6 +7725,7 @@
 {"uk": "Замінити його етикеткою з шаблону? (Скасувати — лише завантажити, файл у базі не зміниться.)", "en": "Replace it with a label from the template? (Cancel — only download, the file in the database will not change.)", "de": "Durch ein Etikett aus der Vorlage ersetzen? (Abbrechen — nur herunterladen, die Datei in der Datenbank bleibt unverändert.)"}
 {"uk": "Замінити поточний план", "en": "Replace the current plan", "de": "Aktuellen Plan ersetzen"}
 {"uk": "Замінити поточний план (кроків", "en": "Replace the current plan (steps", "de": "Aktuellen Plan ersetzen (Schritte"}
+{"uk": "Замінити ступені в таблиці (", "en": "Replace the tiers in the table (", "de": "Staffeln in der Tabelle ersetzen ("}
 {"uk": "Замінити текст листа прикладом?", "en": "Replace the letter text with the example?", "de": "Brieftext durch das Beispiel ersetzen?"}
 {"uk": "Замінити файл", "en": "Replace file", "de": "Datei ersetzen"}
 {"uk": "Занадто рано: наступне сповіщення через {0} год. (інтервал: {1} год.)", "en": "Too early: next notification in {0} h (interval: {1} h)", "de": "Zu früh: nächste Benachrichtigung in {0} Std. (Intervall: {1} Std.)"}
@@ -7942,6 +7951,7 @@
 {"uk": "Заповнити отримувача", "en": "Fill in the recipient", "de": "Empfänger ausfüllen"}
 {"uk": "Заповнити порожні робочі дні в askDANTE (режим і період — у налаштуваннях askDANTE)", "en": "Fill empty working days in askDANTE (mode and period are in the askDANTE settings)", "de": "Leere Arbeitstage in askDANTE ausfüllen (Modus und Zeitraum – in den askDANTE-Einstellungen)"}
 {"uk": "Заповнити пропуски", "en": "Fill gaps", "de": "Lücken füllen"}
+{"uk": "Заповнити шаблон", "en": "Fill the template", "de": "Vorlage ausfüllen"}
 {"uk": "Заповнить поля «📦 Фактична упаковка» нижче автоматично", "en": "Fills in the “📦 Actual packaging” fields below automatically", "de": "Füllt die Felder „📦 Tatsächliche Verpackung“ unten automatisch aus"}
 {"uk": "Заповнюйте лише якщо пакет не підходить. Порожньо = використовується пакет або роль.", "en": "Fill in only if the bundle does not fit. Empty = the bundle or role is used.", "de": "Nur ausfüllen, wenn das Paket nicht passt. Leer = das Paket oder die Rolle wird verwendet."}
 {"uk": "Заповнюйте тільки для типу", "en": "Fill in only for type", "de": "Nur ausfüllen für den Typ"}
@@ -8088,6 +8098,7 @@
 {"uk": "Застосувати git pull? Workers перезавантажуються автоматично.", "en": "Apply git pull? Workers restart automatically.", "de": "git pull anwenden? Worker werden automatisch neu gestartet."}
 {"uk": "Застосувати базові ціни в магазинах", "en": "Apply base prices in shops", "de": "Basispreise in Webshops übernehmen"}
 {"uk": "Застосувати в магазині з картки", "en": "Apply in the shop from the card", "de": "Aus der Karte im Shop anwenden"}
+{"uk": "Застосувати в таблицю", "en": "Apply to the table", "de": "In die Tabelle übernehmen"}
 {"uk": "Застосувати вибрані", "en": "Apply selected", "de": "Ausgewählte übernehmen"}
 {"uk": "Застосувати до {0} лістингів", "en": "Apply to {0} listings", "de": "Auf {0} Listings anwenden"}
 {"uk": "Застосувати до вибраних", "en": "Apply to selected", "de": "Auf Auswahl anwenden"}
@@ -8379,6 +8390,7 @@
 {"uk": "Згенерувати все одно", "en": "Generate anyway", "de": "Trotzdem erzeugen"}
 {"uk": "Згенерувати демо-інвойс із прикладовими даними", "en": "Generate a demo invoice with sample data", "de": "Demo-Rechnung mit Beispieldaten erzeugen"}
 {"uk": "Згенерувати заново", "en": "Generate again", "de": "Erneut erzeugen"}
+{"uk": "Згенерувати знижки", "en": "Generate discounts", "de": "Rabatte erzeugen"}
 {"uk": "Згенерувати й друкувати на DYMO", "en": "Generate and print on DYMO", "de": "Erzeugen und auf DYMO drucken"}
 {"uk": "Згенерувати наклейку", "en": "Generate label", "de": "Etikett erzeugen"}
 {"uk": "Згенерувати наклейку й завантажити", "en": "Generate the label and download", "de": "Etikett erzeugen und herunterladen"}
@@ -8623,13 +8635,18 @@
 {"uk": "Знижка", "en": "Discount", "de": "Rabatt"}
 {"uk": "Знижка %", "en": "Discount %", "de": "Rabatt %"}
 {"uk": "Знижка (від'ємне, напр. -39.90)", "en": "Discount (negative, e.g. -39.90)", "de": "Rabatt (negativ, z. B. -39.90)"}
+{"uk": "Знижка від 1 шт.", "en": "Discount from 1 pc", "de": "Rabatt ab 1 Stk."}
 {"uk": "Знижка від 1 шт., %", "en": "Discount from 1 pc., %", "de": "Rabatt ab 1 Stk., %"}
 {"uk": "Знижка від DigiKey Marketplace", "en": "Discount from DigiKey Marketplace", "de": "Rabatt von DigiKey Marketplace"}
 {"uk": "Знижка від базової ціни (1 шт.) за кількістю, напр. [{\"min_qty\": 10, \"discount\": 5}, {\"min_qty\": 100, \"discount\": 12}]", "en": "Discount from the base price (1 pc) by quantity, e.g. [{\"min_qty\": 10, \"discount\": 5}, {\"min_qty\": 100, \"discount\": 12}]", "de": "Rabatt auf den Basispreis (1 Stk.) nach Menge, z. B. [{\"min_qty\": 10, \"discount\": 5}, {\"min_qty\": 100, \"discount\": 12}]"}
+{"uk": "Знижка на найбільшу кількість — від 0 до 99 %.", "en": "Discount on the largest quantity — 0 to 99 %.", "de": "Rabatt auf die größte Menge — 0 bis 99 %."}
+{"uk": "Знижка на найбільшу кількість, %", "en": "Discount on the largest quantity, %", "de": "Rabatt auf die größte Menge, %"}
+{"uk": "Знижка росте", "en": "Discount grows", "de": "Rabatt steigt"}
 {"uk": "Знижка у % від ціни за 1 шт. Застосовується дією «Згенерувати ступені цін» в «Асортимент і ціни» і кнопкою «Знижки за шаблоном» у базових цінах товару. Спільний для всіх магазинів.", "en": "Discount in % of the price per 1 pc. Applied by the “Generate price breaks” action in “Assortment and prices” and by the “Discounts from template” button in the product’s base prices. Shared by all shops.", "de": "Rabatt in % vom Preis pro 1 Stk. Wird durch die Aktion „Staffelpreise erzeugen“ in „Sortiment und Preise“ und die Schaltfläche „Rabatte aus Vorlage“ in den Basispreisen des Artikels angewendet. Gilt gemeinsam für alle Shops."}
 {"uk": "Знижка, %", "en": "Discount, %", "de": "Rabatt, %"}
 {"uk": "Знижка, якщо є", "en": "Discount, if any", "de": "Rabatt, falls vorhanden"}
 {"uk": "Знижка: {0} USD", "en": "Discount: {0} USD", "de": "Rabatt: {0} USD"}
+{"uk": "Знижки для цих кількостей — у таблицю шаблону нижче; потім «Застосувати до позначених»", "en": "Discounts for these quantities go into the template table below; then «Apply to marked»", "de": "Rabatte für diese Mengen kommen in die Vorlagentabelle unten; dann «Auf markierte anwenden»"}
 {"uk": "Знижки за шаблоном", "en": "Discounts by template", "de": "Rabatte nach Vorlage"}
 {"uk": "Знову в черзі: {0} — агент обробить протягом хвилини за теперішніми налаштуваннями доручень.", "en": "Queued again: {0} — the agent will process them within a minute with the current rule settings.", "de": "Wieder in der Warteschlange: {0} — der Agent verarbeitet sie innerhalb einer Minute mit den aktuellen Einstellungen der Regeln."}
 {"uk": "Знову на розгляд", "en": "Back for review", "de": "Wieder zur Prüfung"}
@@ -9587,6 +9604,7 @@
 {"uk": "Кількості", "en": "Quantities", "de": "Mengen"}
 {"uk": "Кількості (через «;»)", "en": "Quantities (separated by «;»)", "de": "Mengen (getrennt mit «;»)"}
 {"uk": "Кількості зі старого запиту.", "en": "Quantities from the old request.", "de": "Mengen aus der alten Anfrage."}
+{"uk": "Кількості, шт.", "en": "Quantities, pcs", "de": "Mengen, Stk."}
 {"uk": "Кількість", "en": "Quantity", "de": "Menge"}
 {"uk": "Кількість &gt; 0. Крапка або кома.", "en": "Quantity &gt; 0. Dot or comma.", "de": "Menge &gt; 0. Punkt oder Komma."}
 {"uk": "Кількість (PCS)", "en": "Quantity (PCS)", "de": "Menge (PCS)"}
@@ -10412,6 +10430,7 @@
 {"uk": "На його основі", "en": "Based on it", "de": "Auf seiner Grundlage"}
 {"uk": "На кожній сторінці товару є блок покупки: ціна, ступені, наявність. Блок з'являється, лише коли товар є в магазині.", "en": "Every product page has a purchase block: price, price breaks, availability. The block appears only when the product is in the shop.", "de": "Auf jeder Artikelseite gibt es einen Kaufblock: Preis, Staffeln, Verfügbarkeit. Der Block erscheint nur, wenn der Artikel im Shop ist."}
 {"uk": "На митниці", "en": "In customs", "de": "Beim Zoll"}
+{"uk": "На найбільшу кількість (", "en": "For the largest quantity (", "de": "Für die größte Menge ("}
 {"uk": "На основі цих даних визнач оптимальну стратегію комунікації з клієнтом. Враховуй RFM сегмент.", "en": "Based on this data, determine the best communication strategy for the customer. Take the RFM segment into account.", "de": "Bestimmen Sie anhand dieser Daten die optimale Kommunikationsstrategie für den Kunden. Berücksichtigen Sie das RFM-Segment."}
 {"uk": "На перевірку", "en": "For review", "de": "Zur Prüfung"}
 {"uk": "На перевірці", "en": "Under review", "de": "In Prüfung"}
@@ -12036,6 +12055,7 @@
 {"uk": "Округлення", "en": "Rounding", "de": "Rundung"}
 {"uk": "Округлення активності, хв", "en": "Activity rounding, min", "de": "Rundung der Aktivität, Min."}
 {"uk": "Округлення цін", "en": "Price rounding", "de": "Preisrundung"}
+{"uk": "Округлення — як вибрано вгорі («Округлення»).", "en": "Rounding — as chosen above («Rounding»).", "de": "Rundung — wie oben gewählt («Rundung»)."}
 {"uk": "Округлено: {0} позицій", "en": "Rounded: {0} items", "de": "Gerundet: {0} Positionen"}
 {"uk": "Округлити", "en": "Round", "de": "Runden"}
 {"uk": "Округлити до центів", "en": "Round to cents", "de": "Auf Cent runden"}
@@ -15724,6 +15744,8 @@
 {"uk": "Скільки днів?", "en": "How many days?", "de": "Wie viele Tage?"}
 {"uk": "Скільки докуповувати, шт", "en": "How many to buy, pcs", "de": "Nachkaufmenge, Stk"}
 {"uk": "Скільки з них RAG уже забрав", "en": "How many of them RAG has already fetched", "de": "Wie viele davon RAG bereits abgeholt hat"}
+{"uk": "Скільки коштує", "en": "What it costs", "de": "Kosten für"}
+{"uk": "Скільки коштує вся ця кількість: кількість × ціна за шт.", "en": "What the whole quantity costs: quantity × price per pc", "de": "Was die ganze Menge kostet: Menge × Stückpreis"}
 {"uk": "Скільки листів максимум завантажувати на одну папку за раз.", "en": "The maximum number of emails to download per folder at a time.", "de": "Maximale Anzahl E-Mails, die pro Ordner auf einmal geladen werden."}
 {"uk": "Скільки місяців вистачить", "en": "How many months it will last", "de": "Für wie viele Monate es reicht"}
 {"uk": "Скільки одиниць товару вміщується в одну коробку", "en": "How many units of the product fit in one box", "de": "Wie viele Einheiten des Artikels in einen Karton passen"}
@@ -15779,6 +15801,7 @@
 {"uk": "Спершу виберіть, куди зберігати вкладення", "en": "First choose where to save attachments", "de": "Wählen Sie zuerst, wohin die Anhänge gespeichert werden sollen"}
 {"uk": "Спершу вкажіть адресу й API-Key askDANTE і збережіть.", "en": "First enter the askDANTE address and API key and save.", "de": "Geben Sie zuerst die askDANTE-Adresse und den API-Key an und speichern Sie."}
 {"uk": "Спершу вкажіть ціну за 1 шт.", "en": "First enter the price per 1 pc.", "de": "Geben Sie zuerst den Preis pro 1 Stk. an."}
+{"uk": "Спершу вкажіть ціну за 1 шт. (поле вгорі або рядок «1» таблиці).", "en": "First enter the price per 1 pc (the field above or row «1» of the table).", "de": "Geben Sie zuerst den Preis für 1 Stk. ein (Feld oben oder Zeile «1» der Tabelle)."}
 {"uk": "Спершу відмітьте «Прийшов».", "en": "First mark “Clock in”.", "de": "Markieren Sie zuerst „Kommen“."}
 {"uk": "Спершу додайте її", "en": "Add it first", "de": "Fügen Sie es zuerst hinzu"}
 {"uk": "Спершу задайте тут адресу й ключ помічника — інакше без файлу чат на сайті зупиниться.", "en": "First set the assistant address and key here — otherwise, without the file, the chat on the site will stop.", "de": "Legen Sie zuerst hier Adresse und Schlüssel des Assistenten fest — andernfalls stoppt der Chat auf der Website ohne die Datei."}
@@ -16256,6 +16279,7 @@
 {"uk": "Ступені (кількості)", "en": "Price breaks (quantities)", "de": "Staffeln (Mengen)"}
 {"uk": "Ступені (кількість: знижка %)", "en": "Price breaks (quantity: discount %)", "de": "Staffelpreise (Menge: Rabatt %)"}
 {"uk": "Ступені від ціни за 1 шт. за шаблоном «Налаштування цін»", "en": "Tiers from the price per 1 pc by the «Price settings» template", "de": "Staffeln ab dem Preis für 1 Stk. nach der Vorlage «Preiseinstellungen»"}
+{"uk": "Ступені для кількостей, які ви виберете: знижка росте до вказаної на найбільшу кількість — без введення кожної ціни", "en": "Tiers for the quantities you choose: the discount grows up to the one set for the largest quantity — without typing every price", "de": "Staffeln für die gewählten Mengen: der Rabatt steigt bis zu dem für die größte Menge — ohne jeden Preis einzutippen"}
 {"uk": "Ступені за кількістю для позначених: знижки від ціни за 1 шт. або однакові ціни", "en": "Quantity tiers for the marked products: discounts from the price per 1 pc. or identical prices", "de": "Mengenstaffeln für markierte Artikel: Rabatte auf den Preis pro 1 Stk. oder identische Preise"}
 {"uk": "Ступені за шаблоном…", "en": "Tiers by template…", "de": "Staffeln nach Vorlage…"}
 {"uk": "Ступені цін", "en": "Price breaks", "de": "Staffelpreise"}
@@ -17857,6 +17881,7 @@
 {"uk": "Ціна за шт.", "en": "Price per pc", "de": "Preis pro Stk."}
 {"uk": "Ціна за шт. (нетто)", "en": "Price per pc (net)", "de": "Preis pro Stk. (netto)"}
 {"uk": "Ціна за шт. (у валюті товару)", "en": "Price per pc. (in the product’s currency)", "de": "Preis pro Stk. (in der Artikelwährung)"}
+{"uk": "Ціна за шт. на найбільшу кількість", "en": "Price per pc for the largest quantity", "de": "Stückpreis für die größte Menge"}
 {"uk": "Ціна задана в цій позиції вручну.", "en": "The price is set manually in this item.", "de": "Der Preis ist in dieser Position manuell festgelegt."}
 {"uk": "Ціна закупки", "en": "Purchase price", "de": "Einkaufspreis"}
 {"uk": "Ціна закупівлі", "en": "Purchase price", "de": "Einkaufspreis"}
@@ -17865,6 +17890,7 @@
 {"uk": "Ціна зараз, 1 шт", "en": "Price now, 1 pc", "de": "Aktueller Preis, 1 Stk"}
 {"uk": "Ціна на 18 % вища, строк 8 тижнів", "en": "Price 18% higher, lead time 8 weeks", "de": "Preis 18 % höher, Lieferzeit 8 Wochen"}
 {"uk": "Ціна на DigiKey", "en": "Price on DigiKey", "de": "Preis auf DigiKey"}
+{"uk": "Ціна на найбільшу кількість — більша за 0 і менша за ціну 1 шт. (", "en": "Price for the largest quantity — above 0 and below the price of 1 pc (", "de": "Preis für die größte Menge — über 0 und unter dem Preis für 1 Stk. ("}
 {"uk": "Ціна не задана — на сайті «Ціна за запитом»", "en": "No price set — the site shows “Price on request”", "de": "Kein Preis festgelegt — die Website zeigt „Preis auf Anfrage“"}
 {"uk": "Ціна не задана — товар лише за запитом", "en": "No price set — product on request only", "de": "Kein Preis hinterlegt — Artikel nur auf Anfrage"}
 {"uk": "Ціна не може бути від'ємною.", "en": "The price cannot be negative.", "de": "Der Preis darf nicht negativ sein."}
@@ -18176,6 +18202,7 @@
 {"uk": "Шаблон документа", "en": "Document template", "de": "Dokumentvorlage"}
 {"uk": "Шаблон з «Інтернет-магазин → Налаштування цін»", "en": "Template from “Web shop → Price settings”", "de": "Vorlage aus „Webshop → Preiseinstellungen“"}
 {"uk": "Шаблон з такою назвою вже є", "en": "A template with this name already exists", "de": "Eine Vorlage mit diesem Namen gibt es bereits"}
+{"uk": "Шаблон заповнено", "en": "Template filled", "de": "Vorlage ausgefüllt"}
 {"uk": "Шаблон згенерований AI адаптивно для конкретного клієнта", "en": "Template generated by AI adaptively for a specific customer", "de": "Vorlage, von der KI adaptiv für einen bestimmten Kunden erzeugt"}
 {"uk": "Шаблон знижок порожній («Інтернет-магазин → Налаштування цін»).", "en": "The discount template is empty (“Web shop → Price settings”).", "de": "Die Rabattvorlage ist leer („Webshop → Preiseinstellungen“)."}
 {"uk": "Шаблон коректний", "en": "Template is valid", "de": "Vorlage ist korrekt"}
@@ -18599,6 +18626,7 @@
 {"uk": "Як магазин називається в листах покупцям і на сторінці оплати Stripe, напр. «Sevskiy GmbH». Порожньо — «Ім'я відправника», інакше назва вище.", "en": "How the shop is named in e-mails to customers and on the Stripe payment page, e.g. “Sevskiy GmbH”. Empty — “Sender name”, otherwise the name above.", "de": "Wie der Shop in E-Mails an Kunden und auf der Stripe-Zahlungsseite heißt, z. B. „Sevskiy GmbH“. Leer – „Absendername“, sonst der Name oben."}
 {"uk": "Як ми відповіли?", "en": "How did we reply?", "de": "Wie haben wir geantwortet?"}
 {"uk": "Як модулі обмінюються даними та які події тригерять які дії", "en": "How modules exchange data and which events trigger which actions", "de": "Wie Module Daten austauschen und welche Ereignisse welche Aktionen auslösen"}
+{"uk": "Як на DigiKey", "en": "Like on DigiKey", "de": "Wie bei DigiKey"}
 {"uk": "Як на DigiKey: 1 / 10 / 100 / 1000 шт. зі знижкою. Шаблон знижок задається в «Налаштуваннях цін», а вручну можна відкоригувати кожну позицію.", "en": "As on DigiKey: 1 / 10 / 100 / 1000 pcs with a discount. The discount template is set in “Price settings”, and each item can be adjusted manually.", "de": "Wie bei DigiKey: 1 / 10 / 100 / 1000 Stk. mit Rabatt. Die Rabattvorlage wird in den „Preiseinstellungen“ festgelegt, und jede Position lässt sich von Hand anpassen."}
 {"uk": "Як на ПК", "en": "Like on PC", "de": "Wie am PC"}
 {"uk": "Як на складі", "en": "As in stock", "de": "Wie im Lager"}
@@ -18638,6 +18666,7 @@
 {"uk": "Як у ролі / пакеті", "en": "As in role / bundle", "de": "Wie in Rolle / Paket"}
 {"uk": "Як у системі", "en": "As in the system", "de": "Wie im System"}
 {"uk": "Як у системі (Windows / macOS: «менше анімацій»)", "en": "As in the system (Windows / macOS: “reduce motion”)", "de": "Wie im System (Windows / macOS: „Animationen reduzieren“)"}
+{"uk": "Як у шаблоні магазину", "en": "As in the shop template", "de": "Wie in der Shop-Vorlage"}
 {"uk": "Як увімкнути", "en": "How to enable", "de": "So aktivieren Sie es"}
 {"uk": "Як часто", "en": "How often", "de": "Wie oft"}
 {"uk": "Як часто Minerva звіряє ціни (cron: manage.py dk_price_sync --if-due).", "en": "How often Minerva reconciles prices (cron: manage.py dk_price_sync --if-due).", "de": "Wie oft Minerva die Preise abgleicht (Cron: manage.py dk_price_sync --if-due)."}
@@ -18780,6 +18809,7 @@
 {"uk": "або свій емодзі", "en": "or your own emoji", "de": "oder ein eigenes Emoji"}
 {"uk": "або спочатку запустіть з «Показати у звіті» щоб побачити що буде знайдено.", "en": "or first run it with “Show in report” to see what will be found.", "de": "oder starten Sie zuerst mit „Im Bericht anzeigen“, um zu sehen, was gefunden wird."}
 {"uk": "або файл — у таблиці «📎 Документи» нижче (категорія, файл, «Зберегти»).", "en": "or a file — in the “📎 Documents” table below (category, file, “Save”).", "de": "oder eine Datei — in der Tabelle „📎 Dokumente“ unten (Kategorie, Datei, „Speichern“)."}
+{"uk": "або ціна", "en": "or price", "de": "oder Preis"}
 {"uk": "або через плитку на", "en": "or via the tile on", "de": "oder über die Kachel auf"}
 {"uk": "або числовий ID", "en": "or a numeric ID", "de": "oder eine numerische ID"}
 {"uk": "або інше значення:", "en": "or another value:", "de": "oder anderer Wert:"}
@@ -19796,6 +19826,7 @@
 {"uk": "за цим темпом залишилось", "en": "at this rate remaining", "de": "bei diesem Tempo verbleiben"}
 {"uk": "за цю годину", "en": "for this hour", "de": "für diese Stunde"}
 {"uk": "за цінами Anthropic API для моделі, що відповіла, без ПДВ; точна сума за всі AI-функції Minerva — Claude Console → Usage / Cost. RAG-підказки токенів Anthropic не витрачають.", "en": "at Anthropic API prices for the model that answered, excluding VAT; the exact total for all Minerva AI features — Claude Console → Usage / Cost. RAG tips do not use Anthropic tokens.", "de": "nach den Anthropic-API-Preisen für das antwortende Modell, ohne MwSt.; die genaue Summe für alle KI-Funktionen von Minerva — Claude Console → Usage / Cost. RAG-Tipps verbrauchen keine Anthropic-Tokens."}
+{"uk": "за шт.", "en": "per pc", "de": "pro Stk."}
 {"uk": "забагато запитів", "en": "too many requests", "de": "zu viele Anfragen"}
 {"uk": "забагато кроків — спробуйте з меншою кількістю посилань", "en": "too many steps — try with fewer links", "de": "zu viele Schritte — mit weniger Links versuchen"}
 {"uk": "забагато переадресацій", "en": "too many redirects", "de": "zu viele Weiterleitungen"}
@@ -20115,8 +20146,10 @@
 {"uk": "значення.", "en": "values.", "de": "Werte."}
 {"uk": "значень наших схожих лістингів.", "en": "values of our similar listings.", "de": "Werten unserer ähnlichen Listings."}
 {"uk": "значень…\"", "en": "values…\"", "de": "Werten…\""}
+{"uk": "знижка", "en": "discount", "de": "Rabatt"}
 {"uk": "знижка {0}%", "en": "discount {0}%", "de": "Rabatt {0}%"}
 {"uk": "знижка від ціни за 1 шт. (у кожного товару своя ціна)", "en": "discount from the price per 1 pc. (each product has its own price)", "de": "Rabatt auf den Preis pro 1 Stk. (jeder Artikel hat seinen eigenen Preis)"}
+{"uk": "знижка на найбільшу", "en": "discount on the largest", "de": "Rabatt auf die größte"}
 {"uk": "зникає, якщо сума доставки 0.", "en": "disappears if the shipping amount is 0.", "de": "entfällt, wenn der Versandbetrag 0 ist."}
 {"uk": "зникає, якщо сума доставки 0. Суми з крапкою і 2 знаками (149.99), валюта", "en": "disappears if the shipping amount is 0. Amounts with a decimal point and 2 digits (149.99), currency", "de": "entfällt, wenn der Versandbetrag 0 ist. Beträge mit Dezimalpunkt und 2 Nachkommastellen (149.99), Währung"}
 {"uk": "зняти блокування · 🚪 завершити всі входи · ⛔ вимкнути", "en": "remove the lock · 🚪 end all sessions · ⛔ disable", "de": "Sperre aufheben · 🚪 alle Anmeldungen beenden · ⛔ deaktivieren"}
@@ -20409,6 +20442,7 @@
 {"uk": "кількості {0}", "en": "quantities {0}", "de": "Mengen {0}"}
 {"uk": "кількості взято з того, що в ній лежить.", "en": "quantities taken from what it holds.", "de": "Mengen aus dem Paketinhalt übernommen."}
 {"uk": "кількості з листа: {0}", "en": "quantities from the e-mail: {0}", "de": "Mengen aus der E-Mail: {0}"}
+{"uk": "кількості, шт.", "en": "quantities, pcs", "de": "Mengen, Stk."}
 {"uk": "кількість", "en": "quantity", "de": "Menge"}
 {"uk": "кількість коробок: в упаковці", "en": "number of boxes: in packaging", "de": "Anzahl der Kartons: in der Verpackung"}
 {"uk": "кількість має бути > 0 (позиції", "en": "quantity must be > 0 (items", "de": "die Menge muss > 0 sein (Positionen"}
@@ -20667,6 +20701,7 @@
 {"uk": "на DigiKey вже ці ціни", "en": "DigiKey already has these prices", "de": "auf DigiKey gelten bereits diese Preise"}
 {"uk": "на DigiKey немає цін — порівняти неможливо", "en": "no prices on DigiKey — comparison impossible", "de": "auf DigiKey sind keine Preise vorhanden — Vergleich nicht möglich"}
 {"uk": "на DigiKey нічого не надіслано.", "en": "nothing was sent to DigiKey.", "de": "an DigiKey wurde nichts gesendet."}
+{"uk": "на DigiKey підуть перші", "en": "the first ones go to DigiKey:", "de": "an DigiKey gehen die ersten"}
 {"uk": "на DigiKey ще не читали — натисніть «🔍 Прочитати з DigiKey і перевірити»", "en": "not read from DigiKey yet — click “🔍 Read from DigiKey and check”", "de": "noch nicht von DigiKey gelesen — auf „🔍 Von DigiKey lesen und prüfen“ klicken"}
 {"uk": "на DigiKey є, у Minerva лістингу немає", "en": "exists on DigiKey, no listing in Minerva", "de": "auf DigiKey vorhanden, in Minerva gibt es kein Listing"}
 {"uk": "на DigiKey інше — надіслати", "en": "DigiKey has something different — send", "de": "auf DigiKey ist es anders — senden"}
@@ -20777,6 +20812,7 @@
 {"uk": "найближчих: {0}", "en": "upcoming: {0}", "de": "anstehend: {0}"}
 {"uk": "найбільша зміна ціни для однієї кількості (і на новому чи прибраному ступені) — її перевіряє запобіжник автооновлення", "en": "the largest price change for a single quantity (including on a new or removed price break) — it is checked by the auto-update safeguard", "de": "die größte Preisänderung für eine einzelne Menge (auch bei einer neuen oder entfernten Staffel) — sie wird von der Sicherung der automatischen Aktualisierung geprüft"}
 {"uk": "найбільше", "en": "most", "de": "am meisten"}
+{"uk": "найбільші кількості — ні.", "en": "the largest quantities do not.", "de": "die größten Mengen nicht."}
 {"uk": "найдешевше", "en": "cheapest", "de": "am günstigsten"}
 {"uk": "найдешевше для цієї кількості серед повних пропозицій, інші — на скільки дорожче.", "en": "cheapest for this quantity among complete offers, the others — how much more expensive.", "de": "am günstigsten für diese Menge unter den vollständigen Angeboten, die anderen — wie viel teurer."}
 {"uk": "найдешевший", "en": "cheapest", "de": "günstigster"}
@@ -21528,6 +21564,8 @@
 {"uk": "питають", "en": "they ask", "de": "sie fragen"}
 {"uk": "питають: {0}", "en": "they ask: {0}", "de": "sie fragen: {0}"}
 {"uk": "пишіть як колезі — або продиктуйте", "en": "write as to a colleague — or dictate", "de": "schreiben Sie wie einem Kollegen — oder diktieren Sie"}
+{"uk": "плавно — як на DigiKey", "en": "smoothly — like on DigiKey", "de": "gleitend — wie bei DigiKey"}
+{"uk": "плавно — як на DigiKey (на малих кількостях швидше)", "en": "smoothly — like on DigiKey (faster on small quantities)", "de": "gleitend — wie bei DigiKey (bei kleinen Mengen schneller)"}
 {"uk": "план {0}", "en": "plan {0}", "de": "Plan {0}"}
 {"uk": "план {0}–{1}", "en": "plan {0}–{1}", "de": "Plan {0}–{1}"}
 {"uk": "план написано іншою мовою — Claude перекладе назви кроків і фаз мовою документа (назви фірм, людей і артикули лишаються); переклад запам’ятовується — повторний експорт без оплати", "en": "the plan is written in another language — Claude translates the step and phase names into the document language (company and people names and part numbers stay); the translation is remembered — exporting again costs nothing", "de": "der Plan ist in einer anderen Sprache geschrieben — Claude übersetzt die Namen der Schritte und Phasen in die Dokumentsprache (Firmen-, Personennamen und Artikelnummern bleiben); die Übersetzung wird gespeichert — erneuter Export kostet nichts"}
@@ -22123,6 +22161,7 @@
 {"uk": "рядок", "en": "line", "de": "Zeile"}
 {"uk": "рядок {0}: «{1}» — кількість має бути цілою", "en": "line {0}: “{1}” — the quantity must be a whole number", "de": "Zeile {0}: „{1}“ — die Menge muss eine ganze Zahl sein"}
 {"uk": "рядок {0}: «{1}» — товар не знайдено", "en": "line {0}: “{1}” — product not found", "de": "Zeile {0}: „{1}“ — Artikel nicht gefunden"}
+{"uk": "рівними кроками", "en": "in equal steps", "de": "in gleichen Schritten"}
 {"uk": "різних записів сьогодні", "en": "distinct records today", "de": "verschiedene Datensätze heute"}
 {"uk": "різниця", "en": "difference", "de": "Differenz"}
 {"uk": "різниця вже чекає рішення або відхилена", "en": "the difference is already awaiting a decision or was rejected", "de": "Unterschied wartet bereits auf eine Entscheidung oder wurde abgelehnt"}
@@ -22381,7 +22420,10 @@
 {"uk": "ступенів", "en": "tiers", "de": "Staffeln"}
 {"uk": "ступенів {0}", "en": "{0} price breaks", "de": "{0} Staffeln"}
 {"uk": "ступенів базових цін: {0}", "en": "base price tiers: {0}", "de": "Staffeln der Basispreise: {0}"}
+{"uk": "ступенів до", "en": "tiers up to", "de": "Staffeln bis"}
 {"uk": "ступенів цін", "en": "price breaks", "de": "Staffelpreise"}
+{"uk": "ступенів, а тут", "en": "tiers, and here there are", "de": "Staffeln, hier sind es"}
+{"uk": "ступенів.", "en": "tiers.", "de": "Staffeln."}
 {"uk": "ступінь «від", "en": "tier “from", "de": "Staffel „ab"}
 {"uk": "ступінь прибрано", "en": "price break removed", "de": "Staffel entfernt"}
 {"uk": "субота", "en": "Saturday", "de": "Samstag"}
@@ -22941,6 +22983,7 @@
 {"uk": "ціни вже такі", "en": "prices are already the same", "de": "Preise sind bereits so"}
 {"uk": "ціни вже як у Minerva", "en": "prices already match Minerva", "de": "Preise entsprechen bereits Minerva"}
 {"uk": "ціни вписано вручну", "en": "prices entered manually", "de": "Preise manuell eingetragen"}
+{"uk": "ціни для кількостей від ціни за 1 шт.; далі «✓ Застосувати в таблицю» і «Зберегти» внизу сторінки", "en": "prices for quantities from the price per 1 pc; then «✓ Apply to the table» and «Save» at the bottom of the page", "de": "Preise für Mengen aus dem Preis für 1 Stk.; dann «✓ In die Tabelle übernehmen» und «Speichern» unten auf der Seite"}
 {"uk": "ціни змінились після пропозиції (на DigiKey чи в Minerva) — запустіть завдання ще раз", "en": "prices changed after the proposal (on DigiKey or in Minerva) — run the task again", "de": "Preise haben sich nach dem Vorschlag geändert (bei DigiKey oder in Minerva) – starten Sie die Aufgabe erneut"}
 {"uk": "ціни на DigiKey лишаться як були", "en": "prices on DigiKey will stay as they were", "de": "die Preise auf DigiKey bleiben unverändert"}
 {"uk": "ціни на DigiKey не зміняться", "en": "prices on DigiKey will not change", "de": "die Preise auf DigiKey ändern sich nicht"}
@@ -23060,6 +23103,10 @@
 {"uk": "шт.", "en": "pcs", "de": "Stk."}
 {"uk": "шт. (", "en": "pcs. (", "de": "Stk. ("}
 {"uk": "шт. для", "en": "pcs for", "de": "Stk. für"}
+{"uk": "шт. за ціною", "en": "pcs at a price of", "de": "Stk. zum Preis von"}
+{"uk": "шт. — виберіть дрібніше округлення або більшу знижку.", "en": "pcs — choose finer rounding or a larger discount.", "de": "Stk. — wählen Sie eine feinere Rundung oder einen höheren Rabatt."}
+{"uk": "шт.\"", "en": "pcs\"", "de": "Stk.\""}
+{"uk": "шт.)", "en": "pcs)", "de": "Stk.)"}
 {"uk": "шт.: вкажіть ціну.", "en": "pcs.: enter a price.", "de": "Stk.: Preis angeben."}
 {"uk": "шт.: знижка від 0 до 99 %.", "en": "pcs.: discount from 0 to 99 %.", "de": "Stk.: Rabatt von 0 bis 99 %."}
 {"uk": "шт.{0}{1}{2}{3}", "en": "pcs.{0}{1}{2}{3}", "de": "Stk.{0}{1}{2}{3}"}

@@ -281,7 +281,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <style>
 /* Базові ціни: таблиця + інструменти (textarea лишається носієм даних для форми) */
 .field-base_prices_text textarea { display: none !important; }
-.inv-bp { max-width: 760px; }
+.inv-bp { max-width: 1040px; }
 .inv-bp-tools { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 2px 0 10px;
   padding: 10px 12px; background: var(--bg-hover, #1e2d40); border: 1px solid var(--border-strong, #243347); border-radius: 6px; }
 .inv-bp-tool { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted, #9aafbe); }
@@ -293,7 +293,7 @@ document.addEventListener('DOMContentLoaded', function() {
   border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .inv-bp-tool button:hover, .inv-bp-btn:hover { border-color: var(--accent, #58a6ff); }
 .inv-bp-sep { width: 1px; align-self: stretch; background: var(--border-strong, #243347); }
-.inv-bp-table { border-collapse: collapse; font-size: 13px; min-width: 520px; }
+.inv-bp-table { border-collapse: collapse; font-size: 13px; min-width: 760px; }
 .inv-bp-table th { text-align: left; padding: 6px 10px; background: var(--bg-hover, #1e2d40); color: var(--text-muted, #9aafbe);
   font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; border-bottom: 2px solid var(--border-strong, #243347); }
 .inv-bp-table td { padding: 4px 6px; border-bottom: 1px solid var(--border-strong, #243347); vertical-align: middle; }
@@ -303,7 +303,9 @@ document.addEventListener('DOMContentLoaded', function() {
 .inv-bp-table input:focus, .inv-bp-tool input:focus { outline: none; border-color: var(--accent, #58a6ff); box-shadow: 0 0 0 2px rgba(88,166,255,.2); }
 .inv-bp-table input.is-bad { border-color: var(--err, #e53935); }
 .inv-bp-table tr.is-changed td:first-child { box-shadow: inset 3px 0 0 var(--accent, #58a6ff); }
-.inv-bp-cv { color: var(--text-muted, #9aafbe); font-size: 12px; text-align: right; white-space: nowrap; min-width: 90px; }
+.inv-bp-cv { color: var(--text-muted, #9aafbe); font-size: 12px; text-align: right; white-space: nowrap; min-width: 110px; }
+.inv-bp-sum { text-align: right; white-space: nowrap; min-width: 120px; font-variant-numeric: tabular-nums; font-weight: 600; }
+.inv-bp-sum small, .inv-bp-cv small { display: block; font-weight: 400; font-size: 11px; color: var(--text-muted, #9aafbe); }
 .inv-bp-foot { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: 12px; color: var(--text-muted, #9aafbe); }
 .inv-bp-dirty { color: #ffb74d; font-weight: 600; }
 .inv-bp-warn { margin: 0 0 8px; padding: 8px 12px; border: 1px solid var(--warn, #e3b341); border-radius: 6px;
@@ -317,6 +319,25 @@ document.addEventListener('DOMContentLoaded', function() {
 .inv-bp-tool input.t-same { width: auto; min-width: 0; margin: 0; padding: 0; }
 .inv-bp-tool input.t-rate[readonly] { background: var(--bg-hover, #1e2d40); color: var(--text-muted, #9aafbe); }
 .inv-bp-redo label { display: flex; width: auto; float: none; padding: 0; align-items: baseline; gap: 6px; margin-top: 6px; cursor: pointer; }
+/* 📈 Генератор ступенів */
+.inv-bp-gen { margin: 0 0 10px; padding: 10px 12px; border: 1px solid var(--accent, #58a6ff); border-radius: 6px; font-size: 12px; }
+.inv-bp-gen .g-row { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin: 6px 0; }
+.inv-bp-gen .g-l { color: var(--text-muted, #9aafbe); min-width: 190px; }
+.inv-bp-gen .g-muted { color: var(--text-muted, #9aafbe); }
+.inv-bp-gen label { display: inline-flex; width: auto; min-width: 0; float: none; padding: 0; align-items: center; gap: 5px;
+  font-weight: 400; color: var(--text, #c9d8e4); cursor: pointer; }
+.inv-bp-gen input[type=text] { background: var(--bg-input, #141f2b); color: var(--text, #c9d8e4); border: 1px solid var(--border-strong, #243347);
+  border-radius: 3px; padding: 4px 6px; font-size: 12px; width: 70px; text-align: right; }
+.inv-bp-gen input.g-q { width: 300px; text-align: left; }
+.inv-bp-gen input[type=radio] { width: auto; margin: 0; }
+.inv-bp-gen .g-preset { background: var(--bg-card, #1a2535); color: var(--text, #c9d8e4); border: 1px solid var(--border-strong, #243347);
+  border-radius: 12px; padding: 2px 10px; font-size: 11px; cursor: pointer; }
+.inv-bp-gen .g-preset:hover { border-color: var(--accent, #58a6ff); }
+.inv-bp-gen table.g-prev { min-width: 520px; margin-top: 4px; }
+.inv-bp-gen table.g-prev td { padding: 3px 10px; text-align: right; font-variant-numeric: tabular-nums; }
+.inv-bp-gen table.g-prev td:first-child { text-align: left; }
+.inv-bp-gen .g-note { color: var(--warn, #e3b341); margin: 6px 0 0; }
+.inv-bp-gen .g-note:empty { display: none; }
 .inv-bp-conv-note, .inv-bp-rate { font-size: 12px; color: var(--text-muted, #9aafbe); line-height: 1.6; margin: -4px 0 10px; }
 .inv-bp-rate { margin: 8px 0 0; }
 .inv-bp-conv-note b, .inv-bp-rate b { color: var(--text, #c9d8e4); }
@@ -344,6 +365,15 @@ document.addEventListener('DOMContentLoaded', function () {
   function num(v) { v = String(v == null ? '' : v).trim().replace(/\s/g, '').replace(',', '.'); return v === '' ? NaN : Number(v); }
   function fmt(n) { return (Math.round(n * 10000) / 10000).toFixed(4).replace(/\.?0+$/, ''); }
   function money(n) { return n.toFixed(2).replace('.', ','); }
+  function total(n) {                 // сума за кількість: 15 000,00
+    var s = n.toFixed(2).split('.');
+    return s[0].replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0') + ',' + s[1];
+  }
+  function cell(td, main, small, title) {   // текст комірки + дрібний другий рядок (лише textContent)
+    td.textContent = main || '';
+    if (small) { var el = document.createElement('small'); el.textContent = small; td.appendChild(el); }
+    td.title = title || '';
+  }
   function roundMode(v, mode) {
     if (!mode || mode === 'none' || !(v > 0)) return v;
     if (mode === 'x.90' || mode === 'x.99') {
@@ -353,6 +383,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     var step = Number(mode); return Math.round(v / step) * step;
   }
+{% include "admin/inventory/product/_tier_gen.js" %}
   function rate(from, to) {
     from = (from || '').toUpperCase(); to = (to || '').toUpperCase();
     if (from === to) return 1;
@@ -375,6 +406,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<span class="inv-bp-tool">Закупівля + <input type="text" class="t-mk" value="' + (cfg.markup != null ? cfg.markup : 100) + '"> % <button type="button" class="b-mk" title="Ціна за 1 шт. = закупівельна × (1 + націнка); знижки ступенів зберігаються">→ ціна 1 шт.</button></span>' +
       '<span class="inv-bp-sep"></span>' +
       '<span class="inv-bp-tool"><button type="button" class="b-tpl" title="Ступені від ціни за 1 шт. за шаблоном «Налаштування цін»">Знижки за шаблоном</button></span>' +
+      '<span class="inv-bp-tool"><button type="button" class="b-gen" title="Ступені для кількостей, які ви виберете: знижка росте до вказаної на найбільшу кількість — без введення кожної ціни">📈 Генератор ступенів…</button></span>' +
       '<span class="inv-bp-tool">Округлення <select class="t-rnd">' + rOpts + '</select><button type="button" class="b-rnd">Округлити</button></span>' +
       '<span class="inv-bp-sep"></span>' +
       '<span class="inv-bp-tool t-conv-open"><button type="button" class="b-conv-open" title="Якщо числа насправді в іншій валюті (напр. USD з DigiKey) — перевести їх у ' + minerva + ' за курсом">💱 Перевести з іншої валюти…</button></span>' +
@@ -385,7 +417,23 @@ document.addEventListener('DOMContentLoaded', function () {
         '<button type="button" class="b-conv" title="Ціни × курс, до 4 знаків (округлити — «Округлити»); курс запишеться в історію">Перевести</button></span>' +
     '</div>' +
     '<div class="inv-bp-conv-note"></div>' +
-    '<table class="inv-bp-table"><thead><tr><th>Від кількості, шт.</th><th>Ціна за шт., <span class="bp-c"></span></th><th>Знижка від 1 шт., %</th>' +
+    '<div class="inv-bp-gen" hidden>' +
+      '<div><b>📈 Генератор ступенів</b> <span class="g-muted">— ціни для кількостей від ціни за 1 шт.; далі «✓ Застосувати в таблицю» і «Зберегти» внизу сторінки</span></div>' +
+      '<div class="g-row"><span class="g-l">Кількості, шт.</span><input type="text" class="g-q" aria-label="Кількості, шт." placeholder="1, 10, 25, 50, 100, 250, 500, 1000"> ' +
+        tierPresetsHtml((cfg.template || []).length ? [{ label: 'Як у шаблоні магазину', q: [1].concat((cfg.template || []).map(function (t) { return t.min_qty; })) }] : []) + '</div>' +
+      '<div class="g-row"><span class="g-l">На найбільшу кількість (<b class="g-top"></b> шт.)</span>' +
+        '<label><input type="radio" name="g-end" value="disc" checked> знижка <input type="text" class="g-disc" inputmode="decimal" aria-label="Знижка, %"> %</label>' +
+        '<label><input type="radio" name="g-end" value="price"> або ціна <input type="text" class="g-price" inputmode="decimal" aria-label="Ціна за шт. на найбільшу кількість"> <b class="bp-c"></b> за шт.</label></div>' +
+      '<div class="g-row"><span class="g-l">Знижка росте</span>' +
+        '<label><input type="radio" name="g-curve" value="smooth" checked> плавно — як на DigiKey (на малих кількостях швидше)</label>' +
+        '<label><input type="radio" name="g-curve" value="even"> рівними кроками</label></div>' +
+      '<table class="inv-bp-table g-prev"><thead><tr><th>Від, шт.</th><th style="text-align:right">Ціна за шт.</th><th style="text-align:right">Знижка від 1 шт.</th><th style="text-align:right">Сума</th></tr></thead><tbody></tbody></table>' +
+      '<div class="g-note"></div>' +
+      '<div class="g-row"><button type="button" class="inv-bp-btn g-apply">✓ Застосувати в таблицю</button><button type="button" class="inv-bp-btn g-close">Закрити</button>' +
+        '<span class="g-muted">Округлення — як вибрано вгорі («Округлення»).</span></div>' +
+    '</div>' +
+    '<table class="inv-bp-table bp-main"><thead><tr><th>Від кількості, шт.</th><th>Ціна за шт., <span class="bp-c"></span></th>' +
+      '<th style="text-align:right" title="Скільки коштує вся ця кількість: кількість × ціна за шт.">Сума, <span class="bp-c"></span></th><th>Знижка від 1 шт., %</th>' +
       '<th class="h-cv" style="text-align:right">≈ у ' + home + '</th><th style="width:36px"></th></tr></thead><tbody></tbody></table>' +
     '<div class="inv-bp-rate"></div>' +
     '<div class="inv-bp-foot"><button type="button" class="inv-bp-btn b-add">+ Додати ступінь</button>' +
@@ -403,7 +451,7 @@ document.addEventListener('DOMContentLoaded', function () {
         (dk && dk.source ? ' (' + dk.source + ')' : '') + ' — ціни на DigiKey не зміняться</span>' : '');
     wrap.insertBefore(warn, wrap.firstChild);
   }
-  var body = wrap.querySelector('tbody'), $ = function (c) { return wrap.querySelector(c); };
+  var body = wrap.querySelector('.bp-main tbody'), $ = function (c) { return wrap.querySelector(c); };
   var initial = ta.value, initialCur = curInp ? curInp.value : '';
 
   // ── Рядки ──
@@ -418,6 +466,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var tr = document.createElement('tr');
     tr.innerHTML = '<td><input type="text" inputmode="numeric" class="bp-q" placeholder="напр. 10"></td>' +
       '<td><input type="text" inputmode="decimal" class="bp-p" placeholder="0.00"></td>' +
+      '<td class="inv-bp-sum"></td>' +
       '<td><input type="text" inputmode="decimal" class="bp-d" placeholder="—" title="Введіть знижку — ціна порахується від ціни за 1 шт."></td>' +
       '<td class="inv-bp-cv"></td><td><button type="button" class="inv-del-row" title="Видалити">×</button></td>';
     tr.querySelector('.bp-q').value = q || '';
@@ -465,7 +514,11 @@ document.addEventListener('DOMContentLoaded', function () {
         x.d.value = b > 0 && pn > 0 && qn > 1 ? (Math.round((1 - pn / b) * 1000) / 10).toString().replace('.', ',') : '';
       }
       x.d.disabled = qn === 1;
-      x.tr.querySelector('.inv-bp-cv').textContent = r && r !== 1 && pn > 0 ? money(pn * r) + ' ' + cvCur : '';
+      var okQ = qn >= 1 && Math.floor(qn) === qn, okP = pn > 0;
+      cell(x.tr.querySelector('.inv-bp-sum'), okQ && okP ? total(qn * pn) + ' ' + cur : '',
+           okQ && okP && qn > 1 ? qn + ' × ' + fmt(pn).replace('.', ',') : '', okQ && okP ? 'Скільки коштує ' + qn + ' шт. за ціною ' + fmt(pn).replace('.', ',') + ' ' + cur + ' за шт.' : '');
+      cell(x.tr.querySelector('.inv-bp-cv'), r && r !== 1 && okP ? money(pn * r) + ' ' + cvCur : '',
+           r && r !== 1 && okP && okQ && qn > 1 ? 'разом ' + total(qn * pn * r) + ' ' + cvCur : '');
       if (x.p.value.trim()) list.push({ q: x.q.value.trim(), p: x.p.value.trim().replace(',', '.'), qn: qn });
     });
     list.sort(function (a, c) { return (a.qn || 0) - (c.qn || 0); });
@@ -478,6 +531,7 @@ document.addEventListener('DOMContentLoaded', function () {
     st.classList.toggle('inv-bp-dirty', dirty);
     if (document.activeElement !== $('.t-base')) $('.t-base').value = b > 0 ? fmt(b) : '';
     convSync();
+    if (gen && !gen.hidden) genDraw();
   }
 
   // ── 💱 Курси: ЄЦБ онлайн (core/fx-online/), курс для DigiKey під таблицею, конвертер «з → в» ──
@@ -616,6 +670,79 @@ document.addEventListener('DOMContentLoaded', function () {
     tpl.forEach(function (t) { if (t.min_qty > 1) addRow(String(t.min_qty), fmt(roundMode(b * (100 - t.discount) / 100, $('.t-rnd').value))); });
     sync();
   });
+  // ── 📈 Генератор ступенів (функції — _tier_gen.js) ──
+  var gen = $('.inv-bp-gen');
+  function genEnd() { return gen.querySelector('input[name="g-end"]:checked').value; }
+  function genMaxDisc(b) {
+    if (genEnd() === 'price') { var p = num($('.g-price').value); return p > 0 && p < b ? (1 - p / b) * 100 : NaN; }
+    var d = num($('.g-disc').value); return d > 0 && d < 100 ? d : NaN;
+  }
+  function genDraw() {
+    var b = basePrice(), qs = tierQtys($('.g-q').value), cur = (curInp ? curInp.value : home).toUpperCase();
+    var tb = gen.querySelector('.g-prev tbody'), note = gen.querySelector('.g-note'), rnd = $('.t-rnd').value;
+    $('.g-top').textContent = qs[qs.length - 1];
+    tb.innerHTML = ''; note.textContent = ''; gen.plan = null;
+    if (!(b > 0)) { note.textContent = 'Спершу вкажіть ціну за 1 шт. (поле вгорі або рядок «1» таблиці).'; return; }
+    if (qs.length < 2) { note.textContent = 'Додайте хоча б одну кількість, більшу за 1 шт.'; return; }
+    var md = genMaxDisc(b);
+    if (!(md > 0)) {
+      note.textContent = genEnd() === 'price' ? 'Ціна на найбільшу кількість — більша за 0 і менша за ціну 1 шт. (' + fmt(b).replace('.', ',') + ').'
+                                              : 'Знижка на найбільшу кількість — від 0 до 99 %.';
+      return;
+    }
+    var plan = tierPlan(qs, b, md, gen.querySelector('input[name="g-curve"]:checked').value, function (v) { return Number(fmt(roundMode(v, rnd))); });
+    plan.rows.forEach(function (r) {
+      var tr = document.createElement('tr');
+      [String(r.q), fmt(r.p).replace('.', ','), r.q === 1 ? '—' : '−' + String(r.d).replace('.', ',') + ' %', total(r.q * r.p) + ' ' + cur]
+        .forEach(function (t) { var td = document.createElement('td'); td.textContent = t; tr.appendChild(td); });
+      tb.appendChild(tr);
+    });
+    var msgs = [];
+    if (plan.dropped.length) msgs.push('Без окремої ціни (після округлення та сама, що в меншої кількості): ' + plan.dropped.join(', ') +
+      ' шт. — виберіть дрібніше округлення або більшу знижку.');
+    if (plan.rows.length > TIER_DK_MAX) msgs.push('DigiKey приймає до ' + TIER_DK_MAX + ' ступенів, а тут ' + plan.rows.length + ' — на DigiKey підуть перші ' + TIER_DK_MAX + ', найбільші кількості — ні.');
+    note.textContent = msgs.join(' ');
+    gen.plan = plan;
+  }
+  $('.b-gen').addEventListener('click', function () {
+    gen.hidden = !gen.hidden;
+    if (gen.hidden) return;
+    if (!$('.g-q').value.trim()) {          // початкові значення — з таблиці: її найбільша кількість і знижка на неї лишаються
+      var have = rows().map(function (r) { return num(r.q.value); })
+        .filter(function (q) { return q >= 1 && Math.floor(q) === q; }).sort(function (a, c) { return a - c; });
+      var top = have[have.length - 1], qs = have.length >= 3 ? have : TIER_PRESETS[0].q.slice();
+      if (top > 1 && qs.indexOf(top) < 0) { qs = qs.filter(function (q) { return q < top; }); qs.push(top); }
+      $('.g-q').value = qs.join(', ');
+      var b = basePrice(), tr = rows().filter(function (r) { return num(r.q.value) === top; })[0], tp = tr ? num(tr.p.value) : NaN;
+      var d = b > 0 && tp > 0 && tp < b && top > 1 ? (1 - tp / b) * 100
+        : ((cfg.template || []).reduce(function (m, t) { return Math.max(m, Number(t.discount) || 0); }, 0) || 20);
+      $('.g-disc').value = String(Math.round(d * 10) / 10).replace('.', ',');
+      if (b > 0) $('.g-price').value = fmt(roundMode(b * (100 - d) / 100, $('.t-rnd').value)).replace('.', ',');
+    }
+    genDraw();
+  });
+  gen.addEventListener('input', genDraw);
+  gen.addEventListener('change', genDraw);
+  gen.addEventListener('focusin', function (e) {   // клік у поле — вибирає і його варіант
+    var want = e.target.classList.contains('g-price') ? 'price' : e.target.classList.contains('g-disc') ? 'disc' : '';
+    if (want) { gen.querySelector('input[name="g-end"][value="' + want + '"]').checked = true; genDraw(); }
+  });
+  gen.addEventListener('click', function (e) {
+    var t = e.target;
+    if (t.classList.contains('g-preset')) { $('.g-q').value = t.getAttribute('data-q'); genDraw(); }
+    else if (t.classList.contains('g-close')) gen.hidden = true;
+    else if (t.classList.contains('g-apply')) {
+      genDraw();
+      var plan = gen.plan; if (!plan) return;
+      var filled = rows().filter(function (r) { return r.p.value.trim(); }).length;
+      if (filled > 1 && !confirm('Замінити ступені в таблиці (' + filled + ') на згенеровані (' + plan.rows.length + ')?')) return;
+      body.innerHTML = '';
+      plan.rows.forEach(function (r) { addRow(String(r.q), fmt(r.p)); });
+      gen.hidden = true;
+      sync();
+    }
+  });
+  $('.t-rnd').addEventListener('change', function () { if (!gen.hidden) genDraw(); });
   $('.b-rnd').addEventListener('click', function () { var m = $('.t-rnd').value; eachPrice(function (p) { return roundMode(p, m); }); sync(); });
   $('.b-conv-open').addEventListener('click', function () {
     convOpen = true; lastConv = '';
@@ -685,7 +812,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<br><label><input type="checkbox" class="t-redo"> <span><b>Однаковий курс з DigiKey</b> — перевести ціни в ' + esc(from) +
       ' (' + esc(was) + ' ' + esc(from) + ' за ' + q0 + ' шт.…) заново за 1 ' + esc(from) + ' = ' + fmt(rule) + ' ' + minerva +
       ': ціни на DigiKey лишаться як були</span></label> <span class="redo-state inv-bp-dirty"></span>';
-    wrap.insertBefore(box, $('.inv-bp-table'));
+    wrap.insertBefore(box, $('.bp-main'));
     box.querySelector('.t-redo').addEventListener('change', function () {
       var st = box.querySelector('.redo-state');
       if (this.checked) {
