@@ -31,7 +31,7 @@ GROUPS = [
     ("sales", "Продажі", "🛒", ["orders", "offers", "customers"]),
     ("stock", "Склад", "📦", ["stock", "purchases", "suppliers", "rfq", "labels"]),
     ("projects", "Проєкти", "📁", ["portfolio", "projects", "risks", "meetings"]),
-    ("comms", "Комунікації й час", "💬", ["mail", "calendar", "worktime"]),
+    ("comms", "Комунікації й час", "💬", ["mail", "mail_phone", "mail_desktop", "calendar", "worktime"]),
     ("more", "Ще", "⋯", ["shipments", "dashboard", "signals", "settings", "guide"]),
 ]
 GROUP_IDS = tuple(g[0] for g in GROUPS)

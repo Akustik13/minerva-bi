@@ -134,14 +134,21 @@ input:checked + .ms-slider:before { transform: translateX(18px); }
     </div>
   </div>
 
-  {# ── 📱 Пошта на телефоні (email_assistant/app_api.page_view) ── #}
+  {# ── 📲 Пошта на телефоні (email_assistant/app_api.page_view) і на комп'ютері (email_assistant/views_desktop.py) ── #}
   <div class="ms-card">
-    <h3>📱 Пошта на телефоні</h3>
+    <h3>📲 Пошта на телефоні й комп’ютері</h3>
     <div class="ms-info" style="color:var(--text-dim,#607d8b);font-size:12px">
-      Додаток «Minerva Пошта» для Android: листи, відповіді, чернетки, AI й доручення агенту — з телефона.
+      📱 Додаток «Minerva Пошта» для Android: листи, відповіді, чернетки, AI й доручення агенту — з телефона.
       Підключення — QR-кодом під вашим акаунтом, без пароля в телефоні.
     </div>
-    <div style="margin-top:8px"><a class="button" href="{% url 'email_assistant:mail_app' %}">📱 Підключити телефон</a></div>
+    <div class="ms-info" style="color:var(--text-dim,#607d8b);font-size:12px;margin-top:6px">
+      🖥 Програма «Пошта Minerva» для Windows: та сама пошта, що в браузері, у власному вікні — значок у треї,
+      сповіщення про нові листи, mailto:. Підключення — кнопкою з браузера, без пароля.
+    </div>
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+      <a class="button" href="{% url 'email_assistant:mail_app' %}">📱 Підключити телефон</a>
+      <a class="button" href="{% url 'email_assistant:desktop_app' %}">🖥 Пошта для Windows</a>
+    </div>
   </div>
 
   {# ── Інтерфейс ── #}

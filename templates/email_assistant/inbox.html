@@ -747,6 +747,12 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
          title="{% trans "Додаток «Minerva Пошта» для Android: підключити телефон QR-кодом" %}">
         📱 {% trans "Пошта на телефоні" %}
       </a>
+      {% if not mv_mail_app %}
+      <a href="/email/app/" class="em-sync-btn" style="text-decoration:none"
+         title="{% trans "Окрема програма лише з поштою: значок у треї, сповіщення Windows про нові листи, mailto:" %}">
+        🖥 {% trans "Пошта для Windows" %}
+      </a>
+      {% endif %}
       <button class="em-sync-btn" onclick="syncAllFolders(this)" title="{% trans "Синхронізувати всі IMAP-папки (повільно)" %}">
         📂 {% trans "Всі папки" %}
       </button>
@@ -754,12 +760,6 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
          class="em-sync-btn" style="text-decoration:none">
         ⚙️ {% trans "Налаштування" %}
       </a>
-      {% if not mv_mail_app %}
-      <a href="/email/app/" class="em-sync-btn" style="text-decoration:none"
-         title="{% trans "Окрема програма лише з поштою: значок у треї, сповіщення Windows про нові листи, mailto:" %}">
-        🖥 {% trans "Пошта для Windows" %}
-      </a>
-      {% endif %}
       <button class="em-sync-btn" onclick="resetPanelSizes()" title="{% trans "Відновити пропорції панелей" %}">
         ↺ {% trans "Скинути розміри" %}
       </button>

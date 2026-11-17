@@ -16,6 +16,8 @@ ITEMS = {
     "orders":    ("📦", "Замовлення", "/admin/sales/salesorder/", "sales.view_salesorder"),
     "stock":     ("🗃", "Склад", "/admin/inventory/product/", "inventory.view_product"),
     "mail":      ("✉️", "Пошта", "/email/", "module:email_assistant"),
+    "mail_phone": ("📱", "Пошта на телефоні", "/email/phone/", "module:email_assistant"),
+    "mail_desktop": ("🖥", "Пошта для Windows", "/email/app/", "module:email_assistant"),
     "calendar":  ("📅", "Календар", "/calendar/", "module:calendar_app"),
     "customers": ("👥", "Клієнти", "/admin/crm/customer/", "crm.view_customer"),
     "offers":    ("📝", "Angebote", "/offers/", "offers.view_offer"),

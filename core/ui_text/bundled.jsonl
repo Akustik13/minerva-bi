@@ -13623,9 +13623,11 @@
 {"uk": "Почніть з короткого періоду (напр. 30 днів) і розширюйте після перевірки.", "en": "Start with a short period (e.g. 30 days) and extend it after checking.", "de": "Beginnen Sie mit einem kurzen Zeitraum (z. B. 30 Tage) und erweitern Sie ihn nach der Prüfung."}
 {"uk": "Пошта", "en": "Mail", "de": "E-Mail"}
 {"uk": "Пошта Minerva для Windows", "en": "Minerva Mail for Windows", "de": "Minerva Mail für Windows"}
+{"uk": "Пошта для Windows", "en": "Mail for Windows", "de": "E-Mail für Windows"}
 {"uk": "Пошта й 📅 календар — у вас немає скриньки в Minerva", "en": "Mail and 📅 calendar — you have no mailbox in Minerva", "de": "Post und 📅 Kalender — Sie haben kein Postfach in Minerva"}
 {"uk": "Пошта магазину", "en": "Shop mail", "de": "Shop-E-Mail"}
 {"uk": "Пошта на телефоні", "en": "Mail on phone", "de": "Mail auf dem Telefon"}
+{"uk": "Пошта на телефоні й комп’ютері", "en": "Mail on the phone and computer", "de": "E-Mail auf Handy und Computer"}
 {"uk": "Пошта сайтів", "en": "Site mail", "de": "E-Mail der Websites"}
 {"uk": "Пошта — на {0}", "en": "Email — to {0}", "de": "E-Mail — an {0}"}
 {"uk": "Пошта — немає вашої адреси", "en": "Email — no address of yours", "de": "E-Mail — keine Adresse von Ihnen"}
@@ -13988,6 +13990,8 @@
 {"uk": "Прогнозу немає.", "en": "No forecast.", "de": "Keine Prognose."}
 {"uk": "Прогнозування попиту, автоматична сегментація клієнтів, розумні рекомендації reorder на базі ML.", "en": "Demand forecasting, automatic customer segmentation, smart reorder recommendations based on ML.", "de": "Bedarfsprognose, automatische Kundensegmentierung, intelligente Nachbestellempfehlungen auf ML-Basis."}
 {"uk": "Програма", "en": "Application", "de": "Anwendung"}
+{"uk": "Програма «Пошта Minerva» для Windows: та сама пошта, що в браузері, у власному вікні — значок у треї", "en": "The «Minerva Mail» app for Windows: the same mail as in the browser, in its own window — tray icon", "de": "Die App «Minerva Mail» für Windows: dieselbe E-Mail wie im Browser, im eigenen Fenster — Symbol im Infobereich"}
+{"uk": "Програма «Пошта Minerva» для Windows: та сама пошта, що в браузері, у власному вікні — значок у треї, сповіщення про нові листи, mailto:. Підключення — кнопкою з браузера, без пароля.", "en": "The «Minerva Mail» app for Windows: the same mail as in the browser, in its own window — tray icon, notifications about new e-mails, mailto:. Connect with a button from the browser, no password.", "de": "Die App «Minerva Mail» für Windows: dieselbe E-Mail wie im Browser, im eigenen Fenster — Symbol im Infobereich, Benachrichtigungen über neue E-Mails, mailto:. Verbinden per Schaltfläche im Browser, ohne Passwort."}
 {"uk": "Програми (User-Agent)", "en": "Applications (User-Agent)", "de": "Anwendungen (User-Agent)"}
 {"uk": "Програмне забезпечення «Minerva Business Intelligence System» (далі — «ПЗ») є власністю", "en": "The software “Minerva Business Intelligence System” (hereinafter the “Software”) is the property of", "de": "Die Software „Minerva Business Intelligence System“ (nachfolgend „Software“) ist Eigentum von"}
 {"uk": "Програмне забезпечення «Minerva Business Intelligence System» (далі — «ПЗ») є власністю Viacheslav Pryimak (prym.via@gmail.com) та захищене законами про авторське право.", "en": "The software “Minerva Business Intelligence System” (hereinafter the “Software”) is the property of Viacheslav Pryimak (prym.via@gmail.com) and is protected by copyright law.", "de": "Die Software „Minerva Business Intelligence System“ (nachfolgend „Software“) ist Eigentum von Viacheslav Pryimak (prym.via@gmail.com) und urheberrechtlich geschützt."}
@@ -16148,6 +16152,7 @@
 {"uk": "Телефон підтримки", "en": "Support phone", "de": "Support-Telefon"}
 {"uk": "Телефон/Особисто", "en": "Phone / In person", "de": "Telefon / Persönlich"}
 {"uk": "Телефони з додатком візиток", "en": "Phones with the cards app", "de": "Handys mit der Visitenkarten-App"}
+{"uk": "Телефони з поштою Minerva", "en": "Phones with Minerva Mail", "de": "Handys mit Minerva Mail"}
 {"uk": "Телефоном", "en": "By phone", "de": "Telefonisch"}
 {"uk": "Телефонуєте, уточнюєте потреби. Фіксуєте деталі в нотатках.", "en": "You call and clarify the needs. You record the details in the notes.", "de": "Sie rufen an und klären den Bedarf. Sie halten die Details in den Notizen fest."}
 {"uk": "Тем з PI / рахунком без закупівлі немає — нічого не заведено", "en": "No topics with a PI / invoice without a purchase order — nothing created", "de": "Keine Themen mit PI / Rechnung ohne Bestellung — nichts angelegt"}
@@ -18627,6 +18632,7 @@
 {"uk": "вер", "en": "Sep", "de": "Sep"}
 {"uk": "вересень", "en": "September", "de": "September"}
 {"uk": "вересня", "en": "September", "de": "September"}
+{"uk": "версія", "en": "version", "de": "Version"}
 {"uk": "версія {0}", "en": "version {0}", "de": "Version {0}"}
 {"uk": "версія стає «надісланою» й незмінною", "en": "the version becomes “sent” and immutable", "de": "die Version wird „gesendet“ und unveränderlich"}
 {"uk": "весь день", "en": "весь день", "de": "весь день"}
@@ -21687,6 +21693,7 @@
 {"uk": "список оновлено", "en": "list updated", "de": "Liste aktualisiert"}
 {"uk": "списується з нашого UPS-акаунту.", "en": "is charged to our UPS account.", "de": "wird von unserem UPS-Konto abgebucht."}
 {"uk": "сповіщення команді: {0}", "en": "team notifications: {0}", "de": "Teambenachrichtigungen: {0}"}
+{"uk": "сповіщення про нові листи, mailto:. Підключення — кнопкою з браузера, без пароля.", "en": "notifications about new e-mails, mailto:. Connect with a button from the browser, no password.", "de": "Benachrichtigungen über neue E-Mails, mailto:. Verbinden per Schaltfläche im Browser, ohne Passwort."}
 {"uk": "способи не задано", "en": "methods not set", "de": "Methoden nicht festgelegt"}
 {"uk": "спосіб оплати вимкнено", "en": "the payment method is disabled", "de": "die Zahlungsart ist deaktiviert"}
 {"uk": "справжній номер невідомий, впишіть вручну", "en": "the real number is unknown, enter it manually", "de": "die richtige Nummer ist unbekannt, bitte manuell eintragen"}
