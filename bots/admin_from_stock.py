@@ -161,7 +161,14 @@ def view(request, model_admin):
         "ai_now": {str(c["product"].pk): c["ai_now"] for c in cards},
         "ai_ds": {str(c["product"].pk): bool(c["product"].datasheet_url or c["product"].datasheet_file)
                   for c in cards},
+        "ai_hist": _ai_history(request, cards) if cards and can_add else {},
     })
+
+
+def _ai_history(request, cards):
+    """«🕘 Попередні заповнення» кожної картки — свої запуски для цього товару."""
+    from inventory.services.ai_fill import history
+    return {str(c["product"].pk): history(request.user, "digikey", product=c["product"]) for c in cards}
 
 
 def _ai_fill(request, model_admin):

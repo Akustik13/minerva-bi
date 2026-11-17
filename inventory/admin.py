@@ -2275,6 +2275,9 @@ class ProductAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
         if "net_weight_g" in changed and "net_weight_source" not in changed:
             obj.net_weight_source = "manual" if obj.net_weight_g else ""   # людина змінила вагу в картці
         super().save_model(request, obj, form, change)
+        if request.POST.get("_ai_fill_job"):   # «🤖 AI: заповнити…» на «Додати» → історія цього товару
+            from .services.ai_fill import link
+            link(request.POST["_ai_fill_job"], request.user, product=obj)
         if form is not None and "base_prices_text" in getattr(form, "cleaned_data", {}):
             from .services.base_prices import set_base_prices
             d = form.cleaned_data
@@ -2678,7 +2681,8 @@ class ProductAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
             obj = Product.objects.filter(pk=object_id).first() if str(object_id or "").isdigit() else None
             extra_context["ai_fill"] = ai_fill_config(
                 "product", start_url=reverse("admin:inventory_product_ai_fill"),
-                status_url=reverse("admin:inventory_product_ai_fill_status", args=["JOB"]), product=obj)
+                status_url=reverse("admin:inventory_product_ai_fill_status", args=["JOB"]), product=obj,
+                user=request.user)
         if object_id:
             try:
                 from bots.models import DigiKeyListing

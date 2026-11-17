@@ -934,3 +934,38 @@ class MediaLinkCheck(models.Model):
     def save(self, *args, **kwargs):
         self.pk = 1
         super().save(*args, **kwargs)
+
+
+class AIFillRun(models.Model):
+    """🤖 Запуск «AI: заповнити з даташита, посилань і тексту» (inventory/services/ai_fill.py): що людина дала, що AI
+    запропонував і скільки це коштувало. Бачить лише автор (панель картки — «🕘 Попередні заповнення»); у базі —
+    щоб результат можна було відкрити знову в іншій вкладці й після оновлення сервера."""
+    TARGETS = [("product", "Картка товару"), ("digikey", "Картка DigiKey")]
+    STATUSES = [("running", "Працює"), ("done", "Готово"), ("error", "Помилка")]
+
+    job_id = models.CharField("Завдання", max_length=32, unique=True)
+    owner = models.ForeignKey("auth.User", on_delete=models.CASCADE, related_name="ai_fill_runs",
+                              verbose_name="Хто запускав")
+    target = models.CharField("Що заповнювали", max_length=10, choices=TARGETS, default="product")
+    product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, blank=True,
+                                related_name="ai_fill_runs", verbose_name="Товар")
+    listing_id = models.PositiveIntegerField("Лістинг DigiKey", null=True, blank=True, db_index=True)
+    model = models.CharField("Модель", max_length=40, blank=True, default="")
+    status = models.CharField("Стан", max_length=10, choices=STATUSES, default="running")
+    inputs = models.JSONField("Що дали AI", default=dict, blank=True,
+                              help_text="Партномер, посилання, початок тексту, назви файлів, «🌐», «📄 даташит товару»")
+    result = models.JSONField("Що запропонував AI", null=True, blank=True)
+    error = models.CharField("Помилка", max_length=500, blank=True, default="")
+    cost_usd = models.DecimalField("Вартість, $", max_digits=10, decimal_places=4, default=Decimal("0"))
+    searches = models.PositiveIntegerField("Пошуків", default=0)
+    fetches = models.PositiveIntegerField("Прочитано сторінок", default=0)
+    created_at = models.DateTimeField("Запущено", auto_now_add=True, db_index=True)
+    finished_at = models.DateTimeField("Завершено", null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "AI-заповнення картки"
+        verbose_name_plural = "AI-заповнення карток"
+
+    def __str__(self) -> str:
+        return f"{self.get_target_display()} · {self.created_at:%d.%m.%Y %H:%M}" if self.created_at else self.job_id

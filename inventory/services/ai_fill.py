@@ -13,6 +13,9 @@ Claude (з пошуком і читанням сторінок в інтерне
   `knowledge_items._download`). Межі: `FILES_MAX`, `FILE_MB`, `TOTAL_MB`, `LINKS_MAX`, `TEXT_MAX`.
 • `start(user, target, inputs)` — завдання в core.shared_cache (`KEY`), фоновий потік (`BACKGROUND`), одне
   завдання на людину одночасно (`BUSY_KEY`); `state(job_id, user)` — хід і результат лише автору; `cancel`.
+• Кожен запуск — ще й `inventory.AIFillRun` (`_record`: на старті й наприкінці): кеш порожніє після оновлення
+  сервера, тож `state` бере результат з бази; `history` — «🕘 Попередні заповнення» в панелі (лише свої), `link` —
+  запуск зі сторінки «Додати» прив'язується до товару / лістингу, коли їх зберегли.
 • `run` — ручний цикл Messages API: web_search / web_fetch (якщо «🌐»), інструменти цілі, `submit_card` — фінал;
   pause_turn — далі; refusal / max_tokens — зрозуміла помилка; витрати — `PRICES` + $0.01 за пошук (як агент),
   ліміт `RUN_BUDGET_USD`, місячний бюджет — `budget_guard.record_monthly`.
@@ -38,6 +41,9 @@ CANCEL_KEY = "ai-fill-cancel:{}"
 TTL = 24 * 3600
 BUSY_SECONDS = 15 * 60
 STALE_SECONDS = 10 * 60          # «працює» без жодного кроку стільки — процес сервера перезапустився посеред роботи
+KEEP_PER_OWNER = 300             # скільки запусків людини тримати в базі
+HISTORY_MAX = 6                  # «🕘 Попередні заповнення» в панелі
+NEW_HISTORY_DAYS = 7             # сторінка «Додати»: свої запуски без товару за стільки днів
 BACKGROUND = True
 
 FILES_MAX, FILE_MB, TOTAL_MB = 8, 20, 22          # запит до Claude — до 32 МБ (base64 +33 %)
@@ -232,16 +238,117 @@ def _stale(job) -> bool:
     return job.get("status") == "running" and (timezone.now() - beat).total_seconds() > STALE_SECONDS
 
 
+def _from_run(run) -> dict:
+    """AIFillRun → той самий словник, що й завдання в кеші."""
+    return {"id": run.job_id, "owner": run.owner_id, "target": run.target, "status": run.status, "model": run.model,
+            "started": run.created_at.isoformat(timespec="seconds"), "beat": run.created_at.isoformat(timespec="seconds"),
+            "finished": run.finished_at.isoformat(timespec="seconds") if run.finished_at else None,
+            "steps": [], "result": run.result, "error": run.error, "cost_usd": float(run.cost_usd or 0),
+            "searches": run.searches, "fetches": run.fetches, "product_id": run.product_id,
+            "listing_id": run.listing_id}
+
+
 def state(job_id, user):
-    """Стан завдання лише для автора (None — немає або чуже). Зависле — «перервано»."""
-    job = _cache().get(KEY.format(str(job_id)))
+    """Стан завдання лише для автора (None — немає або чуже): з кешу, а після оновлення сервера — з бази.
+    Зависле — «перервано»."""
+    job_id = str(job_id or "")[:32]
+    job = _cache().get(KEY.format(job_id))
+    if not job:
+        from inventory.models import AIFillRun
+        run = AIFillRun.objects.filter(job_id=job_id, owner_id=user.pk).first()
+        job = _from_run(run) if run is not None else None
     if not job or job.get("owner") != user.pk:
         return None
     if _stale(job):
         job.update(status="error", error="роботу перервано (сервер перезапустився) — запустіть ще раз",
                    finished=_now())
         _save(job)
+        _record(job)
     return job
+
+
+def _record(job, inputs=None):
+    """Запуск → inventory.AIFillRun: inputs — на старті (створює), без них — оновлює стан і результат."""
+    from inventory.models import AIFillRun
+    values = {"status": job["status"], "model": job.get("model") or "", "result": job.get("result"),
+              "error": (job.get("error") or "")[:500], "searches": int(job.get("searches") or 0),
+              "fetches": int(job.get("fetches") or 0),
+              "cost_usd": Decimal(str(round(float(job.get("cost_usd") or 0), 4))),
+              "finished_at": timezone.now() if job["status"] != "running" else None}
+    try:
+        if inputs is None:
+            AIFillRun.objects.filter(job_id=job["id"]).update(**values)
+            return
+        AIFillRun.objects.create(job_id=job["id"], owner_id=job["owner"], target=job["target"],
+                                 product_id=job.get("product_id"), listing_id=job.get("listing_id"),
+                                 inputs=inputs, **values)
+        old = list(AIFillRun.objects.filter(owner_id=job["owner"]).order_by("-created_at")
+                   .values_list("pk", flat=True)[KEEP_PER_OWNER:KEEP_PER_OWNER + 500])
+        if old:
+            AIFillRun.objects.filter(pk__in=old).delete()
+    except Exception as e:  # noqa: BLE001 — збій запису історії не зупиняє заповнення
+        logger.warning("ai_fill record %s: %s", job.get("id"), e)
+
+
+def _inputs_text(inputs) -> str:
+    """Коротко, що людина дала: «AN220213 · 2 файли · 1 посилання · текст · 🌐»."""
+    inputs = inputs or {}
+    parts = [inputs.get("pn") or ""]
+    if inputs.get("files"):
+        parts.append(f"файлів: {len(inputs['files'])}")
+    if inputs.get("links"):
+        parts.append(f"посилань: {len(inputs['links'])}")
+    if inputs.get("text"):
+        parts.append("текст")
+    if inputs.get("datasheet"):
+        parts.append("📄 даташит товару")
+    if inputs.get("web"):
+        parts.append("🌐")
+    return " · ".join(p for p in parts if p)
+
+
+def history(user, target, product=None, listing=None, limit=HISTORY_MAX) -> list:
+    """«🕘 Попередні заповнення» для панелі: лише свої; товар — його запуски, лістинг — його і його товару,
+    сторінка «Додати» — свої ще не прив'язані за NEW_HISTORY_DAYS."""
+    from django.db.models import Q
+
+    from inventory.models import AIFillRun
+    if user is None or not getattr(user, "pk", None):
+        return []
+    qs = AIFillRun.objects.filter(owner_id=user.pk, target=target)
+    if listing is not None:
+        cond = Q(listing_id=listing.pk)
+        if listing.product_id:
+            cond |= Q(product_id=listing.product_id, listing_id__isnull=True)
+        qs = qs.filter(cond)
+    elif product is not None:
+        qs = qs.filter(product=product)
+    else:
+        qs = qs.filter(product__isnull=True, listing_id__isnull=True,
+                       created_at__gte=timezone.now() - datetime.timedelta(days=NEW_HISTORY_DAYS))
+    out = []
+    for r in qs.only("job_id", "status", "model", "cost_usd", "result", "inputs", "created_at", "error")[:limit]:
+        res = r.result or {}
+        out.append({"id": r.job_id, "status": r.status, "at": timezone.localtime(r.created_at).strftime("%d.%m %H:%M"),
+                    "model": dict(MODELS).get(r.model, r.model).split(" —")[0], "cost": float(r.cost_usd or 0),
+                    "fields": len(res.get("fields") or []), "attrs": len(res.get("attributes") or []),
+                    "what": _inputs_text(r.inputs), "error": r.error[:120]})
+    return out
+
+
+def link(job_id, user, product=None, listing_id=None) -> int:
+    """Запуск зі сторінки «Додати» → до щойно збереженого товару / лістингу (лише свій і ще не прив'язаний)."""
+    from inventory.models import AIFillRun
+    job_id = str(job_id or "").strip()[:32]
+    if not job_id or user is None or not getattr(user, "pk", None):
+        return 0
+    qs = AIFillRun.objects.filter(job_id=job_id, owner_id=user.pk)
+    n = 0
+    if product is not None:
+        n += qs.filter(product__isnull=True).update(product=product)
+    if listing_id:
+        n += qs.filter(listing_id__isnull=True).update(listing_id=listing_id)
+    return n
 
 
 def cancel(job_id, user) -> bool:
@@ -792,6 +899,7 @@ def run(job, inputs):
         job.update(status="error", error=f"{type(e).__name__}: {str(e)[:300]}", finished=_now())
         _save(job)
     finally:
+        _record(job)
         _cache().delete(BUSY_KEY.format(job["owner"]))
         _cache().delete(CANCEL_KEY.format(job["id"]))
 
@@ -824,8 +932,10 @@ def start(user, target, *, files=(), links="", text="", pn="", product=None, lis
     job = {"id": uuid.uuid4().hex, "owner": user.pk, "target": target, "status": "running", "model": model,
            "web": bool(web), "started": _now(), "beat": _now(), "steps": [], "result": None, "error": "",
            "cost_usd": 0, "searches": 0, "fetches": 0, "tokens_in": 0, "tokens_out": 0,
-           "product_id": getattr(product, "pk", None)}
+           "product_id": getattr(product, "pk", None), "listing_id": getattr(listing, "pk", None)}
     _save(job)
+    _record(job, inputs={"pn": pn, "links": links, "text": text[:2000], "files": [p["name"] for p in parts],
+                         "web": bool(web), "datasheet": bool(datasheet)})
     _cache().set(BUSY_KEY.format(user.pk), job["id"], BUSY_SECONDS)
     inputs = {"parts": parts, "links": links, "text": text, "pn": pn, "product_id": getattr(product, "pk", None),
               "listing_id": getattr(listing, "pk", None), "datasheet": bool(datasheet)}
@@ -859,11 +969,18 @@ def public(job) -> dict:
             "result": job.get("result"), "error": job.get("error") or "", "model": job.get("model"),
             "model_label": dict(MODELS).get(job.get("model"), job.get("model") or "").split(" —")[0],
             "cost_usd": job.get("cost_usd") or 0, "searches": job.get("searches") or 0,
-            "fetches": job.get("fetches") or 0, "elapsed": elapsed}
+            "fetches": job.get("fetches") or 0, "elapsed": elapsed, "at": _local(started)}
 
 
-def config(target, *, start_url, status_url, product=None, can=True) -> dict:
-    """Налаштування панелі для сторінки (json_script)."""
+def _local(iso) -> str:
+    try:
+        return timezone.localtime(datetime.datetime.fromisoformat(iso)).strftime("%d.%m.%Y %H:%M")
+    except (TypeError, ValueError):
+        return ""
+
+
+def config(target, *, start_url, status_url, product=None, listing=None, user=None, can=True) -> dict:
+    """Налаштування панелі для сторінки (json_script); user — щоб показати «🕘 Попередні заповнення»."""
     has_ds = bool(product is not None and (product.datasheet_url or (product.datasheet_file and
                                                                      product.datasheet_file.name)))
     if product is not None and not has_ds:
@@ -873,7 +990,8 @@ def config(target, *, start_url, status_url, product=None, can=True) -> dict:
         except Exception:  # noqa: BLE001
             pass
     return {"target": target, "start_url": start_url, "status_url": status_url, "ready": ready(), "can": can,
-            "product_id": getattr(product, "pk", None), "has_datasheet": has_ds,
+            "product_id": getattr(product, "pk", None), "listing_id": getattr(listing, "pk", None),
+            "has_datasheet": has_ds, "history": history(user, target, product, listing),
             "models": [list(m) for m in MODELS], "default_model": DEFAULT_MODEL,
             "files_max": FILES_MAX, "file_mb": FILE_MB, "links_max": LINKS_MAX, "budget_usd": float(RUN_BUDGET_USD)}
 

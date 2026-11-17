@@ -4,7 +4,7 @@
 
 {% block title %}На DigiKey зі складу — Minerva{% endblock %}
 
-{% block extrastyle %}{{ block.super }}{% if ai_fill %}<link rel="stylesheet" href="/static/admin/css/mv_ai_fill.css?v=1"><script src="/static/admin/js/mv_ai_fill.js?v=3"></script>{% endif %}
+{% block extrastyle %}{{ block.super }}{% if ai_fill %}<link rel="stylesheet" href="/static/admin/css/mv_ai_fill.css?v=1"><script src="/static/admin/js/mv_ai_fill.js?v=4"></script>{% endif %}
 <style>
   .fs-wrap { max-width: 1100px; }
   .fs-box { margin: 0 0 14px; padding: 14px 18px; border: 1px solid var(--border-strong, #243347);
@@ -232,11 +232,12 @@
       var cfgEl = document.getElementById('mvaf-config'), form = document.getElementById('fs-form');
       if (!cfgEl || !form || !window.MVAiFill) return;
       function json(id) { var e = document.getElementById(id); try { return JSON.parse(e ? e.textContent : '{}') || {}; } catch (x) { return {}; } }
-      var base = json('mvaf-config'), now = json('fs-ai-now'), ds = json('fs-ai-ds');
+      var base = json('mvaf-config'), now = json('fs-ai-now'), ds = json('fs-ai-ds'), hist = json('fs-ai-hist');
       var INPUT = { dk_title: 'title', dk_description: 'desc', dk_manufacturer: 'mfr' };
       var COMMON = { dk_packaging: 'packaging', dk_lifecycle_status: 'productLifecycleStatus' };
       document.querySelectorAll('.fs-ai').forEach(function (host) {
-        var pk = host.dataset.pk, cfg = Object.assign({}, base, { product_id: +pk, has_datasheet: !!ds[pk] });
+        var pk = host.dataset.pk, cfg = Object.assign({}, base, { product_id: +pk, has_datasheet: !!ds[pk],
+                                                                   history: hist[pk] || [] });
         var srcInp = form.querySelector('[name="p' + pk + '-aisrc"]');
         function attrInp(code) { return form.querySelector('[name="p' + pk + '-f-' + code + '"]'); }
         function readAttr(code) { var el = attrInp(code); return (el && el.value) || (now[pk] || {})[code] || ''; }
@@ -291,7 +292,7 @@
       });
     })();
   </script>
-  {% if ai_fill %}{{ ai_fill|json_script:"mvaf-config" }}{{ ai_now|json_script:"fs-ai-now" }}{{ ai_ds|json_script:"fs-ai-ds" }}{% endif %}
+  {% if ai_fill %}{{ ai_fill|json_script:"mvaf-config" }}{{ ai_now|json_script:"fs-ai-now" }}{{ ai_ds|json_script:"fs-ai-ds" }}{{ ai_hist|json_script:"fs-ai-hist" }}{% endif %}
   {% elif not listed %}
     <p class="fs-muted">Товари не знайдено.</p>
   {% endif %}

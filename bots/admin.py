@@ -2306,6 +2306,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                 messages.success(request, f'📦 Товар «{base_sku}» автоматично створено на складі.')
 
         super().save_model(request, obj, form, change)
+        if request.POST.get('_ai_fill_job'):   # «🤖 AI: заповнити…» → історія цього лістингу
+            from inventory.services.ai_fill import link
+            link(request.POST['_ai_fill_job'], request.user, product=obj.product, listing_id=obj.pk)
         from bots.services.dk_publish import mark, problems
         if not problems(obj):                                   # усе обов'язкове вперше заповнено
             mark(obj, "checked")
@@ -2434,12 +2437,13 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         extra_context['sku_check_url'] = reverse('admin:bots_digikeylisting_sku_check')
         if self._ai_fill_can(request):          # «🤖 AI: заповнити з даташита…» (і після помилки форми)
             from inventory.services.ai_fill import config as ai_fill_config
-            listing = DigiKeyListing.objects.filter(pk=object_id).select_related('product').first()                 if str(object_id or '').isdigit() else None
-            extra_context['ai_fill'] = dict(ai_fill_config(
+            listing = (DigiKeyListing.objects.filter(pk=object_id).select_related('product').first()
+                       if str(object_id or '').isdigit() else None)
+            extra_context['ai_fill'] = ai_fill_config(
                 'digikey', start_url=reverse('admin:bots_digikeylisting_ai_fill'),
                 status_url=reverse('admin:bots_digikeylisting_ai_fill_status', args=['JOB']),
-                product=listing.product if listing is not None and listing.product_id else None),
-                listing_id=listing.pk if listing is not None else None)
+                product=listing.product if listing is not None and listing.product_id else None,
+                listing=listing, user=request.user)
         if object_id:
             extra_context['publish_url'] = reverse(
                 'admin:bots_digikeylisting_publish', args=[object_id]
