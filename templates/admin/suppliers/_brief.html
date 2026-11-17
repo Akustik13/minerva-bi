@@ -14,7 +14,7 @@
 <div class="rqb">
   <div class="rqb-h"><a href="{{ card_url }}" target="_blank" translate="no"><b>{{ s.name }}</b></a></div>
   <div class="rqb-line">{{ s.get_status_display }} · {{ source }}{% if fair_later %} <span class="spf-muted">{{ fair_later_text }}</span>{% endif %}{% if stars %} · <span title="Наша оцінка">{{ stars }}</span>{% endif %}</div>
-  {% if cats %}<div class="sp-chips">{% for c in cats %}<span class="sp-chip" style="border-color:{{ c.color }}">{{ c.icon }} {{ c.name }}</span>{% endfor %}</div>{% endif %}
+  {% if cats %}<div class="sp-chips">{% for c in cats %}<span class="sp-chip" style="border-color:{{ c.color }}">{{ c.icon_html }} {{ c.name }}</span>{% endfor %}</div>{% endif %}
   <div class="rqb-line" translate="no">
     {% if s.addr_city or s.addr_country %}🌍 {{ s.addr_city }}{% if s.addr_city and s.addr_country %}, {% endif %}{{ s.addr_country }}<br>{% endif %}
     {% if s.website %}🌐 <a href="{% if '://' in s.website %}{{ s.website }}{% else %}https://{{ s.website }}{% endif %}" target="_blank" rel="noopener noreferrer nofollow">{{ s.website }}</a><br>{% endif %}

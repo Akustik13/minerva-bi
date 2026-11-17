@@ -116,7 +116,7 @@
     <div class="spf-marks" style="margin-top:6px">{% for v, n in marks %}<label><input type="checkbox" name="marks" value="{{ v }}"> {{ n }}</label>{% endfor %}</div>
     {% if categories %}
     <details style="margin-top:8px" id="sc-catbox"><summary class="spf-muted">🗂 Категорії для нового постачальника</summary>
-      <div class="spf-cats" style="margin-top:6px">{% for c in categories %}<label class="spf-cat"><input type="checkbox" name="categories" value="{{ c.pk }}"> {{ c.icon }} {{ c.name }}</label>{% endfor %}</div>
+      <div class="spf-cats" style="margin-top:6px">{% for c in categories %}<label class="spf-cat"><input type="checkbox" name="categories" value="{{ c.pk }}"> {{ c.icon_html }} {{ c.name }}</label>{% endfor %}</div>
     </details>
     {% endif %}
   </div>

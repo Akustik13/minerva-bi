@@ -362,7 +362,7 @@ class SupplierCardMixin:
             return "—"
         return format_html_join(" ", '<span style="white-space:nowrap;border:1px solid {};border-radius:10px;'
                                      'padding:0 6px;font-size:11px">{} {}</span>',
-                                ((c.color or "#888", c.icon, c.name) for c in cats))
+                                ((c.color or "#888", c.icon_html, c.name) for c in cats))
 
     @admin.display(description="Закупівель", ordering="_po_count")
     def po_col(self, obj):
@@ -1474,6 +1474,13 @@ class SupplierCardMixin:
                 ai.card(m, user=user, model=model)
                 return {"url": url, "message": "🧠 Прочитано"}
             return JsonResponse({"job": jobs.start(user, f"card {m.pk}", run)})
+        if action == "web":                        # 🌐 знайти фірму в інтернеті — дописати порожні поля, категорію
+            model, user = ai.model_of(request.POST.get("model")), request.user
+
+            def run():
+                d = ai.web_card(m, user=user, model=model)
+                return {"url": url, "message": f"🌐 Дописано полів: {len((d.get('web') or {}).get('filled') or [])}"}
+            return JsonResponse({"job": jobs.start(user, f"web card {m.pk}", run)})
         if action == "qr":
             text = qr.join(request.POST.get("qr_front", ""), request.POST.get("qr_back", ""))
             fields = qr.parse_all(text)
@@ -1561,6 +1568,11 @@ class SupplierCardMixin:
             site_domain=match.site_domain(data.get("website", "")),
             crm_view=crm_view, crm_add=u.has_perm("crm.add_customer"), crm_change=u.has_perm("crm.change_customer"),
             crm_matches=cards.customer_matches(data) if crm_view else [], new_category=new_cat or {},
+            web=data.get("web") if isinstance(data.get("web"), dict) else {},
+            from_web=[k for k in (data.get("from_web") or []) if isinstance(k, str)],
+            web_filled=", ".join(qr.LABELS.get(k, "категорії" if k == "categories" else k)
+                                 for k in ((data.get("web") or {}).get("filled") or [])
+                                 if isinstance(data.get("web"), dict)),
             can_add_category=u.has_perm("suppliers.add_suppliercategory") and can_edit,
             ai_info=cards.info(m)))
 

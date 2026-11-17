@@ -236,7 +236,7 @@ def _bool(value) -> bool:
 # ── 🗂 Категорії ──
 
 def category_json(c) -> dict:
-    return {"id": c.pk, "name": c.name, "icon": c.icon, "color": c.color, "description": c.description,
+    return {"id": c.pk, "name": c.name, "icon": c.icon or "🗂", "color": c.color, "description": c.description,
             "parent": c.parent_id, "order": c.order}
 
 

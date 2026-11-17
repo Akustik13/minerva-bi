@@ -20,6 +20,7 @@ from django.utils.html import format_html
 
 from suppliers.models import (SupplierCategory, SupplierEvent, SupplierRequest, SupplierRequestFile,
                               SupplierRequestRecipient)
+from suppliers.icons import IconPickerWidget
 from suppliers.services import rfq
 
 
@@ -29,8 +30,20 @@ class SupplierCategoryForm(forms.ModelForm):
 
     class Meta:
         model = SupplierCategory
-        fields = ("name", "icon", "color", "parent", "order", "description", "request_template", "is_active")
-        widgets = {"color": forms.TextInput(attrs={"type": "color"}), "description": forms.Textarea(attrs={"rows": 3})}
+        fields = ("name", "icon", "icon_image", "color", "parent", "order", "description", "request_template",
+                  "is_active")
+        widgets = {"color": forms.TextInput(attrs={"type": "color"}), "description": forms.Textarea(attrs={"rows": 3}),
+                   "icon": IconPickerWidget()}
+        help_texts = {"icon": "Стандартний — клік у палітрі, або будь-який свій емодзі.",
+                      "icon_image": "PNG, JPG, GIF або WEBP — логотип, піктограма; зменшиться до 128 px. Є картинка — "
+                                    "показується вона, емодзі — там, де картинки не буває (списки вибору, додаток)."}
+
+    def clean_icon_image(self):
+        from suppliers.icons import clean_image
+        value = self.cleaned_data.get("icon_image")
+        if value and hasattr(value, "content_type"):      # щойно завантажене (не те, що вже збережено)
+            return clean_image(value)
+        return value
 
 
 @admin.register(SupplierCategory)
@@ -48,7 +61,7 @@ class SupplierCategoryAdmin(admin.ModelAdmin):
     @admin.display(description="Категорія", ordering="name")
     def label(self, obj):
         return format_html('<span style="border-left:4px solid {};padding-left:6px">{} {}</span>{}', obj.color or "#888",
-                           obj.icon, obj.name, format_html(' <span style="color:var(--text-muted)">· {}</span>',
+                           obj.icon_html, obj.name, format_html(' <span style="color:var(--text-muted)">· {}</span>',
                                                            obj.parent.name) if obj.parent_id else "")
 
     @admin.display(description="Постачальників", ordering="_n")

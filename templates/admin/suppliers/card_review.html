@@ -79,10 +79,25 @@
         <div class="spf-row">
           <select id="cr-model">{% for v, n in models %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
           <button type="button" class="button" id="cr-ai">🧠 {% if m.cost_usd %}Прочитати ще раз{% else %}Прочитати фото AI{% endif %}</button>
+          <button type="button" class="button" id="cr-web" title="AI шукає цю фірму в інтернеті (сайт, сторінка контактів, Impressum): адреса, телефон, email, VAT, що роблять, продукція, люди з відділу продажів, категорія. Дописує лише порожні поля — прочитане з візитки не змінює. Нічого не надсилає.">🌐 {% if web %}Знайти ще раз{% else %}Знайти в інтернеті{% endif %}</button>
           <span class="spf-job" id="cr-job"></span>
         </div>
+        <div class="spf-muted">🌐 — коли на візитці мало даних (лише сайт чи назва): AI знайде фірму в інтернеті й допише порожні поля, підкаже категорію.</div>
         {% endif %}
       </div>
+      {% if web %}
+      <div class="spf-card cr-webbox">
+        <div class="spf-h">🌐 Знайдено в інтернеті <span class="spf-muted">· {{ web.at|slice:":10" }}{% if web.cost_usd %} · ${{ web.cost_usd|floatformat:3 }}{% endif %}</span></div>
+        {% if web.summary %}<div translate="no">{{ web.summary }}</div>{% endif %}
+        <div class="spf-muted" style="margin-top:4px">{% if web_filled %}Дописано в поля нижче (позначені 🌐): {{ web_filled }}.{% else %}Нових даних для порожніх полів не знайдено — прочитане з візитки не змінювалось.{% endif %}</div>
+        {% if web.people %}<div class="spf-h" style="margin-top:6px">👥 Люди з сайту фірми</div>
+          {% for p in web.people %}<div class="cr-person" translate="no"><b>{{ p.name }}</b>{% if p.position %} · {{ p.position }}{% endif %}{% if p.email %} · <a href="mailto:{{ p.email }}">{{ p.email }}</a>{% endif %}{% if p.phone %} · {{ p.phone }}{% endif %}</div>{% endfor %}
+          <div class="spf-muted">Лише ті, кого фірма сама публікує; у картку постачальника їх додасте вручну, якщо треба.</div>{% endif %}
+        {% if web.sources %}<details style="margin-top:6px"><summary class="spf-muted">Джерела ({{ web.sources|length }})</summary>
+          {% for src in web.sources %}<div class="sp-links" translate="no"><a href="{{ src.url }}" target="_blank" rel="noopener noreferrer">{{ src.title|default:src.url|truncatechars:90 }}</a></div>{% endfor %}</details>{% endif %}
+        <div class="spf-muted" style="margin-top:4px">Перевірте перед «🏭 Створити постачальника»: AI міг помилитися фірмою з такою самою назвою.</div>
+      </div>
+      {% endif %}
       <div class="spf-card">
         <div class="spf-h">🔳 QR-код</div>
         {% if qr_parts %}
@@ -140,12 +155,17 @@
 </div>
 <style>
   .cr-customer { display: flex; flex-direction: column; }
+  .cr-webbox { border-left: 4px solid var(--primary, #5b8def); }
+  .cr-person { font-size: 13px; margin: 2px 0; }
+  #spf-form label.cr-from-web > input, #spf-form label.cr-from-web > textarea { outline: 2px solid rgba(91, 141, 239, .55); }
+  #spf-form label.cr-from-web::after { content: " 🌐"; font-size: 11px; }
   .cr-customer > #crm { order: -1; margin-bottom: 10px; }
   .cr-customer > .cr-role-note { order: -2; margin-bottom: 6px; }
 </style>
 {% include "admin/suppliers/_qr_js.html" %}
 {% include "admin/suppliers/_doc_scan_js.html" %}
 {{ job_js }}
+{{ from_web|json_script:"cr-from-web" }}
 <script>
 (function(){
   var job = "{{ job|escapejs }}";
@@ -158,6 +178,20 @@
   if (b) b.addEventListener('click', function(){
     spJob(location.pathname, {action: 'ai', model: document.getElementById('cr-model').value}, out,
           function(){ location.href = location.pathname; });
+  });
+  // 🌐 пошук фірми в інтернеті (довше — веб-пошук), потім сторінка заново з дописаними полями
+  var w = document.getElementById('cr-web');
+  if (w) w.addEventListener('click', function(){
+    w.disabled = true;
+    spJob(location.pathname, {action: 'web', model: document.getElementById('cr-model').value}, out,
+          function(){ location.href = location.pathname; });
+    if (out) out.textContent = '⏳ AI шукає фірму в інтернеті… (до 1–2 хв)';
+  });
+  // поля, дописані з інтернету, — позначка 🌐
+  var fromWeb = JSON.parse(document.getElementById('cr-from-web').textContent || '[]');
+  fromWeb.forEach(function(k){
+    var el = document.querySelector('#spf-form [name="' + k + '"]'), lab = el && el.closest('label');
+    if (lab) { lab.classList.add('cr-from-web'); lab.title = 'Знайдено в інтернеті — перевірте'; }
   });
   // 🔳 QR: браузер розшифровує код зі збереженого фото → сервер розбирає (vCard / MeCard / посилання) і вносить
   var qrBtn = document.getElementById('cr-qr'), qrOut = document.getElementById('cr-qr-job');

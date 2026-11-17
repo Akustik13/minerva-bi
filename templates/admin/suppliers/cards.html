@@ -75,7 +75,7 @@
     <button type="button" class="button" id="spc-stats-btn" aria-expanded="false" aria-controls="spc-stats" title="Скільки візиток, людей і фірм з кожної виставки, що вже внесено">📊 Статистика</button>
     {% if items %}<button type="button" class="button" id="spc-all" title="Вибрати всі візитки на сторінці — поділитись разом">☑ Вибрати всі</button>{% endif %}
   </form>
-  {% if cat_now %}<div class="spf-row">🗂 Лише категорія: <b>{{ cat_now.icon }} {{ cat_now.name }}</b> <a class="button" href="?{% if event %}event={{ event|urlencode }}{% endif %}">✕ Усі категорії</a></div>{% endif %}
+  {% if cat_now %}<div class="spf-row">🗂 Лише категорія: <b>{{ cat_now.icon_html }} {{ cat_now.name }}</b> <a class="button" href="?{% if event %}event={{ event|urlencode }}{% endif %}">✕ Усі категорії</a></div>{% endif %}
   {% if event %}<div class="spf-row">🎪 Лише подія: <b translate="no">{% if event == "-" %}без події{% else %}{{ event }}{% endif %}</b> <a class="button" href="?">✕ Усі події</a></div>{% endif %}
   <div class="spc-cfg spc-stats" id="spc-stats" hidden>
     <h4>📊 Статистика візиток <span class="sp-muted">— по подіях (поле «Де взяли»), усі візитки</span></h4>
@@ -122,7 +122,7 @@
       {% if i.company %}<div class="spc-co spc-f-company" translate="no">🏢 {{ i.company }}</div>{% endif %}
       {% if i.person %}<div class="sp-muted spc-f-person"><span translate="no">👤 {{ i.person }}</span>{% if i.position %} · <span translate="no">{{ i.position }}</span>{% endif %}</div>{% endif %}
       {% if i.country or i.site %}<div class="sp-muted spc-line">{% if i.country %}<span class="spc-f-country">🌍 {{ i.country }}</span>{% endif %}{% if i.site %}<a class="spc-f-site" href="{{ i.site }}" target="_blank" rel="noopener noreferrer nofollow" translate="no">🌐 {{ i.site_label }}</a>{% endif %}</div>{% endif %}
-      {% if i.cats %}<div class="sp-chips spc-f-cats">{% for c in i.cats %}<a class="sp-chip{% if i.cats_guessed %} spc-guess{% endif %}" style="border-color:{{ c.color }};color:inherit" href="?cat={{ c.pk }}" title="{% if i.cats_guessed %}Вибрав AI — ще не підтверджено. {% endif %}Показати лише цю категорію">{{ c.icon }} {{ c.name }}</a>{% endfor %}</div>
+      {% if i.cats %}<div class="sp-chips spc-f-cats">{% for c in i.cats %}<a class="sp-chip{% if i.cats_guessed %} spc-guess{% endif %}" style="border-color:{{ c.color }};color:inherit" href="?cat={{ c.pk }}" title="{% if i.cats_guessed %}Вибрав AI — ще не підтверджено. {% endif %}Показати лише цю категорію">{{ c.icon_html }} {{ c.name }}</a>{% endfor %}</div>
       {% elif i.new_category.name %}<div class="spc-new spc-f-newcat">💡 AI пропонує нову категорію: <b>{{ i.new_category.icon }} <span translate="no">{{ i.new_category.name }}</span></b>
         {% if can_add_category %}<form method="post" action="{{ review }}" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="add_category"><input type="hidden" name="back" value="{{ request.get_full_path }}"><button type="submit" class="button" style="padding:1px 6px;font-size:11px">＋ Додати</button></form>{% endif %}</div>
       {% endif %}

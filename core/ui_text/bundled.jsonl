@@ -936,6 +936,8 @@
 {"uk": "AI читає листи… до 2 хвилин", "en": "The AI is reading the e-mails… up to 2 minutes", "de": "Die KI liest die E-Mails… bis zu 2 Minuten"}
 {"uk": "AI читає у фоні; перевірити — «🪪 Усі візитки → ще не внесені»", "en": "AI reads in the background; check — «🪪 All business cards → not entered yet»", "de": "Die KI liest im Hintergrund; prüfen — «🪪 Alle Visitenkarten → noch nicht eingetragen»"}
 {"uk": "AI читає фото…", "en": "AI is reading the photo…", "de": "KI liest das Foto…"}
+{"uk": "AI шукає фірму в інтернеті… (до 1–2 хв)", "en": "AI is searching for the company online… (up to 1–2 min)", "de": "AI sucht die Firma im Internet… (bis zu 1–2 Min.)"}
+{"uk": "AI шукає цю фірму в інтернеті (сайт, сторінка контактів, Impressum): адреса, телефон, email, VAT, що роблять, продукція, люди з відділу продажів, категорія. Дописує лише порожні поля — прочитане з візитки не змінює. Нічого не надсилає.", "en": "AI searches for this company online (website, contact page, Impressum): address, phone, email, VAT, what they do, products, sales people, category. Fills in only empty fields — what was read from the card stays. Nothing is sent.", "de": "AI sucht diese Firma im Internet (Website, Kontaktseite, Impressum): Adresse, Telefon, E-Mail, USt-ID, was sie machen, Produkte, Vertriebsmitarbeiter, Kategorie. Füllt nur leere Felder — was von der Karte gelesen wurde, bleibt. Es wird nichts gesendet."}
 {"uk": "AI ще не запускали. «🌐 Знайти в інтернеті» — хто вони, що роблять, сертифікати й ризики з джерелами; «🧠 Оцінка» — з вашого листування й закупівель.", "en": "AI has not been run yet. «🌐 Find on the internet» — who they are, what they do, certificates and risks with sources; «🧠 Assessment» — from your correspondence and purchases.", "de": "KI wurde noch nicht gestartet. «🌐 Im Internet finden» — wer sie sind, was sie machen, Zertifikate und Risiken mit Quellen; «🧠 Bewertung» — aus Ihrer Korrespondenz und Einkäufen."}
 {"uk": "AI ще не питали", "en": "The AI has not been asked yet", "de": "Die AI wurde noch nicht gefragt"}
 {"uk": "AI ще не читав", "en": "AI has not read it yet", "de": "KI hat noch nicht gelesen"}
@@ -1867,6 +1869,7 @@
 {"uk": "PI / рахунок", "en": "PI / invoice", "de": "PI / Rechnung"}
 {"uk": "PLN — Злотий", "en": "PLN — Zloty", "de": "PLN — Zloty"}
 {"uk": "PNG або SVG, рекомендований розмір 200×80px", "en": "PNG or SVG, recommended size 200×80px", "de": "PNG oder SVG, empfohlene Größe 200×80px"}
+{"uk": "PNG, JPG, GIF або WEBP — логотип, піктограма; зменшиться до 128 px. Є картинка — показується вона, емодзі — там, де картинки не буває (списки вибору, додаток).", "en": "PNG, JPG, GIF or WEBP — a logo or pictogram; reduced to 128 px. With a picture it is shown; the emoji — where a picture is not possible (drop-down lists, the app).", "de": "PNG, JPG, GIF oder WEBP — Logo oder Piktogramm; wird auf 128 px verkleinert. Mit Bild wird es angezeigt, das Emoji — wo kein Bild möglich ist (Auswahllisten, App)."}
 {"uk": "PO зависло {0} днів: {1}", "en": "PO stuck for {0} days: {1}", "de": "Bestellung hängt seit {0} Tagen: {1}"}
 {"uk": "PO номер", "en": "PO number", "de": "PO-Nummer"}
 {"uk": "PRN не знайдено в нотатках відправлення.", "en": "PRN not found in the shipment notes.", "de": "PRN in den Sendungsnotizen nicht gefunden."}
@@ -6322,6 +6325,7 @@
 {"uk": "Джерел ще немає — папку з файлами з ПК або сайт за посиланнями можна додати в «📂 Джерела знань».", "en": "There are no sources yet — a folder with files from the PC or a website by links can be added in “📂 Knowledge sources”.", "de": "Noch keine Quellen vorhanden – ein Ordner mit Dateien vom PC oder eine Website per Links kann unter „📂 Wissensquellen“ hinzugefügt werden."}
 {"uk": "Джерела", "en": "Sources", "de": "Quellen"}
 {"uk": "Джерела (", "en": "Sources (", "de": "Quellen ("}
+{"uk": "Джерела ({0})", "en": "Sources ({0})", "de": "Quellen ({0})"}
 {"uk": "Джерела (фільтр)", "en": "Sources (filter)", "de": "Quellen (Filter)"}
 {"uk": "Джерела [#N]: група, підпис, посилання, текст", "en": "Sources [#N]: group, caption, link, text", "de": "Quellen [#N]: Gruppe, Beschriftung, Link, Text"}
 {"uk": "Джерела замовлень", "en": "Order sources", "de": "Auftragsquellen"}
@@ -6696,6 +6700,8 @@
 {"uk": "Домен системи", "en": "System domain", "de": "System-Domain"}
 {"uk": "Домівка", "en": "Home", "de": "Startseite"}
 {"uk": "Домініканська Республіка", "en": "Dominican Republic", "de": "Dominikanische Republik"}
+{"uk": "Дописано в поля нижче (позначені 🌐): {0}.", "en": "Filled into the fields below (marked 🌐): {0}.", "de": "In die Felder unten eingetragen (mit 🌐 markiert): {0}."}
+{"uk": "Дописано полів: {0}", "en": "Fields filled: {0}", "de": "Felder ergänzt: {0}"}
 {"uk": "Доповнення — у відповіді на цей лист.", "en": "Additions — in a reply to this e-mail.", "de": "Ergänzungen — als Antwort auf diese E-Mail."}
 {"uk": "Доповнено {0}", "en": "Completed {0}", "de": "Ergänzt {0}"}
 {"uk": "Доповнено закупівель: {0}", "en": "Purchase orders updated: {0}", "de": "Bestellungen ergänzt: {0}"}
@@ -8377,6 +8383,8 @@
 {"uk": "Знайдено в даташиті — перевірте й внесіть:", "en": "Found in the datasheet — check and save:", "de": "Im Datenblatt gefunden — prüfen und übernehmen:"}
 {"uk": "Знайдено в листах {0} рази — показано один раз", "en": "Found in e-mails {0} times — shown once", "de": "In E-Mails {0}-mal gefunden — einmal angezeigt"}
 {"uk": "Знайдено в пошті", "en": "Found in mail", "de": "In der Post gefunden"}
+{"uk": "Знайдено в інтернеті", "en": "Found online", "de": "Im Internet gefunden"}
+{"uk": "Знайдено в інтернеті — перевірте", "en": "Found online — please check", "de": "Im Internet gefunden — bitte prüfen"}
 {"uk": "Знайдено виправлення", "en": "Corrections found", "de": "Korrekturen gefunden"}
 {"uk": "Знайдено востаннє", "en": "Last found", "de": "Zuletzt gefunden"}
 {"uk": "Знайдено груп з дублікатами: {0}", "en": "Groups with duplicates found: {0}", "de": "Gefundene Gruppen mit Duplikaten: {0}"}
@@ -8399,6 +8407,7 @@
 {"uk": "Знайти email листи з конкретним клієнтом. Повертає останні листи з теми, датами і коротким змістом.", "en": "Find emails with a specific customer. Returns the latest emails with subject, dates and a short summary.", "de": "E-Mails mit einem bestimmten Kunden finden. Liefert die letzten E-Mails mit Betreff, Datum und kurzer Zusammenfassung."}
 {"uk": "Знайти в пошті", "en": "Find in mail", "de": "In der Post finden"}
 {"uk": "Знайти в списку замовлень", "en": "Find in the order list", "de": "In der Auftragsliste suchen"}
+{"uk": "Знайти в інтернеті", "en": "Find online", "de": "Im Internet suchen"}
 {"uk": "Знайти вагу в даташиті", "en": "Find weight in datasheet", "de": "Gewicht im Datenblatt suchen"}
 {"uk": "Знайти за номером", "en": "Find by number", "de": "Nach Nummer suchen"}
 {"uk": "Знайти забуті листи", "en": "Find forgotten emails", "de": "Vergessene E-Mails finden"}
@@ -8419,6 +8428,7 @@
 {"uk": "Знайти прострочені й більше не актуальні дедлайни — події типу deadline або email_follow_up, дата яких вже минула і вони не виконані. Використовуй перш ніж пропонувати очищення.", "en": "Find overdue and no longer relevant deadlines — events of type deadline or email_follow_up whose date has passed and which are not done. Use before suggesting a cleanup.", "de": "Überfällige und nicht mehr aktuelle Fristen finden — Termine vom Typ deadline oder email_follow_up, deren Datum bereits verstrichen ist und die nicht erledigt sind. Vor einem Bereinigungsvorschlag verwenden."}
 {"uk": "Знайти та синхронізувати один конкретний SKU (Supplier SKU DigiKey)", "en": "Find and sync one specific SKU (DigiKey Supplier SKU)", "de": "Eine bestimmte SKU (DigiKey Supplier SKU) suchen und synchronisieren"}
 {"uk": "Знайти товари складу за артикулом, назвою, виробником, категорією чи параметром. Повертає до 15 товарів (артикул, назва, доступно на складі).", "en": "Find stock products by SKU, name, manufacturer, category or parameter. Returns up to 15 products (SKU, name, available in stock).", "de": "Lagerartikel nach Artikelnummer, Name, Hersteller, Kategorie oder Parameter finden. Liefert bis zu 15 Artikel (Artikelnummer, Name, verfügbar im Lager)."}
+{"uk": "Знайти ще раз", "en": "Search again", "de": "Erneut suchen"}
 {"uk": "Знаходили", "en": "Found", "de": "Gefunden"}
 {"uk": "Знаходити різницю й питати (оновлення — після підтвердження)", "en": "Find differences and ask (update only after confirmation)", "de": "Unterschiede finden und nachfragen (Aktualisierung erst nach Bestätigung)"}
 {"uk": "Знаходить оффери DigiKey Marketplace, для яких ще немає лістингу в Minerva", "en": "Finds DigiKey Marketplace offers that do not have a listing in Minerva yet", "de": "Findet DigiKey-Marketplace-Offers, für die es in Minerva noch kein Listing gibt"}
@@ -8617,6 +8627,8 @@
 {"uk": "Картинка PNG", "en": "PNG image", "de": "PNG-Bild"}
 {"uk": "Картинка діаграми пошкоджена", "en": "The chart image is damaged", "de": "Das Diagrammbild ist beschädigt"}
 {"uk": "Картинка завелика — зменште масштаб діаграми", "en": "The image is too large — zoom the chart out", "de": "Das Bild ist zu groß — Diagramm verkleinern"}
+{"uk": "Картинка понад {0} МБ.", "en": "Picture over {0} MB.", "de": "Bild über {0} MB."}
+{"uk": "Картинка — PNG, JPG, GIF або WEBP.", "en": "Picture — PNG, JPG, GIF or WEBP.", "de": "Bild — PNG, JPG, GIF oder WEBP."}
 {"uk": "Картка", "en": "Card", "de": "Karte"}
 {"uk": "Картка Angebot", "en": "Angebot card", "de": "Angebot-Karte"}
 {"uk": "Картка CRM", "en": "CRM card", "de": "CRM-Karte"}
@@ -9677,6 +9689,7 @@
 {"uk": "Лише товари з рухами після цієї дати (інкрементальна синхронізація)", "en": "Only products with movements after this date (incremental synchronization)", "de": "Nur Artikel mit Bewegungen nach diesem Datum (inkrementelle Synchronisation)"}
 {"uk": "Лише товари, картку яких змінено після цієї дати (атрибути, ціни, статус…)", "en": "Only products whose card was changed after this date (attributes, prices, status…)", "de": "Nur Artikel, deren Karte nach diesem Datum geändert wurde (Attribute, Preise, Status…)"}
 {"uk": "Лише трекінг: статус оновлюється сам, як і для наших відправлень.", "en": "Tracking only: the status updates by itself, like for our shipments.", "de": "Nur Sendungsverfolgung: der Status aktualisiert sich selbst, wie bei unseren Sendungen."}
+{"uk": "Лише ті, кого фірма сама публікує; у картку постачальника їх додасте вручну, якщо треба.", "en": "Only people the company publishes itself; add them to the supplier card manually if needed.", "de": "Nur Personen, die die Firma selbst veröffentlicht; bei Bedarf manuell zur Lieferantenkarte hinzufügen."}
 {"uk": "Лише фази й віхи (◆) — ключові моменти проєкту", "en": "Phases and milestones (◆) only — the key moments of the project", "de": "Nur Phasen und Meilensteine (◆) — die Schlüsselmomente des Projekts"}
 {"uk": "Лише факти з даних нижче, нічого не вигадуй. Кожен пункт посилається у \"ref\" на лист [#N] або документ.", "en": "Only facts from the data below, do not invent anything. Each item refers in \"ref\" to an e-mail [#N] or a document.", "de": "Nur Fakten aus den folgenden Daten, erfinden Sie nichts. Jeder Punkt verweist in \"ref\" auf eine E-Mail [#N] oder ein Dokument."}
 {"uk": "Лише факти з джерел, нічого не вигадуй. Кожен пункт посилається у \"ref\" на джерело [#N].", "en": "Only facts from the sources, invent nothing. Each item refers in \"ref\" to a source [#N].", "de": "Nur Fakten aus den Quellen, erfinden Sie nichts. Jeder Punkt verweist in \"ref\" auf eine Quelle [#N]."}
@@ -9752,6 +9765,7 @@
 {"uk": "Локації складу (код і назва) і локація за замовчуванням.", "en": "Stock locations (code and name) and the default location.", "de": "Lagerorte (Code und Name) und der Standardlagerort."}
 {"uk": "Людей", "en": "People", "de": "Personen"}
 {"uk": "Людей — за email чи іменем контактної особи, фірм — за назвою без форми (Ltd, GmbH…). Клік на подію — лише її візитки.", "en": "People — by the contact's e-mail or name, companies — by name without legal form (Ltd, GmbH…). Click an event — only its business cards.", "de": "Personen — nach E-Mail oder Name des Kontakts, Firmen — nach Namen ohne Rechtsform (Ltd, GmbH…). Klick auf ein Ereignis — nur dessen Visitenkarten."}
+{"uk": "Люди з сайту фірми", "en": "People from the company website", "de": "Personen von der Firmenwebsite"}
 {"uk": "Людина", "en": "Person", "de": "Person"}
 {"uk": "Людина й посада", "en": "Person and position", "de": "Person und Position"}
 {"uk": "Людина ключа не має права на завдання агенту.", "en": "The person assigned to the key has no permission for agent tasks.", "de": "Die dem Schlüssel zugeordnete Person hat keine Berechtigung für Agentenaufgaben."}
@@ -10785,6 +10799,7 @@
 {"uk": "Не вдалося видати унікальний код проєкту", "en": "Could not issue a unique project code", "de": "Es konnte kein eindeutiger Projektcode vergeben werden"}
 {"uk": "Не вдалося видати унікальний номер Angebot", "en": "Could not issue a unique Angebot number", "de": "Es konnte keine eindeutige Angebotsnummer vergeben werden"}
 {"uk": "Не вдалося визначити рекомендовану стратегію.", "en": "Could not determine the recommended strategy.", "de": "Die empfohlene Strategie konnte nicht ermittelt werden."}
+{"uk": "Не вдалося відкрити картинку.", "en": "Could not open the picture.", "de": "Das Bild konnte nicht geöffnet werden."}
 {"uk": "Не вдалося відкрити папку {0}", "en": "Could not open folder {0}", "de": "Ordner {0} konnte nicht geöffnet werden"}
 {"uk": "Не вдалося відкрити папку: {0}", "en": "Could not open folder: {0}", "de": "Ordner konnte nicht geöffnet werden: {0}"}
 {"uk": "Не вдалося відкрити файл: {0}", "en": "Could not open file: {0}", "de": "Datei konnte nicht geöffnet werden: {0}"}
@@ -11168,6 +11183,7 @@
 {"uk": "Немає недавніх дій", "en": "No recent activity", "de": "Keine letzten Aktivitäten"}
 {"uk": "Немає номера відправлення UPS (1Z…) — в UPS нічого не створено, скасовувати нічого. Статус у Minerva — «🔧 Статус вручну».", "en": "There is no UPS shipment number (1Z…) — nothing was created in UPS, nothing to cancel. Status in Minerva — “🔧 Set status manually”.", "de": "Es gibt keine UPS-Sendungsnummer (1Z…) — bei UPS wurde nichts erstellt, es gibt nichts zu stornieren. Status in Minerva — „🔧 Status manuell“."}
 {"uk": "Немає номера замовлення", "en": "No order number", "de": "Keine Bestellnummer"}
+{"uk": "Немає ні даних з візитки, ні фото — спершу «🧠 Прочитати фото AI».", "en": "No data from the card and no photo — first «🧠 Read photo with AI».", "de": "Weder Daten von der Karte noch ein Foto — zuerst «🧠 Foto mit AI lesen»."}
 {"uk": "Немає ні підтвердження прочитання, ні відповіді — лист і Telegram вам: потрібне ручне втручання.", "en": "Neither a read receipt nor a reply — an email and Telegram to you: manual action needed.", "de": "Weder Lesebestätigung noch Antwort — E-Mail und Telegram an Sie: manuelles Eingreifen nötig."}
 {"uk": "Немає опису: ні на складі, ні на DigiKey, ні в старому файлі — впишіть.", "en": "No description: not in stock, not on DigiKey, not in the old file — please enter one.", "de": "Keine Beschreibung: weder im Lager noch auf DigiKey noch in der alten Datei — bitte eintragen."}
 {"uk": "Немає отримувачів", "en": "No recipients", "de": "Keine Empfänger"}
@@ -11425,6 +11441,7 @@
 {"uk": "Новинки: бейдж «Neu» і місце вгорі каталогу", "en": "New arrivals: “Neu” badge and a spot at the top of the catalog", "de": "Neuheiten: Badge „Neu“ und ein Platz oben im Katalog"}
 {"uk": "Нових", "en": "New", "de": "Neue"}
 {"uk": "Нових артикулів у документах не знайдено.", "en": "No new item numbers found in the documents.", "de": "Keine neuen Artikelnummern in den Dokumenten gefunden."}
+{"uk": "Нових даних для порожніх полів не знайдено — прочитане з візитки не змінювалось.", "en": "No new data for empty fields found — what was read from the card did not change.", "de": "Keine neuen Daten für leere Felder gefunden — das von der Karte Gelesene blieb unverändert."}
 {"uk": "Нових замовлень немає.", "en": "No new orders.", "de": "Keine neuen Aufträge."}
 {"uk": "Нових клієнтів CRM: {0} · ➕ додано до наявних: {1}{2}", "en": "New CRM customers: {0} · ➕ added to existing: {1}{2}", "de": "Neue CRM-Kunden: {0} · ➕ zu bestehenden hinzugefügt: {1}{2}"}
 {"uk": "Нових листів від клієнтів: {0} ({1})", "en": "New e-mails from customers: {0} ({1})", "de": "Neue E-Mails von Kunden: {0} ({1})"}
@@ -12494,6 +12511,7 @@
 {"uk": "Перевірте дані перед відправкою на Jumingo", "en": "Check the data before sending to Jumingo", "de": "Prüfen Sie die Daten vor dem Senden an Jumingo"}
 {"uk": "Перевірте зв’язок і спробуйте ще.", "en": "Check your connection and try again.", "de": "Prüfen Sie die Verbindung und versuchen Sie es erneut."}
 {"uk": "Перевірте наявність на складі", "en": "Check availability in stock", "de": "Prüfen Sie die Verfügbarkeit im Lager"}
+{"uk": "Перевірте перед «🏭 Створити постачальника»: AI міг помилитися фірмою з такою самою назвою.", "en": "Check before «🏭 Create supplier»: AI may have confused a company with the same name.", "de": "Vor «🏭 Lieferant anlegen» prüfen: AI kann eine Firma mit gleichem Namen verwechselt haben."}
 {"uk": "Перевірте перед друком", "en": "Check before printing", "de": "Vor dem Druck prüfen"}
 {"uk": "Перевірте поля.", "en": "Check the fields.", "de": "Prüfen Sie die Felder."}
 {"uk": "Перевірте порт (465 — SSL, 587 — STARTTLS) і чи не блокує його мережа сервера.", "en": "Check the port (465 — SSL, 587 — STARTTLS) and whether the server's network blocks it.", "de": "Port prüfen (465 — SSL, 587 — STARTTLS) und ob das Netzwerk des Servers ihn blockiert."}
@@ -15021,6 +15039,7 @@
 {"uk": "Свайп", "en": "Swipe", "de": "Wischen"}
 {"uk": "Свайп вліво або торкніть затемнену область — закриє.", "en": "Swipe left or tap the dimmed area — it closes.", "de": "Nach links wischen oder auf den abgedunkelten Bereich tippen — schließt es."}
 {"uk": "Свайп ліворуч — в архів, праворуч — прочитано / непрочитано", "en": "Swipe left — archive, right — read / unread", "de": "Nach links wischen — archivieren, nach rechts — gelesen / ungelesen"}
+{"uk": "Своя картинка", "en": "Own picture", "de": "Eigenes Bild"}
 {"uk": "Своя категорія листа", "en": "E-mail's own category", "de": "Eigene Kategorie der E-Mail"}
 {"uk": "Своя категорія листів", "en": "Own email category", "de": "Eigene E-Mail-Kategorie"}
 {"uk": "Своя надбавка / знижка, %", "en": "Custom markup / discount, %", "de": "Eigener Aufschlag / Rabatt, %"}
@@ -15612,6 +15631,7 @@
 {"uk": "Стандартний робочий день", "en": "Standard working day", "de": "Standardarbeitstag"}
 {"uk": "Стандартний термін постачання в днях.", "en": "Standard lead time in days.", "de": "Standard-Lieferzeit in Tagen."}
 {"uk": "Стандартний шаблон", "en": "Default template", "de": "Standardvorlage"}
+{"uk": "Стандартний — клік у палітрі, або будь-який свій емодзі.", "en": "Standard — click in the palette, or any emoji of your own.", "de": "Standard — Klick in der Palette, oder ein beliebiges eigenes Emoji."}
 {"uk": "Стане", "en": "Will be", "de": "Nachher"}
 {"uk": "Стане доступно, коли буде розшифровка.", "en": "Becomes available once there is a transcript.", "de": "Verfügbar, sobald ein Transkript vorliegt."}
 {"uk": "Стане на DigiKey, {0}", "en": "Will become on DigiKey, {0}", "de": "Wird bei DigiKey, {0}"}
@@ -19863,6 +19883,7 @@
 {"uk": "колеги", "en": "a colleague", "de": "eines Kollegen"}
 {"uk": "колегу", "en": "colleague", "de": "Kollegen"}
 {"uk": "колекцій {0}", "en": "collections {0}", "de": "Collections {0}"}
+{"uk": "коли на візитці мало даних (лише сайт чи назва): AI знайде фірму в інтернеті й допише порожні поля, підкаже категорію.", "en": "when the card has little data (only a website or name): AI finds the company online, fills in empty fields and suggests a category.", "de": "wenn auf der Karte wenig steht (nur Website oder Name): AI findet die Firma im Internet, füllt leere Felder und schlägt eine Kategorie vor."}
 {"uk": "коли статус змінюється на «Відправлено».", "en": "when the status changes to “Shipped”.", "de": "wenn der Status auf „Versendet“ wechselt."}
 {"uk": "коли статус змінюється на «Доставлено».", "en": "when the status changes to “Delivered”.", "de": "wenn der Status auf „Zugestellt“ wechselt."}
 {"uk": "коли є що: пропозиції, внесене самому або помилка", "en": "when there is something: proposals, entries made by itself or an error", "de": "wenn es etwas gibt: Vorschläge, selbst Eingetragenes oder ein Fehler"}
@@ -21670,6 +21691,7 @@
 {"uk": "свіжі ціни DigiKey → дрібні зміни надіслати", "en": "fresh DigiKey prices → send small changes", "de": "aktuelle DigiKey-Preise → kleine Änderungen senden"}
 {"uk": "свій Chat ID, Enter", "en": "your own Chat ID, Enter", "de": "eigene Chat-ID, Enter"}
 {"uk": "свій ID через", "en": "your ID via", "de": "Ihre ID über"}
+{"uk": "свій емодзі або виберіть нижче (Win + . — усі емодзі Windows)", "en": "your own emoji or choose below (Win + . — all Windows emoji)", "de": "eigenes Emoji oder unten wählen (Win + . — alle Windows-Emojis)"}
 {"uk": "свій курс для DigiKey", "en": "own rate for DigiKey", "de": "eigener Kurs für DigiKey"}
 {"uk": "свій курс не вписано — «Курси валют»", "en": "own rate not entered — “Exchange rates”", "de": "eigener Kurs nicht eingetragen — „Wechselkurse“"}
 {"uk": "свій файл", "en": "own file", "de": "eigene Datei"}

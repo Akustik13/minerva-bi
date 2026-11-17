@@ -324,6 +324,118 @@ def card(media, user=None, model=DEFAULT_MODEL) -> dict:
     return data
 
 
+WEB_CARD_JSON = SUPPLIER_JSON[:-1] + (
+    ', "summary": "2–4 речення українською: хто вони, що роблять, для кого, виробник чи посередник", '
+    '"people": [{"name": "", "position": "", "email": "", "phone": ""}], '
+    '"sources": [{"title": "", "url": ""}]}')
+WEB_CARD_HINT = (
+    " За даними з візитки знайди цю фірму в інтернеті й заповни її картку: офіційний сайт, адреса, телефон, "
+    "загальний email (sales@ / info@), VAT ID, що роблять і яку продукцію, виробник чи посередник, країна. Спершу "
+    "переконайся, що це саме ця фірма (той самий домен пошти чи сайту, назва, країна); не впевнений — поле порожнє. "
+    "contact — лише людина з візитки (посаду, телефон чи email доповни, тільки якщо знайшов саме її); інших людей з "
+    "відділу продажів чи керівництва — у people, і лише тих, кого фірма сама публікує (сторінка контактів, Impressum, "
+    "офіційний профіль). Опис — 1–3 речення, на основі сайту фірми. Категорій — 1–2 найближчі з переліку (назва без "
+    "опису в дужках); жодна не підходить — new_category: коротка назва в множині, значок-емодзі, опис реченням. "
+    "Лише факти зі знайдених сторінок, нічого не вигадуй; кожне джерело — у sources.")
+WEB_FIELDS = ("name", "website", "email", "phone", "addr_street", "addr_zip", "addr_city", "addr_country", "vat_id",
+              "description", "contact_name", "contact_position", "contact_email", "contact_phone", "contact_mobile",
+              "notes")
+
+
+def _norm_name(value) -> str:
+    return " ".join(re.sub(r"[^\w\s]", " ", str(value or "").lower()).split())
+
+
+def web_card(media, user=None, model=DEFAULT_MODEL) -> dict:
+    """🌐 Візитка → пошук фірми в інтернеті (сайт, адреса, телефони, email, що роблять, продукція, люди з публічних
+    сторінок, категорія, хто це для нас). У extracted дописує лише порожні поля (і опис-здогад «Схоже, …»),
+    from_web — що взято з інтернету; web = {summary, people, sources, filled, at, cost_usd, model}. Візитку ще не
+    читали — фото теж іде в той самий запит."""
+    from django.utils import timezone
+
+    from suppliers.models import SupplierMedia
+    from suppliers.services import match
+    d = dict(media.extracted or {})
+    labels = {"name": "Фірма", "website": "Сайт", "email": "Email", "phone": "Телефон", "addr_street": "Вулиця",
+              "addr_zip": "Індекс", "addr_city": "Місто", "addr_country": "Країна", "vat_id": "VAT ID",
+              "description": "Що роблять (з візитки)", "contact_name": "Людина", "contact_position": "Посада",
+              "contact_email": "Email людини", "contact_phone": "Телефон людини", "contact_mobile": "Мобільний"}
+    known = [f"{n}: {d[k]}" for k, n in labels.items() if str(d.get(k) or "").strip()]
+    if media.qr_text:
+        known.append("QR-код: " + media.qr_text[:600])
+    if media.event:
+        known.append(f"Де взяли візитку: {media.event}")
+    if media.note:
+        known.append(f"Примітка людини: {media.note[:400]}")
+    blocks = [] if known else [b for b in (_image_block(media.image), _image_block(media.image_back)) if b]
+    if not known and not blocks:
+        raise AIError("Немає ні даних з візитки, ні фото — спершу «🧠 Прочитати фото AI».")
+    system = ("Ти дослідник закупівель: шукаєш інформацію про фірми з візиток. " + DATA_NOTE + WEB_CARD_HINT +
+              _us_text() + ROLE_HINT + " Відповідай лише JSON такої форми: " + WEB_CARD_JSON +
+              " Категорії — лише з переліку: " + _categories_text() + ".")
+    text = ("<<<ДАНІ\n" + ("\n".join(known) if known else "Візитка ще не прочитана — дані на фото.") +
+            "\nДАНІ>>>\nЗнайди цю фірму в інтернеті й поверни JSON.")
+    content = blocks + [{"type": "text", "text": text}] if blocks else text
+    try:
+        answer, price = call(system, content, model=model_of(model), user=user, web=True, effort="medium",
+                             max_tokens=10000)
+        raw = parse_json(answer)
+    except AIError:
+        raise
+    except Exception as e:  # noqa: BLE001 — мережа / API
+        logger.warning("suppliers web card failed: %s", e)
+        raise AIError(f"AI не відповів: {e}") from e
+    web = clean_supplier(raw)
+    # людина з візитки — та сама? Інша — не в поля контакту, а в «люди з сайту»
+    same_person = not d.get("contact_name") or not web.get("contact_name") or \
+        _norm_name(d["contact_name"]) == _norm_name(web["contact_name"])
+    filled = []
+    for k in WEB_FIELDS:
+        value = web.get(k)
+        if not value or (k.startswith("contact_") and not same_person):
+            continue
+        cur = str(d.get(k) or "").strip()
+        if not cur or (k == "description" and cur.startswith("Схоже")):
+            d[k] = value
+            filled.append(k)
+    if web.get("categories") and not d.get("categories"):
+        d["categories"] = web["categories"]
+        filled.append("categories")
+    if web.get("new_category") and not d.get("new_category"):
+        d["new_category"] = web["new_category"]
+    people = []
+    for p in (raw.get("people") or []) if isinstance(raw.get("people"), list) else []:
+        if isinstance(p, dict) and _s(p.get("name")):
+            people.append({"name": _s(p.get("name"), 120), "position": _s(p.get("position"), 120),
+                           "email": match.addr(p.get("email")), "phone": _s(p.get("phone"), 60)})
+    if not same_person and web.get("contact_name"):
+        people.insert(0, {"name": web["contact_name"], "position": web.get("contact_position", ""),
+                          "email": web.get("contact_email", ""), "phone": web.get("contact_phone", "")})
+    sources = [{"title": _s(s.get("title"), 160), "url": _s(s.get("url"), 400)}
+               for s in (raw.get("sources") or []) if isinstance(s, dict)
+               and re.match(r"^https?://", str(s.get("url") or ""))][:12] \
+        if isinstance(raw.get("sources"), list) else []
+    d["from_web"] = sorted(set(d.get("from_web") or []) | {k for k in filled if k != "categories"})
+    d["web"] = {"summary": _s(raw.get("summary"), 1200), "people": people[:8], "sources": sources, "filled": filled,
+                "at": timezone.now().isoformat(), "cost_usd": float(price), "model": model_of(model)}
+    role = _s(raw.get("role"), 10).lower()
+    if role in ("supplier", "customer", "other"):
+        d["role_ai"], d["role_why"] = role, _s(raw.get("role_why"), 200)
+    state = SupplierMedia.READ if media.state in (SupplierMedia.NEW, SupplierMedia.FAILED) else media.state
+    total = (media.cost_usd or Decimal(0)) + price
+    SupplierMedia.objects.filter(pk=media.pk).update(extracted=d, state=state, error="", cost_usd=total)
+    media.extracted, media.state, media.cost_usd = d, state, total
+    if d.get("role_ai") and (not media.role or media.role_ai):     # 👥 підказка — лише якщо людина не вибрала
+        SupplierMedia.objects.filter(pk=media.pk).update(role=d["role_ai"], role_ai=True)
+        media.role, media.role_ai = d["role_ai"], True
+    if not media.categories.exists():
+        from suppliers.services.cards import match_categories
+        found = match_categories(d.get("categories"))
+        if found:
+            media.categories.set(found)
+    return d
+
+
 def from_mail(msg, user=None, model=DEFAULT_MODEL, web=False) -> dict:
     """✉️ Лист (новий текст + переслане) → поля постачальника; web — ще й пошук сайту фірми."""
     from email_assistant.quotes import forwarded_in, new_text

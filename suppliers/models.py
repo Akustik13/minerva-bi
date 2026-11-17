@@ -16,6 +16,8 @@ class SupplierCategory(models.Model):
     """Група постачальників: «Виробники кабелів», «Виробники плат», «Закупка компонентів»… Можна вкладати."""
     name = models.CharField("Назва", max_length=120, unique=True)
     icon = models.CharField("Значок", max_length=8, blank=True, default="🏭")
+    # своя картинка замість емодзі (suppliers/icons.py: PNG до 128 px); емодзі лишається там, де картинки не буває
+    icon_image = models.ImageField("Своя картинка", upload_to="supplier_categories/", blank=True, max_length=255)
     color = models.CharField("Колір", max_length=7, blank=True, default="#5b8def", help_text="#rrggbb")
     parent = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="children",
                                verbose_name="Входить до")
@@ -34,6 +36,15 @@ class SupplierCategory(models.Model):
 
     def __str__(self):
         return f"{self.icon} {self.name}".strip()
+
+    @property
+    def icon_html(self):
+        """Своя картинка, якщо є, інакше емодзі — для списків, плиток, форм (у тексті / <option> — лише емодзі)."""
+        from django.utils.html import format_html
+        if self.icon_image:
+            return format_html('<img src="{}" alt="" class="sp-cat-img" style="width:1.3em;height:1.3em;'
+                               'object-fit:contain;vertical-align:-0.3em;border-radius:3px">', self.icon_image.url)
+        return format_html("{}", self.icon or "")
 
     @property
     def path(self) -> str:

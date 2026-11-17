@@ -17,7 +17,7 @@ from django.http import Http404
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.static import serve
 
-PUBLIC = ("products/", "thumbs/", "shop_media/", "config/", "accounting/logos/")
+PUBLIC = ("products/", "thumbs/", "shop_media/", "config/", "accounting/logos/", "supplier_categories/")
 MODULES = (                          # тека → розділ Minerva (перший збіг)
     ("orders/", "sales"), ("offers/", "offers"), ("accounting/", "accounting"),
     ("invoices/", "shipping"), ("packing_lists/", "shipping"), ("commercial_invoices/", "shipping"),

@@ -167,7 +167,7 @@
       <div class="rq-ms" data-f="status" data-title="Стан"><button type="button" class="button rq-ms-btn">Стан: усі ▾</button>
         <div class="rq-ms-pop" hidden>{% for v, n in f_statuses %}<label><input type="checkbox" value="{{ v }}"> {{ n }}</label>{% endfor %}<a href="#" class="rq-ms-clear">✕ усі</a></div></div>
       <div class="rq-ms" data-f="cat" data-title="Категорія"><button type="button" class="button rq-ms-btn">Категорія: усі ▾</button>
-        <div class="rq-ms-pop" hidden><label><input type="checkbox" value="none"> — без категорії</label>{% for c in categories %}<label><input type="checkbox" value="{{ c.pk }}"> {{ c.icon }} {{ c.name }}</label>{% endfor %}<a href="#" class="rq-ms-clear">✕ усі</a></div></div>
+        <div class="rq-ms-pop" hidden><label><input type="checkbox" value="none"> — без категорії</label>{% for c in categories %}<label><input type="checkbox" value="{{ c.pk }}"> {{ c.icon_html }} {{ c.name }}</label>{% endfor %}<a href="#" class="rq-ms-clear">✕ усі</a></div></div>
       <div class="rq-ms" data-f="src" data-title="Звідки"><button type="button" class="button rq-ms-btn">Звідки: усі ▾</button>
         <div class="rq-ms-pop" hidden>{% for v, n in f_sources %}<label><input type="checkbox" value="{{ v }}"> {{ n }}</label>{% endfor %}<a href="#" class="rq-ms-clear">✕ усі</a></div></div>
       <div class="rq-ms" data-f="where" data-title="Де взяли"><button type="button" class="button rq-ms-btn" title="Де взяли — з візиток постачальника">Де взяли: усі ▾</button>
@@ -187,7 +187,7 @@
       {% for s in suppliers %}
       <label class="rq-row" data-pk="{{ s.pk }}" data-label="{{ s.name }}" data-email="{{ s.email }}" data-cats="{% for c in s.categories.all %}{{ c.pk }} {% endfor %}" data-name="{{ s.name|lower }} {{ s.email|lower }}" data-status="{{ s.status }}" data-src="{{ s.f_src }}" data-where="{{ s.f_where }}" data-country="{{ s.f_country }}">
         <input type="checkbox" name="rcp" value="{{ s.pk }}" {% if s.pk in picked %}checked{% endif %}>
-        <span class="rq-nm" data-photo="{{ s.f_photo }}" data-photo-note="{{ s.f_photo_note }}"><b translate="no" title="{{ s.name }} — клік: дані постачальника праворуч">{{ s.name }}{% for c in s.categories.all %} <span title="{{ c.name }}">{{ c.icon }}</span>{% endfor %}</b>
+        <span class="rq-nm" data-photo="{{ s.f_photo }}" data-photo-note="{{ s.f_photo_note }}"><b translate="no" title="{{ s.name }} — клік: дані постачальника праворуч">{{ s.name }}{% for c in s.categories.all %} <span title="{{ c.name }}">{{ c.icon_html }}</span>{% endfor %}</b>
           <span class="rq-meta">{% if s.status == "potential" %}🌱 {% elif s.status == "paused" %}⏸ {% endif %}{% if s.f_country %}🌍 {{ s.f_country }}{% endif %}{% if s.f_fair %} · 🎪{% endif %}{% if s.f_where_label %} · <span translate="no">{{ s.f_where_label }}</span>{% endif %}</span></span>
         <span class="rq-to">{% if s.contacts.all %}<select name="contact_{{ s.pk }}" title="Кому піде лист"><option value="">{{ s.email|default:"— без email фірми" }}</option>{% for c in s.contacts.all %}{% if c.email %}<option value="{{ c.pk }}" {% if s.f_contact %}{% if c.pk == s.f_contact %}selected{% endif %}{% elif c.is_primary %}selected{% endif %}>{{ c.name }} · {{ c.email }}</option>{% endif %}{% endfor %}</select>
           {% else %}<span class="spf-muted" translate="no">{{ s.email|default:"⚠️ немає email" }}</span>{% endif %}</span>
