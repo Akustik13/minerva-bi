@@ -1176,6 +1176,31 @@
       if (!done(j)) { btn.disabled = false; btn.textContent = label; }
     });
   }
+  // 📨 Запрошення на зустрічі (_invites.html → api/project/<pk>/invite/): ✅ / ❔ / ✕ — лист організатору й календар;
+  // обрали варіант — решта за вибором у групі (відхилити / не заносити / не чіпати)
+  function inviteAnswer(btn) {
+    var row = btn.closest('[data-inv]'), group = btn.closest('[data-pjc-inv-group]');
+    if (!row) return;
+    var what = btn.getAttribute('data-pjc-inv-act');
+    var sel = group && group.querySelector('[data-pjc-inv-others]');
+    var others = what === 'accepted' && sel ? sel.value : 'keep';
+    var when = row.getAttribute('data-when') || '', n = 0;
+    if (others === 'decline') {
+      group.querySelectorAll('[data-inv]').forEach(function (r) {
+        if (r !== row && r.querySelector('[data-pjc-inv-act="declined"]')) n += 1;
+      });
+    }
+    var ask = n ? 'Підтвердити зустріч {0} і відхилити ще {1} варіант(и)? Організатор отримає листи з вашої скриньки.'
+      .replace('{0}', when).replace('{1}', n)
+      : what === 'remove' ? '' : 'Надіслати організатору відповідь {1} на зустріч {0}? Лист піде з вашої скриньки.'
+      .replace('{0}', when).replace('{1}', btn.textContent.trim());
+    if (ask && !window.confirm(ask)) return;
+    btn.disabled = true;
+    toast(what === 'remove' ? '📅 Прибираю з календаря…' : '✉️ Надсилаю відповідь організатору…');
+    send(box().dataset.invite, {invite: row.getAttribute('data-inv'), answer: what, others: others}).then(function (j) {
+      if (!done(j)) btn.disabled = false;
+    });
+  }
   function send(url, body) {
     return fetch(url, {
       method: 'POST', credentials: 'same-origin',
@@ -2273,7 +2298,8 @@
       '[data-pjc-mdel],g[data-mails],g[data-cal],g[data-files],[data-pjc-event-add],[data-pjc-tab],[data-pjc-step-new],[data-pjc-phase-new],[data-pjc-post],' +
       '[data-pjc-save-tpl],[data-pjc-tpl-apply],[data-pjc-phase],g[data-step],g[data-phase],[data-pjc-risk],' +
       '[data-pjc-risk-new],[data-pjs-health],[data-pjs-save],[data-pjs-ai],[data-pjc-act],[data-pjc-unmark],' +
-      'g[data-party],[data-pjy-new],[data-pjy-suggest],[data-pjx],[data-pjq],[data-pjy-view-btn],[data-pje-open]');
+      'g[data-party],[data-pjy-new],[data-pjy-suggest],[data-pjx],[data-pjq],[data-pjy-view-btn],[data-pje-open],' +
+      '[data-pjc-inv-act]');
     if (!t || !root.contains(t)) return;
     var link = e.target.closest('a[href]');
     if (link && link !== t && t.contains(link)) return;   // посилання в рядку («🎙 з наради») відкривається саме
@@ -2285,6 +2311,7 @@
       return;
     }
     if (t.hasAttribute('data-pje-open')) { openEditor(); return; }
+    if (t.hasAttribute('data-pjc-inv-act')) { inviteAnswer(t); return; }
     if (t.hasAttribute('data-pjy-new')) { openParty(''); return; }
     if (t.hasAttribute('data-pjy-suggest')) { t.disabled = true; send(box().dataset.partySuggest, {}).then(done); return; }
     if (t.hasAttribute('data-pjx')) { openExport(t.getAttribute('data-pjx')); return; }

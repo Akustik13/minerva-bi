@@ -208,6 +208,16 @@ def collect(project, today=None) -> dict:
                 item["act"] = act
         attention.append(item)
 
+    # 📨 Запрошення на зустрічі (projects/invites.py): оберіть варіант, підтвердіть, змінено, скасовано
+    invites_list, invite_mail = [], set()
+    try:
+        from . import invites
+        invites_list = invites.related(project, messages, deadlines)
+        if is_open:
+            invite_mail = invites.attention(invites_list, add)
+    except Exception:  # noqa: BLE001 — огляд без запрошень краще, ніж без огляду
+        logger.exception("project invites %s", project.pk)
+
     if is_open and project.due_date:
         left = (project.due_date - today).days
         if left < 0:
@@ -235,7 +245,7 @@ def collect(project, today=None) -> dict:
             continue
         if x["dir"] == "in":
             waiting_us.append(m)
-            if is_open:
+            if is_open and m.pk not in invite_mail:      # відповідь на запрошення — пункт «📨 Запрошення…»
                 add("high" if age >= REPLY_WAIT_DAYS else "medium", "📨",
                     f"Чекає нашої відповіді {_days(age)}: «{m.subject or '(без теми)'}» від {m.from_name or m.from_email}",
                     url, kind="todo", owner=_owner(m),
@@ -330,7 +340,8 @@ def collect(project, today=None) -> dict:
     attention.sort(key=lambda a: LEVELS[a["level"]])
     return {
         "project": project, "today": today, "messages": messages, "offers": offers, "orders": orders,
-        "deadlines": deadlines, "terms": terms_list, "attention": attention, "waiting_us": waiting_us,
+        "deadlines": deadlines, "terms": terms_list, "invites": invites_list, "attention": attention,
+        "waiting_us": waiting_us,
         "waiting_them": waiting_them, "handled": handled,
         "purchases": purchases, "jlc": jlc, "shipments": shipments, "highlights": highlights, "plan": plan,
         "counts": {"in": sum(1 for x in messages if x["dir"] == "in"),

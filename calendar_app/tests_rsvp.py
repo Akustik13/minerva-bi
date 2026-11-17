@@ -3,6 +3,7 @@ iCalendar METHOD:REPLY з UID / SEQUENCE / ORGANIZER оригіналу, лис�
 
 python manage.py test calendar_app.tests_rsvp --settings=tabele.settings_test
 """
+import datetime
 import email
 from unittest import mock
 
@@ -127,3 +128,35 @@ class RsvpTests(TestCase):
         parts = {p.get_content_type(): p for p in parsed.walk()}
         self.assertEqual(parts['text/calendar'].get_param('method'), 'REPLY')
         self.assertIn('invite.ics', [p.get_filename() for p in parsed.walk() if p.get_filename()])
+
+
+class TrackReplyTests(RsvpTests):
+    """Відповідь з Outlook / телефона: наш лист з METHOD:REPLY (копія з «Надісланих») записується на запрошення."""
+    def reply(self, partstat, sender='viacheslav.pryimak@sevskiy.de', when=None, attendee='Viacheslav.Pryimak@sevskiy.de'):
+        from email_assistant.models import EmailMessage
+        body = ICS.replace('METHOD:REQUEST', 'METHOD:REPLY').replace(
+            'ATTENDEE;CN=Slava;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:Viacheslav.Pryimak@sevskiy.de',
+            f'ATTENDEE;CN=Slava;PARTSTAT={partstat}:mailto:{attendee}')
+        self._uid = getattr(self, '_uid', 10) + 1
+        return EmailMessage.objects.create(account=self.account, folder='sent', imap_folder_name='Sent',
+                                           imap_uid=self._uid, subject='Accepted: Online meeting', body_text=body,
+                                           from_email=sender, sent_at=when or timezone.now())
+
+    def test_own_reply_is_recorded(self):
+        self.reply('ACCEPTED')
+        self.inv.refresh_from_db()
+        self.assertEqual((self.inv.status, self.inv.response), (MeetingInvite.ADDED, 'accepted'))
+        self.assertTrue(CalendarEvent.objects.filter(pk=self.inv.event_id).exists())
+        self.reply('DECLINED')
+        self.inv.refresh_from_db()
+        self.assertEqual((self.inv.status, self.inv.response), (MeetingInvite.DISMISSED, 'declined'))
+        self.assertTrue(self.inv.event.title.startswith('✕ Відхилено: '))
+
+    def test_other_or_older_reply_changes_nothing(self):
+        self.reply('DECLINED', sender='pieter@customer.example', attendee='pieter@customer.example')
+        self.inv.refresh_from_db()
+        self.assertEqual(self.inv.response, '')
+        self.reply('ACCEPTED')
+        self.reply('DECLINED', when=timezone.now() - datetime.timedelta(days=1))
+        self.inv.refresh_from_db()
+        self.assertEqual(self.inv.response, 'accepted')

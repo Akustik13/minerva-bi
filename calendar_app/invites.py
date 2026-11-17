@@ -7,7 +7,8 @@
 Правила:
 - один рядок MeetingInvite на зустріч (UID); новіша версія (SEQUENCE) — зміна, METHOD:CANCEL — скасування;
 - у календар — лише після ✓ (CalendarSettings.invites_auto — без підтвердження); «✕ Не заносити» не повертається;
-- відповіді учасників (METHOD:REPLY / COUNTER) — не запрошення.
+- відповіді учасників (METHOD:REPLY / COUNTER) — не запрошення; наша власна відповідь (REPLY з нашої адреси,
+  надіслана з Outlook / телефона) — `track_reply`: відповідь записується на запрошення, як після «✅ Буду» в Minerva.
 """
 from __future__ import annotations
 
@@ -306,6 +307,11 @@ def detect(message, texts=None) -> list:
     touched = []
     for text in texts:
         for ev in parse_ics(text):
+            if ev["method"] == "REPLY":
+                inv = track_reply(user, message, text, ev)   # відповіли самі — з Outlook / телефона
+                if inv is not None:
+                    touched.append(inv)
+                continue
             if ev["method"] in NOT_INVITES:
                 continue
             inv = _apply(user, message, ev)
@@ -541,6 +547,14 @@ def respond(inv, user, answer: str) -> dict:
     result = SMTPClient(account).send([organizer], subject, body, reply_to_message=msg, calendar=("REPLY", ics))
     if not result.get("ok"):
         raise RespondError("лист не надіслано" + (f": {result['error']}" if result.get("error") else ""))
+    record_answer(inv, user, answer)
+    return {"ok": True, "to": organizer}
+
+
+def record_answer(inv, user, answer: str, when=None):
+    """Відповідь уже пішла організатору (з Minerva — `respond`, чи з поштової програми — `track_reply`): календар
+    Minerva й запрошення. Буду / можливо — подія в календарі (❔ — з позначкою), відхилено — подія знімається."""
+    from .models import MeetingInvite
     if answer == "declined":
         if inv.event_id:
             event = inv.event
@@ -548,9 +562,10 @@ def respond(inv, user, answer: str) -> dict:
                 event.title = ("✕ Відхилено: " + event.title)[:300]
             event.is_done = True
             event.save(update_fields=["title", "is_done"])
-        inv.status = MeetingInvite.DISMISSED
+        if inv.status != MeetingInvite.CANCELLED:
+            inv.status = MeetingInvite.DISMISSED
         inv.decided_at = timezone.now()
-    else:
+    elif inv.status not in (MeetingInvite.CANCEL, MeetingInvite.CANCELLED):
         if inv.status in MeetingInvite.PENDING or not inv.event_id:
             accept(inv, user)
         event = inv.event
@@ -559,9 +574,40 @@ def respond(inv, user, answer: str) -> dict:
             event.title = (("❔ " + title) if answer == "tentative" else title)[:300]
             event.is_done = False
             event.save(update_fields=["title", "is_done"])
-    inv.response, inv.responded_at = answer, timezone.now()
+    inv.response, inv.responded_at = answer, when or timezone.now()
     inv.save(update_fields=["status", "decided_at", "response", "responded_at"])
-    return {"ok": True, "to": organizer}
+    return inv
+
+
+ANSWER_OF = {v: k for k, v in PARTSTAT.items()}
+
+
+def track_reply(user, message, text: str, ev: dict):
+    """Наша відповідь на запрошення, надіслана не з Minerva (Outlook, телефон): лист з METHOD:REPLY з нашої адреси
+    (зазвичай копія з «Надісланих») → `record_answer` для запрошення з тим самим UID. Чужі відповіді (учасники нашої
+    зустрічі) і старіші за вже записану — без змін. → MeetingInvite або None."""
+    from email_assistant.crm_link import is_own, own_addresses
+
+    from .models import MeetingInvite
+    own = own_addresses()
+    if not is_own(getattr(message, "from_email", "") or "", own):
+        return None
+    inv = MeetingInvite.objects.filter(user=user, uid=ev["uid"]).first()
+    if inv is None:
+        return None
+    raw = _raw_event(text, ev["uid"]) or {}
+    answer = ""
+    for params, value in raw.get("ATTENDEE", []):
+        if is_own(_mailto(value), own):
+            answer = ANSWER_OF.get(str(params.get("PARTSTAT", "")).strip().upper(), "")
+            if answer:
+                break
+    if not answer:
+        return None
+    when = getattr(message, "sent_at", None) or timezone.now()
+    if inv.responded_at and inv.responded_at >= when:
+        return None                         # уже записано цю чи пізнішу відповідь
+    return record_answer(inv, user, answer, when)
 
 
 def for_messages(user, messages) -> dict:

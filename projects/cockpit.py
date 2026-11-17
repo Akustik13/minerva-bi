@@ -11,6 +11,7 @@ MEETINGS_SHOWN, без розшифровки); моменти / ризики / 
 в записі — лише тому, хто записав.
 """
 import json
+import logging
 
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -18,6 +19,8 @@ from django.utils import timezone
 
 from . import overview, state, timeline
 from .models import ProjectHighlight, ProjectLink
+
+logger = logging.getLogger(__name__)
 
 MOMENTS = 6
 MEETINGS_SHOWN = 5
@@ -182,6 +185,16 @@ def _meetings_context(project, user, meetings, facts=None, today=None) -> dict:
     return {"rows": rows, "total": len(meetings), "all_url": all_url, "upcoming": upcoming,
             "pending": sum(getattr(m, "pending", 0) for m in meetings),
             "record_url": timeline.new_meeting_url(user, project=project)}
+
+
+def _invites_context(project, user, facts) -> dict:
+    """«📨 Запрошення на зустрічі» (projects/invites.py): лише свої запрошення; збій — блоку немає."""
+    try:
+        from . import invites
+        return invites.cockpit(project, user, facts)
+    except Exception:  # noqa: BLE001 — пульт без блоку запрошень краще, ніж без пульта
+        logger.exception("project invites block %s", project.pk)
+        return {"groups": [], "open": 0}
 
 
 def _mails(facts, uid) -> list:
@@ -360,6 +373,7 @@ def context(project, user, range_key="all", notice="") -> dict:
         "parties": _parties_context(project, can_change, today, facts, user),
         "sourcing": _sourcing_context(project, user),
         "meetings": _meetings_context(project, user, meetings, facts, today),
+        "invites": _invites_context(project, user, facts),
         "status": _status_context(project, user, facts, st, today, can_change),
         "urls": {"cockpit": reverse("projects:cockpit", args=[pk]), "highlight": reverse("projects:highlight", args=[pk]),
                  "mail_handled": reverse("projects:mail_handled", args=[pk]),
@@ -368,6 +382,7 @@ def context(project, user, range_key="all", notice="") -> dict:
                  "sourcing": reverse("projects:sourcing", args=[pk]),
                  "export": reverse("projects:export", args=[pk]),
                  "export_names": reverse("projects:export_names", args=[pk]),
+                 "invite": reverse("projects:invite", args=[pk]),
                  "party_suggest": reverse("projects:party_suggest", args=[pk]),
                  "party_base": f"/projects/api/project/{pk}/party/",
                  "risk": reverse("projects:risk", args=[pk]), "status_save": reverse("projects:status", args=[pk]),

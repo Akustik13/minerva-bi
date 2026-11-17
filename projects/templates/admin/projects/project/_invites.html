@@ -1,0 +1,37 @@
+{# 📨 Запрошення на зустрічі проєкту (projects/invites.py → cockpit). Лише свої запрошення того, хто дивиться; #}
+{# назви, організатор і місце — дані листа: translate="no". Кнопки — data-pjc-inv-act (pj.js → urls.invite). #}
+{% if invites.groups %}
+<section class="pjc-card pjc-inv" id="pj-invites" aria-label="Запрошення на зустрічі">
+  <h4>📨 Запрошення на зустрічі <span class="pjc-sub">бачите лише ви{% if invites.open %} · чекають відповіді: {{ invites.open }}{% endif %}</span></h4>
+  {% for g in invites.groups %}
+    <div class="pjc-inv-g{% if g.choose %} pjc-inv-choose{% endif %}" data-pjc-inv-group>
+      <div class="pjc-inv-h"><b translate="no">{{ g.title }}</b>{% if g.organizer %} <span class="pjc-sub">· від <span translate="no">{{ g.organizer }}</span></span>{% endif %}
+        {% if g.choose %}<span class="pjc-inv-tag">оберіть один з {{ g.rows|length }} варіантів</span>{% elif g.chosen and g.rows|length > 1 %}<span class="pjc-inv-tag ok">обрано: {{ g.chosen.when }}</span>{% endif %}</div>
+      <ul class="pjc-list pjc-inv-list">
+        {% for r in g.rows %}
+          <li class="pjc-inv-r pjc-inv-{{ r.cls }}{% if g.chosen and g.chosen.pk == r.pk %} pjc-inv-picked{% endif %}" data-inv="{{ r.pk }}" data-when="{{ r.when }}">
+            <span class="pjc-inv-when">📅 {{ r.when }}</span>
+            {% if r.variant %}<span class="pjc-sub">{{ r.variant }}</span>{% endif %}
+            {% if g.rows|length > 1 and r.title != g.title %}<span translate="no">{{ r.title }}</span>{% endif %}
+            <span class="pjc-inv-state">{{ r.label }}{% if r.responded and r.state in "accepted tentative declined" %} · {{ r.responded }}{% endif %}</span>
+            {% if r.place %}<span class="pjc-sub" translate="no">📍 {{ r.place }}</span>{% endif %}
+            {% if r.join %}<a class="pjc-link" href="{{ r.join }}" target="_blank" rel="noopener" title="Посилання на онлайн-зустріч з запрошення">🔗 Приєднатися</a>{% endif %}
+            {% if r.mail_url %}<a class="pjc-link" href="{{ r.mail_url }}" target="_blank" rel="noopener" title="Лист із запрошенням">✉️ лист</a>{% endif %}
+            {% if r.answers %}<span class="pjc-inv-acts">{% for a in r.answers %}<button type="button" class="pjc-b{% if a.main %} pri{% endif %}" data-pjc-inv-act="{{ a.key }}" title="{{ a.tip }}">{{ a.label }}</button>{% endfor %}</span>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+      {% if g.others %}
+        <label class="pjc-inv-others">Решта варіантів після «✅ Буду»:
+          <select data-pjc-inv-others aria-label="Що зробити з рештою варіантів">
+            <option value="decline" selected>відхилити — організатор отримає «✕»</option>
+            <option value="dismiss">лише не заносити в календар</option>
+            <option value="keep">не чіпати</option>
+          </select></label>
+      {% endif %}
+    </div>
+  {% endfor %}
+  <div class="pjc-sub">✅ / ❔ / ✕ — як у пошті й календарі: лист організатору з вашої скриньки і зустріч у ваш календар Minerva.
+    Відповіли з Outlook чи телефона — Minerva побачить відповідь у «Надісланих» і покаже її тут.</div>
+</section>
+{% endif %}

@@ -583,3 +583,23 @@ svg.pjz-grab { cursor: grabbing; }
 .pje-add { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .pje-dlg .pjp-foot { margin-top: 0; }
 @media (max-width: 900px) { .pje-t { font-size: 12px; } .pje-tt { min-width: 160px; } }
+
+/* 📨 Запрошення на зустрічі (_invites.html) */
+.pjc-inv-g { padding: 6px 0; border-top: 1px solid var(--border); }
+.pjc-inv-g:first-of-type { border-top: none; }
+.pjc-inv-h { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.pjc-inv-tag { font-size: 12px; padding: 1px 8px; border-radius: 10px; background: color-mix(in srgb, var(--warn) 22%, transparent); }
+.pjc-inv-tag.ok { background: color-mix(in srgb, var(--ok) 22%, transparent); }
+.pjc-inv-list { margin: 4px 0 0; }
+.pjc-inv-r { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; padding: 4px 6px; border-radius: 6px; }
+.pjc-inv-when { font-weight: 600; white-space: nowrap; }
+.pjc-inv-state { font-size: 12.5px; }
+.pjc-inv-warn { background: color-mix(in srgb, var(--warn) 10%, transparent); }
+.pjc-inv-bad { background: color-mix(in srgb, var(--err) 10%, transparent); }
+.pjc-inv-off { opacity: .65; }
+.pjc-inv-off .pjc-inv-when { text-decoration: line-through; }
+.pjc-inv-picked { outline: 2px solid var(--ok); outline-offset: -2px; }
+.pjc-inv-acts { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
+.pjc-inv-choose .pjc-inv-r { border: 1px dashed var(--border-strong); margin-top: 4px; }
+.pjc-inv-others { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; font-size: 12.5px; }
+.pjc-inv-others select { padding: 2px 6px; }

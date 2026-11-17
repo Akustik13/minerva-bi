@@ -554,6 +554,23 @@ def scan_view(request, pk):
 
 # ── 📅 План (projects/plan.py, schedule.py) ──────────────────────────────────
 
+@staff_member_required
+@require_POST
+def invite_view(request, pk):
+    """📨 Відповідь на запрошення з пульта: {invite, answer: accepted | tentative | declined | remove, others: decline
+    | dismiss | keep} → лист організатору (calendar_app.invites.respond) і свіжий пульт. Лише своє запрошення цього
+    проєкту; проєкт — право перегляду (відповідь — дія людини у своїй пошті й календарі, проєкт не змінюється)."""
+    from . import invites
+    project = _project_for(request, pk, "view")
+    body = _body(request)
+    what = str(body.get("answer") or "")
+    try:
+        result = invites.answer(project, request.user, body.get("invite"), what, str(body.get("others") or "keep"))
+    except invites.InviteError as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=400)
+    return _cockpit(request, project, invites.notice(what, result), {"declined": result["declined"]})
+
+
 def _plan_action(request, pk, fn):
     """Дія плану, ризику чи статусу: право змінювати проєкт; помилка даних (PlanError, RiskError, ValueError) →
     400 з поясненням; успіх → свіжий пульт."""

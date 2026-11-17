@@ -1,7 +1,7 @@
 """Проєкти й події інших модулів:
 - новий лист → підказка, до якого проєкту він може належати (після прив'язки до CRM у email_assistant);
 - нова закупівля, нова позиція закупівлі, JLC-замовлення → пропозиції прив'язки за товарами проєкту (services);
-- зміни прив'язок, важливих моментів, проєкту, листів, Angebote, замовлень, закупівель, JLC, відправлень →
+- зміни прив'язок, важливих моментів, проєкту, листів, Angebote, замовлень, закупівель, JLC, відправлень, запрошень на зустрічі →
   кеш стану проєкту застарів (projects/state.py: список і фільтр «За терміновістю»).
 Збій тут ніколи не ламає збереження самого об'єкта.
 """
@@ -119,3 +119,26 @@ def shipment_changed(sender, instance, **kwargs):
         if getattr(instance, field, None):
             cond |= Q(**{field: getattr(instance, field)})
     _safe("dirty (shipment)", _dirty, cond)
+
+
+@receiver(post_save, sender="calendar_app.MeetingInvite")
+def invite_changed(sender, instance, **kwargs):
+    """📨 Запрошення прийшло, змінилось чи на нього відповіли — «потребує уваги» проєктів його листа, гілки, події
+    й клієнта (projects/invites.py)."""
+    if kwargs.get("raw"):
+        return
+
+    def run():
+        from . import state
+        cond = Q(message_id=instance.email_message_id) if instance.email_message_id else Q(pk__in=[])
+        thread_id = (EmailMessage.objects.filter(pk=instance.email_message_id).values_list("thread_id", flat=True)
+                     .first() if instance.email_message_id else None)
+        if thread_id:
+            cond |= Q(thread_id=thread_id)
+        if instance.event_id:
+            cond |= Q(event_id=instance.event_id)
+        _dirty(cond)
+        if instance.crm_customer_id:
+            state.mark_dirty(list(Project.objects.filter(customer_id=instance.crm_customer_id,
+                                                         status__in=Project.OPEN_STATUSES).values_list("pk", flat=True)))
+    _safe("dirty (invite)", run)

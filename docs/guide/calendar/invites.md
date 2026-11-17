@@ -5,8 +5,8 @@ summary: Запрошення Outlook / Teams / Google / Zoom з ваших ли
 where: 📅 Календар → Мій календар (блок «📨 Запрошення на зустрічі з пошти»)
 urls: /calendar/, /calendar/settings/, /admin/calendar_app/meetinginvite/
 roles: усі користувачі
-keywords: запрошення, зустріч, відповісти на запрошення, буду, можливо, відхилити, прийняти, accept, decline, tentative, zusagen, absagen, RSVP, meeting, invite, Einladung, Besprechung, Teams, Zoom, Outlook, Google Meet, ics, iCalendar, скасовано, перенесено
-related: calendar/overview, calendar/cleanup, worktime/meetings
+keywords: відповідь з Outlook, відповів з телефона, варіанти зустрічі, проєкт, запрошення, зустріч, відповісти на запрошення, буду, можливо, відхилити, прийняти, accept, decline, tentative, zusagen, absagen, RSVP, meeting, invite, Einladung, Besprechung, Teams, Zoom, Outlook, Google Meet, ics, iCalendar, скасовано, перенесено
+related: calendar/overview, calendar/cleanup, worktime/meetings, crm/project-cockpit
 ---
 
 ## Що це
@@ -49,6 +49,13 @@ related: calendar/overview, calendar/cleanup, worktime/meetings
 підтвердження. Відповісти можна, лише якщо в листі є файл запрошення (.ics) з адресою організатора; на скасовану
 зустріч — ні. Сервіси бронювання на кшталт Cal.com відповідей поштою зазвичай не читають — там відмова чи
 перенесення — за посиланням у листі.
+
+Відповіли не з Minerva, а з Outlook чи телефона? Ваша відповідь (лист «Accepted / Angenommen», «Declined…» з
+файлом запрошення) потрапляє в «Надіслані», і Minerva записує її на запрошення так само: «✅ Буду» / «❔ Можливо» —
+зустріч у календарі, «✕» — знято з календаря. Старіша відповідь новішу не перебиває.
+
+Запрошення з листування проєкту видно ще й на пульті проєкту — там же можна обрати один з кількох запропонованих
+варіантів і відхилити решту ([Пульт проєкту → 📨 Запрошення](guide:crm/project-cockpit#запрошення-на-зустрічі)).
 
 Подія з запрошення містить у описі 📍 місце, 🔗 посилання на Teams / Zoom / Meet, 👤 організатора й текст
 запрошення, а також прив'язку до листа й до клієнта CRM гілки листування. Нагадування — як задано в

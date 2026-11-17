@@ -115,6 +115,7 @@ def events(project, facts, viewer, today=None, meetings=None) -> list:
     _order_events(ev, facts, today)
     _supply_events(ev, facts, today)
     _term_events(ev, project, facts, viewer)
+    _invite_events(ev, facts, viewer)
     _meeting_events(ev, project, viewer, meetings)
     out.extend(_hours(project, viewer))
     return out
@@ -149,6 +150,26 @@ def _term_events(ev, project, facts, viewer):
             if e.pk in recorded:
                 cal["rec"] = recorded[e.pk]
         ev("calendar", "diamond", e.start_at, f"{t.icon} {e.title}{times}", tip, "", t.cls, cal=cal)
+
+
+def _invite_events(ev, facts, viewer):
+    """📨 Запрошення без відповіді (і змінені / скасовані організатором) — лише свої, на доріжці «📅 Терміни й
+    зустрічі»; підтверджене вже стоїть там подією календаря. Клік — лист із запрошенням."""
+    uid = getattr(viewer, "pk", None)
+    mine = [inv for inv in facts.get("invites") or [] if inv.user_id == uid]
+    if not mine:
+        return
+    from . import invites
+    for g in invites.groups(mine, viewer):
+        for r in g["rows"]:
+            if r["state"] not in invites.ACTIONABLE + (invites.CANCEL,) or r["state"] == invites.ADDED:
+                continue
+            variant = f" · {r['variant']}" if r.get("variant") else ""
+            tip = (f"📨 {r['when']} · {r['title']}{variant}\n{r['label']}"
+                   + (f"\nВід: {g['organizer']}" if g["organizer"] else "")
+                   + "\nКлік — лист із запрошенням; ✅ / ❔ / ✕ — у блоці «📨 Запрошення на зустрічі» нижче")
+            ev("calendar", "diamond", r["start"], f"📨 {r['title']}{variant}", tip, r["mail_url"],
+               "bad" if r["state"] == invites.CANCEL else "warn")
 
 
 # ── 🎙 Наради (meetings) — лише свої ────────────────────────────────────────
