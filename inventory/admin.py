@@ -19,7 +19,8 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import path, reverse
 
-from . import param_filters, thumbs
+from . import category_badges, param_filters, thumbs
+from .admin_category import ProductCategoryAdminForm
 from .admin_currency import BaseCurrencyFilter
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
@@ -254,13 +255,14 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
     change_list_template = "admin/inventory/reorderproxy/change_list.html"
 
     list_display = (
-        "sku", "name_col", "category",
+        "sku", "name_col", "category_col",
         "stock_col", "reserved_col", "available_col",
         "monthly_col", "months_left_col",
         "reorder_col", "status_col",
         "cart_col", "quick_add_btn",
     )
-    list_filter  = ("category", "kind", SalesPeriodFilter, SalesSourceFilter, ReorderStatusFilter)
+    list_filter  = (("category", category_badges.CategoryValuesFilter), "kind", SalesPeriodFilter, SalesSourceFilter,
+                    ReorderStatusFilter)
     search_fields = ("sku", "name")
     ordering     = ("sku",)
     actions      = ["bulk_create_po", "add_to_cart"]
@@ -473,6 +475,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             'subtitle': None,
             'rows':     rows,
             'params':   param_filters.params_map(products),   # пошук за параметрами на сторінці
+            'cats':     category_badges.info(),               # кнопки категорій: значок, назва, колір
             'opts':     ReorderProxy._meta,
         }
         return render(request, 'admin/inventory/reorderproxy/supply.html', context)
@@ -816,7 +819,12 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             days = 90
         since = (timezone.now() - timedelta(days=days)).date()
         source_slug = (request.GET.get('sales_source') or '').strip()
-        return _annotate_reorder(super().get_queryset(request).filter(is_active=True), since, source_slug)
+        qs = _annotate_reorder(super().get_queryset(request).filter(is_active=True), since, source_slug)
+        return category_badges.annotate(qs)
+
+    @admin.display(description=_("Категорія"), ordering="category")
+    def category_col(self, obj):
+        return category_badges.column(obj)
 
     def name_col(self, obj):
         n = obj.name
@@ -1713,9 +1721,20 @@ _CATEGORY_TIPS = {
         "Можна писати будь-якою мовою, з пробілами.\n\n"
         "Змінювати можна вільно — на базу даних не впливає."
     ),
+    "icon": (
+        "Значок бейджу — емодзі перед назвою",
+        "Показується перед назвою категорії в списках,\n"
+        "фільтрах і виборі категорії: «📡 Антени».\n\n"
+        "Клікніть значок у палітрі або впишіть свій емодзі\n"
+        "(Win + . — усі емодзі Windows).\n"
+        "«✕ Без значка» — лише назва.\n\n"
+        "Змінювати можна вільно — лише зовнішній вигляд."
+    ),
     "color": (
         "Колір бейджу (мітки) у форматі HEX",
-        "Визначає колір кольорової мітки категорії.\n\n"
+        "Визначає колір кольорової мітки категорії.\n"
+        "Клікніть колір у палітрі або «🎨 Свій колір…».\n"
+        "Колір тексту (білий чи чорний) Minerva вибирає сама.\n\n"
         "Формат: # і 6 символів (цифри 0-9 та літери a-f)\n"
         "Приклади:\n"
         "• #e91e63 — рожевий\n"
@@ -1747,15 +1766,18 @@ def _mtip(field_key, tips_dict):
 
 @admin.register(ProductCategory)
 class ProductCategoryAdmin(admin.ModelAdmin):
+    form = ProductCategoryAdminForm            # палітри значка й кольору (admin_category.py)
+    change_form_template = "admin/inventory/productcategory/change_form.html"
     list_display       = ("order", "slug", "name", "color_badge", "customs_hs_code", "customs_description_de", "customs_country_of_origin")
     list_display_links = ("slug",)
     list_editable      = ("order",)
     search_fields      = ("slug", "name")
     ordering           = ("order", "name")
+    readonly_fields    = ("badge_preview",)
 
     fieldsets = (
         ("🏷️ Категорія", {
-            "fields": (("slug", "name"), ("color", "order")),
+            "fields": (("slug", "name"), "badge_preview", "icon", "color", "order"),
         }),
         ("🛃 Митне оформлення (CN23)", {
             "fields": (("customs_hs_code", "customs_country_of_origin"), "customs_description_de"),
@@ -1766,17 +1788,19 @@ class ProductCategoryAdmin(admin.ModelAdmin):
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
-        for field_key in ("slug", "name", "color", "order"):
+        for field_key in ("slug", "name", "icon", "color", "order"):
             if field_key in form.base_fields:
                 form.base_fields[field_key].help_text = _mtip(field_key, _CATEGORY_TIPS)
         return form
 
+    @admin.display(description=_("Як виглядатиме"))
+    def badge_preview(self, obj):
+        from .admin_category import preview
+        return preview(obj)
+
+    @admin.display(description=_("Вигляд бейджу"), ordering="name")
     def color_badge(self, obj):
-        return format_html(
-            '<span style="background:{};color:#fff;padding:3px 12px;border-radius:10px;'
-            'font-size:12px;font-weight:bold">{}</span>',
-            obj.color, obj.name)
-    color_badge.short_description = _("Вигляд бейджу")
+        return obj.badge_html
 
 
 @admin.register(ProductAlias)
@@ -2194,8 +2218,7 @@ class ProductCategoryForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        from .models import ProductCategory
-        known = list(ProductCategory.objects.order_by("order", "name").values_list("slug", "name"))
+        known = category_badges.choices()   # [(код, «📡 Антени»)]
         slugs = {k for k, _ in known}
         used = (Product.objects.exclude(category__in=slugs).exclude(category="")
                 .values_list("category", flat=True).distinct().order_by("category"))
@@ -2209,12 +2232,12 @@ class ProductAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
     projects_block_after = "📦 Availability"
     change_list_template = "admin/inventory/product/change_list.html"
     list_display = (
-        "sku", "media_col", "sku_short", "category", "shops_col", "kind", "bom_type", "is_active",
+        "sku", "media_col", "sku_short", "category_col", "shops_col", "kind", "bom_type", "is_active",
         "stock_qty", "reserved_qty", "stock_badge", "incoming_qty", "buildable_qty",
         "reorder_badge", "label_btn", "set_stock_link",
     )
     search_fields = ("sku", "sku_short", "name")
-    list_filter   = ("category", ProductShopFilter, thumbs.MediaFilter, "lifecycle_status", "kind", "bom_type",
+    list_filter   = (("category", category_badges.CategoryValuesFilter), ProductShopFilter, thumbs.MediaFilter, "lifecycle_status", "kind", "bom_type",
                      "is_active", BaseCurrencyFilter,
                      param_filters.ParamFilter)   # параметри — останнім (решта фільтрів уже застосована)
     list_per_page = 50
@@ -2223,6 +2246,11 @@ class ProductAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
     actions       = ["action_set_category", "action_set_lifecycle", "action_archive", "action_unarchive", "action_base_editor", "action_base_from_dk",
                      "action_base_to_home", "action_sale_price_from_base", "action_media_links", "action_shared_media",
                      "bulk_sync_digikey_attrs", "action_dk_prices", "action_dk_from_stock", "action_agent_task"]
+
+    @admin.display(description=_("Категорія"), ordering="category")
+    def category_col(self, obj):
+        """Бейдж «📡 Антени» на кольорі категорії (inventory/category_badges.py)."""
+        return category_badges.column(obj)
 
     @admin.display(description="⚖️ Вага з даташита")
     def weight_panel(self, obj):
@@ -2652,7 +2680,7 @@ class ProductAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
     def get_form(self, request, obj=None, **kwargs):
         self._weight_can_change = request.user.has_perm("inventory.change_product")   # «🔎 Знайти вагу»
         form = super().get_form(request, obj, **kwargs)
-        cats = list(ProductCategory.objects.order_by("order", "name").values_list("slug", "name"))
+        cats = category_badges.choices()   # «📡 Антени»
         if cats:
             form.base_fields["category"].widget = forms.Select(
                 choices=[("", "— оберіть категорію —")] + cats,
@@ -2665,7 +2693,8 @@ class ProductAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
         from django.db.models import F
         since_3m = (timezone.now() - timedelta(days=90)).date()
         qs = super().get_queryset(request).prefetch_related("shop_listings__shop").select_related("dk_listing")
-        return _annotate_reorder(qs, since_3m).annotate(_incoming_total=F('_incoming'), _sales_3m=F('_sales_period'))
+        qs = _annotate_reorder(qs, since_3m).annotate(_incoming_total=F('_incoming'), _sales_3m=F('_sales_period'))
+        return category_badges.annotate(qs)   # бейдж «Категорія» — без запиту на рядок
 
     def changelist_view(self, request, extra_context=None):
         """Pre-load labels dir listing once per request to avoid per-row filesystem scans."""

@@ -1,0 +1,156 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+/* 🏷️ Картка категорії: палітри значка й кольору + «Як виглядатиме» (inventory/admin_category.py) */
+.pcb-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pcb-hex { width: 8.5em; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.pcb-emoji { width: 4.2em; font-size: 20px !important; text-align: center; padding: 2px 4px !important; }
+.pcb-hex.pcb-bad, .pcb-emoji.pcb-bad { border-color: var(--err, #d32f2f) !important;
+  box-shadow: 0 0 0 1px var(--err, #d32f2f); }
+.pcb-err { font-size: 12px; color: var(--err, #d32f2f); }
+.pcb-hint { font-size: 12px; color: var(--text-muted, #6b7785); }
+.pcb-own { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px;
+  padding: 3px 10px 3px 4px; border: 1px solid var(--border-strong, #ccd3da); border-radius: 8px;
+  background: var(--bg-card-2, transparent); color: var(--text, inherit); }
+.pcb-own:hover { border-color: var(--accent, #1e6fa8); }
+.pcb-own input[type="color"] { width: 28px; height: 24px; padding: 0; border: 0; background: none; cursor: pointer; }
+.pcb-swatches { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; max-width: 560px; }
+.pcb-sw { width: 28px; height: 28px; border-radius: 50%; padding: 0; cursor: pointer; display: inline-flex;
+  align-items: center; justify-content: center;
+  border: 2px solid var(--bg-card, #fff); box-shadow: 0 0 0 1px var(--border-strong, #ccd3da);
+  transition: transform .08s; }
+.pcb-sw:hover { transform: scale(1.12); }
+.pcb-sw:focus-visible, .pcb-ib:focus-visible { outline: 2px solid var(--accent, #1e6fa8); outline-offset: 2px; }
+.pcb-sw.on { box-shadow: 0 0 0 2px var(--accent, #1e6fa8); transform: scale(1.12); }
+.pcb-sw.on::after { content: "✓"; font-size: 14px; font-weight: 700; color: var(--pcb-on, #fff); }
+.pcb-groups { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 8px; max-width: 980px; }
+.pcb-gt { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted, #6b7785);
+  margin-bottom: 3px; }
+.pcb-grid { display: flex; flex-wrap: wrap; gap: 4px; }
+.pcb-ib { font-size: 19px; width: 36px; height: 36px; padding: 0; cursor: pointer; border-radius: 8px;
+  border: 1px solid var(--border-strong, #ccd3da); background: var(--bg-card-2, transparent); color: var(--text, inherit);
+  line-height: 1; }
+.pcb-ib:hover { border-color: var(--accent, #1e6fa8); }
+.pcb-ib.on { border-color: var(--accent, #1e6fa8); box-shadow: 0 0 0 2px var(--accent, #1e6fa8);
+  background: var(--accent-subtle, rgba(30,111,168,.12)); }
+.pcb-ib.pcb-none { width: auto; height: 32px; font-size: 12.5px; padding: 0 10px; color: var(--text-muted, #6b7785); }
+.pcb-preview { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px 22px; }
+.pcb-pv-big .mv-cat-badge { font-size: 15px !important; padding: 5px 16px !important; border-radius: 14px !important; }
+.pcb-pv-list { border: 1px solid var(--border-strong, #ccd3da); border-radius: 8px; overflow: hidden; min-width: 300px;
+  font-size: 12.5px; background: var(--bg-card, #fff); }
+.pcb-pv-h, .pcb-pv-r { display: grid; grid-template-columns: 9.5em 1fr 3.5em; gap: 10px; align-items: center;
+  padding: 5px 10px; }
+.pcb-pv-h { background: var(--bg-card-2, #f4f6f8); color: var(--text-muted, #6b7785); font-size: 11px;
+  text-transform: uppercase; letter-spacing: .03em; }
+.pcb-pv-r + .pcb-pv-r { border-top: 1px solid var(--border, rgba(0,0,0,.06)); }
+.pcb-pv-sku { font-weight: 600; color: var(--accent, #1e6fa8); }
+.pcb-pv-n { text-align: right; color: var(--text, inherit); }
+.pcb-pv-filter { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; min-width: 150px;
+  padding: 6px 10px; border: 1px solid var(--border-strong, #ccd3da); border-radius: 8px; background: var(--bg-card, #fff); }
+.pcb-pv-ft { font-weight: 600; color: var(--text, inherit); margin-bottom: 2px; }
+.pcb-pv-fi { color: var(--text-muted, #6b7785); }
+.pcb-pv-on { color: var(--accent, #1e6fa8); font-weight: 600; }
+.pcb-pv-note { flex-basis: 100%; font-size: 12px; color: var(--text-muted, #6b7785); max-width: 760px; }
+@media (max-width: 768px) {
+  .pcb-pv-list { min-width: 0; width: 100%; }
+  .pcb-groups { gap: 6px 10px; }
+}
+</style>
+{% endblock %}
+
+{% block admin_change_form_document_ready %}
+{{ block.super }}
+<script>
+/* 🏷️ Значок і колір бейджа категорії: палітри → поля, «Як виглядатиме» — наживо.
+   Колір тексту — той самий розрахунок, що category_badges.text_color (контраст WCAG: білий чи чорний). */
+(function () {
+  var hexIn = document.querySelector('[data-pcb="color"] .pcb-hex');
+  var native = document.querySelector('[data-pcb="color"] .pcb-native');
+  var iconIn = document.querySelector('[data-pcb="icon"] .pcb-emoji');
+  var nameIn = document.getElementById('id_name');
+  var pv = document.getElementById('pcb-preview');
+  if (!hexIn || !iconIn) return;
+  var DEF = '#607d8b';
+
+  function hex(v) {
+    var m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(v || '').trim());
+    if (!m) return null;
+    var h = m[1].toLowerCase();
+    if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
+    return '#' + h;
+  }
+  function lum(h) {
+    function ch(x) { var c = parseInt(x, 16) / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+    return 0.2126 * ch(h.substr(1, 2)) + 0.7152 * ch(h.substr(3, 2)) + 0.0722 * ch(h.substr(5, 2));
+  }
+  function fg(h) { var L = lum(h); return 1.05 / (L + 0.05) >= (L + 0.05) / 0.05 ? '#ffffff' : '#000000'; }
+  function icon(v) {
+    v = String(v || '').trim();
+    if (!v) return '';
+    if (Array.from(v).length > 8 || /[A-Za-z0-9<>&"'\\\s;:{}()]/.test(v)) return null;
+    return v;
+  }
+  function err(input, bad) {
+    input.classList.toggle('pcb-bad', bad);
+    var e = input.closest('[data-pcb]').querySelector('.pcb-err');
+    if (e) e.hidden = !bad;
+  }
+
+  function paint() {
+    var c = hex(hexIn.value), ic = icon(iconIn.value);
+    err(hexIn, c === null);
+    err(iconIn, ic === null);
+    var col = c || DEF, txt = fg(col), ico = ic || '';
+    var name = (nameIn && nameIn.value.trim()) || (pv && pv.dataset.empty) || '';
+    document.querySelectorAll('[data-pcb="color"] .pcb-sw').forEach(function (b) {
+      var on = b.dataset.v === c;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      b.style.setProperty('--pcb-on', fg(b.dataset.v));
+    });
+    document.querySelectorAll('[data-pcb="icon"] .pcb-ib').forEach(function (b) {
+      var on = b.dataset.v === ico;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    if (c && native && native.value !== c) native.value = c;
+    if (!pv) return;
+    pv.querySelectorAll('.mv-cat-badge').forEach(function (b) {
+      b.style.background = col;
+      b.style.color = txt;
+      b.title = name;
+      b.textContent = '';
+      if (ico) {
+        var s = document.createElement('span');
+        s.setAttribute('aria-hidden', 'true');
+        s.textContent = ico;
+        b.appendChild(s);
+      }
+      b.appendChild(document.createTextNode(name));
+    });
+    var fi = pv.querySelector('.pcb-pv-ic'), fn = pv.querySelector('.pcb-pv-nm');
+    if (fi) fi.textContent = ico;
+    if (fn) fn.textContent = name;
+  }
+
+  function set(input, v) {
+    input.value = v;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  document.querySelectorAll('[data-pcb="color"] .pcb-sw').forEach(function (b) {
+    b.addEventListener('click', function () { set(hexIn, b.dataset.v); });
+  });
+  document.querySelectorAll('[data-pcb="icon"] .pcb-ib').forEach(function (b) {
+    b.addEventListener('click', function () { set(iconIn, b.dataset.v); });
+  });
+  if (native) native.addEventListener('input', function () { set(hexIn, native.value); });
+  [hexIn, iconIn, nameIn].forEach(function (el) { if (el) el.addEventListener('input', paint); });
+  hexIn.addEventListener('blur', function () { var c = hex(hexIn.value); if (c && c !== hexIn.value) { hexIn.value = c; } });
+  paint();
+})();
+</script>
+{% endblock %}

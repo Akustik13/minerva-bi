@@ -17,6 +17,9 @@ class ProductCategory(models.Model):
     name  = models.CharField("Назва", max_length=128)
     color = models.CharField("Колір бейджу", max_length=16, default="#607d8b",
                              help_text="HEX, напр. #e91e63")
+    # значок перед назвою в бейджі (inventory/category_badges.py: палітра, перевірка, вигляд); порожньо — без значка
+    icon  = models.CharField("Значок бейджу", max_length=8, blank=True, default="",
+                             help_text="Емодзі перед назвою категорії в списках; порожньо — без значка.")
     order = models.PositiveSmallIntegerField("Порядок", default=0)
 
     # ── Митне оформлення (CN23) ────────────────────────────────────────────────
@@ -41,6 +44,17 @@ class ProductCategory(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def label(self) -> str:
+        """«📡 Антени» — значок і назва (списки вибору, фільтри; без значка — лише назва)."""
+        return f"{self.icon} {self.name}" if self.icon else self.name
+
+    @property
+    def badge_html(self):
+        """Бейдж категорії, як у списках: значок + назва на кольорі категорії."""
+        from inventory.category_badges import badge
+        return badge(self.name, self.color, self.icon)
 
 
 class Product(models.Model):
