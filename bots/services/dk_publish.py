@@ -425,9 +425,12 @@ def step_details(listing, steps, events, todo, error, current):
                 actions.append({"label": "🔗 Звірити офери й записати ID",
                                 "url": reverse("admin:bots_digikeypricerun_offers") + f"?q={listing.get_supplier_sku()}"})
             if s["state"] in ("current", "error"):
+                from bots.services.dk_marketplace import qty_alert
+                alert = qty_alert(listing.dk_qty_alert, listing.dk_min_order_qty)
                 s["text"] = ("Товар затверджено — Minerva створить офер з цінами, залишком (зараз "
                              f"{listing.get_dk_quantity()} шт), MOQ {listing.dk_min_order_qty} і строком "
-                             f"{listing.dk_lead_time_days} дн.")
+                             f"{listing.dk_lead_time_days} дн"
+                             + (f", алерт залишку ≤ {alert} шт." if alert else ", без алерту залишку."))
                 actions.append({"label": "📦 Створити Offer", "url": url("create_offer"), "post": True,
                                 "confirm": "Створити офер на DigiKey з поточними цінами й залишком?"})
                 actions.append(sync)

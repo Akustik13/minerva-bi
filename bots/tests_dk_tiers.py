@@ -82,3 +82,36 @@ class RoundingNoteTests(PriceBase):
     def test_normal_price_no_note(self):
         _, notes = svc.compute([(1, D("10"))], None, svc.Rules(), D("1.1"))
         self.assertFalse(any("округлення" in n for n in notes))
+
+
+class QtyAlertTests(PriceBase):
+    """DigiKey: «When provided, Min Quantity Alert must be greater than or equal to Min Order Quantity» (400)."""
+
+    def test_rule(self):
+        from bots.services.dk_marketplace import qty_alert
+        self.assertIsNone(qty_alert(0, 1))                 # 0 — не надсилаємо (без алерту)
+        self.assertIsNone(qty_alert(None, 4000))
+        self.assertEqual(qty_alert(3, 1), 3)
+        self.assertEqual(qty_alert(3, 4000), 4000)        # менше за MOQ — MOQ
+
+    def test_offer_payload_from_listing(self):
+        from bots.services.dk_marketplace import _offer_payload
+        l = self.listing(self.product("QA-1", [(1, 1)]), "qa1", [(1, 1.2)], dk_qty_alert=0)
+        self.assertNotIn("minQuantityAlert", _offer_payload(l))
+        l.dk_qty_alert, l.dk_min_order_qty = 3, 4000
+        body = _offer_payload(l)
+        self.assertEqual((body["minOrderQuantity"], body["minQuantityAlert"]), (4000, 4000))
+
+    def test_price_put_keeps_digikey_alert_valid(self):
+        offer = {"supplierSku": "X", "title": "X", "quantityAvailable": 5, "minOrderQuantity": 100,
+                 "leadTimeToShip": 3, "minQuantityAlert": 0}
+        body = svc.offer_payload(offer, [(100, D("1.5"))])
+        self.assertNotIn("minQuantityAlert", body)
+
+    def test_push_only_moq_raises_alert_too(self):
+        from bots.services import dk_view
+        l = self.listing(self.product("QA-2", [(1, 1)]), "qa2", [(1, 1.2)], dk_qty_alert=3, dk_min_order_qty=1000)
+        self.dk.offers["qa2"]["minQuantityAlert"] = 3
+        dk_view.push_offer_fields(l, ["minOrderQuantity"])
+        sent = self.dk.puts[-1][1]
+        self.assertEqual((sent["minOrderQuantity"], sent["minQuantityAlert"]), (1000, 1000))

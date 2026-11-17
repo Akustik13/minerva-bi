@@ -5,7 +5,7 @@ summary: Ваші товари на DigiKey Marketplace у Minerva — ліст�
 where: 🛒 DigiKey → Лістинги (підключення — 🛒 DigiKey → Налаштування → Підключення DigiKey)
 urls: /admin/bots/digikeylisting/, /admin/bots/digikeylisting/add/, /admin/bots/digikeylisting/from-stock/, /admin/bots/digikeylisting/dk-diff/, /admin/bots/digikeylisting/lead-times/, /admin/bots/digikeyconfig/
 roles: адміністратор, менеджер
-keywords: DigiKey, Marketplace, лістинг, мінімальне замовлення, MOQ, термін відправки, строк відвантаження, залишок для DigiKey, даташит для DigiKey, цінові тири, ціна за штуку, сума за кількість, ціна за 1000, listing, що бачить DigiKey, звірка, не дійшло, строк відвантаження, lead time, leadTimeToShip, зі складу, обов'язкові поля, RoHS, етапи з DigiKey, офер, offer, Supplier SKU, опублікувати, staged, затвердження, стягнути з DigiKey, залишок на DigiKey, атрибути DigiKey, additionalFields, MOQ, Excel, OAuth
+keywords: DigiKey, Marketplace, лістинг, Min Quantity Alert, мін. залишок алерт, мінімальне замовлення, MOQ, термін відправки, строк відвантаження, залишок для DigiKey, даташит для DigiKey, цінові тири, ціна за штуку, сума за кількість, ціна за 1000, listing, що бачить DigiKey, звірка, не дійшло, строк відвантаження, lead time, leadTimeToShip, зі складу, обов'язкові поля, RoHS, етапи з DigiKey, офер, offer, Supplier SKU, опублікувати, staged, затвердження, стягнути з DigiKey, залишок на DigiKey, атрибути DigiKey, additionalFields, MOQ, Excel, OAuth
 related: inventory/ai-fill, digikey/prices, digikey/media, digikey/orders, inventory/products, shop/catalog-prices
 ---
 
@@ -330,6 +330,11 @@ Minerva»**, дія **«⏱ Строк відвантаження (масово)
 **«🆕 Створити лістинги»**, **«📋 Custom Fields»**, **«🪪 Supplier UUID»**, **«📦 Компоненти»**.
 
 ## Часті питання та проблеми
+
+**«Min Quantity Alert must be greater than or equal to Min Order Quantity» при створенні офера.** DigiKey вимагає,
+щоб «Мін. залишок (алерт)» був не меншим за MOQ. Тепер Minerva сама: алерт 0 — не надсилає (без алерту), алерт
+менший за MOQ — надсилає рівним MOQ. На кроці «Офер» дорожньої карти видно, що піде («алерт залишку ≤ … шт.» або
+«без алерту залишку»). Достатньо ще раз натиснути **«📦 Створити Offer»**.
 
 **Де задати мінімальне замовлення й термін відправки?** Нова картка — на сторінці «🔷 Зі складу на DigiKey»
 («Мін. замовлення (MOQ), шт.», «Відвантаження, днів»). Наявний лістинг — у картці → **«🛒 Offer (Пропозиція)»** →

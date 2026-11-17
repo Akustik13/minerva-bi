@@ -639,6 +639,7 @@ def build_draft(product, given=None, overrides=None, ai_sources=None) -> dict:
         "dk_category_name": cat["dk_category_name"], "category_type": cat["category_type"],
         "dk_image_url": image, "dk_datasheet_url": datasheet,
         "dk_prices": prices, "dk_min_order_qty": terms["moq"], "dk_quantity_override": stock["override"],
+        "dk_qty_alert": max(DigiKeyListing._meta.get_field("dk_qty_alert").default, terms["moq"]),
         "dk_lead_time_days": terms["lead"],
         "dk_packaging": values.get("packaging", DEFAULT_PACKAGING),
         "dk_lifecycle_status": values.get("productLifecycleStatus", "Active"),

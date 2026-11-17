@@ -723,7 +723,8 @@ def offer_payload(offer: dict, tiers, listing=None) -> dict:
             payload[key] = offer[key]
     if isinstance(payload.get("description"), str):
         payload["description"] = payload["description"][:500]
-    return payload
+    from bots.services.dk_marketplace import fix_qty_alert   # алерт ≥ MOQ, 0 — не надсилаємо
+    return fix_qty_alert(payload)
 
 
 def direct_payload(listing, tiers) -> dict:

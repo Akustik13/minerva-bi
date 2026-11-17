@@ -276,12 +276,32 @@ def offer_title(title) -> str:
     return m.group(1) if m else title
 
 
+def qty_alert(alert, moq) -> int | None:
+    """«Мін. залишок (алерт)» для DigiKey: 0 / порожньо — не надсилаємо (без алерту); менше за MOQ — MOQ.
+    DigiKey: «When provided, Min Quantity Alert must be greater than or equal to Min Order Quantity» (400)."""
+    try:
+        alert, moq = int(alert or 0), max(1, int(moq or 1))
+    except (TypeError, ValueError):
+        return None
+    return None if alert <= 0 else max(alert, moq)
+
+
+def fix_qty_alert(payload: dict) -> dict:
+    """Тіло POST / PUT офера: minQuantityAlert за qty_alert (після злиття з GET-офером чи вибраними полями)."""
+    alert = qty_alert(payload.get("minQuantityAlert"), payload.get("minOrderQuantity"))
+    if alert is None:
+        payload.pop("minQuantityAlert", None)
+    else:
+        payload["minQuantityAlert"] = alert
+    return payload
+
+
 def _offer_payload(listing) -> dict:
     stock  = listing.get_dk_quantity()
     prices = listing.get_prices_api()
     if not prices:
         raise DKMarketplaceError("Цінові тири не заповнені (dk_prices порожній)")
-    return {
+    return fix_qty_alert({
         "supplierSku":       listing.get_supplier_sku(),
         "title":             offer_title(listing.dk_title),
         "description":       listing.dk_description[:500],
@@ -292,7 +312,7 @@ def _offer_payload(listing) -> dict:
         "minOrderQuantity":  max(1, listing.dk_min_order_qty),
         "leadTimeToShip":    listing.dk_lead_time_days,
         "minQuantityAlert":  listing.dk_qty_alert,
-    }
+    })
 
 
 def create_offer(config, listing) -> str:
@@ -388,6 +408,7 @@ def update_offer(config, listing) -> None:
         for key in PRESERVE_OFFER_FIELDS:
             if fresh.get(key) is not None:
                 payload.setdefault(key, fresh[key])
+    fix_qty_alert(payload)
     resp = req.put(url, json=payload, headers=_headers(config, token), timeout=30)
     try:
         resp.raise_for_status()

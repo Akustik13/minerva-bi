@@ -16924,6 +16924,7 @@
 {"uk": "Товар з артикулом", "en": "A product with SKU", "de": "Ein Artikel mit der Artikelnummer"}
 {"uk": "Товар з каталогу", "en": "Catalog product", "de": "Katalogartikel"}
 {"uk": "Товар з'являється в магазині на сайті (через API).", "en": "The product appears in the shop on the website (via the API).", "de": "Der Artikel erscheint im Shop auf der Website (über die API)."}
+{"uk": "Товар затверджено — Minerva створить офер з цінами, залишком (зараз {0} шт), MOQ {1} і строком {2} дн", "en": "Product approved — Minerva will create the offer with prices, stock (now {0} pcs), MOQ {1} and {2} days shipping time", "de": "Artikel freigegeben — Minerva erstellt das Angebot mit Preisen, Bestand (jetzt {0} Stk.), MOQ {1} und {2} Tagen Versandzeit"}
 {"uk": "Товар затверджено — Minerva створить офер з цінами, залишком (зараз {0} шт), MOQ {1} і строком {2} дн.", "en": "The product is approved — Minerva will create an offer with prices, stock (currently {0} pcs), MOQ {1} and lead time {2} d.", "de": "Artikel freigegeben — Minerva erstellt ein Offer mit Preisen, Bestand (aktuell {0} Stk.), MOQ {1} und Lieferzeit {2} Tg."}
 {"uk": "Товар знято з виробництва — доступний лише залишок на складі.", "en": "The product has been discontinued — only the remaining stock is available.", "de": "Der Artikel wurde aus der Produktion genommen — nur der Lagerbestand ist verfügbar."}
 {"uk": "Товар зі SKU «{0}» вже є на складі — лістинг прив'язано до існуючого.", "en": "A product with SKU “{0}” already exists in stock — the listing was linked to it.", "de": "Ein Artikel mit der SKU „{0}“ ist bereits im Lager vorhanden — das Listing wurde mit ihm verknüpft."}
@@ -18983,6 +18984,7 @@
 {"uk": "але відправлення ще не підтверджено через DigiKey Marketplace API.", "en": "but the shipment has not yet been confirmed via the DigiKey Marketplace API.", "de": "aber die Sendung wurde noch nicht über die DigiKey Marketplace API bestätigt."}
 {"uk": "але гілка лише в категоріях, вибраних вручну", "en": "but the thread is only in manually selected categories", "de": "aber der Verlauf ist nur in manuell gewählten Kategorien"}
 {"uk": "але замовлення", "en": "but the order", "de": "aber der Auftrag"}
+{"uk": "алерт залишку ≤ {0} шт.", "en": "stock alert at ≤ {0} pcs", "de": "Bestandswarnung bei ≤ {0} Stk."}
 {"uk": "аналіз", "en": "analysis", "de": "Analyse"}
 {"uk": "аналізатор запиту: {0} / {1}", "en": "query analyzer: {0} / {1}", "de": "Anfrage-Analysator: {0} / {1}"}
 {"uk": "аналітика", "en": "analytics", "de": "Analytik"}
@@ -19042,6 +19044,7 @@
 {"uk": "без автооновлення", "en": "no auto-update", "de": "keine automatische Aktualisierung"}
 {"uk": "без акаунту UPS відхилить запит. Для", "en": "without an account UPS will reject the request. For", "de": "ohne Konto lehnt UPS die Anfrage ab. Für"}
 {"uk": "без активності в Minerva — стандартний день", "en": "no activity in Minerva — standard day", "de": "keine Aktivität in Minerva — Standardtag"}
+{"uk": "без алерту залишку.", "en": "no stock alert.", "de": "ohne Bestandswarnung."}
 {"uk": "без ваги нетто", "en": "without net weight", "de": "ohne Nettogewicht"}
 {"uk": "без ваги: {0}", "en": "without weight: {0}", "de": "ohne Gewicht: {0}"}
 {"uk": "без валюти", "en": "no currency", "de": "keine Währung"}

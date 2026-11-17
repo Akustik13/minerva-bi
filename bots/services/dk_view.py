@@ -322,7 +322,8 @@ def push_offer_fields(listing, fields) -> list:
     mine = _offer_payload(listing)
     for f in fields:
         body[f] = mine[f]
-    _put_offer(offer["id"], body)
+    from bots.services.dk_marketplace import fix_qty_alert   # новий MOQ з Minerva + алерт з DigiKey — не менший
+    _put_offer(offer["id"], fix_qty_alert(body))
     if "prices" in fields:                                  # локальна копія цін DigiKey — як тепер на DigiKey
         listing.dk_prices = [{"qty": int(p["quantityBreak"]), "price": p["price"]} for p in mine["prices"]]
         listing.save(update_fields=["dk_prices"])
