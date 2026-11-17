@@ -263,6 +263,7 @@
 {"uk": "(або змінна середовища", "en": "(or the environment variable", "de": "(oder die Umgebungsvariable"}
 {"uk": "(автоматичних {0})", "en": "(automatic: {0})", "de": "(automatisch: {0})"}
 {"uk": "(активно)", "en": "(active)", "de": "(aktiv)"}
+{"uk": "(базові ціни × курс, без надбавки й округлення)", "en": "(base prices × rate, without markup and rounding)", "de": "(Basispreise × Kurs, ohne Aufschlag und Rundung)"}
 {"uk": "(без AI, миттєво)", "en": "(no AI, instant)", "de": "(ohne KI, sofort)"}
 {"uk": "(без SKU)", "en": "(no SKU)", "de": "(ohne SKU)"}
 {"uk": "(без назви)", "en": "(no name)", "de": "(ohne Name)"}
@@ -458,6 +459,7 @@
 {"uk": "(❔ |✕ Відхилено: )", "en": "(❔ |✕ Відхилено: )", "de": "(❔ |✕ Відхилено: )"}
 {"uk": "(🎙 з наради від \\d{0}\\.\\d{1}\\.\\d{2}): «[^\\n]", "en": "(🎙 з наради від \\d{0}\\.\\d{1}\\.\\d{2}): «[^\\n]", "de": "(🎙 з наради від \\d{0}\\.\\d{1}\\.\\d{2}): «[^\\n]"}
 {"uk": ") автоматично оновить статус на ✅ Опубліковано.", "en": ") will automatically update the status to ✅ Published.", "de": ") aktualisiert den Status automatisch auf ✅ Veröffentlicht."}
+{"uk": ") більша, ніж на", "en": ") is higher than at", "de": ") höher als bei"}
 {"uk": ") для", "en": ") for", "de": ") für"}
 {"uk": ") для товарів з опублікованим офером", "en": ") for products with a published offer", "de": ") für Artikel mit veröffentlichtem Angebot"}
 {"uk": ") з вашими правами.", "en": ") with your permissions.", "de": ") mit Ihren Rechten."}
@@ -478,6 +480,7 @@
 {"uk": ") — не вгадую", "en": ") — not guessing", "de": ") — kein Raten"}
 {"uk": ") — під час масових дій.", "en": ") — during bulk actions.", "de": ") — bei Massenaktionen."}
 {"uk": ") — старі кроки, їхні дати й прив'язки зникнуть після «✓ Застосувати план»", "en": ") — the old steps, their dates and links will disappear after «✓ Apply the plan»", "de": ") — die alten Schritte, ihre Daten und Verknüpfungen verschwinden nach «✓ Plan übernehmen»"}
+{"uk": ") — у тирі ціна за ОДНУ штуку, не за всю кількість.", "en": ") — a tier holds the price of ONE piece, not of the whole quantity.", "de": ") — eine Staffel enthält den Preis für EIN Stück, nicht für die ganze Menge."}
 {"uk": ") — учасники ще бачать старе", "en": ") — attendees still see the old version", "de": ") — die Teilnehmer sehen noch den alten Stand"}
 {"uk": ") — ціни запишуться у валюті кожного товару.", "en": ") — prices will be saved in each product’s currency.", "de": ") — die Preise werden in der Währung des jeweiligen Artikels gespeichert."}
 {"uk": ") → username (напр.", "en": ") → username (e.g.", "de": ") → username (z. B."}
@@ -3240,6 +3243,7 @@
 {"uk": "{0}, до {1} $ за запуск", "en": "{0}, up to {1} $ per run", "de": "{0}, bis {1} $ pro Lauf"}
 {"uk": "{0}, права в порядку; {1}.", "en": "{0}, permissions are fine; {1}.", "de": "{0}, Berechtigungen in Ordnung; {1}."}
 {"uk": "{0}, усього виручки", "en": "{0}, total revenue", "de": "{0}, Gesamtumsatz"}
+{"uk": "{0}. DigiKey приймає ціну за 1 шт.", "en": "{0}. DigiKey expects the price per 1 pc.", "de": "{0}. DigiKey erwartet den Preis pro 1 Stk."}
 {"uk": "{0}. {1}: {2} (подій {3})", "en": "{0}. {1}: {2} (events {3})", "de": "{0}. {1}: {2} (Ereignisse {3})"}
 {"uk": "{0}. Перевіряються збережені налаштування — після змін спершу «Зберегти і продовжити редагування».", "en": "{0}. The saved settings are checked — after changes first click «Save and continue editing».", "de": "{0}. Geprüft werden die gespeicherten Einstellungen — nach Änderungen zuerst «Sichern und weiter bearbeiten»."}
 {"uk": "{0}.dymo відсутній", "en": "{0}.dymo is missing", "de": "{0}.dymo fehlt"}
@@ -6633,6 +6637,7 @@
 {"uk": "Довжина кабелю у метрах або дюймах", "en": "Cable length in meters or inches", "de": "Kabellänge in Metern oder Zoll"}
 {"uk": "Довідка", "en": "Help", "de": "Hilfe"}
 {"uk": "Довідка по полях та результатах", "en": "Help on fields and results", "de": "Hilfe zu Feldern und Ergebnissen"}
+{"uk": "Довідка — ціни Minerva у", "en": "For reference — Minerva prices in", "de": "Zur Info — Minerva-Preise in"}
 {"uk": "Довідка: Публікація продукту на DigiKey", "en": "Help: Publishing a product on DigiKey", "de": "Hilfe: Artikel auf DigiKey veröffentlichen"}
 {"uk": "Довідка: публікація продукту", "en": "Help: publishing a product", "de": "Hilfe: Artikel veröffentlichen"}
 {"uk": "Довідка: як це працює", "en": "Help: how it works", "de": "Hilfe: So funktioniert es"}
@@ -10438,6 +10443,7 @@
 {"uk": "НЕДОСТУПНО ЦЬОМУ ЮЗЕРУ (на прохання — поясни коротко, що саме й чому, як це ввімкнути, і де зробити інакше; лист можна написати самому в «📥 Пошта → ✍️ Написати» з AI-відповіддю)", "en": "UNAVAILABLE TO THIS USER (on request — briefly explain what exactly and why, how to enable it, and where to do it differently; the e-mail can be written manually in “📥 Mail → ✍️ Compose” with an AI reply)", "de": "NICHT VERFÜGBAR FÜR DIESEN BENUTZER (auf Nachfrage – erkläre kurz, was genau und warum, wie es aktiviert wird und wo es anders geht; die E-Mail kann man selbst unter „📥 E-Mail → ✍️ Verfassen“ mit einer KI-Antwort schreiben)"}
 {"uk": "НЕМАЄ", "en": "NONE", "de": "KEINE"}
 {"uk": "НОРВЕГІЯ", "en": "NORWAY", "de": "NORWEGEN"}
+{"uk": "На", "en": "At", "de": "Bei"}
 {"uk": "На 1 шт.", "en": "Per 1 pc.", "de": "Pro 1 Stk."}
 {"uk": "На DigiKey", "en": "On DigiKey", "de": "Bei DigiKey"}
 {"uk": "На DigiKey буде передано", "en": "The following will be sent to DigiKey", "de": "An DigiKey wird übermittelt"}
@@ -13061,6 +13067,7 @@
 {"uk": "Перший ступінь має бути від 1 шт.", "en": "The first tier must start at 1 pc.", "de": "Die erste Staffel muss ab 1 Stk. gelten."}
 {"uk": "Перший ступінь — від 1 шт. Рядки без ціни не зберігаються. (Без JavaScript — по рядку «кількість: ціна», напр. «10: 4.52».)", "en": "The first price break starts from 1 pc. Rows without a price are not saved. (Without JavaScript — one line per “quantity: price”, e.g. “10: 4.52”.)", "de": "Die erste Staffel gilt ab 1 Stk. Zeilen ohne Preis werden nicht gespeichert. (Ohne JavaScript — pro Zeile „Menge: Preis“, z. B. „10: 4.52“.)"}
 {"uk": "Перший тир = MOQ. Макс. 9 тирів.", "en": "First price break = MOQ. Max. 9 price breaks.", "de": "Erste Staffel = MOQ. Max. 9 Staffeln."}
+{"uk": "Перший тир = MOQ. Макс. 9 тирів. DigiKey приймає ціну за ОДНУ штуку; знаєте суму за всю кількість — впишіть її в «Сума», ціна за 1 шт. порахується сама.", "en": "First tier = MOQ. Max. 9 tiers. DigiKey expects the price of ONE piece; if you know the total for the whole quantity, enter it in «Total» and the price per 1 pc is calculated.", "de": "Erste Staffel = MOQ. Max. 9 Staffeln. DigiKey erwartet den Preis für EIN Stück; kennen Sie die Summe für die ganze Menge, tragen Sie sie in «Summe» ein — der Stückpreis wird berechnet."}
 {"uk": "Перший товар", "en": "First product", "de": "Erster Artikel"}
 {"uk": "Першим", "en": "First", "de": "Zuerst"}
 {"uk": "Період", "en": "Period", "de": "Zeitraum"}
@@ -15795,6 +15802,7 @@
 {"uk": "Скільки докуповувати, шт", "en": "How many to buy, pcs", "de": "Nachkaufmenge, Stk"}
 {"uk": "Скільки з них RAG уже забрав", "en": "How many of them RAG has already fetched", "de": "Wie viele davon RAG bereits abgeholt hat"}
 {"uk": "Скільки коштує", "en": "What it costs", "de": "Kosten für"}
+{"uk": "Скільки коштує вся ця кількість: кількість × ціна за 1 шт. Можна вписати суму — ціна за 1 шт. порахується сама", "en": "What the whole quantity costs: quantity × price per 1 pc. You can enter the total — the price per 1 pc is calculated", "de": "Was die ganze Menge kostet: Menge × Stückpreis. Sie können die Summe eintragen — der Stückpreis wird berechnet"}
 {"uk": "Скільки коштує вся ця кількість: кількість × ціна за шт.", "en": "What the whole quantity costs: quantity × price per pc", "de": "Was die ganze Menge kostet: Menge × Stückpreis"}
 {"uk": "Скільки листів максимум завантажувати на одну папку за раз.", "en": "The maximum number of emails to download per folder at a time.", "de": "Maximale Anzahl E-Mails, die pro Ordner auf einmal geladen werden."}
 {"uk": "Скільки місяців вистачить", "en": "How many months it will last", "de": "Für wie viele Monate es reicht"}
@@ -16371,6 +16379,8 @@
 {"uk": "Сума без ПДВ", "en": "Amount excl. VAT", "de": "Betrag ohne MwSt."}
 {"uk": "Сума брутто", "en": "Gross total", "de": "Bruttosumme"}
 {"uk": "Сума ваг митних артикулів", "en": "Sum of customs item weights", "de": "Summe der Gewichte der Zollartikel"}
+{"uk": "Сума за всю кількість — ціна за 1 шт. порахується сама", "en": "Total for the whole quantity — the price per 1 pc is calculated", "de": "Summe für die ganze Menge — der Stückpreis wird berechnet"}
+{"uk": "Сума за кількість", "en": "Total for the quantity", "de": "Summe für die Menge"}
 {"uk": "Сума замовлення", "en": "Order total", "de": "Auftragssumme"}
 {"uk": "Сума замовлення замала для онлайн-оплати.", "en": "The order amount is too small for an online payment.", "de": "Der Auftragsbetrag ist für eine Online-Zahlung zu gering."}
 {"uk": "Сума нетто", "en": "Net total", "de": "Summe netto"}
@@ -17813,6 +17823,7 @@
 {"uk": "Це службовий ключ RAG / RAG-ПК (база знань чи наради) — у консолі не використовується: ним читаються чужі листи й розшифровки нарад", "en": "This is a RAG / RAG PC service key (knowledge base or meetings) — not used in the console: it reads other people’s e-mails and meeting transcripts", "de": "Das ist ein Dienstschlüssel für RAG / RAG-PC (Wissensdatenbank oder Besprechungen) — in der Konsole nicht verwendet: Damit werden fremde E-Mails und Besprechungstranskripte gelesen"}
 {"uk": "Це спам", "en": "This is spam", "de": "Das ist Spam"}
 {"uk": "Це спам — прибрати все від відправника", "en": "This is spam — remove everything from the sender", "de": "Das ist Spam — alles vom Absender entfernen"}
+{"uk": "Це сума за всю кількість: поставити ціну за 1 шт.", "en": "This is the total for the whole quantity: set the price per 1 pc", "de": "Das ist die Summe für die ganze Menge: Stückpreis setzen"}
 {"uk": "Це те, що бачать користувачі в списках та бейджах.", "en": "This is what users see in lists and badges.", "de": "Das sehen die Benutzer in Listen und Badges."}
 {"uk": "Це те, що бачать користувачі в списках та бейджах. Можна писати будь-якою мовою, з пробілами. Змінювати можна вільно — на базу даних не впливає.", "en": "This is what users see in lists and badges. Can be written in any language, with spaces. Can be changed freely — it does not affect the database.", "de": "Das sehen die Benutzer in Listen und Badges. Kann in beliebiger Sprache und mit Leerzeichen geschrieben werden. Kann frei geändert werden – hat keinen Einfluss auf die Datenbank."}
 {"uk": "Це те, що бачать користувачі в списках та фільтрах.", "en": "This is what users see in lists and filters.", "de": "Das ist das, was Benutzer in Listen und Filtern sehen."}
@@ -17921,6 +17932,7 @@
 {"uk": "Ціна за 1 шт, {0}", "en": "Price per 1 pc, {0}", "de": "Preis pro 1 Stk., {0}"}
 {"uk": "Ціна за 1 шт.", "en": "Price per 1 pc.", "de": "Preis pro 1 Stk."}
 {"uk": "Ціна за 1 шт. = закупівельна × (1 + націнка); знижки ступенів зберігаються", "en": "Price per 1 pc. = purchase price × (1 + markup); tier discounts are kept", "de": "Preis pro 1 Stk. = Einkaufspreis × (1 + Aufschlag); Staffelrabatte bleiben erhalten"}
+{"uk": "Ціна за ОДНУ штуку", "en": "Price of ONE piece", "de": "Preis für EIN Stück"}
 {"uk": "Ціна за од.", "en": "Price per unit", "de": "Preis pro Einh."}
 {"uk": "Ціна за одиницю", "en": "Unit price", "de": "Einzelpreis"}
 {"uk": "Ціна за одиницю (ступені — рядками)", "en": "Unit price (price breaks — as rows)", "de": "Einzelpreis (Staffeln — zeilenweise)"}
@@ -17951,6 +17963,7 @@
 {"uk": "Ціна продажу = базова ціна за 1 шт.", "en": "Sale price = base price per 1 pc.", "de": "Verkaufspreis = Basispreis für 1 Stk."}
 {"uk": "Ціна продажу за одиницю.", "en": "Sale price per unit.", "de": "Verkaufspreis pro Einheit."}
 {"uk": "Ціна продажу товару", "en": "Product sale price", "de": "Verkaufspreis des Artikels"}
+{"uk": "Ціна схожа на суму за всю кількість", "en": "The price looks like the total for the whole quantity", "de": "Der Preis sieht aus wie die Summe für die ganze Menge"}
 {"uk": "Ціна товарів", "en": "Goods price", "de": "Warenpreis"}
 {"uk": "Ціна, {0}", "en": "Price, {0}", "de": "Preis, {0}"}
 {"uk": "Ціна/шт", "en": "Price/pc", "de": "Preis/Stk."}
@@ -19829,6 +19842,7 @@
 {"uk": "за", "en": "at", "de": "zu"}
 {"uk": "за 1 шт, 12 міс", "en": "per 1 pc, 12 mo", "de": "pro 1 Stk, 12 Mon."}
 {"uk": "за 1 шт.", "en": "per pc", "de": "pro Stk."}
+{"uk": "за 1 шт., а з цін Minerva", "en": "per 1 pc, while Minerva prices give", "de": "pro Stk., laut Minerva-Preisen"}
 {"uk": "за 12 міс", "en": "over 12 months", "de": "in 12 Monaten"}
 {"uk": "за 2 роки", "en": "last 2 years", "de": "letzte 2 Jahre"}
 {"uk": "за 30 днів", "en": "over 30 days", "de": "in 30 Tagen"}
@@ -20782,6 +20796,8 @@
 {"uk": "на {0}", "en": "for {0}", "de": "für {0}"}
 {"uk": "на {0} {1} дорожче за найдешевший ({2} · {3})", "en": "{0} {1} more than the cheapest ({2} · {3})", "de": "{0} {1} teurer als der günstigste ({2} · {3})"}
 {"uk": "на {0} дн. пізніше за план кроку ({1})", "en": "{0} days later than the step's plan ({1})", "de": "{0} Tage später als der Plan des Schritts ({1})"}
+{"uk": "на {0} шт. ціна за 1 шт. ({1}) більша, ніж на {2} шт. ({3}) — у тирі ціна за ОДНУ штуку, не за всю кількість", "en": "at {0} pcs the price per 1 pc ({1}) is higher than at {2} pcs ({3}) — a tier holds the price of ONE piece, not of the whole quantity", "de": "bei {0} Stk. ist der Stückpreis ({1}) höher als bei {2} Stk. ({3}) — eine Staffel enthält den Preis für EIN Stück, nicht für die ganze Menge"}
+{"uk": "на {0} шт. — {1} за 1 шт., а з цін Minerva ≈ {2}: схоже, вписано суму за всю кількість (тоді за 1 шт. — {3})", "en": "at {0} pcs — {1} per 1 pc, while Minerva prices give ≈ {2}: looks like the total for the whole quantity was entered (then per 1 pc — {3})", "de": "bei {0} Stk. — {1} pro Stk., laut Minerva-Preisen ≈ {2}: offenbar wurde die Summe für die ganze Menge eingetragen (dann pro Stk. — {3})"}
 {"uk": "на «{0}»: {1} → {2}", "en": "at “{0}”: {1} → {2}", "de": "an „{0}“: {1} → {2}"}
 {"uk": "на адреси", "en": "to addresses", "de": "an Adressen"}
 {"uk": "на адресу відправника", "en": "to the sender’s address", "de": "an die Absenderadresse"}
@@ -22519,6 +22535,7 @@
 {"uk": "схоже на питання про Minerva", "en": "looks like a question about Minerva", "de": "sieht nach einer Frage zu Minerva aus"}
 {"uk": "схоже на питання про продукцію", "en": "looks like a question about products", "de": "sieht nach einer Frage zu Produkten aus"}
 {"uk": "схоже на подяку за наш Angebot або відповідь на нього", "en": "looks like a thank-you for our Angebot or a reply to it", "de": "sieht nach einem Dank für unser Angebot oder einer Antwort darauf aus"}
+{"uk": "схоже, вписано суму за всю кількість.", "en": "looks like the total for the whole quantity was entered.", "de": "offenbar wurde die Summe für die ganze Menge eingetragen."}
 {"uk": "схожих товарів на DigiKey ще немає — виберіть категорію з каталогу DigiKey", "en": "no similar products on DigiKey yet — choose a category from the DigiKey catalog", "de": "noch keine ähnlichen Artikel auf DigiKey — wählen Sie eine Kategorie aus dem DigiKey-Katalog"}
 {"uk": "сьогодні", "en": "today", "de": "heute"}
 {"uk": "сьогодні {0}", "en": "today {0}", "de": "heute {0}"}
@@ -23031,6 +23048,7 @@
 {"uk": "ціна = ціна продажу, округлити", "en": "price = sale price, round", "de": "Preis = Verkaufspreis, runden"}
 {"uk": "ціна {0}", "en": "price {0}", "de": "Preis {0}"}
 {"uk": "ціна вийшла ≤ 0 — перевірте знижку / фіксовану добавку", "en": "the price came out ≤ 0 — check the discount / fixed surcharge", "de": "Preis ist ≤ 0 — prüfen Sie Rabatt / festen Aufschlag"}
+{"uk": "ціна за 1 шт.", "en": "price per 1 pc", "de": "Stückpreis"}
 {"uk": "ціна за 1 шт. {0}", "en": "price per 1 pc {0}", "de": "Preis pro 1 Stk. {0}"}
 {"uk": "ціна за запитом", "en": "price on request", "de": "Preis auf Anfrage"}
 {"uk": "ціна за одиницю", "en": "unit price", "de": "Einzelpreis"}
@@ -23176,6 +23194,7 @@
 {"uk": "шт. (", "en": "pcs. (", "de": "Stk. ("}
 {"uk": "шт. для", "en": "pcs for", "de": "Stk. für"}
 {"uk": "шт. за ціною", "en": "pcs at a price of", "de": "Stk. zum Preis von"}
+{"uk": "шт. ціна за 1 шт. (", "en": "pcs the price per 1 pc (", "de": "Stk. ist der Stückpreis ("}
 {"uk": "шт. — виберіть дрібніше округлення або більшу знижку.", "en": "pcs — choose finer rounding or a larger discount.", "de": "Stk. — wählen Sie eine feinere Rundung oder einen höheren Rabatt."}
 {"uk": "шт.\"", "en": "pcs\"", "de": "Stk.\""}
 {"uk": "шт.)", "en": "pcs)", "de": "Stk.)"}

@@ -559,7 +559,7 @@ body.dk-edit .dk-view-val      { display: none !important; }
 ═══════════════════════════════════════════════════════════════════════════ */
 .dk-prices-wrap { margin: 4px 0 8px; }
 .dk-prices-table {
-  border-collapse: collapse; width: 100%; max-width: 400px; font-size: 13px;
+  border-collapse: collapse; width: 100%; max-width: 640px; font-size: 13px;
 }
 .dk-prices-table th {
   text-align: left; padding: 5px 12px;
@@ -578,6 +578,12 @@ body.dk-edit .dk-view-val      { display: none !important; }
   box-shadow: 0 0 0 2px rgba(88,166,255,.2);
 }
 .dk-tier-num { color: var(--text-dim, #607d8b); font-size: 11px; text-align: center; width: 28px; }
+.dk-prices-table tr.dk-suspect input.dk-price { border-color: var(--warn, #e3b341); box-shadow: 0 0 0 2px rgba(227,179,65,.2); }
+.dk-prices-warn { display: none; margin: 6px 0; padding: 8px 12px; max-width: 640px; border: 1px solid var(--warn, #e3b341);
+  border-radius: 6px; color: var(--warn, #e3b341); font-size: 12px; font-weight: 600; line-height: 1.6; }
+.dk-prices-warn button { margin-left: 6px; font-weight: 600; }
+.dk-prices-ref { margin: 4px 0; max-width: 640px; color: var(--text-muted, #9aafbe); font-size: 12px; }
+.dk-prices-ref:empty { display: none; }
 .dk-del-row {
   background: none; border: none; color: var(--text-dim, #607d8b);
   cursor: pointer; font-size: 18px; padding: 0 6px; transition: color .1s;
@@ -664,7 +670,7 @@ body.dk-edit .dk-view-val      { display: none !important; }
   margin-left: 8px; vertical-align: middle; cursor: help; white-space: nowrap;
 }
 /* Persistent teal border on the actual input */
-.dk-autofill-row input:not(.dk-qty):not(.dk-price):not([data-code]),
+.dk-autofill-row input:not(.dk-qty):not(.dk-price):not(.dk-sum):not([data-code]),
 .dk-autofill-row textarea:not([name="dk_attributes"]):not([name="dk_prices"]),
 .dk-autofill-row select {
   border-color: #00bfa5 !important;
@@ -1399,22 +1405,43 @@ function dkShowPreview(fields, raw, changed) {
 /* ════════════════════════════════════════════════════════════════════════════
    Price table
 ════════════════════════════════════════════════════════════════════════════ */
-var _pTbody = null, _pTa = null;
+var _pTbody = null, _pTa = null, _pRef = [], DK_PCUR = '{{ price_currency|default:"EUR"|escapejs }}';
+var DK_SUSPECT = 5;   /* як bots/services/dk_prices.SUSPECT_FACTOR */
+
+function _pNum(v) { v = String(v == null ? '' : v).trim().replace(/\s/g, '').replace(',', '.'); return v === '' ? NaN : Number(v); }
+function _pR4(n) { return Math.round(n * 10000) / 10000; }
+function _pShow(n) { return String(_pR4(n)).replace('.', ','); }
+function _pMoney(n) {                     /* 15 000,00 */
+  var s = n.toFixed(2).split('.');
+  return s[0].replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0') + ',' + s[1];
+}
+function _pRefAt(q) {                     /* ціна Minerva для кількості q (найвищий ступінь, якого досягнуто) */
+  if (!_pRef.length) return null;
+  var p = _pRef[0].price;
+  _pRef.forEach(function (r) { if (r.qty <= q) p = r.price; });
+  return p;
+}
 
 function dkPricesInit() {
   _pTa = document.querySelector('[name="dk_prices"]');
   if (!_pTa) return;
+  try { var refEl = document.getElementById('dk-minerva-ref'); _pRef = refEl ? (JSON.parse(refEl.textContent) || []) : []; }
+  catch (e) { _pRef = []; }
 
   var wrap = document.createElement('div');
   wrap.className = 'dk-prices-wrap';
   wrap.innerHTML =
     '<table class="dk-prices-table"><thead><tr>'+
-      '<th style="width:28px">#</th><th>Кількість (шт.)</th><th>Ціна ({{ price_currency|default:"EUR" }})</th><th class="dk-edit-col" style="width:36px"></th>'+
+      '<th style="width:28px">#</th><th>Кількість (шт.)</th><th>Ціна за 1 шт., '+dkEsc(DK_PCUR)+'</th>'+
+      '<th title="Скільки коштує вся ця кількість: кількість × ціна за 1 шт. Можна вписати суму — ціна за 1 шт. порахується сама">Сума за кількість, '+dkEsc(DK_PCUR)+'</th>'+
+      '<th class="dk-edit-col" style="width:36px"></th>'+
     '</tr></thead><tbody class="dk-ptbody"></tbody></table>'+
     '<div class="dk-prices-footer">'+
       '<button type="button" class="dk-add-btn" id="dkAddTier">+ Додати тир</button>'+
-      '<span class="dk-prices-hint">Перший тир = MOQ. Макс. 9 тирів.</span>'+
+      '<span class="dk-prices-hint">Перший тир = MOQ. Макс. 9 тирів. DigiKey приймає ціну за ОДНУ штуку; знаєте суму за всю кількість — впишіть її в «Сума», ціна за 1 шт. порахується сама.</span>'+
     '</div>'+
+    '<div class="dk-prices-warn" id="dkPricesWarn"></div>'+
+    '<div class="dk-prices-ref" id="dkPricesRef"></div>'+
     '<div class="dk-prices-err" id="dkPricesErr"></div>';
 
   _pTa.parentNode.insertBefore(wrap, _pTa);
@@ -1426,6 +1453,21 @@ function dkPricesInit() {
     _pTbody.lastElementChild.querySelector('.dk-qty').focus();
     _pSync();
   });
+  wrap.querySelector('#dkPricesWarn').addEventListener('click', function (e) {   /* «÷ кількість»: сума → ціна за 1 шт. */
+    var b = e.target.closest('button[data-q]'); if (!b) return;
+    Array.from(_pTbody.rows).forEach(function (tr) {
+      if (parseInt(tr.querySelector('.dk-qty').value, 10) === Number(b.getAttribute('data-q'))) {
+        tr.querySelector('.dk-price').value = b.getAttribute('data-p');
+        _pSumFromPrice(tr);
+      }
+    });
+    _pSync();
+  });
+
+  if (_pRef.length) {
+    wrap.querySelector('#dkPricesRef').textContent = 'Довідка — ціни Minerva у ' + DK_PCUR + ' (базові ціни × курс, без надбавки й округлення): ' +
+      _pRef.map(function (r) { return r.qty + ' шт. — ' + _pShow(r.price); }).join(' · ');
+  }
 
   var ex = [];
   try { var r = _pTa.value.trim(); if (r) ex = JSON.parse(r); } catch(e) {}
@@ -1434,17 +1476,34 @@ function dkPricesInit() {
   _pSync();
 }
 
+function _pSumFromPrice(tr) {
+  var q = parseInt(tr.querySelector('.dk-qty').value, 10), p = _pNum(tr.querySelector('.dk-price').value);
+  tr.querySelector('.dk-sum').value = q > 0 && p >= 0 ? (Math.round(q * p * 100) / 100).toFixed(2) : '';
+}
+
+function _pPriceFromSum(tr) {
+  var q = parseInt(tr.querySelector('.dk-qty').value, 10), s = _pNum(tr.querySelector('.dk-sum').value);
+  if (q > 0 && s >= 0) tr.querySelector('.dk-price').value = String(_pR4(s / q));
+}
+
 function _pAddRow(qty, price) {
   var tr = document.createElement('tr');
   tr.innerHTML =
     '<td class="dk-tier-num">?</td>'+
     '<td><input type="number" class="dk-qty" min="1" step="1" value="'+(qty!==undefined&&qty!==''?qty:'')+'" placeholder="1" autocomplete="off"></td>'+
-    '<td><input type="number" class="dk-price" min="0" step="0.0001" value="'+(price!==undefined&&price!==''?price:'')+'" placeholder="0.0000" autocomplete="off"></td>'+
+    '<td><input type="number" class="dk-price" min="0" step="0.0001" value="'+(price!==undefined&&price!==''?price:'')+'" placeholder="0.0000" autocomplete="off" title="Ціна за ОДНУ штуку"></td>'+
+    '<td><input type="number" class="dk-sum" min="0" step="0.01" placeholder="0.00" autocomplete="off" title="Сума за всю кількість — ціна за 1 шт. порахується сама"></td>'+
     '<td class="dk-edit-col"><button type="button" class="dk-del-row">×</button></td>';
   tr.querySelector('.dk-del-row').addEventListener('click', function() { tr.remove(); _pRenum(); _pSync(); });
-  tr.querySelector('.dk-qty').addEventListener('input', _pSync);
-  tr.querySelector('.dk-price').addEventListener('input', _pSync);
+  tr.querySelector('.dk-qty').addEventListener('input', function () {
+    var hasPrice = !isNaN(_pNum(tr.querySelector('.dk-price').value)), hasSum = !isNaN(_pNum(tr.querySelector('.dk-sum').value));
+    if (!hasPrice && hasSum) _pPriceFromSum(tr); else _pSumFromPrice(tr);
+    _pSync();
+  });
+  tr.querySelector('.dk-price').addEventListener('input', function () { _pSumFromPrice(tr); _pSync(); });
+  tr.querySelector('.dk-sum').addEventListener('input', function () { _pPriceFromSum(tr); _pSync(); });
   _pTbody.appendChild(tr);
+  _pSumFromPrice(tr);
   _pRenum();
 }
 
@@ -1464,6 +1523,43 @@ function _pSync() {
   _pTa.value = JSON.stringify(tiers);
   var errEl = document.getElementById('dkPricesErr');
   if (errEl) { errEl.textContent = err ? '⚠️ Заповни обидва поля.' : ''; errEl.style.display = err ? 'block' : 'none'; }
+  _pWarn(tiers);
+}
+
+function _pWarn(tiers) {   /* схоже на «вписав суму за всю кількість» — як dk_prices.price_suspects */
+  var box = document.getElementById('dkPricesWarn'); if (!box) return;
+  var bad = {};
+  box.textContent = '';
+  tiers.forEach(function (t, i) {
+    var prev = tiers[i - 1], text = '';
+    if (prev && t.price > prev.price) {
+      text = 'На ' + t.qty + ' шт. ціна за 1 шт. (' + _pShow(t.price) + ') більша, ніж на ' + prev.qty + ' шт. (' + _pShow(prev.price) +
+             ') — у тирі ціна за ОДНУ штуку, не за всю кількість.';
+    } else if (t.qty > 1 && t.price > 0) {
+      var r = _pRefAt(t.qty);
+      if (r && t.price > r * DK_SUSPECT) {
+        text = 'На ' + t.qty + ' шт. — ' + _pShow(t.price) + ' ' + DK_PCUR + ' за 1 шт., а з цін Minerva ≈ ' + _pShow(r) +
+               ': схоже, вписано суму за всю кількість.';
+      }
+    }
+    if (!text) return;
+    bad[t.qty] = true;
+    var line = document.createElement('div');
+    line.textContent = '⚠ ' + text + ' ';
+    if (t.qty > 1) {
+      var per = _pR4(t.price / t.qty), b = document.createElement('button');
+      b.type = 'button'; b.className = 'dk-add-btn';
+      b.setAttribute('data-q', t.qty); b.setAttribute('data-p', String(per));
+      b.textContent = '÷ ' + t.qty + ' → ціна за 1 шт. ' + _pShow(per) + ' ' + DK_PCUR;
+      b.title = 'Це сума за всю кількість: поставити ціну за 1 шт. = ' + _pShow(t.price) + ' ÷ ' + t.qty;
+      line.appendChild(b);
+    }
+    box.appendChild(line);
+  });
+  box.style.display = box.childNodes.length ? 'block' : 'none';
+  Array.from(_pTbody.rows).forEach(function (tr) {
+    tr.classList.toggle('dk-suspect', !!bad[parseInt(tr.querySelector('.dk-qty').value, 10)]);
+  });
 }
 
 function dkPricesRebuild(tiers) {
@@ -2222,6 +2318,7 @@ var _SKU_CHECK_URL = '{{ sku_check_url|default:"" }}';
   if (_skuFld.value.trim()) _dkCheckSku(_skuFld.value.trim(), false);
 })();
 </script>
+{{ minerva_ref|default_if_none:""|json_script:"dk-minerva-ref" }}
 {% if ai_fill %}{{ ai_fill|json_script:"mvaf-config" }}
 <link rel="stylesheet" href="/static/admin/css/mv_ai_fill.css?v=1"><script src="/static/admin/js/mv_ai_fill.js?v=4"></script>
 <script>

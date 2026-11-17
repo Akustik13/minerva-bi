@@ -2030,6 +2030,15 @@ def _local_quality_checks(listing, ignored_fields=None) -> list:
 
     if not listing.dk_prices:
         issue('dk_prices', 'error', 'Цінові тири не задані', 'Додайте хоча б одну ціну для публікації')
+    else:
+        from .services import dk_prices as _dkp
+        try:
+            ref = _dkp.minerva_ref(listing)
+        except Exception:
+            ref = []
+        for text in _dkp.price_suspects(listing.dk_prices, ref)[:3]:
+            issue('dk_prices', 'warning', 'Ціна схожа на суму за всю кількість',
+                  f'{text}. DigiKey приймає ціну за 1 шт.')
 
     if not (listing.dk_manufacturer or '').strip():
         issue('dk_manufacturer', 'warning', 'Виробник не вказаний', 'Вкажіть назву виробника')
@@ -2430,10 +2439,19 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
 
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
         extra_context = extra_context or {}
+        from .services import dk_prices as _dkp
         try:
-            extra_context['price_currency'] = DigiKeyConfig.get().locale_currency or 'EUR'
+            extra_context['price_currency'] = _dkp.currency()   # валюта цін офера: «💲 Налаштування цін DigiKey» → Locale
         except Exception:
             extra_context['price_currency'] = 'EUR'
+        # ціни Minerva у валюті DigiKey — редактор тирів порівнює з ними («схоже на суму за всю кількість»)
+        ref_listing = (DigiKeyListing.objects.filter(pk=object_id).select_related('product').first()
+                       if str(object_id or '').isdigit() else None)
+        try:
+            ref = _dkp.minerva_ref(ref_listing) if ref_listing is not None else []
+        except Exception:
+            ref = []
+        extra_context['minerva_ref'] = [{'qty': q, 'price': float(p)} for q, p in ref]
         extra_context['sku_check_url'] = reverse('admin:bots_digikeylisting_sku_check')
         if self._ai_fill_can(request):          # «🤖 AI: заповнити з даташита…» (і після помилки форми)
             from inventory.services.ai_fill import config as ai_fill_config

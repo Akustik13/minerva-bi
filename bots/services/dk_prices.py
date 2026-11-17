@@ -313,6 +313,37 @@ def _price_at(tiers, qty: int) -> Decimal:
     return price
 
 
+SUSPECT_FACTOR = 5           # ціна за 1 шт. у стільки разів більша за ціну Minerva — схоже на суму за всю кількість
+
+
+def minerva_ref(listing, s=None) -> list[tuple[int, Decimal]]:
+    """Ціни Minerva товару лістингу у валюті DigiKey (лише × курс, без надбавки й округлення) — довідка для
+    редактора тирів і перевірки «схоже на суму». Немає товару / цін / курсу — []."""
+    product = listing.product if getattr(listing, "product_id", None) else None
+    if product is None:
+        return []
+    s = s or settings()
+    tiers, cur, _ = minerva_tiers(product, s.source or "base_or_sale", home_currency())
+    rate = fx(cur, currency(s), s) if tiers else None
+    return [] if rate is None else [(q, p * rate) for q, p in tiers]
+
+
+def price_suspects(prices, ref=None) -> list[str]:
+    """Ціни лістингу, схожі на помилку «вписав суму за всю кількість замість ціни за 1 шт.»: ціна за 1 шт. росте з
+    кількістю або в SUSPECT_FACTOR разів більша за ціну Minerva для цієї кількості. → тексти для людини."""
+    tiers, out = tiers_of(prices), []
+    for i, (q, p) in enumerate(tiers):
+        if i and p > tiers[i - 1][1]:
+            out.append(f"на {q} шт. ціна за 1 шт. ({fmt_price(p)}) більша, ніж на {tiers[i - 1][0]} шт. "
+                       f"({fmt_price(tiers[i - 1][1])}) — у тирі ціна за ОДНУ штуку, не за всю кількість")
+        elif ref and q > 1 and p > 0:
+            r = _price_at(ref, q)
+            if r and p > r * SUSPECT_FACTOR:
+                out.append(f"на {q} шт. — {fmt_price(p)} за 1 шт., а з цін Minerva ≈ {fmt_price(r.quantize(Decimal('0.0001')))}: "
+                           f"схоже, вписано суму за всю кількість (тоді за 1 шт. — {fmt_price((p / q).quantize(Decimal('0.0001')))})")
+    return out
+
+
 def _template():
     try:
         from shop.models import ShopSettings

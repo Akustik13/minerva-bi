@@ -5,7 +5,7 @@ summary: Ваші товари на DigiKey Marketplace у Minerva — ліст�
 where: 🛒 DigiKey → Лістинги (підключення — 🛒 DigiKey → Налаштування → Підключення DigiKey)
 urls: /admin/bots/digikeylisting/, /admin/bots/digikeylisting/add/, /admin/bots/digikeylisting/from-stock/, /admin/bots/digikeylisting/dk-diff/, /admin/bots/digikeylisting/lead-times/, /admin/bots/digikeyconfig/
 roles: адміністратор, менеджер
-keywords: DigiKey, Marketplace, лістинг, listing, що бачить DigiKey, звірка, не дійшло, строк відвантаження, lead time, leadTimeToShip, зі складу, обов'язкові поля, RoHS, етапи з DigiKey, офер, offer, Supplier SKU, опублікувати, staged, затвердження, стягнути з DigiKey, залишок на DigiKey, атрибути DigiKey, additionalFields, MOQ, Excel, OAuth
+keywords: DigiKey, Marketplace, лістинг, цінові тири, ціна за штуку, сума за кількість, ціна за 1000, listing, що бачить DigiKey, звірка, не дійшло, строк відвантаження, lead time, leadTimeToShip, зі складу, обов'язкові поля, RoHS, етапи з DigiKey, офер, offer, Supplier SKU, опублікувати, staged, затвердження, стягнути з DigiKey, залишок на DigiKey, атрибути DigiKey, additionalFields, MOQ, Excel, OAuth
 related: inventory/ai-fill, digikey/prices, digikey/media, digikey/orders, inventory/products, shop/catalog-prices
 ---
 
@@ -119,7 +119,13 @@ DigiKey Marketplace — майданчик, де ваші товари прод�
 3. **«🛒 Offer (Пропозиція)»** — **«Supplier SKU (DK)»** (порожньо — SKU товару), **«MOQ (мін. кількість)»**,
    **«Термін відвантаження (дні)»**, **«Мін. залишок (алерт)»**, **«Кількість для DigiKey»** (порожньо — залишок
    складу).
-4. **«💰 Цінові тири (JSON)»** — ціни (візуальний редактор у картці), до 9 ступенів.
+4. **«💰 Цінові тири (JSON)»** — ціни (візуальний редактор у картці), до 9 ступенів. Колонки: **«Кількість (шт.)»**,
+   **«Ціна за 1 шт., USD»** — DigiKey приймає ціну за **одну** штуку — і **«Сума за кількість, USD»** (кількість × ціна).
+   Знаєте лише суму за всю кількість (напр. 250 USD за 1000 шт.) — впишіть її в «Сума», ціна за 1 шт. (0,25)
+   порахується сама. Під таблицею — довідка «ціни Minerva у USD» (базові ціни × курс, без надбавки).
+   Ціна за 1 шт. схожа на суму за всю кількість (у 5 разів більша за ціну Minerva для цієї кількості або більша,
+   ніж на меншу кількість) — жовте попередження з кнопкою **«÷ 1000 → ціна за 1 шт. …»**; те саме попередження
+   є в перевірці якості лістингу.
 5. **«📋 Обов'язкові атрибути DigiKey»** — **«Packaging»** (Tape & Reel (TR) / Cut Tape (CT) / Bulk / Digi-Reel®) і
    **«Product Life Cycle Status»** (зазвичай Active).
 6. **«📡 Технічні атрибути DigiKey»** — `{"код": "значення"}`, напр. для фільтра
