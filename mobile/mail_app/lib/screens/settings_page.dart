@@ -1,11 +1,14 @@
 // Налаштування застосунку: скринька й телефон, тема, мова, групування гілок, що робить свайп ліворуч, підпис,
-// оновлення застосунку, відключення телефону.
+// 🔔 сповіщення про нові листи, оновлення застосунку, відключення телефону.
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
 import '../l10n.dart';
+import '../notify.dart';
 import '../state.dart';
+import '../system.dart';
+import '../util.dart';
 import '../widgets/common.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -120,6 +123,8 @@ class SettingsPage extends StatelessWidget {
           value: app.store.signature,
           onChanged: app.setSignature,
         ),
+        section(context.t('notifications')),
+        const _NotifySection(),
         section(context.t('safety')),
         ListTile(
           leading: Icon(Icons.link_off, color: scheme.error),
@@ -133,5 +138,117 @@ class SettingsPage extends StatelessWidget {
         ),
       ]),
     );
+  }
+}
+
+/// 🔔 Сповіщення про нові листи: увімкнено, як часто Android будить перевірку, «Перевірити зараз», дозвіл.
+class _NotifySection extends StatefulWidget {
+  const _NotifySection();
+
+  @override
+  State<_NotifySection> createState() => _NotifySectionState();
+}
+
+class _NotifySectionState extends State<_NotifySection> with WidgetsBindingObserver {
+  bool? allowed; // Android дозволяє сповіщення цьому застосунку
+  bool checking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _readAllowed();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _readAllowed(); // повернулись з налаштувань Android
+  }
+
+  Future<void> _readAllowed() async {
+    try {
+      final v = await MailNotifier.allowed();
+      if (mounted) setState(() => allowed = v);
+    } catch (_) {}
+  }
+
+  Future<void> _toggle(bool on) async {
+    final app = AppScope.read(context);
+    final ok = await app.setNotify(on);
+    await _readAllowed();
+    if (on && !ok && mounted) {
+      snack(context, context.t('notify_denied'),
+          seconds: 6, action: context.t('android_settings'), onAction: System.openNotificationSettings);
+    }
+  }
+
+  Future<void> _checkNow() async {
+    setState(() => checking = true);
+    final none = context.t('notify_none_new');
+    try {
+      final n = await MailNotifier.check(force: true);
+      if (!mounted) return;
+      snack(context, n > 0 ? context.tn('notify_shown_n', n) : none);
+    } catch (e) {
+      if (mounted) snack(context, errorText(context, e));
+    } finally {
+      if (mounted) setState(() => checking = false);
+    }
+  }
+
+  String _every(BuildContext c, int m) => m < 60 ? c.tn('every_min_n', m) : c.tn('every_hour_n', m ~/ 60);
+
+  @override
+  Widget build(BuildContext context) {
+    final app = AppScope.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final on = app.store.notifyOn;
+    return Column(children: [
+      SwitchListTile(
+        secondary: const Icon(Icons.notifications_active_outlined),
+        title: Text(context.t('notify_on')),
+        subtitle: Text(context.t('notify_hint')),
+        isThreeLine: true,
+        value: on,
+        onChanged: _toggle,
+      ),
+      if (on && allowed == false)
+        ListTile(
+          leading: Icon(Icons.notifications_off_outlined, color: scheme.error),
+          title: Text(context.t('notify_denied'), style: TextStyle(color: scheme.error)),
+          trailing: const Icon(Icons.open_in_new),
+          onTap: System.openNotificationSettings,
+        ),
+      if (on) ...[
+        ListTile(
+          leading: const Icon(Icons.schedule),
+          title: Text(context.t('notify_every')),
+          trailing: DropdownButton<int>(
+            value: intervals.contains(app.store.notifyEvery) ? app.store.notifyEvery : 15,
+            underline: const SizedBox.shrink(),
+            items: [for (final m in intervals) DropdownMenuItem(value: m, child: Text(_every(context, m)))],
+            onChanged: (v) => app.setNotifyEvery(v ?? 15),
+          ),
+        ),
+        ListTile(
+          leading: checking
+              ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5))
+              : const Icon(Icons.mark_email_unread_outlined),
+          title: Text(context.t('notify_check_now')),
+          onTap: checking ? null : _checkNow,
+        ),
+        ListTile(
+          leading: const Icon(Icons.battery_saver_outlined),
+          subtitle: Text(context.t('battery_hint')),
+          trailing: TextButton(onPressed: System.openAppSettings, child: Text(context.t('android_settings'))),
+        ),
+      ],
+    ]);
   }
 }

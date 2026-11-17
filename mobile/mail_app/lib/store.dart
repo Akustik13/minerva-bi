@@ -14,8 +14,10 @@ class Store {
 
   static const _tokenKey = 'mail_token';
 
-  static Future<Store> open() async {
+  /// reload — перечитати з диска (фонова перевірка пошти: значення міг змінити відкритий застосунок).
+  static Future<Store> open({bool reload = false}) async {
     final prefs = await SharedPreferences.getInstance();
+    if (reload) await prefs.reload();
     const secure = FlutterSecureStorage(aOptions: AndroidOptions(encryptedSharedPreferences: true));
     var token = '';
     try {
@@ -41,7 +43,10 @@ class Store {
     try {
       await _secure.delete(key: _tokenKey);
     } catch (_) {}
-    final keep = {'theme', 'lang', 'grouped', 'swipe_left', 'signature', 'text_scale'};
+    final keep = {
+      'theme', 'lang', 'grouped', 'swipe_left', 'signature', 'text_scale', //
+      'notify_on', 'notify_every', 'notify_asked', 'ui_lang', 'speak_lang', 'write_lang',
+    };
     for (final k in _prefs.getKeys().toList()) {
       if (!keep.contains(k)) await _prefs.remove(k);
     }
@@ -54,6 +59,29 @@ class Store {
   set lang(String v) => _prefs.setString('lang', v);
   bool get grouped => _prefs.getBool('grouped') ?? true;
   set grouped(bool v) => _prefs.setBool('grouped', v);
+
+  // ── 🔔 сповіщення (lib/notify.dart) ──
+  bool get notifyOn => _prefs.getBool('notify_on') ?? true;
+  set notifyOn(bool v) => _prefs.setBool('notify_on', v);
+  int get notifyEvery => _prefs.getInt('notify_every') ?? 15; // хв: 15 | 30 | 60 | 120 (Android — не частіше 15)
+  set notifyEvery(int v) => _prefs.setInt('notify_every', v);
+  bool get notifyAsked => _prefs.getBool('notify_asked') ?? false; // дозвіл на сповіщення вже питали
+  set notifyAsked(bool v) => _prefs.setBool('notify_asked', v);
+  int get notifyLast => _prefs.getInt('notify_last') ?? 0; // найновіший лист, про який уже знаємо (pk)
+  Future<void> setNotifyLast(int v) async {
+    if (v > notifyLast) await _prefs.setInt('notify_last', v);
+  }
+
+  int get foregroundAt => _prefs.getInt('fg_at') ?? 0; // застосунок відкритий (мс) — фонова перевірка мовчить
+  set foregroundAt(int v) => _prefs.setInt('fg_at', v);
+  String get uiLang => _prefs.getString('ui_lang') ?? 'uk'; // мова написів — для сповіщень у фоні
+  set uiLang(String v) => _prefs.setString('ui_lang', v);
+
+  // ── 🎤 голосовий набір ──
+  String get speakLang => _prefs.getString('speak_lang') ?? ''; // '' — мова застосунку
+  set speakLang(String v) => _prefs.setString('speak_lang', v);
+  String get writeLang => _prefs.getString('write_lang') ?? ''; // '' — тією ж мовою (без перекладу)
+  set writeLang(String v) => _prefs.setString('write_lang', v);
   String get swipeLeft => _prefs.getString('swipe_left') ?? 'archive'; // archive | delete
   set swipeLeft(String v) => _prefs.setString('swipe_left', v);
   bool get signature => _prefs.getBool('signature') ?? true;

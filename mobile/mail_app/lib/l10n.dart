@@ -11,27 +11,32 @@ Locale resolveLocale(Locale? locale, Iterable<Locale> supported) {
   return const Locale('en');
 }
 
-extension L10n on BuildContext {
-  String t(String key) {
-    final lang = Localizations.maybeLocaleOf(this)?.languageCode ?? 'en';
-    final row = _s[key];
-    if (row == null) return key;
-    return row[lang] ?? row['en'] ?? key;
-  }
+/// Напис мовою lang без BuildContext — для фонової перевірки пошти (сповіщення), де екранів немає.
+String tr(String lang, String key) {
+  final row = _s[key];
+  if (row == null) return key;
+  return row[lang] ?? row['en'] ?? key;
+}
 
-  /// «3 дні» / «3 days» / «3 Tage» — число з підписом (українська — три форми).
-  String tn(String key, int n) {
-    final lang = Localizations.maybeLocaleOf(this)?.languageCode ?? 'en';
-    final forms = (_s[key]?[lang] ?? _s[key]?['en'] ?? key).split('|');
-    String form;
-    if (lang == 'uk' && forms.length == 3) {
-      final m10 = n % 10, m100 = n % 100;
-      form = m10 == 1 && m100 != 11 ? forms[0] : (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? forms[1] : forms[2]);
-    } else {
-      form = n == 1 ? forms.first : forms.last;
-    }
-    return form.replaceAll('{n}', '$n');
+/// «3 дні» / «3 days» / «3 Tage» — число з підписом (українська — три форми).
+String trn(String lang, String key, int n) {
+  final forms = (_s[key]?[lang] ?? _s[key]?['en'] ?? key).split('|');
+  String form;
+  if (lang == 'uk' && forms.length == 3) {
+    final m10 = n % 10, m100 = n % 100;
+    form = m10 == 1 && m100 != 11 ? forms[0] : (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? forms[1] : forms[2]);
+  } else {
+    form = n == 1 ? forms.first : forms.last;
   }
+  return form.replaceAll('{n}', '$n');
+}
+
+extension L10n on BuildContext {
+  String get lang => Localizations.maybeLocaleOf(this)?.languageCode ?? 'en';
+
+  String t(String key) => tr(lang, key);
+
+  String tn(String key, int n) => trn(lang, key, n);
 }
 
 const Map<String, Map<String, String>> _s = {
@@ -310,6 +315,92 @@ const Map<String, Map<String, String>> _s = {
     'de': 'Minerva muss über HTTPS erreichbar sein (https://…), sonst können Mails nicht sicher übertragen werden.',
   },
   'camera_error': {'uk': 'Немає доступу до камери — дозвольте його в налаштуваннях Android', 'en': 'No camera access — allow it in Android settings', 'de': 'Kein Kamerazugriff — in den Android-Einstellungen erlauben'},
+  // 🔔 сповіщення про нові листи (фонова перевірка)
+  'notifications': {'uk': 'Сповіщення', 'en': 'Notifications', 'de': 'Benachrichtigungen'},
+  'notif_channel': {'uk': 'Нові листи', 'en': 'New mail', 'de': 'Neue E-Mails'},
+  'notif_channel_desc': {
+    'uk': 'Нові листи у «Вхідних» скриньки Minerva',
+    'en': 'New mail in the Minerva mailbox inbox',
+    'de': 'Neue E-Mails im Posteingang des Minerva-Postfachs',
+  },
+  'notif_new_n': {'uk': '{n} новий лист|{n} нові листи|{n} нових листів', 'en': '{n} new email|{n} new emails', 'de': '{n} neue E-Mail|{n} neue E-Mails'},
+  'notif_more_n': {'uk': '+ ще {n}', 'en': '+ {n} more', 'de': '+ {n} weitere'},
+  'notify_on': {'uk': 'Сповіщати про нові листи', 'en': 'Notify about new mail', 'de': 'Über neue E-Mails benachrichtigen'},
+  'notify_hint': {
+    'uk': 'Телефон сам перевіряє пошту у фоні й показує сповіщення та позначку на іконці. Android будить застосунок не точно — коли телефон довго лежить, рідше.',
+    'en': 'The phone checks mail in the background and shows a notification and a badge on the icon. Android does not wake the app exactly on time — less often when the phone lies idle for long.',
+    'de': 'Das Telefon prüft die Mails im Hintergrund und zeigt eine Benachrichtigung und ein Abzeichen am Symbol. Android weckt die App nicht minutengenau — seltener, wenn das Telefon lange ruht.',
+  },
+  'notify_every': {'uk': 'Перевіряти пошту', 'en': 'Check mail', 'de': 'Mails prüfen'},
+  'every_min_n': {'uk': 'кожні {n} хв', 'en': 'every {n} min', 'de': 'alle {n} Min.'},
+  'every_hour_n': {'uk': 'щогодини|кожні {n} год|кожні {n} год', 'en': 'every hour|every {n} hours', 'de': 'stündlich|alle {n} Std.'},
+  'notify_check_now': {'uk': 'Перевірити зараз', 'en': 'Check now', 'de': 'Jetzt prüfen'},
+  'notify_none_new': {'uk': 'Нових листів немає', 'en': 'No new mail', 'de': 'Keine neuen E-Mails'},
+  'notify_shown_n': {'uk': 'Показано сповіщення: {n}', 'en': 'Notifications shown: {n}', 'de': 'Benachrichtigungen angezeigt: {n}'},
+  'notify_denied': {
+    'uk': 'Сповіщення для застосунку вимкнені в Android — увімкніть їх, інакше листи не з\'являтимуться',
+    'en': 'Notifications for the app are turned off in Android — turn them on, otherwise mail will not show up',
+    'de': 'Benachrichtigungen für die App sind in Android aus — einschalten, sonst erscheinen keine E-Mails',
+  },
+  'battery_hint': {
+    'uk': 'Сповіщення спізнюються або не приходять? Дозвольте застосунку працювати у фоні: налаштування Android → Батарея → «Без обмежень».',
+    'en': 'Notifications late or missing? Let the app run in the background: Android settings → Battery → «Unrestricted».',
+    'de': 'Benachrichtigungen verspätet oder fehlen? App im Hintergrund erlauben: Android-Einstellungen → Akku → «Nicht eingeschränkt».',
+  },
+  'android_settings': {'uk': 'Налаштування Android', 'en': 'Android settings', 'de': 'Android-Einstellungen'},
+  // 🎤 голосовий набір і 🌐 переклад надиктованого
+  'dictate': {'uk': 'Надиктувати', 'en': 'Dictate', 'de': 'Diktieren'},
+  'voice_stop': {'uk': 'Стоп', 'en': 'Stop', 'de': 'Stopp'},
+  'listening': {'uk': 'Слухаю… говоріть', 'en': 'Listening… speak now', 'de': 'Ich höre zu… bitte sprechen'},
+  'voice_speak': {'uk': 'Говорю', 'en': 'I speak', 'de': 'Ich spreche'},
+  'voice_write': {'uk': 'Писати', 'en': 'Write in', 'de': 'Schreiben auf'},
+  'voice_same': {'uk': 'тією ж мовою, без перекладу', 'en': 'the same language, no translation', 'de': 'in derselben Sprache, ohne Übersetzung'},
+  'voice_langs': {'uk': 'Мова диктування й листа', 'en': 'Dictation and letter language', 'de': 'Diktat- und Briefsprache'},
+  'voice_langs_hint': {
+    'uk': 'Говоріть своєю мовою — Minerva перекладе надиктоване мовою листа, коли закінчите. «кома», «крапка», «новий рядок» — розділові знаки.',
+    'en': 'Speak your language — Minerva translates the dictated text into the letter language when you finish. «comma», «full stop», «new line» — punctuation.',
+    'de': 'Sprechen Sie Ihre Sprache — Minerva übersetzt das Diktat in die Briefsprache, wenn Sie fertig sind. «Komma», «Punkt», «neue Zeile» — Satzzeichen.',
+  },
+  'voice_reply_lang': {'uk': 'мова листа, на який відповідаєте', 'en': 'language of the letter you reply to', 'de': 'Sprache der beantworteten E-Mail'},
+  'translating': {'uk': 'Перекладаю…', 'en': 'Translating…', 'de': 'Übersetze…'},
+  'translated_inserted': {'uk': 'Вставлено переклад', 'en': 'Translation inserted', 'de': 'Übersetzung eingefügt'},
+  'voice_original': {'uk': 'Оригінал', 'en': 'Original', 'de': 'Original'},
+  'translate_failed_original': {
+    'uk': 'Не вдалося перекласти — вставлено як надиктували',
+    'en': 'Could not translate — inserted as dictated',
+    'de': 'Übersetzung fehlgeschlagen — wie diktiert eingefügt',
+  },
+  'mic_denied': {'uk': 'Немає доступу до мікрофона — дозвольте його в налаштуваннях Android', 'en': 'No microphone access — allow it in Android settings', 'de': 'Kein Mikrofonzugriff — in den Android-Einstellungen erlauben'},
+  'speech_unavailable': {
+    'uk': 'На телефоні немає розпізнавання мови — потрібен застосунок Google (або клавіатура з 🎤)',
+    'en': 'No speech recognition on this phone — the Google app is needed (or a keyboard with 🎤)',
+    'de': 'Keine Spracherkennung auf dem Telefon — die Google-App wird benötigt (oder eine Tastatur mit 🎤)',
+  },
+  'speech_lang_missing': {
+    'uk': 'Ця мова не встановлена для розпізнавання — додайте її в налаштуваннях Google → Голос',
+    'en': 'This language is not installed for recognition — add it in Google settings → Voice',
+    'de': 'Diese Sprache ist für die Erkennung nicht installiert — in den Google-Einstellungen → Sprache hinzufügen',
+  },
+  'speech_network': {'uk': 'Розпізнаванню мови потрібен інтернет', 'en': 'Speech recognition needs the internet', 'de': 'Die Spracherkennung braucht Internet'},
+  'speech_nothing': {'uk': 'Нічого не почув — спробуйте ще раз', 'en': 'Heard nothing — try again', 'de': 'Nichts gehört — erneut versuchen'},
+  'translate_text': {'uk': 'Перекласти текст', 'en': 'Translate text', 'de': 'Text übersetzen'},
+  'translate_to': {'uk': 'Перекласти на', 'en': 'Translate to', 'de': 'Übersetzen in'},
+  'translate_selection_hint': {
+    'uk': 'Виділений шматок або весь текст листа — переклад замінить його, «Повернути» — назад.',
+    'en': 'The selected part or the whole letter text — the translation replaces it, «Undo» brings it back.',
+    'de': 'Der markierte Teil oder der ganze Brieftext — die Übersetzung ersetzt ihn, «Rückgängig» holt ihn zurück.',
+  },
+  'nothing_to_translate': {'uk': 'Немає тексту для перекладу', 'en': 'No text to translate', 'de': 'Kein Text zum Übersetzen'},
+  'translated_done': {'uk': 'Перекладено', 'en': 'Translated', 'de': 'Übersetzt'},
+  'lang_uk': {'uk': 'Українська', 'en': 'Ukrainian', 'de': 'Ukrainisch'},
+  'lang_de': {'uk': 'Німецька', 'en': 'German', 'de': 'Deutsch'},
+  'lang_en': {'uk': 'Англійська', 'en': 'English', 'de': 'Englisch'},
+  'lang_pl': {'uk': 'Польська', 'en': 'Polish', 'de': 'Polnisch'},
+  'lang_ru': {'uk': 'Російська', 'en': 'Russian', 'de': 'Russisch'},
+  'lang_fr': {'uk': 'Французька', 'en': 'French', 'de': 'Französisch'},
+  'lang_es': {'uk': 'Іспанська', 'en': 'Spanish', 'de': 'Spanisch'},
+  'lang_it': {'uk': 'Італійська', 'en': 'Italian', 'de': 'Italienisch'},
+  'lang_cs': {'uk': 'Чеська', 'en': 'Czech', 'de': 'Tschechisch'},
   // загальне
   'ok': {'uk': 'OK', 'en': 'OK', 'de': 'OK'},
   'cancel': {'uk': 'Скасувати', 'en': 'Cancel', 'de': 'Abbrechen'},

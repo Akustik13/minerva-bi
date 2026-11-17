@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Значок сповіщення називається лише з Dart (notify.dart: 'ic_stat_mail') — щоб release-збірка його не викинула. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_mail" />

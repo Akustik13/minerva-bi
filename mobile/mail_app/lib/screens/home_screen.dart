@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import '../l10n.dart';
+import '../notify.dart';
 import '../state.dart';
 import 'compose_screen.dart';
 import 'folders_page.dart';
@@ -31,7 +32,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final app = AppScope.read(context);
       app.refreshMeta().catchError((_) {});
       app.refreshNav().catchError((_) {});
+      app.refreshCounts(); // звідки фонова перевірка рахує «нові» листи
+      app.startNotify();
+      _foreground(true);
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    AppScope.read(context).store.uiLang = context.lang; // мова сповіщень у фоні
+  }
+
+  /// Застосунок на екрані: фонова перевірка мовчить (список і так оновлюється), сповіщення й крапка на іконці
+  /// зникають — людина вже дивиться пошту.
+  void _foreground(bool open) {
+    AppScope.read(context).store.foregroundAt = open ? DateTime.now().millisecondsSinceEpoch : 0;
+    if (open) MailNotifier.clear();
   }
 
   @override
@@ -43,7 +60,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   void _tick() {
-    AppScope.read(context).refreshCounts();
+    final app = AppScope.read(context);
+    app.store.foregroundAt = DateTime.now().millisecondsSinceEpoch;
+    app.refreshCounts();
     refreshTick.value++;
   }
 
@@ -51,9 +70,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       ticker.start();
+      _foreground(true);
       _tick();
     } else if (state == AppLifecycleState.paused) {
       ticker.stop();
+      _foreground(false);
     }
   }
 

@@ -4,6 +4,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'notify.dart';
 import 'store.dart';
 
 class AppState extends ChangeNotifier {
@@ -61,6 +62,41 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 🔔 Сповіщення про нові листи: увімкнули — Android 13+ питає дозвіл, розклад фонової перевірки.
+  Future<bool> setNotify(bool on) async {
+    store.notifyOn = on;
+    notifyListeners();
+    var allowed = true;
+    try {
+      if (on) allowed = await MailNotifier.requestPermission();
+      await MailNotifier.schedule(store);
+      if (!on) await MailNotifier.clear();
+    } catch (_) {}
+    notifyListeners();
+    return allowed;
+  }
+
+  Future<void> setNotifyEvery(int minutes) async {
+    store.notifyEvery = minutes;
+    notifyListeners();
+    try {
+      await MailNotifier.schedule(store);
+    } catch (_) {}
+  }
+
+  /// Головний екран відкрився (після підключення теж): розклад фонової перевірки, а дозвіл на сповіщення —
+  /// питаємо лише раз (далі — перемикач у «Налаштуваннях»).
+  Future<void> startNotify() async {
+    if (!store.paired) return;
+    try {
+      if (!store.notifyAsked && store.notifyOn) {
+        store.notifyAsked = true;
+        await MailNotifier.requestPermission();
+      }
+      await MailNotifier.schedule(store);
+    } catch (_) {}
+  }
+
   static Future<String> deviceName() async {
     try {
       final info = await DeviceInfoPlugin().androidInfo;
@@ -107,6 +143,8 @@ class AppState extends ChangeNotifier {
     if (a == null || meta == null) return;
     try {
       final c = await a.get('counts/');
+      // що людина вже бачить у відкритому застосунку, фонова перевірка не оголошує вдруге
+      await store.setNotifyLast((c['latest'] as num?)?.toInt() ?? 0);
       final folders = (meta!['folders'] as List? ?? []).cast<Map<String, dynamic>>();
       for (final f in folders) {
         final key = f['key'];
@@ -152,6 +190,9 @@ class AppState extends ChangeNotifier {
 
   Future<void> logout() async {
     navigatorKey.currentState?.popUntil((r) => r.isFirst);
+    try {
+      await MailNotifier.stop(); // без ключа фонова перевірка нічого не дізнається — і сповіщення прибрати
+    } catch (_) {}
     api?.close();
     api = null;
     meta = null;

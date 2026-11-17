@@ -36,7 +36,7 @@ PAIR_PER_HOUR = 20             # спроб підключення з одніє
 SEEN_EVERY = 60                # «востаннє на зв'язку» — не частіше
 PAGE = 30                      # листів на сторінку (як у скриньці)
 HTML_INLINE_MAX = 3 * 1024 * 1024   # картинки cid: усередині HTML листа для додатка — разом не більше
-APP_VERSION = '1.0.1'          # остання версія додатка — сторінка підключення й «є нова версія» в додатку
+APP_VERSION = '1.0.2'          # остання версія додатка — сторінка підключення й «є нова версія» в додатку
 APP_TAG = f'mail-app-v{APP_VERSION}'
 APP_URL = getattr(settings, 'MINERVA_MAIL_APP_URL',
                   f'https://github.com/Akustik13/minerva-bi/releases/download/{APP_TAG}/minerva-mail.apk')
@@ -536,7 +536,26 @@ def compose(account, msg, mode) -> dict:
     to, cc = V._reply_addresses(account, msg)
     return {'mode': mode, 'to': to, 'cc': ', '.join(cc) if mode == 'all' else '',
             'subject': V._reply_subject(msg.subject), 'body': '', 'attachments': [], 'reply_to': msg.pk,
-            'with_quote': True, 'quote': reply_quote.quote_text(msg).strip()[:4000]}
+            'with_quote': True, 'quote': reply_quote.quote_text(msg).strip()[:4000], 'lang': letter_lang(msg)}
+
+
+_CYRILLIC_RE = re.compile(r'[а-яіїєґё]', re.IGNORECASE)
+_LATIN_RE = re.compile(r'[a-zäöüß]', re.IGNORECASE)
+
+
+def letter_lang(msg) -> str:
+    """Мова листа, на який відповідаємо (uk / de / en; не впізнали — ''): «🎤 Надиктувати» в додатку пропонує
+    перекласти надиктоване саме нею. Новий текст листа без цитат; de / en — offers.services.guess_language."""
+    from email_assistant import quotes
+    text = f'{msg.subject or ""}\n{quotes.new_text(msg.body_text or "")}'[:6000]
+    cyr, lat = len(_CYRILLIC_RE.findall(text)), len(_LATIN_RE.findall(text))
+    if cyr >= 20 and cyr > lat:
+        return 'uk'
+    try:
+        from offers.services import guess_language
+    except Exception:  # noqa: BLE001 — без Angebote — лише кирилиця
+        return ''
+    return guess_language(text, '')
 
 
 def app_html(account, msg) -> str:

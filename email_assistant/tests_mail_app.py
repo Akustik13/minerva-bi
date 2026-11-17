@@ -309,6 +309,37 @@ class ApiTests(Base):
         c = self.call('get', 'counts/', self.tok).json()
         self.assertEqual(c['inbox'], 1)
 
+    def test_new_mail_for_background_check(self):
+        """🔔 Фонова перевірка додатка: counts/?new_after=<pk> — нові непрочитані «Вхідних» від інших людей."""
+        old = self.message(subject='Alt')
+        new = self.message(subject='Neue Anfrage', from_name='Anna Kunde')
+        self.message(subject='Gelesen', is_read=True)
+        self.message(subject='Meine', from_email=ME)
+        self.message(account=self.other_account, subject='Olena')
+        c = self.call('get', 'counts/', self.tok, {'new_after': old.pk}).json()
+        self.assertEqual(c['inbox'], 3)          # лічильник — як у скриньці; у сповіщення — без своїх листів
+        self.assertEqual(c['new'],[{'pk': new.pk, 'from': 'Anna Kunde', 'subject': 'Neue Anfrage'}])
+        self.assertGreaterEqual(c['latest'], new.pk)
+        self.assertEqual(self.call('get', 'counts/', self.tok, {'new_after': c['latest']}).json()['new'], [])
+        self.assertNotIn('new', self.call('get', 'counts/', self.tok).json())
+
+    def test_translate_dictated_text(self):
+        """🎤 → 🌐: переклад надиктованого — та сама функція, що «🌐» у формі відповіді веб-пошти."""
+        with patch('email_assistant.ai_helper.translate_email', return_value='Vielen Dank!') as tr:
+            j = self.call('post', 'translate-text/', self.tok, json_body={'text': 'Дуже дякую!', 'lang': 'de'}).json()
+        self.assertEqual(j, {'ok': True, 'translation': 'Vielen Dank!', 'lang': 'de'})
+        self.assertEqual(tr.call_args.args[:2], ('Дуже дякую!', 'de'))
+        self.assertEqual(self.call('get', 'translate-text/', self.tok).status_code, 405)
+        self.assertEqual(self.call('post', 'translate-text/', 'mvm_wrong', json_body={'text': 'x'}).status_code, 401)
+
+    def test_reply_language_for_dictation(self):
+        de = self.message(body_text='Sehr geehrte Damen und Herren, bitte senden Sie uns ein Angebot für die '
+                                    'Antennen und die Filter. Mit freundlichen Grüßen')
+        uk = self.message(subject='Запит', body_text='Добрий день! Надішліть, будь ласка, пропозицію на антени й '
+                                                     'фільтри до кінця тижня. Дякую')
+        self.assertEqual(self.call('get', f'messages/{de.pk}/compose/', self.tok).json()['lang'], 'de')
+        self.assertEqual(self.call('get', f'messages/{uk.pk}/compose/', self.tok).json()['lang'], 'uk')
+
     def test_agent_window_data(self):
         m = self.message()
         j = self.call('get', f'messages/{m.pk}/agent/', self.tok).json()

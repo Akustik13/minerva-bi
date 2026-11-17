@@ -5,7 +5,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
-const appVersion = '1.0.1';
+const appVersion = '1.0.2';
 
 class ApiException implements Exception {
   ApiException(this.status, this.message);

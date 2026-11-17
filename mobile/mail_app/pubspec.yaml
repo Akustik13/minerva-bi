@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.1+2
+version: 1.0.2+3
 
 environment:
   sdk: ^3.8.0
@@ -48,6 +48,9 @@ dependencies:
     sdk: flutter
   file_picker: ^11.0.3
   device_info_plus: ^12.4.0
+  workmanager: ^0.9.2
+  flutter_local_notifications: ^20.1.0
+  speech_to_text: ^7.4.0
 
 dev_dependencies:
   flutter_test:
@@ -103,3 +106,10 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# workmanager 0.9.x: workmanager_platform_interface 0.9.4 (і workmanager_android 0.9.3, що її вимагає) додали
+# параметр, якого немає в workmanager_apple 0.9.4 — збірка падає. Узгоджений набір, поки Flutter < 3.38
+# (workmanager 0.10 потребує 3.38):
+dependency_overrides:
+  workmanager_platform_interface: 0.9.3
+  workmanager_android: 0.9.2

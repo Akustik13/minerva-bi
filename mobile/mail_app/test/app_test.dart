@@ -4,8 +4,44 @@ import 'package:minerva_mail/api.dart';
 import 'package:minerva_mail/l10n.dart';
 import 'package:minerva_mail/screens/mail_list.dart';
 import 'package:minerva_mail/util.dart';
+import 'package:minerva_mail/voice.dart';
 
 void main() {
+  test('🎤 розділові знаки голосом — як у Minerva', () {
+    expect(spokenPunctuation('добрий день кома дякую за лист крапка надішліть ціну знак питання', 'uk'),
+        'добрий день, дякую за лист. Надішліть ціну?');
+    expect(spokenPunctuation('vielen Dank Komma neue Zeile mit freundlichen Grüßen', 'de'),
+        'vielen Dank,\nMit freundlichen Grüßen');
+    expect(spokenPunctuation('день, кома, як', 'uk'), 'день, як'); // знак від розпізнавання + слово — один знак
+    expect(spokenPunctuation('тема новий рядок далі', 'uk', single: true), 'тема далі');
+    expect(spokenPunctuation('the period of time', 'uk'), 'the period of time'); // чужа мова — без заміни
+  });
+
+  test('🎤 вставка там, де курсор', () {
+    final c = TextEditingController(text: 'Hallo Anna,');
+    c.selection = const TextSelection.collapsed(offset: 11);
+    final r = insertAtCursor(c, 'danke für die Anfrage.');
+    expect(c.text, 'Hallo Anna, danke für die Anfrage.');
+    expect(r, (11, 34));
+    insertAtCursor(c, 'wir melden uns');
+    expect(c.text, 'Hallo Anna, danke für die Anfrage. Wir melden uns'); // після крапки — з великої
+    final empty = TextEditingController();
+    insertAtCursor(empty, 'дякую');
+    expect(empty.text, 'Дякую');
+    expect(replaceInserted(c, r!, ' danke für die Anfrage.', ' Дякую за запит.'), isTrue);
+    expect(c.text, 'Hallo Anna, Дякую за запит. Wir melden uns');
+    expect(replaceInserted(c, r, 'щось інше', 'x'), isFalse); // змінили руками — не чіпаємо
+    expect(insertAtCursor(c, '   '), isNull);
+  });
+
+  test('🔔 написи сповіщень без BuildContext', () {
+    expect(trn('uk', 'notif_new_n', 1), '1 новий лист');
+    expect(trn('uk', 'notif_new_n', 3), '3 нові листи');
+    expect(trn('uk', 'notif_new_n', 7), '7 нових листів');
+    expect(trn('de', 'notif_new_n', 2), '2 neue E-Mails');
+    expect(tr('en', 'notif_channel'), 'New mail');
+  });
+
   test('адреса Minerva з QR / ручного вводу', () {
     expect(normalizeBase('minerva.example.com/'), 'https://minerva.example.com');
     expect(normalizeBase(' https://m.example.com// '), 'https://m.example.com');

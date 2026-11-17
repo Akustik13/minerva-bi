@@ -11,7 +11,9 @@ offers/views.py) — логіка й перевірки однакові, тут
   GET  me/                           — хто, скринька, підпис, права, папки з непрочитаними, версія додатка;
   POST unpair/                       — відключити цей телефон (ключ перестає діяти);
   GET  nav/                          — свої категорії, типи, клієнти, проєкти, запити, «⏰ Чекаю реакції»;
-  GET  counts/                       — непрочитані (як /email/unread-count/);
+  GET  counts/?new_after=<pk>        — непрочитані (як /email/unread-count/) і нові листи «Вхідних» після pk
+                                       ([{pk, from, subject}]) — фонова перевірка додатка (🔔, позначка на іконці);
+  POST translate-text/ {text, lang}  — переклад тексту (🎤 надиктоване в «Написати»), як «🌐» у формі відповіді;
   GET  messages/                     — список: folder, q, cat, wcat, customer, project, quote, fu, grouped, page;
   GET  messages/<pk>/                — гілка листа (позначає прочитаним); html/ — HTML листа для перегляду;
   GET  messages/<pk>/attachments/<i>/ — вкладення; compose/?mode=reply|all|forward — поля форми;
@@ -231,6 +233,7 @@ def _delegate(name, methods=('POST',), module='email'):
 
 
 counts = _delegate('unread_count_view', ('GET',))
+translate_text = _delegate('translate_text_view')
 mark_read = _delegate('mark_read_api')
 mark_unread = _delegate('mark_unread_api')
 star = _delegate('toggle_star_view')

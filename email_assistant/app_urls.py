@@ -10,6 +10,7 @@ urlpatterns = [
     path('api/unpair/', a.unpair, name='mail_app_unpair'),
     path('api/nav/', a.nav, name='mail_app_nav'),
     path('api/counts/', a.counts, name='mail_app_counts'),
+    path('api/translate-text/', a.translate_text, name='mail_app_translate_text'),
     path('api/messages/', a.message_list, name='mail_app_messages'),
     path('api/messages/<int:pk>/', a.message_detail, name='mail_app_message'),
     path('api/messages/<int:pk>/html/', a.message_html, name='mail_app_message_html'),

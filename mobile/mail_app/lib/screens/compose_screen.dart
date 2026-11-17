@@ -11,6 +11,7 @@ import '../api.dart';
 import '../l10n.dart';
 import '../state.dart';
 import '../util.dart';
+import 'voice_bar.dart';
 
 class ComposeScreen extends StatefulWidget {
   const ComposeScreen({super.key, this.mode = 'new', this.messageId, this.draftId, this.initialBody = ''});
@@ -29,6 +30,10 @@ class _ComposeScreenState extends State<ComposeScreen> {
   final cc = TextEditingController();
   final subject = TextEditingController();
   final body = TextEditingController();
+  final subjectFocus = FocusNode();
+  final bodyFocus = FocusNode();
+  bool subjectLast = false; // 🎤 пише туди, де був курсор: у тему або (за замовчуванням) у текст листа
+  String replyLang = ''; // мова листа, на який відповідаємо (сервер) — 🎤 перекладає надиктоване нею
   final List<LocalFile> files = [];
   final List<Map<String, dynamic>> refs = []; // {ref, name, size} — вкладення пересланого листа / чернетки
   int? replyTo;
@@ -60,6 +65,12 @@ class _ComposeScreenState extends State<ComposeScreen> {
     for (final c in [to, cc, subject, body]) {
       c.addListener(() => dirty = true);
     }
+    subjectFocus.addListener(() {
+      if (subjectFocus.hasFocus) subjectLast = true;
+    });
+    bodyFocus.addListener(() {
+      if (bodyFocus.hasFocus) subjectLast = false;
+    });
   }
 
   @override
@@ -67,7 +78,54 @@ class _ComposeScreenState extends State<ComposeScreen> {
     for (final c in [to, cc, subject, body]) {
       c.dispose();
     }
+    subjectFocus.dispose();
+    bodyFocus.dispose();
     super.dispose();
+  }
+
+  VoiceTarget _voiceTarget() {
+    if (subjectLast) return (subject, true);
+    if (!body.selection.isValid) body.selection = TextSelection.collapsed(offset: body.text.length);
+    return (body, false);
+  }
+
+  /// 🌐 Перекласти виділене (або весь текст листа) — та сама функція Minerva, що «🌐» у формі відповіді.
+  Future<void> _translateText() async {
+    final sel = body.selection;
+    final part = sel.isValid && !sel.isCollapsed;
+    final source = part ? sel.textInside(body.text) : body.text;
+    if (source.trim().isEmpty) {
+      snack(context, context.t('nothing_to_translate'));
+      return;
+    }
+    final store = app.store;
+    final current = replyLang.isNotEmpty ? replyLang : (store.writeLang.isNotEmpty ? store.writeLang : 'de');
+    FocusManager.instance.primaryFocus?.unfocus(); // після вибору мови клавіатура не вискакує знову на пів екрана
+    final lang = await pickTranslateLang(context, current);
+    if (lang == null || !mounted) return;
+    final before = body.value;
+    final done = context.t('translated_done');
+    final undo = context.t('undo');
+    final failed = context.t('error');
+    setState(() => loading = true);
+    try {
+      final j = await api.postJson('translate-text/', {'text': source, 'lang': lang}, Api.longTimeout);
+      final translation = (j['translation'] ?? '').toString().trim();
+      if (j['ok'] != true || translation.isEmpty) throw ApiException(400, (j['error'] ?? failed).toString());
+      if (part) {
+        body.value = TextEditingValue(
+          text: body.text.replaceRange(sel.start, sel.end, translation),
+          selection: TextSelection.collapsed(offset: sel.start + translation.length),
+        );
+      } else {
+        body.value = TextEditingValue(text: translation, selection: TextSelection.collapsed(offset: translation.length));
+      }
+      if (mounted) snack(context, '$done · ${lang.toUpperCase()}', action: undo, seconds: 8, onAction: () => body.value = before);
+    } catch (e) {
+      if (mounted) snack(context, errorText(context, e));
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
   }
 
   Future<void> _prefill() async {
@@ -98,6 +156,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
         replyTo = j['reply_to'] as int?;
         withQuote = j['with_quote'] == true;
         quote = (j['quote'] ?? '').toString();
+        replyLang = (j['lang'] ?? '').toString();
         refs.addAll(((j['attachments'] as List?) ?? []).cast<Map<String, dynamic>>());
       }
       showCc = cc.text.isNotEmpty;
@@ -330,10 +389,12 @@ class _ComposeScreenState extends State<ComposeScreen> {
                 if (v == 'later') _sendLater();
                 if (v == 'draft') _saveDraft();
                 if (v == 'ai') _aiGenerate();
+                if (v == 'translate') _translateText();
               },
               itemBuilder: (c) => [
                 PopupMenuItem(value: 'later', child: ListTile(leading: const Icon(Icons.schedule_send), title: Text(c.t('send_later')))),
                 PopupMenuItem(value: 'draft', child: ListTile(leading: const Icon(Icons.save_outlined), title: Text(c.t('save_draft')))),
+                PopupMenuItem(value: 'translate', child: ListTile(leading: const Icon(Icons.g_translate_outlined), title: Text(c.t('translate_text')))),
                 if (widget.mode == 'new' || widget.mode == 'forward')
                   PopupMenuItem(value: 'ai', child: ListTile(leading: const Icon(Icons.auto_awesome), title: Text(c.t('ai_generate')))),
               ],
@@ -356,12 +417,14 @@ class _ComposeScreenState extends State<ComposeScreen> {
               if (showCc) _RecipientField(controller: cc, label: context.t('cc')),
               TextField(
                 controller: subject,
+                focusNode: subjectFocus,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(labelText: context.t('subject')),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: body,
+                focusNode: bodyFocus,
                 minLines: 8,
                 maxLines: null,
                 keyboardType: TextInputType.multiline,
@@ -439,6 +502,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
                 Padding(padding: const EdgeInsets.only(top: 12), child: Text(error, style: TextStyle(color: scheme.error))),
             ]),
           ),
+          VoiceBar(target: _voiceTarget, replyLang: replyLang, onTranslateText: _translateText),
         ]),
       ),
     );
