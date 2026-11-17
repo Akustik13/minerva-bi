@@ -41,6 +41,8 @@
     <span>🔁 Автооновлення: <b>{{ s.get_auto_mode_display }}</b>{% if s.last_auto_at %}
       <small>· {{ s.last_auto_at|date:"d.m H:i" }} — {{ s.last_auto_result }}</small>{% endif %}</span>
   </div>
+  {% include "admin/bots/digikeypricerun/_fx_fix.html" %}
+  {% include "admin/bots/digikeypricerun/_fx_form.html" %}
 
   {% if flt %}
   <div class="dp-facts" style="border-color:var(--accent)">

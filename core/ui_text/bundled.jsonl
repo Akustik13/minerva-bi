@@ -245,6 +245,7 @@
 {"uk": "({0} — DigiKey API валюти не передає, звірте з supplier.digikey.com)", "en": "({0} — the DigiKey API does not return the currency, check against supplier.digikey.com)", "de": "({0} — die DigiKey-API liefert die Währung nicht, mit supplier.digikey.com abgleichen)"}
 {"uk": "({0}) · курс — {1}", "en": "({0}) · rate — {1}", "de": "({0}) · Kurs — {1}"}
 {"uk": "(«Зображення (URL)», «Посилання на Datasheet»); якщо воно не відповідає або віддає не фото / не PDF", "en": "(“Image (URL)”, “Datasheet link”); if it does not respond or returns something that is not a photo / not a PDF", "de": "(„Bild (URL)“, „Link zum Datenblatt“); wenn er nicht antwortet oder kein Foto / kein PDF liefert"}
+{"uk": "(«Курси валют»)", "en": "(«Exchange rates»)", "de": "(«Wechselkurse»)"}
 {"uk": "(«Переведено з … в {0} за курсом …»).", "en": "(“Converted from … to {0} at rate …”).", "de": "(„Umgerechnet von … in {0} zum Kurs …“)."}
 {"uk": "(«🔄 Синх технічних атрибутів з DigiKey») або додайте їх у картці товару («📡 Технічні атрибути»).", "en": "(“🔄 Sync technical attributes from DigiKey”) or add them in the product card (“📡 Technical attributes”).", "de": "(„🔄 Technische Attribute von DigiKey synchronisieren“) oder fügen Sie sie in der Artikelkarte hinzu („📡 Technische Attribute“)."}
 {"uk": "(Доручення «{0}»: цей лист підійшов під умови. Якщо він не про це — нічого не пропонуй і коротко напиши чому.)", "en": "(Доручення «{0}»: цей лист підійшов під умови. Якщо він не про це — нічого не пропонуй і коротко напиши чому.)", "de": "(Доручення «{0}»: цей лист підійшов під умови. Якщо він не про це — нічого не пропонуй і коротко напиши чому.)"}
@@ -270,6 +271,8 @@
 {"uk": "(бот або чат не налаштовані)", "en": "(bot or chat not configured)", "de": "(Bot oder Chat nicht konfiguriert)"}
 {"uk": "(в коробці кілька товарів — вага на всю коробку)", "en": "(the box contains several products — weight is for the whole box)", "de": "(im Karton befinden sich mehrere Artikel — das Gewicht gilt für den ganzen Karton)"}
 {"uk": "(валюта Minerva)", "en": "(Minerva currency)", "de": "(Minerva-Währung)"}
+{"uk": "(валюта вашого акаунта продавця). Зараз курс береться: «{0}».", "en": "(the currency of your seller account). The rate currently comes from: «{0}».", "de": "(Währung Ihres Verkäuferkontos). Der Kurs kommt derzeit aus: «{0}»."}
+{"uk": "(валюта вашого акаунта продавця). Зараз курс береться: «{0}». Minerva може брати курс сама — довідковий курс Європейського центрального банку, оновлюється щодня.", "en": "(the currency of your seller account). The rate currently comes from: «{0}». Minerva can fetch the rate itself — the European Central Bank reference rate, updated daily.", "de": "(Währung Ihres Verkäuferkontos). Der Kurs kommt derzeit aus: «{0}». Minerva kann den Kurs selbst holen — den Referenzkurs der Europäischen Zentralbank, täglich aktualisiert."}
 {"uk": "(варіант 3 — в розробці).", "en": "(option 3 — in development).", "de": "(Variante 3 — in Entwicklung)."}
 {"uk": "(ваша)", "en": "(yours)", "de": "(Ihr Postfach)"}
 {"uk": "(ви адміністратор Minerva)", "en": "(you are a Minerva administrator)", "de": "(Sie sind Minerva-Administrator)"}
@@ -390,6 +393,7 @@
 {"uk": "(пусто)", "en": "(empty)", "de": "(leer)"}
 {"uk": "(рахунок #{0} — без PDF)", "en": "(invoice #{0} — no PDF)", "de": "(Rechnung #{0} — ohne PDF)"}
 {"uk": "(реальні продажі).", "en": "(real sales).", "de": "(echte Verkäufe)."}
+{"uk": "(решту DigiKey ще не опублікував — пропустимо)", "en": "(DigiKey has not published the rest yet — they will be skipped)", "de": "(den Rest hat DigiKey noch nicht veröffentlicht — wird übersprungen)"}
 {"uk": "(реєстрація з підтвердженням email) — вони з'являються тут автоматично.", "en": "(registration with e-mail confirmation) — they appear here automatically.", "de": "(Registrierung mit E-Mail-Bestätigung) – sie erscheinen hier automatisch."}
 {"uk": "(реєстрація з підтвердженням email) — вони з'являються тут автоматично. Можна створити й за покупця", "en": "(registration with e-mail confirmation) — they appear here automatically. You can also create one on behalf of the customer", "de": "(Registrierung mit E-Mail-Bestätigung) – sie erscheinen hier automatisch. Sie können auch im Namen des Kunden eines erstellen"}
 {"uk": "(розшифровку наради видалено)", "en": "(meeting transcript deleted)", "de": "(Besprechungstranskript gelöscht)"}
@@ -410,6 +414,7 @@
 {"uk": "(таблиця внизу); для окремої людини можна дозволити ✓ або заборонити ✗.", "en": "(table below); for an individual person you can allow ✓ or deny ✗.", "de": "(Tabelle unten); für einzelne Personen kann ✓ erlaubt oder ✗ verboten werden."}
 {"uk": "(таблиця внизу); для окремої людини можна дозволити ✓ або заборонити ✗. Суперкористувач і ролі «Суперадмін» / «Адміністратор» мають усе. Пошук RAG і так повертає лише дані, які людина бачить (свої скриньки, документи за видимістю) — право вирішує, чи можна шукати взагалі.", "en": "(table below); for an individual person you can allow ✓ or deny ✗. The superuser and the roles “Superadmin” / “Administrator” have everything. RAG search returns only the data the person can see (own mailboxes, documents according to visibility) — the right decides whether searching is allowed at all.", "de": "(Tabelle unten); für einzelne Personen kann ✓ erlaubt oder ✗ verboten werden. Superuser und die Rollen „Superadmin“ / „Administrator“ haben alles. Die RAG-Suche liefert ohnehin nur Daten, die die Person sieht (eigene Postfächer, Dokumente nach Sichtbarkeit) – das Recht entscheidet, ob überhaupt gesucht werden darf."}
 {"uk": "(там же перевірка, що ціни діють).", "en": "(the same place also checks that the prices are in effect).", "de": "(dort wird auch geprüft, ob die Preise gelten)."}
+{"uk": "(там хід і перевірка, що ціни діють).", "en": "(progress there, plus a check that the prices are live).", "de": "(dort der Fortschritt und die Prüfung, dass die Preise gelten)."}
 {"uk": "(текст листа)", "en": "(e-mail text)", "de": "(E-Mail-Text)"}
 {"uk": "(текст порожній — «🔄 Скласти текст з параметрів» або напишіть свій)", "en": "(the text is empty — «🔄 Compose text from parameters» or write your own)", "de": "(der Text ist leer — «🔄 Text aus Parametern erstellen» oder eigenen schreiben)"}
 {"uk": "(текст: {0})", "en": "(text: {0})", "de": "(Text: {0})"}
@@ -451,6 +456,7 @@
 {"uk": "(🎙 з наради від \\d{0}\\.\\d{1}\\.\\d{2}): «[^\\n]", "en": "(🎙 з наради від \\d{0}\\.\\d{1}\\.\\d{2}): «[^\\n]", "de": "(🎙 з наради від \\d{0}\\.\\d{1}\\.\\d{2}): «[^\\n]"}
 {"uk": ") автоматично оновить статус на ✅ Опубліковано.", "en": ") will automatically update the status to ✅ Published.", "de": ") aktualisiert den Status automatisch auf ✅ Veröffentlicht."}
 {"uk": ") для", "en": ") for", "de": ") für"}
+{"uk": ") для товарів з опублікованим офером", "en": ") for products with a published offer", "de": ") für Artikel mit veröffentlichtem Angebot"}
 {"uk": ") з вашими правами.", "en": ") with your permissions.", "de": ") mit Ihren Rechten."}
 {"uk": ") зникнуть.", "en": ") will be lost.", "de": ") gehen verloren."}
 {"uk": ") потім стоїть у кожному замовленні як «Джерело», за ним видно, звідки прийшов продаж.", "en": ") then appears in every order as “Source”, showing where the sale came from.", "de": ") steht anschließend in jedem Auftrag als „Quelle“, daran erkennt man, woher der Verkauf kam."}
@@ -486,6 +492,7 @@
 {"uk": "), але", "en": "), but", "de": "), aber"}
 {"uk": "), буде перенесено до нього. Порожні поля основного клієнта заповняться даними з дублікатів. Дублікати будуть видалені.", "en": "), will be moved to it. Empty fields of the primary customer will be filled with data from the duplicates. The duplicates will be deleted.", "de": "), wird auf ihn übertragen. Leere Felder des Hauptkunden werden mit Daten aus den Duplikaten gefüllt. Die Duplikate werden gelöscht."}
 {"uk": "), його контактних осіб, а також листи з кодом закупівлі, номером замовлення постачальника чи трек-номером (переслані колегами). Домени постачальника — поле «✉️ Пошта» в картці.", "en": "), its contact persons, and e-mails with a purchase order code, supplier order number or tracking number (forwarded by colleagues). Supplier domains — field «✉️ Mail» in the card.", "de": "), seiner Ansprechpartner sowie E-Mails mit Bestellcode, Auftragsnummer des Lieferanten oder Sendungsnummer (von Kollegen weitergeleitet). Domains des Lieferanten — Feld «✉️ Post» in der Karte."}
+{"uk": "). Змінюються лише ціни офера; надсилаються лише позиції, де ціна відрізняється від тієї, що зараз на DigiKey.", "en": "). Only the offer prices change; only items whose price differs from the current DigiKey price are sent.", "de": "). Nur die Angebotspreise ändern sich; gesendet werden nur Positionen, deren Preis vom aktuellen DigiKey-Preis abweicht."}
 {"uk": "). Отримати ключ", "en": "). Get a key", "de": "). Schlüssel erhalten"}
 {"uk": "). Перевіряйте заголовок", "en": "). Check the header", "de": "). Prüfen Sie den Header"}
 {"uk": "). Позначте рядки → посилання запишуться", "en": "). Select rows → the links will be written", "de": "). Zeilen auswählen → die Links werden geschrieben"}
@@ -1340,6 +1347,7 @@
 {"uk": "DigiKey — Лістинги", "en": "DigiKey — Listings", "de": "DigiKey — Listings"}
 {"uk": "DigiKey — Пошук за PO номером", "en": "DigiKey — Search by PO number", "de": "DigiKey — Suche nach PO-Nummer"}
 {"uk": "DigiKey — Пошук компонентів", "en": "DigiKey — Component search", "de": "DigiKey — Komponentensuche"}
+{"uk": "DigiKey — не надіслано ({0}): {1}{2}.", "en": "DigiKey — not sent ({0}): {1}{2}.", "de": "DigiKey — nicht gesendet ({0}): {1}{2}."}
 {"uk": "DigiKey — офер", "en": "DigiKey — offer", "de": "DigiKey — Offer"}
 {"uk": "DigiKey — підтвердження через DigiKey API (автоматично або вручну). Інші — замовлення позначається як «Відправлено» в Minerva.", "en": "DigiKey — confirmation via the DigiKey API (automatically or manually). Others — the order is marked as “Shipped” in Minerva.", "de": "DigiKey — Bestätigung über die DigiKey API (automatisch oder manuell). Andere — der Auftrag wird in Minerva als „Versendet“ markiert."}
 {"uk": "DigiKey → 📦 склад → 📄 стара етикетка", "en": "DigiKey → 📦 stock → 📄 old label", "de": "DigiKey → 📦 Lager → 📄 altes Etikett"}
@@ -1356,13 +1364,19 @@
 {"uk": "DigiKey: лістинги затверджено", "en": "DigiKey: listings approved", "de": "DigiKey: Listings genehmigt"}
 {"uk": "DigiKey: лістинги опубліковано", "en": "DigiKey: listings published", "de": "DigiKey: Listings veröffentlicht"}
 {"uk": "DigiKey: немає", "en": "DigiKey: not available", "de": "DigiKey: nicht vorhanden"}
+{"uk": "DigiKey: немає лістингу", "en": "DigiKey: no listing", "de": "DigiKey: kein Listing"}
 {"uk": "DigiKey: немає права змінювати лістинги — ціни не надіслано.", "en": "DigiKey: no permission to change listings — prices not sent.", "de": "DigiKey: keine Berechtigung zum Ändern von Listings — Preise nicht gesendet."}
 {"uk": "DigiKey: нове повідомлення", "en": "DigiKey: new message", "de": "DigiKey: neue Nachricht"}
 {"uk": "DigiKey: нових повідомлень {0}", "en": "DigiKey: {0} new messages", "de": "DigiKey: {0} neue Nachrichten"}
 {"uk": "DigiKey: нові повідомлення покупців", "en": "DigiKey: new buyer messages", "de": "DigiKey: neue Käufernachrichten"}
+{"uk": "DigiKey: нові ціни {0} товарів у {1} надсилаються", "en": "DigiKey: new prices of {0} products in {1} are being sent", "de": "DigiKey: neue Preise für {0} Artikel in {1} werden gesendet"}
 {"uk": "DigiKey: нові ціни діють", "en": "DigiKey: new prices are in effect", "de": "DigiKey: neue Preise gelten"}
 {"uk": "DigiKey: підтверджено частину замовлення ({0}). Ще не відправлено на DigiKey: {1} шт. — замовлення лишається «В обробці».", "en": "DigiKey: part of the order confirmed ({0}). Not yet shipped on DigiKey: {1} pcs — the order stays “Processing”.", "de": "DigiKey: Teil des Auftrags bestätigt ({0}). Auf DigiKey noch nicht versendet: {1} Stk. — der Auftrag bleibt „In Bearbeitung“."}
 {"uk": "DigiKey: підтвердимо разом, коли буде відправлено все замовлення", "en": "DigiKey: we will confirm together once the whole order has shipped", "de": "DigiKey: wir bestätigen gemeinsam, sobald der ganze Auftrag versendet ist"}
+{"uk": "DigiKey: свіжі ціни не прочитано ({0}) — порівняно з останніми збереженими.", "en": "DigiKey: fresh prices not read ({0}) — compared with the last saved ones.", "de": "DigiKey: aktuelle Preise nicht gelesen ({0}) — mit den zuletzt gespeicherten verglichen."}
+{"uk": "DigiKey: серед позначених товарів немає жодного з лістингом DigiKey.", "en": "DigiKey: none of the marked products has a DigiKey listing.", "de": "DigiKey: Keiner der markierten Artikel hat ein DigiKey-Listing."}
+{"uk": "DigiKey: у вибраних товарів немає лістингів — нічого не надіслано.", "en": "DigiKey: the selected products have no listings — nothing sent.", "de": "DigiKey: Die ausgewählten Artikel haben keine Listings — nichts gesendet."}
+{"uk": "DigiKey: ціни вибраних товарів не збережено — на DigiKey нічого не надіслано.", "en": "DigiKey: the prices of the selected products were not saved — nothing sent to DigiKey.", "de": "DigiKey: Die Preise der ausgewählten Artikel wurden nicht gespeichert — nichts an DigiKey gesendet."}
 {"uk": "DigiKey: ціни оновлено", "en": "DigiKey: prices updated", "de": "DigiKey: Preise aktualisiert"}
 {"uk": "DigiKey: ціни перевірено", "en": "DigiKey: prices verified", "de": "DigiKey: Preise geprüft"}
 {"uk": "DigiKeyConfig не налаштовано.", "en": "DigiKeyConfig is not configured.", "de": "DigiKeyConfig ist nicht konfiguriert."}
@@ -1734,6 +1748,7 @@
 {"uk": "Minerva звертається до сайту (каталог, вебхук), сайт — до Minerva своїм ключем. Адреса — з поля «Адреса сайту», можна перевірити й незбережену (напр. тестовий домен).", "en": "Minerva contacts the site (catalog, webhook), and the site contacts Minerva with its own key. The address comes from the “Site address” field; an unsaved one can also be checked (e.g., a test domain).", "de": "Minerva ruft die Website auf (Katalog, Webhook), die Website ruft Minerva mit ihrem eigenen Schlüssel auf. Die Adresse stammt aus dem Feld „Website-Adresse“; es kann auch eine ungespeicherte geprüft werden (z. B. eine Testdomain)."}
 {"uk": "Minerva звіряє ціни з cron (manage.py dk_price_sync --if-due). Самостійно надсилаються лише невеликі зміни; великі й масові — на підтвердження, з повідомленням.", "en": "Minerva compares prices via cron (manage.py dk_price_sync --if-due). Only small changes are sent automatically; large and bulk ones await confirmation, with a notification.", "de": "Minerva gleicht die Preise per Cron ab (manage.py dk_price_sync --if-due). Selbstständig werden nur kleine Änderungen gesendet; große und umfangreiche Änderungen warten mit Benachrichtigung auf Bestätigung."}
 {"uk": "Minerva знайшла закупівлі чи JLC-замовлення з товарами проєкту: {0}. Перевірте пропозиції у «🧭 Пульті» (✓ / ✗).", "en": "Minerva found purchase orders or JLC orders with project products: {0}. Check the suggestions in the \"🧭 Cockpit\" (✓ / ✗).", "de": "Minerva hat Bestellungen oder JLC-Bestellungen mit Projektartikeln gefunden: {0}. Prüfen Sie die Vorschläge im „🧭 Cockpit“ (✓ / ✗)."}
+{"uk": "Minerva може брати курс сама — довідковий курс Європейського центрального банку, оновлюється щодня.", "en": "Minerva can fetch the rate itself — the European Central Bank reference rate, updated daily.", "de": "Minerva kann den Kurs selbst holen — den Referenzkurs der Europäischen Zentralbank, täglich aktualisiert."}
 {"uk": "Minerva надсилає", "en": "Minerva sends", "de": "Minerva sendet"}
 {"uk": "Minerva надсилає, {0}", "en": "Minerva sends, {0}", "de": "Minerva sendet, {0}"}
 {"uk": "Minerva не знає цієї наради", "en": "Minerva does not know this meeting", "de": "Minerva kennt diese Besprechung nicht"}
@@ -2841,6 +2856,7 @@
 {"uk": "{0} {1} × «{2}» на «{3}»", "en": "{0} {1} × “{2}” at “{3}”", "de": "{0} {1} × „{2}“ an „{3}“"}
 {"uk": "{0} {1} × курс {2}", "en": "{0} {1} × rate {2}", "de": "{0} {1} × Kurs {2}"}
 {"uk": "{0} {1} без курсу", "en": "{0} {1} without exchange rate", "de": "{0} {1} ohne Wechselkurs"}
+{"uk": "{0} {1} від {2} шт.", "en": "{0} {1} from {2} pcs", "de": "{0} {1} ab {2} Stk."}
 {"uk": "{0} {1}/шт", "en": "{0} {1}/pc", "de": "{0} {1}/Stk."}
 {"uk": "{0} {1}: Minerva не відповідає", "en": "{0} {1}: Minerva is not responding", "de": "{0} {1}: Minerva antwortet nicht"}
 {"uk": "{0} {1}: мало бути доставлено {2}", "en": "{0} {1}: was due {2}", "de": "{0} {1}: sollte am {2} zugestellt sein"}
@@ -3082,6 +3098,7 @@
 {"uk": "{0} тиж.", "en": "{0} wk.", "de": "{0} Wo."}
 {"uk": "{0} точок", "en": "{0} points", "de": "{0} Punkte"}
 {"uk": "{0} транзакцій", "en": "{0} transactions", "de": "{0} Buchungen"}
+{"uk": "{0} у «Курсах валют» Minerva — додайте {1} там або виберіть «Курс для цін DigiKey»: онлайн ЄЦБ чи свій", "en": "{0} in Minerva «Exchange rates» — add {1} there or choose «Rate for DigiKey prices»: online ECB or your own", "de": "{0} in den «Wechselkursen» von Minerva — fügen Sie {1} dort hinzu oder wählen Sie «Kurs für DigiKey-Preise»: online EZB oder eigenen"}
 {"uk": "{0} у вкладенні", "en": "{0} in the attachment", "de": "{0} im Anhang"}
 {"uk": "{0} у списку «🚫 Не надсилати листи цим клієнтам» ({1})", "en": "{0} is on the list «🚫 Do not mail these customers» ({1})", "de": "{0} steht auf der Liste «🚫 Diesen Kunden keine E-Mails senden» ({1})"}
 {"uk": "{0} уже надіслано — не видаляється (можна «🚫 Скасовано» в картці).", "en": "{0} has already been sent — it cannot be deleted (you can set “🚫 Cancelled” in the card).", "de": "{0} wurde bereits gesendet — es kann nicht gelöscht werden (in der Karte kann „🚫 Storniert“ gesetzt werden)."}
@@ -3128,6 +3145,7 @@
 {"uk": "{0} — артикул товару (або «Фото: спільний файл»); досить початку адреси — Minerva допише {1}.jpg. Напр. https://docs.sevskiy.com/pictures/download.php?file={2}.jpg", "en": "{0} — the product SKU (or “Photo: shared file”); the beginning of the address is enough — Minerva will append {1}.jpg. E.g. https://docs.sevskiy.com/pictures/download.php?file={2}.jpg", "de": "{0} — Artikelnummer des Artikels (oder „Foto: gemeinsame Datei“); der Anfang der Adresse genügt — Minerva ergänzt {1}.jpg. Z. B. https://docs.sevskiy.com/pictures/download.php?file={2}.jpg"}
 {"uk": "{0} — більше не пропонувати", "en": "{0} — do not suggest again", "de": "{0} — nicht mehr vorschlagen"}
 {"uk": "{0} — до {1}", "en": "{0} — by {1}", "de": "{0} — bis {1}"}
+{"uk": "{0} — додайте {1} у «Курси валют» Minerva або переведіть базові ціни в {2}", "en": "{0} — add {1} to Minerva «Exchange rates» or convert the base prices to {2}", "de": "{0} — fügen Sie {1} zu den «Wechselkursen» von Minerva hinzu oder rechnen Sie die Basispreise in {2} um"}
 {"uk": "{0} — дублікат, пропущено", "en": "{0} — duplicate, skipped", "de": "{0} — Duplikat, übersprungen"}
 {"uk": "{0} — закупівлі для {1} проєктів одночасно: {2}.", "en": "{0} — purchases for {1} projects at the same time: {2}.", "de": "{0} — Einkäufe für {1} Projekte gleichzeitig: {2}."}
 {"uk": "{0} — затверджено DigiKey! Offer створено: {1}. Товар тепер активний у маркетплейсі.", "en": "{0} — approved by DigiKey! Offer created: {1}. The product is now active in the marketplace.", "de": "{0} — von DigiKey genehmigt! Offer erstellt: {1}. Der Artikel ist jetzt im Marketplace aktiv."}
@@ -3283,6 +3301,7 @@
 {"uk": "{0}: немає права створювати постачальників", "en": "{0}: no right to create suppliers", "de": "{0}: kein Recht, Lieferanten anzulegen"}
 {"uk": "{0}: немає сторінки гіда «{1}»", "en": "{0}: no guide page “{1}”", "de": "{0}: keine Leitfaden-Seite „{1}“"}
 {"uk": "{0}: нових правок — {1}", "en": "{0}: new corrections — {1}", "de": "{0}: neue Korrekturen — {1}"}
+{"uk": "{0}: онлайн-курс ЄЦБ ще не отримано — «⚙ Налаштування» → «🔄 Оновити онлайн-курс зараз»", "en": "{0}: the online ECB rate has not been fetched yet — «⚙ Settings» → «🔄 Update online rate now»", "de": "{0}: der Online-EZB-Kurs wurde noch nicht abgerufen — «⚙ Einstellungen» → «🔄 Online-Kurs jetzt aktualisieren»"}
 {"uk": "{0}: оновлено листів {1}", "en": "{0}: e-mails updated {1}", "de": "{0}: aktualisierte E-Mails {1}"}
 {"uk": "{0}: оприбутковано на склад — {1}", "en": "{0}: received into stock — {1}", "de": "{0}: ins Lager eingebucht — {1}"}
 {"uk": "{0}: офер надіслано на DigiKey — нижче те, що DigiKey повертає тепер.", "en": "{0}: offer sent to DigiKey — below is what DigiKey returns now.", "de": "{0}: Offer an DigiKey gesendet — unten sehen Sie, was DigiKey jetzt zurückgibt."}
@@ -3470,6 +3489,7 @@
 {"uk": "«Кому (email)» сповіщень", "en": "notification «To (email)»", "de": "«An (E-Mail)» der Benachrichtigungen"}
 {"uk": "«Кому» — клієнт проєкту. Перевірте адресу й текст і надішліть самі — без вас нічого не відправляється.", "en": "«To» — the project customer. Check the address and text and send it yourself — nothing is sent without you.", "de": "«An» — der Projektkunde. Prüfen Sie Adresse und Text und senden Sie selbst — ohne Sie wird nichts verschickt."}
 {"uk": "«Критичні» — строк відправки через стільки днів або раніше", "en": "“Critical” — shipping deadline in this many days or sooner", "de": "„Kritisch“ – Versandfrist in so vielen Tagen oder früher"}
+{"uk": "«Курс для цін DigiKey» → онлайн ЄЦБ і одразу свіжий курс", "en": "«Rate for DigiKey prices» → online ECB and a fresh rate right away", "de": "«Kurs für DigiKey-Preise» → online EZB und sofort ein aktueller Kurs"}
 {"uk": "«Курси валют» Minerva", "en": "“Exchange rates” of Minerva", "de": "„Wechselkurse“ von Minerva"}
 {"uk": "«Ласкаво просимо»", "en": "«Welcome»", "de": "«Willkommen»"}
 {"uk": "«Лише ця» або категорію прибрали з гілки: правила не додають гілці інших категорій", "en": "“Only this one” or a category was removed from the thread: rules do not add other categories to the thread", "de": "„Nur diese“ oder eine Kategorie wurde aus dem Verlauf entfernt: Regeln fügen dem Verlauf keine weiteren Kategorien hinzu"}
@@ -4477,6 +4497,7 @@
 {"uk": "Бразилія", "en": "Brazil", "de": "Brasilien"}
 {"uk": "Бракує перекладу", "en": "Translation missing", "de": "Übersetzung fehlt"}
 {"uk": "Брати й інші сторінки сайту", "en": "Also take other pages of the site", "de": "Auch weitere Seiten der Website übernehmen"}
+{"uk": "Брати онлайн-курс ЄЦБ", "en": "Use the online ECB rate", "de": "Online-EZB-Kurs verwenden"}
 {"uk": "Брати участь в автоматичному оновленні цін DigiKey з базових цін Minerva (якщо воно увімкнене в «💲 Налаштуваннях цін DigiKey»).", "en": "Take part in the automatic update of DigiKey prices from the Minerva base prices (if it is enabled in “💲 DigiKey price settings”).", "de": "Am automatischen Aktualisieren der DigiKey-Preise aus den Minerva-Basispreisen teilnehmen (sofern in den „💲 DigiKey-Preiseinstellungen“ aktiviert)."}
 {"uk": "Браузер (Google / Microsoft)", "en": "Browser (Google / Microsoft)", "de": "Browser (Google / Microsoft)"}
 {"uk": "Браузер бере мікрофон Windows «за замовчуванням»; звук іде до Google / Microsoft.", "en": "The browser uses the Windows “default” microphone; the sound goes to Google / Microsoft.", "de": "Der Browser nutzt das Windows-„Standard“-Mikrofon; der Ton geht an Google / Microsoft."}
@@ -5368,6 +5389,7 @@
 {"uk": "Впевненість", "en": "Confidence", "de": "Sicherheit"}
 {"uk": "Вперше", "en": "First time", "de": "Erstmals"}
 {"uk": "Вписати вручну", "en": "Enter manually", "de": "Manuell eintragen"}
+{"uk": "Вписати свій курс для DigiKey", "en": "Enter your own rate for DigiKey", "de": "Eigenen Kurs für DigiKey eintragen"}
 {"uk": "Вписати у «Вартість доставки»", "en": "Enter in “Shipping cost”", "de": "In „Versandkosten“ eintragen"}
 {"uk": "Впиши його в «Мої налаштування» → «Telegram ID» або попроси адміністратора додати цей ID до твого профілю. /myid — показати ID ще раз.", "en": "Enter it in “My settings” → “Telegram ID” or ask the administrator to add this ID to your profile. /myid — show the ID again.", "de": "Trage sie unter „Meine Einstellungen“ → „Telegram-ID“ ein oder bitte den Administrator, diese ID zu deinem Profil hinzuzufügen. /myid – zeigt die ID noch einmal an."}
 {"uk": "Впишіть ID у «Мої налаштування» → «Telegram ID» або передайте його адміністратору.", "en": "Enter the ID in “My settings” → “Telegram ID” or pass it on to the administrator.", "de": "Tragen Sie die ID unter „Meine Einstellungen“ → „Telegram-ID“ ein oder geben Sie sie an den Administrator weiter."}
@@ -6444,6 +6466,7 @@
 {"uk": "Для пошуку в уже отриманій пошті.", "en": "For searching in already received mail.", "de": "Für die Suche in bereits empfangener E-Mail."}
 {"uk": "Для рахунку й оплати — сума документа.", "en": "For an invoice or payment — the document amount.", "de": "Für Rechnung und Zahlung — der Betrag des Dokuments."}
 {"uk": "Для сайту", "en": "For the website", "de": "Für die Website"}
+{"uk": "Для товарів", "en": "For products", "de": "Für Artikel"}
 {"uk": "Для цих валют немає курсу в «Налаштуваннях цін» магазину — суми не додано", "en": "There is no exchange rate for these currencies in the shop’s “Price settings” — the amounts were not added", "de": "Für diese Währungen gibt es in den „Preiseinstellungen“ des Webshops keinen Wechselkurs — die Beträge wurden nicht addiert"}
 {"uk": "Для цих валют немає курсу в «Налаштуваннях цін» магазину — суми не додано до виручки", "en": "There is no exchange rate for these currencies in the shop's “Price settings” — the amounts were not added to revenue", "de": "Für diese Währungen gibt es in den „Preiseinstellungen“ des Shops keinen Wechselkurs — die Beträge wurden nicht zum Umsatz hinzugefügt"}
 {"uk": "Для цього запису ця дія недоступна.", "en": "This action is not available for this record.", "de": "Diese Aktion ist für diesen Datensatz nicht verfügbar."}
@@ -8384,6 +8407,7 @@
 {"uk": "Змінити ціни (масово)", "en": "Change prices (bulk)", "de": "Preise ändern (Massenbearbeitung)"}
 {"uk": "Змінити ціни на ± %%", "en": "Change prices by ± %%", "de": "Preise um ± %% ändern"}
 {"uk": "Змінити ціни на відсоток", "en": "Change prices by a percentage", "de": "Preise um einen Prozentsatz ändern"}
+{"uk": "Змінити, звідки курс, може людина з правом змінювати «💲 Налаштування цін DigiKey».", "en": "The rate source can be changed by someone allowed to change «💲 DigiKey price settings».", "de": "Die Kursquelle ändern darf, wer die «💲 DigiKey-Preiseinstellungen» ändern darf."}
 {"uk": "Змінити: {0}", "en": "Edit: {0}", "de": "Bearbeiten: {0}"}
 {"uk": "Змінити…", "en": "Edit…", "de": "Ändern…"}
 {"uk": "Змінна", "en": "Variable", "de": "Variable"}
@@ -8401,6 +8425,8 @@
 {"uk": "Змінювати можна вільно — на дані не впливає.", "en": "You can change this freely — it does not affect the data.", "de": "Kann frei geändert werden — hat keinen Einfluss auf die Daten."}
 {"uk": "Змінювати права може суперкористувач або той, хто «Може керувати юзерами».", "en": "Rights can be changed by the superuser or anyone who “Can manage users”.", "de": "Rechte kann der Superuser oder jemand mit „Kann Benutzer verwalten“ ändern."}
 {"uk": "Змінюй тільки якщо відправляєш неповну кількість (часткове відправлення).", "en": "Change only if you are shipping less than the full quantity (partial shipment).", "de": "Ändern Sie dies nur, wenn Sie nicht die vollständige Menge versenden (Teilsendung)."}
+{"uk": "Змінюються лише ціни офера й лише там, де вони відрізняються від цін на DigiKey.", "en": "Only the offer prices change, and only where they differ from the prices on DigiKey.", "de": "Nur die Angebotspreise ändern sich, und nur dort, wo sie von den Preisen auf DigiKey abweichen."}
+{"uk": "Змінюються лише ціни офера; надсилаються лише позиції, де ціна відрізняється від тієї, що зараз на DigiKey.", "en": "Only the offer prices change; only items whose price differs from the current DigiKey price are sent.", "de": "Nur die Angebotspreise ändern sich; gesendet werden nur Positionen, deren Preis vom aktuellen DigiKey-Preis abweicht."}
 {"uk": "Змінюються лише ціни офера; потім Minerva перевірить, що вони діють.", "en": "Only the offer prices are changed; then Minerva checks that they are in effect.", "de": "Es werden nur die Preise des Offers geändert; danach prüft Minerva, ob sie gelten."}
 {"uk": "Змінює адрес", "en": "Changes addresses", "de": "Ändert Adressen"}
 {"uk": "Змінює адресу, події чи стан вебхука цього ключа.", "en": "Changes the address, events or state of this key’s webhook.", "de": "Ändert Adresse, Ereignisse oder Zustand des Webhooks dieses Schlüssels."}
@@ -9406,8 +9432,12 @@
 {"uk": "Курс ЄЦБ отримано: {0}.", "en": "ECB rate received: {0}.", "de": "EZB-Kurs abgerufen: {0}."}
 {"uk": "Курс вписано вручну", "en": "The rate was entered manually", "de": "Kurs manuell eingegeben"}
 {"uk": "Курс для цін DigiKey", "en": "Exchange rate for DigiKey prices", "de": "Wechselkurs für DigiKey-Preise"}
+{"uk": "Курс для цін DigiKey — онлайн ЄЦБ ({0}): 1 {1} = {2} {3}. Було: {4}.", "en": "Rate for DigiKey prices — online ECB ({0}): 1 {1} = {2} {3}. Was: {4}.", "de": "Kurs für DigiKey-Preise — online EZB ({0}): 1 {1} = {2} {3}. Vorher: {4}."}
+{"uk": "Курс для цін DigiKey — онлайн ЄЦБ, але курс зараз не отримано (мережа або сайт ЄЦБ) — Minerva спробує ще раз сама; доти ціни DigiKey не рахуються.", "en": "Rate for DigiKey prices — online ECB, but the rate could not be fetched now (network or ECB site) — Minerva will retry by itself; until then DigiKey prices are not calculated.", "de": "Kurs für DigiKey-Preise — online EZB, aber der Kurs konnte gerade nicht abgerufen werden (Netz oder EZB-Seite) — Minerva versucht es selbst erneut; bis dahin werden keine DigiKey-Preise berechnet."}
+{"uk": "Курс для цін DigiKey: {0} → онлайн ЄЦБ", "en": "Rate for DigiKey prices: {0} → online ECB", "de": "Kurs für DigiKey-Preise: {0} → online EZB"}
 {"uk": "Курс має бути більшим за 0", "en": "The exchange rate must be greater than 0", "de": "Der Wechselkurs muss größer als 0 sein"}
 {"uk": "Курс порожній — з «Налаштувань цін → Курси валют» для валюти кожного товару", "en": "Rate is empty — taken from “Price settings → Exchange rates” for each product’s currency", "de": "Kurs leer — aus „Preiseinstellungen → Wechselkurse“ für die Währung des jeweiligen Artikels"}
+{"uk": "Курс у «Курсах валют» Minerva — той самий, що для магазину", "en": "Rate in Minerva «Exchange rates» — the same as for the shop", "de": "Kurs in den «Wechselkursen» von Minerva — derselbe wie für den Shop"}
 {"uk": "Курс як для DigiKey — зніміть «однаковий курс з DigiKey», щоб вписати свій або взяти 🌐 ЄЦБ", "en": "Rate as for DigiKey — clear “same rate as DigiKey” to enter your own or take 🌐 ECB", "de": "Kurs wie bei DigiKey — entfernen Sie „gleicher Kurs wie DigiKey“, um einen eigenen einzugeben oder 🌐 EZB zu übernehmen"}
 {"uk": "Курс — скільки одиниць валюти магазину коштує 1 одиниця іншої валюти.", "en": "Rate — how many units of the shop’s currency 1 unit of another currency costs.", "de": "Wechselkurs — wie viele Einheiten der Shopwährung 1 Einheit einer anderen Währung kostet."}
 {"uk": "Курс → {0}", "en": "Rate → {0}", "de": "Kurs → {0}"}
@@ -10242,6 +10272,7 @@
 {"uk": "На DigiKey зі складу (bots/admin_from_stock.py): вибір товарів без лістингу, чернетка картки з даних складу, поля, яких бракує DigiKey, створення лістингів (і за галочкою — одразу на DigiKey).", "en": "To DigiKey from stock (bots/admin_from_stock.py): choosing products without a listing, a draft card from stock data, the fields DigiKey is missing, creating listings (and, with the checkbox, sending straight to DigiKey).", "de": "Vom Lager zu DigiKey (bots/admin_from_stock.py): Auswahl von Artikeln ohne Listing, Kartenentwurf aus den Lagerdaten, die bei DigiKey fehlenden Felder, Erstellen von Listings (und mit dem Häkchen — direkt an DigiKey senden)."}
 {"uk": "На DigiKey зі складу — Minerva", "en": "To DigiKey from stock — Minerva", "de": "Vom Lager zu DigiKey — Minerva"}
 {"uk": "На DigiKey уже надсилаються строки — дочекайтеся кінця й повторіть.", "en": "Lead times are already being sent to DigiKey — wait for it to finish and try again.", "de": "Lieferzeiten werden bereits an DigiKey gesendet — warten Sie, bis der Vorgang abgeschlossen ist, und versuchen Sie es erneut."}
+{"uk": "На DigiKey ціни в", "en": "On DigiKey the prices are in", "de": "Auf DigiKey sind die Preise in"}
 {"uk": "На DigiKey ціни як у Minerva.", "en": "Prices on DigiKey match Minerva.", "de": "Die Preise auf DigiKey entsprechen denen in Minerva."}
 {"uk": "На DigiKey є офер з цим артикулом", "en": "There is an offer with this SKU on DigiKey", "de": "Auf DigiKey gibt es ein Offer mit dieser Artikelnummer"}
 {"uk": "На DigiKey інакше, ніж у Minerva", "en": "Different on DigiKey than in Minerva", "de": "Auf DigiKey anders als in Minerva"}
@@ -10357,6 +10388,7 @@
 {"uk": "Надсилати зображення товарів після текстового повідомлення. Кілька товарів — альбомом (до 10 фото).", "en": "Send product images after the text message. Several products — as an album (up to 10 photos).", "de": "Artikelbilder nach der Textnachricht senden. Mehrere Artikel — als Album (bis zu 10 Fotos)."}
 {"uk": "Надсилати підсумок після автоматичних синхронізацій — DigiKey (нові замовлення) та авто-трекінг (зміни статусу відправлень). Сповіщення надходить лише якщо були реальні зміни.", "en": "Send a summary after automatic synchronizations — DigiKey (new orders) and auto-tracking (shipment status changes). A notification is sent only if there were real changes.", "de": "Zusammenfassung nach automatischen Synchronisierungen senden — DigiKey (neue Aufträge) und Auto-Tracking (Statusänderungen von Sendungen). Eine Benachrichtigung erfolgt nur, wenn es tatsächliche Änderungen gab."}
 {"uk": "Надсилати самому — через кілька хвилин, можна скасувати", "en": "Send automatically — after a few minutes, can be cancelled", "de": "Selbst senden – nach einigen Minuten, abbrechbar"}
+{"uk": "Надсилати ціни на DigiKey може людина з правом змінювати лістинги DigiKey — вам доступне лише порівняння.", "en": "Prices can be sent to DigiKey by someone allowed to change DigiKey listings — you can only compare.", "de": "Preise an DigiKey senden darf, wer DigiKey-Listings ändern darf — Ihnen steht nur der Vergleich zur Verfügung."}
 {"uk": "Надсилати через, хв", "en": "Send after, min", "de": "Senden nach, Min."}
 {"uk": "Надсилаю {0} {1} · {2} (станом на {3}).", "en": "Sending {0} {1} · {2} (as of {3}).", "de": "Anbei {0} {1} · {2} (Stand {3})."}
 {"uk": "Надсилаю відповідь організатору…", "en": "Sending the reply to the organiser…", "de": "Antwort an den Organisator wird gesendet…"}
@@ -10444,6 +10476,7 @@
 {"uk": "Надіслати листом…", "en": "Send by e-mail…", "de": "Per E-Mail senden…"}
 {"uk": "Надіслати лише йому", "en": "Send to this one only", "de": "Nur an diesen senden"}
 {"uk": "Надіслати місячний звіт зараз", "en": "Send monthly report now", "de": "Monatsbericht jetzt senden"}
+{"uk": "Надіслати на DigiKey нові ціни (у", "en": "Send new prices to DigiKey (in", "de": "Neue Preise an DigiKey senden (in"}
 {"uk": "Надіслати нагадування про непідтверджені відправлення на DigiKey", "en": "Send a reminder about unconfirmed shipments on DigiKey", "de": "Erinnerung zu nicht bestätigten Sendungen auf DigiKey senden"}
 {"uk": "Надіслати нагадування юзерам по CustomerTimeline", "en": "Send reminders to users per CustomerTimeline", "de": "Erinnerungen an Benutzer gemäß CustomerTimeline senden"}
 {"uk": "Надіслати одразу", "en": "Send immediately", "de": "Sofort senden"}
@@ -11910,6 +11943,7 @@
 {"uk": "Оновити на DigiKey з Minerva", "en": "Update on DigiKey from Minerva", "de": "Auf DigiKey aus Minerva aktualisieren"}
 {"uk": "Оновити на DigiKey зараз", "en": "Update on DigiKey now", "de": "Jetzt auf DigiKey aktualisieren"}
 {"uk": "Оновити огляд", "en": "Refresh overview", "de": "Übersicht aktualisieren"}
+{"uk": "Оновити онлайн-курс ЄЦБ зараз", "en": "Update the online ECB rate now", "de": "Online-EZB-Kurs jetzt aktualisieren"}
 {"uk": "Оновити онлайн-курс зараз", "en": "Refresh the online rate now", "de": "Online-Kurs jetzt aktualisieren"}
 {"uk": "Оновити панель", "en": "Refresh panel", "de": "Panel aktualisieren"}
 {"uk": "Оновити пошту зараз", "en": "Refresh mail now", "de": "E-Mails jetzt aktualisieren"}
@@ -12772,6 +12806,7 @@
 {"uk": "Перерахувати всі листи", "en": "Recalculate all emails", "de": "Alle E-Mails neu berechnen"}
 {"uk": "Перерахувати з введеним", "en": "Recalculate with the entered values", "de": "Mit den eingegebenen Werten neu berechnen"}
 {"uk": "Перерахувати перегляд", "en": "Recalculate preview", "de": "Vorschau neu berechnen"}
+{"uk": "Перерахунок", "en": "Conversion", "de": "Umrechnung"}
 {"uk": "Перерахунок запущено у фоні — хід видно над списком.", "en": "Recalculation started in the background — progress is shown above the list.", "de": "Die Neuberechnung läuft im Hintergrund — der Fortschritt wird über der Liste angezeigt."}
 {"uk": "Перерахунок зупинився на {0} з {1} листів (останній знак {2}) — мабуть, сервер перезапускався. Запустіть ще раз.", "en": "The recalculation stopped at {0} of {1} emails (last sign of activity {2}) — the server was probably restarted. Run it again.", "de": "Die Neuberechnung stoppte bei {0} von {1} E-Mails (letzte Aktivität {2}) — vermutlich wurde der Server neu gestartet. Starten Sie sie erneut."}
 {"uk": "Перерахунок перервано ({0})", "en": "Recalculation interrupted ({0})", "de": "Neuberechnung abgebrochen ({0})"}
@@ -14571,6 +14606,7 @@
 {"uk": "Пізніше", "en": "Later", "de": "Später"}
 {"uk": "Після", "en": "After", "de": "Nach"}
 {"uk": "Після «Зберегти» — за новими налаштуваннями. Під ним, як завжди, — підпис скриньки.", "en": "After “Save” — with the new settings. Below it, as always, — the mailbox signature.", "de": "Nach „Speichern“ — mit den neuen Einstellungen. Darunter wie immer — die Signatur des Postfachs."}
+{"uk": "Після «Зберегти» — на DigiKey", "en": "After «Save» — to DigiKey", "de": "Nach «Speichern» — an DigiKey"}
 {"uk": "Після «Зберегти» — одразу оновити ціну на DigiKey (з новими базовими цінами, правила — «💲 Налаштування цін DigiKey»)", "en": "After “Save” — update the price on DigiKey immediately (with the new base prices, rules from “💲 DigiKey price settings”)", "de": "Nach „Speichern“ — den Preis sofort auf DigiKey aktualisieren (mit den neuen Basispreisen, Regeln aus „💲 DigiKey-Preiseinstellungen“)"}
 {"uk": "Після «Створити» / «Додати до нього» Minerva одразу збере листування з ними з вашої пошти: теми, файли, PI.", "en": "After «Create» / «Add to it» Minerva immediately collects the correspondence with them from your mail: topics, files, PI.", "de": "Nach «Anlegen» / «Hinzufügen» sammelt Minerva sofort die Korrespondenz mit ihnen aus Ihrer Post: Themen, Dateien, PI."}
 {"uk": "Після впровадження", "en": "After implementation", "de": "Nach der Einführung"}
@@ -15182,6 +15218,7 @@
 {"uk": "Свій значок…", "en": "Custom icon…", "de": "Eigenes Symbol…"}
 {"uk": "Свій курс для DigiKey — вписую вручну", "en": "Own rate for DigiKey — I enter it manually", "de": "Eigener Kurs für DigiKey — ich trage ihn manuell ein"}
 {"uk": "Свій курс: 1 валюта Minerva = … валюти DigiKey", "en": "Own rate: 1 Minerva currency = … DigiKey currency", "de": "Eigener Kurs: 1 Minerva-Währung = … DigiKey-Währung"}
+{"uk": "Свій курс…", "en": "Own rate…", "de": "Eigener Kurs…"}
 {"uk": "Свій прихід", "en": "Own clock-in", "de": "Eigenes Kommen"}
 {"uk": "Свій статус у магазині", "en": "Own status in the shop", "de": "Eigener Status im Shop"}
 {"uk": "Свій текст підпису", "en": "Custom signature text", "de": "Eigener Signaturtext"}
@@ -17663,6 +17700,7 @@
 {"uk": "Ціни DigiKey ← склад Minerva", "en": "DigiKey prices ← Minerva stock", "de": "DigiKey-Preise ← Minerva-Lager"}
 {"uk": "Ціни Minerva", "en": "Minerva prices", "de": "Minerva-Preise"}
 {"uk": "Ціни Minerva (EUR) → валюта DigiKey. «Свій» — поле нижче; «Онлайн» — довідковий курс Європейського центрального банку, Minerva бере його сама (не вдалось — останній збережений).", "en": "Minerva prices (EUR) → DigiKey currency. “Own” — the field below; “Online” — the reference rate of the European Central Bank, which Minerva fetches itself (if that fails, the last saved one).", "de": "Minerva-Preise (EUR) → DigiKey-Währung. „Eigener“ — das Feld unten; „Online“ — der Referenzkurs der Europäischen Zentralbank, den Minerva selbst abruft (falls das nicht gelingt, der zuletzt gespeicherte)."}
+{"uk": "Ціни Minerva — у {0}, на DigiKey — у", "en": "Minerva prices are in {0}, on DigiKey in", "de": "Minerva-Preise sind in {0}, auf DigiKey in"}
 {"uk": "Ціни {0} на DigiKey уже як за правилами Minerva", "en": "The prices of {0} on DigiKey already follow the Minerva rules", "de": "Die Preise von {0} bei DigiKey entsprechen bereits den Minerva-Regeln"}
 {"uk": "Ціни {0}{1}%{2} застосовано до {3} лістингів", "en": "Prices {0}{1}%{2} applied to {3} listings", "de": "Preise {0}{1}%{2} auf {3} Listings angewendet"}
 {"uk": "Ціни × курс, до 4 знаків (округлити — «Округлити»); курс запишеться в історію", "en": "Prices × rate, to 4 decimals (to round — «Round»); the rate is saved in the history", "de": "Preise × Kurs, auf 4 Stellen (runden — «Runden»); der Kurs wird in der Historie gespeichert"}
@@ -17675,6 +17713,7 @@
 {"uk": "Ціни вручну", "en": "Manual prices", "de": "Preise manuell"}
 {"uk": "Ціни вручну (від'єднати від базових цін)", "en": "Manual prices (detach from base prices)", "de": "Manuelle Preise (von Basispreisen trennen)"}
 {"uk": "Ціни відсутні в БД", "en": "Prices missing in the DB", "de": "Preise fehlen in der Datenbank"}
+{"uk": "Ціни для DigiKey не рахуються: {0}.", "en": "DigiKey prices are not calculated: {0}.", "de": "DigiKey-Preise werden nicht berechnet: {0}."}
 {"uk": "Ціни для DigiKey, {0} (MOQ {1}, відвантаження {2} дн)", "en": "Prices for DigiKey, {0} (MOQ {1}, lead time {2} d)", "de": "Preise für DigiKey, {0} (MOQ {1}, Lieferzeit {2} Tg.)"}
 {"uk": "Ціни з", "en": "Prices from", "de": "Preise aus"}
 {"uk": "Ціни з Minerva", "en": "Prices from Minerva", "de": "Preise aus Minerva"}
@@ -17696,6 +17735,7 @@
 {"uk": "Ціни магазину (ступені), мінімальні кількості й доставка перевіряються лише справжнім запитом; у Minerva замовлення отримає номер PO", "en": "Shop prices (price breaks), minimum quantities and shipping are checked only by a real request; in Minerva the order will get a PO number", "de": "Shop-Preise (Staffelpreise), Mindestmengen und Versand werden nur durch eine echte Anfrage geprüft; in Minerva erhält der Auftrag eine PO-Nummer"}
 {"uk": "Ціни на DigiKey", "en": "Prices on DigiKey", "de": "Preise auf DigiKey"}
 {"uk": "Ціни на DigiKey з Minerva (порівняти й оновити)…", "en": "DigiKey prices from Minerva (compare and update)…", "de": "DigiKey-Preise aus Minerva (vergleichen und aktualisieren)…"}
+{"uk": "Ціни на DigiKey з цих базових цін", "en": "DigiKey prices from these base prices", "de": "DigiKey-Preise aus diesen Basispreisen"}
 {"uk": "Ціни на DigiKey за правилами", "en": "DigiKey prices by rules", "de": "DigiKey-Preise nach Regeln"}
 {"uk": "Ціни на DigiKey за правилами Minerva, строк відвантаження — лише з ✓ людини", "en": "DigiKey prices by Minerva rules, shipping lead time — only with a person's ✓", "de": "DigiKey-Preise nach Minerva-Regeln, Versandzeit – nur mit ✓ einer Person"}
 {"uk": "Ціни на DigiKey зараз", "en": "Prices on DigiKey now", "de": "Preise aktuell bei DigiKey"}
@@ -18712,6 +18752,7 @@
 {"uk": "без пароля", "en": "without a password", "de": "ohne Passwort"}
 {"uk": "без перезавантаження сторінки", "en": "without reloading the page", "de": "ohne die Seite neu zu laden"}
 {"uk": "без перекладу", "en": "no translation", "de": "ohne Übersetzung"}
+{"uk": "без перерахунку", "en": "no conversion", "de": "ohne Umrechnung"}
 {"uk": "без плану", "en": "no plan", "de": "ohne Plan"}
 {"uk": "без події", "en": "no event", "de": "ohne Ereignis"}
 {"uk": "без пояснення", "en": "no explanation", "de": "ohne Erklärung"}
@@ -18817,6 +18858,8 @@
 {"uk": "валюта з «Налаштувань Angebote»", "en": "currency from “Angebote settings”", "de": "Währung aus den „Angebote-Einstellungen“"}
 {"uk": "валюта рядка", "en": "line currency", "de": "Zeilenwährung"}
 {"uk": "валюта — код з 3 літер", "en": "currency — a 3-letter code", "de": "Währung — Code aus 3 Buchstaben"}
+{"uk": "валюті вашого акаунта продавця (DigiKey API валюти не передає", "en": "the currency of your seller account (the DigiKey API does not transmit a currency", "de": "der Währung Ihres Verkäuferkontos (die DigiKey-API überträgt keine Währung"}
+{"uk": "валюті вашого акаунта продавця (DigiKey API валюти не передає; {0}).", "en": "the currency of your seller account (the DigiKey API does not transmit a currency; {0}).", "de": "der Währung Ihres Verkäuferkontos (die DigiKey-API überträgt keine Währung; {0})."}
 {"uk": "вам і покупцю: номер", "en": "to you and the buyer: number", "de": "an Sie und den Käufer: Nummer"}
 {"uk": "вартості, хід перекладу (опитування …/status/ кожні 3 с, поки йде).", "en": "cost, translation progress (polling …/status/ every 3 s while it runs).", "de": "Kosten, Übersetzungsfortschritt (Abfrage …/status/ alle 3 s, solange sie läuft)."}
 {"uk": "вартість", "en": "cost", "de": "Kosten"}
@@ -19459,6 +19502,7 @@
 {"uk": "з наради від {0}", "en": "from the meeting of {0}", "de": "aus der Besprechung vom {0}"}
 {"uk": "з них {0} критичних", "en": "{0} of them critical", "de": "davon {0} kritisch"}
 {"uk": "з них відмов 401 / 403 / 429: {0}", "en": "of which denials 401 / 403 / 429: {0}", "de": "davon Ablehnungen 401 / 403 / 429: {0}"}
+{"uk": "з опублікованим офером", "en": "with a published offer", "de": "mit veröffentlichtem Angebot"}
 {"uk": "з позначкою «важливо»", "en": "marked «important»", "de": "als «wichtig» markiert"}
 {"uk": "з поля «Мова документа».", "en": "from the “Document language” field.", "de": "aus dem Feld „Dokumentsprache“."}
 {"uk": "з помилками", "en": "with errors", "de": "mit Fehlern"}
@@ -19479,6 +19523,7 @@
 {"uk": "з шаблону — файлу немає", "en": "from template — no file", "de": "aus Vorlage — keine Datei vorhanden"}
 {"uk": "за", "en": "at", "de": "zu"}
 {"uk": "за 1 шт, 12 міс", "en": "per 1 pc, 12 mo", "de": "pro 1 Stk, 12 Mon."}
+{"uk": "за 1 шт.", "en": "per pc", "de": "pro Stk."}
 {"uk": "за 12 міс", "en": "over 12 months", "de": "in 12 Monaten"}
 {"uk": "за 2 роки", "en": "last 2 years", "de": "letzte 2 Jahre"}
 {"uk": "за 30 днів", "en": "over 30 days", "de": "in 30 Tagen"}
@@ -20127,6 +20172,8 @@
 {"uk": "курс", "en": "rate", "de": "Kurs"}
 {"uk": "курс 1 {0} = {1} {2} (", "en": "rate 1 {0} = {1} {2} (", "de": "Kurs 1 {0} = {1} {2} ("}
 {"uk": "курс як для DigiKey: 1", "en": "rate as for DigiKey: 1", "de": "Kurs wie bei DigiKey: 1"}
+{"uk": "курс — {0}; правила — {1}", "en": "rate — {0}; rules — {1}", "de": "Kurs — {0}; Regeln — {1}"}
+{"uk": "курс — {0}; правила — {1} (", "en": "rate — {0}; rules — {1} (", "de": "Kurs — {0}; Regeln — {1} ("}
 {"uk": "курс: {0}", "en": "rate: {0}", "de": "Kurs: {0}"}
 {"uk": "курси ЄЦБ недоступні", "en": "ECB rates unavailable", "de": "EZB-Kurse nicht verfügbar"}
 {"uk": "курси ЄЦБ недоступні (мережа)", "en": "ECB rates unavailable (network)", "de": "EZB-Kurse nicht verfügbar (Netzwerk)"}
@@ -21009,10 +21056,13 @@
 {"uk": "одразу лист і Telegram вам", "en": "an email and Telegram to you right away", "de": "sofort E-Mail und Telegram an Sie"}
 {"uk": "одразу на DigiKey (товари, вже створені там)", "en": "straight to DigiKey (products already created there)", "de": "direkt an DigiKey (dort bereits angelegte Artikel)"}
 {"uk": "одразу на принтер", "en": "straight to the printer", "de": "direkt zum Drucker"}
+{"uk": "одразу надіслати", "en": "send right away", "de": "sofort senden"}
 {"uk": "одразу надіслати на DigiKey", "en": "send to DigiKey right away", "de": "sofort an DigiKey senden"}
 {"uk": "одразу надіслати на DigiKey (лише строк)", "en": "send to DigiKey right away (lead time only)", "de": "sofort an DigiKey senden (nur die Lieferzeit)"}
 {"uk": "одразу показує, як буде. Нічого не збережено, доки не натиснете «💾 Зберегти».", "en": "immediately shows the result. Nothing is saved until you click “💾 Save”.", "de": "zeigt sofort das Ergebnis. Es wird nichts gespeichert, bis Sie auf „💾 Speichern“ klicken."}
 {"uk": "одразу при додаванні замовлення.", "en": "immediately when the order is added.", "de": "sofort beim Hinzufügen des Auftrags."}
+{"uk": "одразу після збереження — з новими базовими цінами.", "en": "right after saving — with the new base prices.", "de": "direkt nach dem Speichern — mit den neuen Basispreisen."}
+{"uk": "одразу після збереження — з новими базовими цінами. На DigiKey ціни в", "en": "right after saving — with the new base prices. On DigiKey the prices are in", "de": "direkt nach dem Speichern — mit den neuen Basispreisen. Auf DigiKey sind die Preise in"}
 {"uk": "одразу шукати тарифи", "en": "look up rates right away", "de": "Tarife sofort abfragen"}
 {"uk": "одразу, звіт прийде як за розкладом; збережені налаштування", "en": "right away, the report comes as on schedule; saved settings", "de": "sofort, der Bericht kommt wie nach Zeitplan; gespeicherte Einstellungen"}
 {"uk": "окрема сторінка: фаза, крок, хто, початок, кінець, стан", "en": "a separate page: phase, step, who, start, end, status", "de": "eigene Seite: Phase, Schritt, wer, Beginn, Ende, Status"}
@@ -21329,9 +21379,11 @@
 {"uk": "позиції", "en": "items", "de": "Positionen"}
 {"uk": "позначена для цієї візитки", "en": "ticked for this business card", "de": "für diese Visitenkarte markiert"}
 {"uk": "позначених товарів на цей шаблон?", "en": "marked products to this template?", "de": "markierte Artikel auf diese Vorlage?"}
+{"uk": "позначених у таблиці", "en": "marked in the table", "de": "die in der Tabelle markiert sind"}
 {"uk": "позначених: знижка від ціни за 1 шт. (10 шт. −5 %, 100 шт. −10 % …, у кожного товару від його ціни) або однакові ціни; шаблон можна", "en": "selected: a discount from the price per 1 pc (10 pcs −5 %, 100 pcs −10 % …, for each product from its own price) or identical prices; the template can", "de": "Markierte: Rabatt auf den Preis pro 1 Stk. (10 Stk. −5 %, 100 Stk. −10 % …, bei jedem Artikel ausgehend von seinem Preis) oder gleiche Preise; die Vorlage kann"}
 {"uk": "позначено", "en": "ticked", "de": "markiert"}
 {"uk": "позначено «прибуло» (оприбуткує склад у Minerva).", "en": "marked “arrived” (Minerva will receive it into stock).", "de": "als „angekommen“ markiert (Minerva bucht ins Lager ein)."}
+{"uk": "позначено з лістингом DigiKey", "en": "marked with a DigiKey listing", "de": "markiert mit DigiKey-Listing"}
 {"uk": "позначені", "en": "marked", "de": "markierte"}
 {"uk": "позначив відправник", "en": "marked by the sender", "de": "vom Absender markiert"}
 {"uk": "позначили ви", "en": "marked by you", "de": "von Ihnen markiert"}
@@ -21962,6 +22014,7 @@
 {"uk": "спам і чернетки", "en": "spam and drafts", "de": "Spam und Entwürfe"}
 {"uk": "спершу коротка відповідь (1–3 речення)", "en": "first a short answer (1–3 sentences)", "de": "zuerst eine kurze Antwort (1–3 Sätze)"}
 {"uk": "спершу поверніть якийсь: «↺ Значок як був».", "en": "first restore one: “↺ Icon as it was”.", "de": "setzen Sie zuerst eines zurück: „↺ Symbol wie zuvor“."}
+{"uk": "спершу показати, що стане (надіслати там)", "en": "first show what it will be (send from there)", "de": "zuerst zeigen, was es wird (dort senden)"}
 {"uk": "спецвідпустка", "en": "special leave", "de": "Sonderurlaub"}
 {"uk": "списання", "en": "write-off", "de": "Ausbuchung"}
 {"uk": "списання / повернення товару на складі (inventory/services/stock.py)", "en": "write-off / return of the product in stock (inventory/services/stock.py)", "de": "Ausbuchung / Rückbuchung des Artikels im Lager (inventory/services/stock.py)"}
@@ -22085,6 +22138,7 @@
 {"uk": "ступені за кількістю в товарі → магазини", "en": "quantity price breaks in the product → shops", "de": "Mengenstaffeln im Artikel → Shops"}
 {"uk": "ступені менші за MOQ {0} шт. об'єднано в {1} шт.", "en": "price breaks below the MOQ of {0} pcs were merged into {1} pcs", "de": "Staffeln unter der MOQ von {0} Stk. wurden zu {1} Stk. zusammengefasst"}
 {"uk": "ступені цін: шаблон, свої, видалити", "en": "price breaks: template, custom, delete", "de": "Staffelpreise: Vorlage, eigene, löschen"}
+{"uk": "ступенів", "en": "tiers", "de": "Staffeln"}
 {"uk": "ступенів {0}", "en": "{0} price breaks", "de": "{0} Staffeln"}
 {"uk": "ступенів базових цін: {0}", "en": "base price tiers: {0}", "de": "Staffeln der Basispreise: {0}"}
 {"uk": "ступенів цін", "en": "price breaks", "de": "Staffelpreise"}
@@ -22607,10 +22661,12 @@
 {"uk": "цьому клієнту відправляли {0} ({1} раз.)", "en": "shipped to this customer with {0} ({1} times)", "de": "an diesen Kunden mit {0} versandt ({1}-mal)"}
 {"uk": "ця зустріч уже записувалась сюди", "en": "this meeting has already been recorded here", "de": "diese Besprechung wurde hier bereits eingetragen"}
 {"uk": "ця скринька не вибрана на «🧠 База знань»", "en": "this mailbox is not selected on “🧠 Knowledge base”", "de": "dieses Postfach ist auf „🧠 Wissensdatenbank“ nicht ausgewählt"}
+{"uk": "ці товари в магазині не оновляться", "en": "these products will not be updated in the shop", "de": "diese Artikel werden im Shop nicht aktualisiert"}
 {"uk": "цікаво", "en": "interesting", "de": "interessant"}
 {"uk": "цін", "en": "prices", "de": "Preise"}
 {"uk": "цін немає", "en": "no prices", "de": "keine Preise"}
 {"uk": "цін у відповіді немає", "en": "no prices in the reply", "de": "keine Preise in der Antwort"}
+{"uk": "цін ще немає", "en": "no prices yet", "de": "noch keine Preise"}
 {"uk": "ціна", "en": "price", "de": "Preis"}
 {"uk": "ціна 1 шт.", "en": "price 1 pc.", "de": "Preis 1 Stk."}
 {"uk": "ціна 100,00", "en": "price 100.00", "de": "Preis 100,00"}
@@ -22640,6 +22696,7 @@
 {"uk": "ціни ± %", "en": "prices ± %", "de": "Preise ± %"}
 {"uk": "ціни в", "en": "prices in", "de": "Preise in"}
 {"uk": "ціни в Minerva застарілі — «🔄 Записати в Minerva»", "en": "prices in Minerva are outdated — “🔄 Save to Minerva”", "de": "Preise in Minerva sind veraltet — „🔄 In Minerva speichern“"}
+{"uk": "ціни вже такі", "en": "prices are already the same", "de": "Preise sind bereits so"}
 {"uk": "ціни вже як у Minerva", "en": "prices already match Minerva", "de": "Preise entsprechen bereits Minerva"}
 {"uk": "ціни вписано вручну", "en": "prices entered manually", "de": "Preise manuell eingetragen"}
 {"uk": "ціни змінились після пропозиції (на DigiKey чи в Minerva) — запустіть завдання ще раз", "en": "prices changed after the proposal (on DigiKey or in Minerva) — run the task again", "de": "Preise haben sich nach dem Vorschlag geändert (bei DigiKey oder in Minerva) – starten Sie die Aufgabe erneut"}
@@ -22944,10 +23001,12 @@
 {"uk": "і перевести їх у", "en": "and convert them to", "de": "und sie umrechnen in"}
 {"uk": "і переводить їх у", "en": "and converts them to", "de": "und wandelt sie um in"}
 {"uk": "і полем «Магазин». Ключ вставляється в конфіг сайту.", "en": "and the “Shop” field. The key is pasted into the website config.", "de": "und das Feld „Shop“. Der Schlüssel wird in die Website-Konfiguration eingefügt."}
+{"uk": "і порівняти з DigiKey", "en": "and compare with DigiKey", "de": "und mit DigiKey vergleichen"}
 {"uk": "і після підтвердження перевірить, чи DigiKey прив'язав його до замовлення.", "en": "and after the confirmation checks whether DigiKey attached it to the order.", "de": "und prüft nach der Bestätigung, ob DigiKey sie dem Auftrag zugeordnet hat."}
 {"uk": "і створює записи DigiKeyListing. Оберіть режим імпорту", "en": "and creates DigiKeyListing records. Choose the import mode", "de": "und legt DigiKeyListing-Datensätze an. Wählen Sie den Importmodus"}
 {"uk": "і товарами", "en": "and products", "de": "und Artikeln"}
 {"uk": "і хочете побачити їх у Minerva зі статусом ⏳ Очікує затвердження.", "en": "and want to see them in Minerva with the status ⏳ Awaiting approval.", "de": "und sie in Minerva mit dem Status ⏳ Wartet auf Freigabe sehen möchten."}
+{"uk": "і ще {0}", "en": "and {0} more", "de": "und {0} weitere"}
 {"uk": "і 🧠 «Що змінити в плані»: AI пропонує виправлення", "en": "and 🧠 «What should change in the plan»: the AI suggests corrections", "de": "und 🧠 «Was soll sich am Plan ändern»: die AI schlägt Korrekturen vor"}
 {"uk": "ів", "en": "s", "de": "s"}
 {"uk": "ігнорує інтервал", "en": "ignores the interval", "de": "ignoriert das Intervall"}

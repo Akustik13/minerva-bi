@@ -1,7 +1,9 @@
 """Базові ціни в адмінці товарів: масовий редактор для вибраних товарів і застосування цін у магазинах
 (блок «🏪 Інтернет-магазини» картки та низ редактора). Логіка цін — inventory/services/base_prices.py,
-магазинів — shop/services.py (apply_base_to_shop)."""
+магазинів — shop/services.py (apply_base_to_shop), DigiKey після збереження — bots/admin_prices.py
+(editor_rows / editor_config / push_products)."""
 import json
+import logging
 import re
 from decimal import Decimal, InvalidOperation
 
@@ -14,6 +16,8 @@ from django.utils.html import format_html, format_html_join
 
 from .models import Product
 from .services.base_prices import normalize, set_base_prices
+
+logger = logging.getLogger(__name__)
 
 
 def editor_config() -> dict:
@@ -130,9 +134,20 @@ def _ids(raw) -> list[int]:
     return [int(x) for x in re.findall(r"\d+", str(raw or ""))][:1000]
 
 
+def _dk_rows(products) -> dict:
+    """Що зараз на DigiKey у товарів редактора; збій DigiKey-частини не ламає редактор цін."""
+    try:
+        from bots.admin_prices import editor_rows
+        return editor_rows(products)
+    except Exception:
+        logger.warning("Редактор базових цін: дані DigiKey не прочитано", exc_info=True)
+        return {}
+
+
 def editor_items(products) -> list[dict]:
     from shop.models import ShopListing
     shops = _shops()
+    dk = _dk_rows(products)
     listings = {}
     for l in (ShopListing.objects.filter(product__in=products, shop__in=shops).select_related("shop")
               .prefetch_related("tiers")):
@@ -150,12 +165,13 @@ def editor_items(products) -> list[dict]:
                       "currency": p.base_price_currency or "EUR",
                       "purchase": float(p.purchase_price) if p.purchase_price else None,
                       "rows": [[r["min_qty"], r["unit_price"]] for r in normalize(p.base_prices)],
-                      "shops": state})
+                      "shops": state, "dk": dk.get(p.pk)})
     return items
 
 
-def save_editor(products, data: dict, user) -> tuple[int, list[str], list[str]]:
-    """Зберегти ціни з редактора і застосувати в позначених магазинах. → (змінено, помилки, підсумки магазинів)."""
+def save_editor(products, data: dict, user, failed: set | None = None) -> tuple[int, list[str], list[str]]:
+    """Зберегти ціни з редактора і застосувати в позначених магазинах. → (змінено, помилки, підсумки магазинів);
+    failed — сюди pk товарів, чиї ціни не збережено через помилку (на DigiKey їх тоді не надсилаємо)."""
     from shop.models import Shop
     from shop.services import APPLY_TEXT, apply_base_to_shop
     by_id = {p.pk: p for p in products}
@@ -167,12 +183,17 @@ def save_editor(products, data: dict, user) -> tuple[int, list[str], list[str]]:
             continue
         currency = str(item.get("currency") or p.base_price_currency or "EUR").strip().upper()
         rows = normalize(item.get("rows") or [])
+        bad = ""
         if not re.fullmatch(r"[A-Z]{3}", currency):
-            errors.append(f"{p.sku}: валюта «{currency}» — код з 3 літер")
+            bad = f"{p.sku}: валюта «{currency}» — код з 3 літер"
         elif not rows:
-            errors.append(f"{p.sku}: немає жодної ціни — не змінено")
+            bad = f"{p.sku}: немає жодної ціни — не змінено"
         elif rows[0]["min_qty"] != 1:
-            errors.append(f"{p.sku}: перший ступінь має бути від 1 шт. — не змінено")
+            bad = f"{p.sku}: перший ступінь має бути від 1 шт. — не змінено"
+        if bad:
+            errors.append(bad)
+            if failed is not None:
+                failed.add(p.pk)
         elif set_base_prices(p, rows, source="manual", user=user, currency=currency,
                              note="Масовий редактор" + (f" · {note}" if note else "")):
             changed += 1
@@ -209,24 +230,56 @@ def editor_view(model_admin, request):
         except ValueError:
             messages.error(request, "Не вдалося прочитати зміни — оновіть сторінку й спробуйте ще раз.")
             return redirect(url)
-        changed, errors, summaries = save_editor(products, data, request.user)
+        failed = set()
+        changed, errors, summaries = save_editor(products, data, request.user, failed)
         messages.success(request, f"Базові ціни змінено: {changed} товарів (записано в історію)." if changed
                          else "Базові ціни не змінювались.")
         for text in summaries:
             messages.info(request, text)
         for text in errors[:30]:
             messages.warning(request, text)
-        return redirect(url)
+        go = _push_digikey(request, products, data.get("digikey"), failed)
+        return redirect(go or url)
     cfg = editor_config()
     cfg["shops"] = [{"id": s.pk, "name": s.name, "currency": s.currency} for s in _shops()]
     cfg["template_url"] = reverse("admin:inventory_product_base_prices_template")
     cfg["can_save_template"] = request.user.has_perm("shop.change_shopsettings")
+    items = editor_items(products)
+    cfg["dk"], fx_fix = _dk_config(request, products, items, url)
     return render(request, "admin/inventory/product/base_prices_editor.html", {
         **model_admin.admin_site.each_context(request),
         "title": f"Базові ціни: {len(products)} товарів", "opts": Product._meta,
-        "items": editor_items(products), "config": cfg, "ids": ",".join(str(p.pk) for p in products),
-        "back_url": reverse("admin:inventory_product_changelist"),
+        "items": items, "config": cfg, "ids": ",".join(str(p.pk) for p in products),
+        "back_url": reverse("admin:inventory_product_changelist"), "fx_fix": fx_fix,
     })
+
+
+def _dk_config(request, products, items, url):
+    """Блок «💲 DigiKey» редактора — лише коли в товарів є лістинги DigiKey. → (конфіг | None, банер «немає курсу»)."""
+    if not any(it["dk"] for it in items):
+        return None, None
+    try:
+        from bots.admin_prices import editor_config as dk_editor_config, fx_fix
+        cfg = dk_editor_config(request, products)
+        return cfg, fx_fix(request, url, list(cfg["rates"].items()))
+    except Exception:
+        logger.warning("Редактор базових цін: налаштування DigiKey не прочитано", exc_info=True)
+        return None, None
+
+
+def _push_digikey(request, products, choice, failed: set) -> str | None:
+    """Галочка «💲 Після «Зберегти» — на DigiKey»: payload digikey = {mode: push | compare, ids: [...]}.
+    Лише товари цієї сторінки, позначені в таблиці, без помилок збереження. → адреса переходу або None."""
+    if not isinstance(choice, dict):
+        return None
+    ids = {int(x) for x in choice.get("ids") or [] if str(x).isdigit()}
+    chosen = [p for p in products if p.pk in ids and p.pk not in failed]
+    if not chosen:
+        if ids:
+            messages.warning(request, "DigiKey: ціни вибраних товарів не збережено — на DigiKey нічого не надіслано.")
+        return None
+    from bots.admin_prices import push_products
+    return push_products(request, chosen, "compare" if choice.get("mode") == "compare" else "push")
 
 
 def template_view(model_admin, request):

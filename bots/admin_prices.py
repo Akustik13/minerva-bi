@@ -17,6 +17,7 @@ from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from .models import DigiKeyListing, DigiKeyPriceChange, DigiKeyPriceRun, DigiKeyPriceSettings
 from .services import dk_prices as svc
@@ -37,6 +38,39 @@ def _can_view(request):
 
 def _can_change(request):
     return request.user.has_perm("bots.change_digikeylisting")
+
+
+def _can_fx(request):
+    return request.user.has_perm("bots.change_digikeypricesettings")
+
+
+def _safe_next(request, default: str) -> str:
+    """Куди повернутись після дії: лише адреса цієї Minerva (/…), інакше default."""
+    nxt = request.POST.get("next") or request.GET.get("next") or ""
+    if nxt.startswith("/") and url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()}):
+        return nxt
+    return default
+
+
+def fx_fix(request, next_url: str, rates=None) -> dict | None:
+    """Курсу ціни Minerva → валюта DigiKey немає: що сказати й які кнопки дати (сторінка порівняння, редактор
+    базових цін). rates — [(валюта Minerva, курс | None)]; None — лише валюта Minerva. Курс є — None."""
+    s = DigiKeyPriceSettings.get()
+    cur = svc.currency(s)
+    if rates is None:
+        home = svc.home_currency()
+        rates = [(home, svc.fx(home, cur, s))]
+    missing = [c for c, r in rates if c != cur and r is None]
+    if not missing:
+        return None
+    return {
+        "text": svc.no_rate_text(missing[0], cur, s), "missing": missing, "cur": cur,
+        "source": s.get_fx_source_display(), "online": s.fx_source == s.FX_ONLINE,
+        "can": _can_fx(request), "next": next_url,
+        "use_url": reverse("admin:bots_digikeypricesettings_fx_use"),
+        "settings_url": reverse("admin:bots_digikeypricesettings_change", args=[s.pk]) + "#fieldset-0-2",
+        "rates_url": reverse("admin:shop_shopsettings_changelist"),
+    }
 
 
 def _compare_url(query: str = "") -> str:
@@ -205,7 +239,36 @@ class DigiKeyPriceSettingsAdmin(admin.ModelAdmin):
     def get_urls(self):
         from django.urls import path
         return [path("fx-refresh/", self.admin_site.admin_view(self.fx_refresh_view),
-                     name="bots_digikeypricesettings_fx_refresh")] + super().get_urls()
+                     name="bots_digikeypricesettings_fx_refresh"),
+                path("fx-use/", self.admin_site.admin_view(self.fx_use_view),
+                     name="bots_digikeypricesettings_fx_use")] + super().get_urls()
+
+    def fx_use_view(self, request):
+        """«🌐 Брати онлайн-курс ЄЦБ» зі сторінки порівняння / редактора базових цін: курс для DigiKey → онлайн
+        і свіжий курс ЄЦБ (POST, право змінювати налаштування цін DigiKey); назад — на ту саму сторінку Minerva."""
+        if request.method != "POST" or not self.has_change_permission(request):
+            raise PermissionDenied
+        s = DigiKeyPriceSettings.get()
+        back = _safe_next(request, reverse("admin:bots_digikeypricesettings_change", args=[s.pk]) + "#fieldset-0-2")
+        if request.POST.get("source") != s.FX_ONLINE:
+            return redirect(back)
+        before = s.get_fx_source_display()
+        if s.fx_source != s.FX_ONLINE:
+            s.fx_source = s.FX_ONLINE
+            s.save(update_fields=["fx_source"])
+            self.log_change(request, s, f"Курс для цін DigiKey: {before} → онлайн ЄЦБ")
+        data = svc.online_rates(s, force=True)
+        home, cur = svc.home_currency(), svc.currency(s)
+        rate = svc.fx(home, cur, s)
+        if data and rate:
+            self.message_user(request, f"💱 Курс для цін DigiKey — {svc.rate_source_text(s)}: "
+                                       f"1 {home} = {format(rate.quantize(Decimal('0.0001')).normalize(), 'f')} {cur}. "
+                                       f"Було: {before}.", messages.SUCCESS)
+        else:
+            self.message_user(request, "💱 Курс для цін DigiKey — онлайн ЄЦБ, але курс зараз не отримано (мережа або "
+                                       "сайт ЄЦБ) — Minerva спробує ще раз сама; доти ціни DigiKey не рахуються.",
+                              messages.WARNING)
+        return redirect(back)
 
     def fx_refresh_view(self, request):
         """«🔄 Оновити онлайн-курс зараз» — свіжі курси ЄЦБ у налаштування (лише читання публічних курсів)."""
@@ -385,12 +448,14 @@ class DigiKeyPriceRunAdmin(admin.ModelAdmin):
         checked = [r.listing.price_checked_at for r in rows if r.listing.price_checked_at and r.state != "no_offer"]
         custom = rules.as_dict() != svc.Rules.from_settings(s).as_dict()
         held = DigiKeyPriceChange.objects.filter(status=DigiKeyPriceChange.HELD).values("run_id").distinct().count()
+        rates = _rates(rows, cur)
         context = {
             **self.admin_site.each_context(request),
             "title": "💲 Ціни DigiKey ← склад Minerva", "opts": self.model._meta,
             "s": s, "rules": rules, "rules_dict": rules.as_dict(), "rules_error": error, "custom": custom,
             "rules_text": rules.describe(cur), "cur": cur, "currency_source": svc.currency_source(s),
-            "rows": views, "sum": svc.summary(rows), "rates": _rates(rows, cur),
+            "rows": views, "sum": svc.summary(rows), "rates": rates,
+            "fx_fix": fx_fix(request, request.get_full_path(), [(r["cur"], r["rate"]) for r in rates]),
             "checked_min": min(checked) if checked else None, "checked_max": max(checked) if checked else None,
             "rounding_choices": DigiKeyPriceSettings.ROUNDING_CHOICES,
             "tiers_choices": DigiKeyPriceSettings.TIERS_CHOICES,
@@ -725,3 +790,84 @@ def apply_after_save(request, product):
     messages.success(request, format_html(
         '💲 DigiKey: {} → <b>{}</b> надсилається — <a href="{}">оновлення #{}</a> (там же перевірка, що ціни діють).',
         row.sku, svc.fmt_tiers(row.new, cur), reverse("admin:bots_digikeypricerun_change", args=[run.pk]), run.pk))
+
+
+# ── Масовий редактор базових цін (inventory/admin_prices.py) → DigiKey ──────
+
+def editor_rows(products) -> dict:
+    """Що зараз на DigiKey у кожного товару редактора (без мережі): {pk товару: {...}}; без лістингу — немає ключа."""
+    s = DigiKeyPriceSettings.get()
+    cur, rules, cache, out = svc.currency(s), svc.Rules.from_settings(s), {}, {}
+    for listing in svc.listings_qs().filter(product__in=products):
+        row = svc.row_for(listing, rules, cur, cache=cache)
+        own = rules.for_listing(listing)
+        out[listing.product_id] = {
+            "sendable": listing.sync_status == listing.SYNC_PUBLISHED and bool(listing.dk_offer_id),
+            "state": row.state, "note": row.state_text if row.state in ("staged", "no_offer") else "",
+            "now": f"{svc.fmt_price(row.dk[0][1])} {cur} від {row.dk[0][0]} шт." if row.dk else "",
+            "tiers": len(row.dk),
+            "pct": float(own.adjust_pct), "fixed": float(own.adjust_fixed), "own": own.own,
+            "url": reverse("admin:bots_digikeylisting_change", args=[listing.pk]),
+        }
+    return out
+
+
+def editor_config(request, products) -> dict:
+    """Блок «💲 DigiKey» редактора: валюта акаунта DigiKey, курс із кожної валюти базових цін, правила, права."""
+    s = DigiKeyPriceSettings.get()
+    cur, home, rules = svc.currency(s), svc.home_currency(), svc.Rules.from_settings(s)
+    currencies = {home} | {(p.base_price_currency or home).upper() for p in products}
+    rates = {}
+    for c in sorted(currencies):
+        rate = svc.fx(c, cur, s)
+        rates[c] = None if rate is None else float(rate)
+    return {
+        "cur": cur, "home": home, "rates": rates, "rate_source": svc.rate_source_text(s),
+        "currency_source": svc.currency_source(s), "rules": rules.describe(cur), "rounding": rules.rounding,
+        "can": _can_change(request),
+        "settings_url": reverse("admin:bots_digikeypricesettings_change", args=[s.pk]),
+        "compare_url": _compare_url("products=" + ",".join(str(p.pk) for p in products)),
+    }
+
+
+def push_products(request, products, mode: str = "push") -> str | None:
+    """Після «💾 Зберегти» редактора базових цін — ціни вибраних товарів на DigiKey з нових базових цін.
+    «push» — одразу оновлення (як «✓ Оновити вибрані» на сторінці порівняння, лише позиції з різницею),
+    «compare» — сторінка порівняння лише цих товарів, надіслати — там. → адреса, куди перейти, або None."""
+    ids = [p.pk for p in products]
+    if not ids:
+        return None
+    if mode == "compare":
+        return _compare_url("products=" + ",".join(map(str, ids)))
+    if not _can_change(request):
+        messages.warning(request, "DigiKey: немає права змінювати лістинги — ціни не надіслано.")
+        return None
+    listings = list(svc.listings_qs().filter(product_id__in=ids))
+    if not listings:
+        messages.info(request, "DigiKey: у вибраних товарів немає лістингів — нічого не надіслано.")
+        return None
+    if svc.stale(listings):
+        try:
+            svc.refresh(listings)            # «ціни вже такі» — за свіжими цінами DigiKey, а не давніми
+        except Exception as exc:
+            messages.warning(request, f"DigiKey: свіжі ціни не прочитано ({exc}) — порівняно з останніми збереженими.")
+    s = DigiKeyPriceSettings.get()
+    cur = svc.currency(s)
+    rows = svc.plan(listings, s=s)
+    skipped = {}
+    for r in rows:
+        if not r.differs:
+            skipped.setdefault("ціни вже такі" if r.state == "ok" else r.state_text, []).append(r.sku)
+    for text, skus in skipped.items():
+        more = f" і ще {len(skus) - 10}" if len(skus) > 10 else ""
+        messages.info(request, f"DigiKey — не надіслано ({text}): {', '.join(skus[:10])}{more}.")
+    send = [r for r in rows if r.differs]
+    if not send:
+        return None
+    run = svc.create_run(send, request.user)
+    svc.start(run)
+    messages.success(request, format_html(
+        '💲 DigiKey: нові ціни {} товарів у {} надсилаються — <a href="{}">оновлення #{}</a> '
+        '(там хід і перевірка, що ціни діють).',
+        len(send), cur, reverse("admin:bots_digikeypricerun_change", args=[run.pk]), run.pk))
+    return None

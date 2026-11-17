@@ -1,0 +1,6 @@
+{# Форма для кнопки «🌐 Брати онлайн-курс ЄЦБ» з _fx_fix.html — поза іншими формами сторінки. #}
+{% if fx_fix and fx_fix.can %}
+<form id="dkfx-form" method="post" action="{{ fx_fix.use_url }}" hidden>{% csrf_token %}
+  <input type="hidden" name="next" value="{{ fx_fix.next }}">
+</form>
+{% endif %}

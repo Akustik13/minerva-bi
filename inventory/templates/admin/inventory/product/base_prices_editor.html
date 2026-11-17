@@ -82,7 +82,7 @@
     <thead><tr>
       <th><input type="checkbox" id="bpe-all" checked title="Позначити всі"></th><th>Товар</th><th>Валюта</th>
       <th style="text-align:right">Закупівля</th><th style="text-align:right">1 шт.</th><th style="text-align:right">Зміна</th>
-      <th>Ступені (від шт. · ціна)</th><th style="text-align:right" class="h-home"></th><th>Магазини</th>
+      <th>Ступені (від шт. · ціна)</th><th style="text-align:right" class="h-home"></th><th>Магазини{% if config.dk %} · DigiKey{% endif %}</th>
     </tr></thead>
     <tbody id="bpe-body"></tbody>
   </table>
@@ -97,6 +97,28 @@
         оновлюється разом з базовими цінами; ціна в валюті магазину — за курсом із «Налаштувань цін».</div>
       <div id="bpe-shops"></div>
     </div>
+    {% if config.dk %}
+    <div class="bpe-shops" id="bpe-dk">
+      <b>💲 Ціни на DigiKey з цих базових цін</b>
+      <div class="bpe-muted">Для товарів, <b>позначених у таблиці</b>, одразу після збереження — з новими базовими цінами.
+        На DigiKey ціни в <b>{{ config.dk.cur }}</b> — валюті вашого акаунта продавця (DigiKey API валюти не передає;
+        {{ config.dk.currency_source }}).
+        {% for c, r in config.dk.rates.items %}{% if c != config.dk.cur %}
+          Перерахунок: {% if r %}<b>1 {{ c }} = {{ r|floatformat:"-4" }} {{ config.dk.cur }}</b>{% else %}<b class="bpe-err">немає курсу {{ c }} → {{ config.dk.cur }}</b>{% endif %} ·
+        {% endif %}{% endfor %}
+        курс — {{ config.dk.rate_source }}; правила — {{ config.dk.rules }}
+        (<a href="{{ config.dk.settings_url }}" target="_blank">💲 Налаштування цін DigiKey</a>).
+        Змінюються лише ціни офера; надсилаються лише позиції, де ціна відрізняється від тієї, що зараз на DigiKey.</div>
+      {% include "admin/bots/digikeypricerun/_fx_fix.html" %}
+      <div class="bpe-shop">
+        <label><input type="checkbox" id="dk-on"> <b>Після «Зберегти» — на DigiKey</b></label>
+        <label class="bpe-tool"><input type="radio" name="dk-mode" value="push"{% if config.dk.can %} checked{% else %} disabled{% endif %}> 📤 одразу надіслати</label>
+        <label class="bpe-tool"><input type="radio" name="dk-mode" value="compare"{% if not config.dk.can %} checked{% endif %}> 👁 спершу показати, що стане (надіслати там)</label>
+        <span class="bpe-muted" id="dk-count"></span>
+      </div>
+      {% if not config.dk.can %}<div class="bpe-muted">Надсилати ціни на DigiKey може людина з правом змінювати лістинги DigiKey — вам доступне лише порівняння.</div>{% endif %}
+    </div>
+    {% endif %}
     <div class="bpe-foot">
       <label class="bpe-tool">Примітка в історію <input type="text" id="bpe-note-in" maxlength="150" style="width:280px;text-align:left"></label>
       <button type="submit" class="button default" id="bpe-save">💾 Зберегти</button>
@@ -104,6 +126,7 @@
       <span id="bpe-state" class="bpe-muted"></span>
     </div>
   </form>
+  {% include "admin/bots/digikeypricerun/_fx_form.html" %}
 </div>
 <script>
 (function () {
@@ -171,13 +194,34 @@
       return '<span class="' + (old[r.q] !== r.p ? 'ch' : '') + '">' + r.q + '+ ' + (r.p > 0 ? fmt(r.p) : '?') + '</span>';
     }).join('');
   }
+  var dk = cfg.dk || null;
+  function dkRate(cur) {
+    if (!dk) return null;
+    cur = (cur || '').toUpperCase();
+    if (cur === dk.cur) return 1;
+    return dk.rates[cur] || null;
+  }
+  function dkPrice(b, r, d) {           // ≈ ціна за 1 шт. на DigiKey: × курс × (100 + надбавка) % + добавка → округлення
+    return roundMode(b * r * (100 + (d.pct || 0)) / 100 + (d.fixed || 0), dk.rounding);
+  }
+  function dkHtml(it) {
+    if (!dk) return '';
+    var d = it.dk;
+    if (!d) return '<div class="bpe-muted">DigiKey: немає лістингу</div>';
+    var b = base(it), r = dkRate(it.currency), out = '<a href="' + d.url + '" target="_blank">DigiKey</a>: ' +
+      (d.now ? esc(d.now) : 'цін ще немає') + (d.tiers > 1 ? ' · ступенів ' + d.tiers : '');
+    if (d.note) out += ' · ' + esc(d.note);
+    else if (d.sendable && b > 0) out += r ? ' → <b>≈ ' + money(dkPrice(b, r, d)) + ' ' + esc(dk.cur) + '</b> за 1 шт.' +
+      (d.own ? ' (' + esc(d.own) + ')' : '') : ' · <span class="bpe-err">немає курсу ' + esc(it.currency) + ' → ' + esc(dk.cur) + '</span>';
+    return '<div class="bpe-muted">' + out + '</div>';
+  }
   function shopsHtml(it) {
     return (cfg.shops || []).map(function (s) {
       var st = it.shops[s.id];
       if (!st) return '<div class="bpe-muted">' + esc(s.name) + ': немає</div>';
       return '<div class="bpe-muted">' + esc(s.name) + ': ' + (st.base ? 'базові × ' + st.factor + ' %' : 'вручну') +
              ' · ' + esc(st.price) + (st.visible ? '' : ' · сховано') + '</div>';
-    }).join('');
+    }).join('') + dkHtml(it);
   }
   function detailHtml(it) {
     var b = base(it);
@@ -220,10 +264,21 @@
     $('#bpe-all').checked = on === items.length;
     document.getElementById('bpe-count').textContent = 'Позначено ' + on + ' з ' + items.length + ' · змінено ' + ch.length +
       (bad.length ? ' · з помилками ' + bad.length + ' (не збережуться, поки не виправите)' : '');
-    var shops = box.querySelectorAll('.s-on:checked').length;
+    var shops = box.querySelectorAll('.s-on:checked').length, dkc = dkChoice();
     document.getElementById('bpe-save').textContent = '💾 Зберегти' + (ch.length ? ' (' + ch.length + ')' : '') +
-      (shops ? ' і застосувати в магазинах' : '');
+      (shops ? ' і застосувати в магазинах' : '') +
+      (dkc ? (dkc.mode === 'compare' ? ' і порівняти з DigiKey' : ' і надіслати на DigiKey') : '');
     document.getElementById('bpe-state').textContent = ch.length || shops ? 'Є незбережені зміни' : '';
+    (cfg.shops || []).forEach(function (s) {
+      var el = box.querySelector('.s-cur[data-id="' + s.id + '"]'); if (el) el.innerHTML = shopCurrency(s);
+    });
+    var dkn = document.getElementById('dk-count');
+    if (dkn) {
+      var marked = items.filter(function (it) { return it.on && it.dk; });
+      var live = marked.filter(function (it) { return it.dk.sendable; });
+      dkn.innerHTML = 'позначено з лістингом DigiKey: ' + marked.length + ' · з опублікованим офером: <b>' + live.length + '</b>' +
+        (marked.length > live.length ? ' (решту DigiKey ще не опублікував — пропустимо)' : '');
+    }
   }
   items.forEach(function (it) { render(it); body.appendChild(it.tr); body.appendChild(it.dt); });
   document.querySelector('.h-home').textContent = '≈ 1 шт. у ' + home;
@@ -392,12 +447,24 @@
   });
 
   // ── Магазини ──
+  function shopCurrency(s) {        // у якій валюті ціни підуть у магазин і за яким курсом
+    var to = (s.currency || '').toUpperCase(), seen = {}, parts = [];
+    items.forEach(function (it) { if (it.on) seen[(it.currency || '').toUpperCase()] = true; });
+    Object.keys(seen).sort().forEach(function (c) {
+      if (c === to) return;
+      var r = rate(c, to);
+      parts.push(r ? esc(c) + ' → ' + esc(to) + ': 1 ' + esc(c) + ' = ' + fmt(r) + ' ' + esc(to) + ' («Курси валют»)'
+                   : '<span class="bpe-err">немає курсу ' + esc(c) + ' → ' + esc(to) + ' — ці товари в магазині не оновляться</span>');
+    });
+    return parts.length ? parts.join(' · ') : 'ціни в ' + esc(to) + ' — без перерахунку';
+  }
   var shopBox = document.getElementById('bpe-shops');
   (cfg.shops || []).forEach(function (s) {
     var listed = items.filter(function (it) { return it.shops[s.id]; }).length;
     var based = items.filter(function (it) { return it.shops[s.id] && it.shops[s.id].base; }).length;
     var d = document.createElement('div'); d.className = 'bpe-shop';
     d.innerHTML = '<label><input type="checkbox" class="s-on" data-id="' + s.id + '"> <b>' + esc(s.name) + '</b> (' + esc(s.currency) + ')</label>' +
+      '<span class="bpe-muted s-cur" data-id="' + s.id + '"></span>' +
       '<span class="bpe-muted">у магазині ' + listed + ' з ' + items.length + ', з базовими цінами ' + based + '</span>' +
       '<label class="bpe-tool">% від базової <input type="text" class="s-factor" data-id="' + s.id + '" placeholder="як зараз" title="Порожньо — позиції з базовими цінами зберігають свій %, решта — 100 %"></label>' +
       (listed < items.length ? '<label class="bpe-tool"><input type="checkbox" class="s-add" data-id="' + s.id + '"> додати ' + (items.length - listed) + ' товарів, яких там немає</label>' +
@@ -405,6 +472,17 @@
     shopBox.appendChild(d);
   });
   shopBox.addEventListener('change', counts);
+
+  // ── DigiKey ──
+  function dkChoice() {
+    var on = document.getElementById('dk-on');
+    if (!dk || !on || !on.checked) return null;
+    var m = box.querySelector('input[name="dk-mode"]:checked');
+    return { mode: m ? m.value : 'compare',
+             ids: items.filter(function (it) { return it.on && it.dk; }).map(function (it) { return it.id; }) };
+  }
+  var dkBox = document.getElementById('bpe-dk');
+  if (dkBox) dkBox.addEventListener('change', counts);
 
   // ── Збереження ──
   var form = document.getElementById('bpe-form'), saving = false;
@@ -416,9 +494,16 @@
       return { id: Number(id), factor: q('.s-factor') ? q('.s-factor').value : '', add: !!(q('.s-add') && q('.s-add').checked),
                visible: q('.s-vis') ? q('.s-vis').checked : true };
     });
-    if (!changed.length && !shops.length) { e.preventDefault(); tell('Немає змін для збереження.'); return; }
+    var dkc = dkChoice();
+    if (dkc && !dkc.ids.length) { e.preventDefault(); tell('DigiKey: серед позначених товарів немає жодного з лістингом DigiKey.'); return; }
+    if (!changed.length && !shops.length && !dkc) { e.preventDefault(); tell('Немає змін для збереження.'); return; }
+    if (dkc && dkc.mode === 'push') {
+      var live = items.filter(function (it) { return it.on && it.dk && it.dk.sendable; }).length;
+      if (!confirm('Надіслати на DigiKey нові ціни (у ' + dk.cur + ') для товарів з опублікованим офером: ' + live + '?\n' +
+                   'Змінюються лише ціни офера й лише там, де вони відрізняються від цін на DigiKey.')) { e.preventDefault(); return; }
+    }
     document.getElementById('bpe-payload').value = JSON.stringify({
-      note: document.getElementById('bpe-note-in').value, shops: shops,
+      note: document.getElementById('bpe-note-in').value, shops: shops, digikey: dkc,
       products: changed.map(function (it) {
         return { id: it.id, currency: it.currency, rows: it.rows.map(function (r) { return { min_qty: r.q, unit_price: fmt(r.p) }; }) };
       })

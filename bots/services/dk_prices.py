@@ -127,6 +127,18 @@ def rate_source_text(s=None) -> str:
     return "«Курси валют» Minerva"
 
 
+def no_rate_text(src: str, dst: str, s=None) -> str:
+    """Чому немає курсу src → dst і що зробити — за тим, звідки береться курс для DigiKey (`fx_source`)."""
+    s = s or settings()
+    head = f"немає курсу {src} → {dst}"
+    if s.fx_source == s.FX_ONLINE:
+        return f"{head}: онлайн-курс ЄЦБ ще не отримано — «⚙ Налаштування» → «🔄 Оновити онлайн-курс зараз»"
+    if s.fx_source == s.FX_MANUAL and s.fx_manual_rate:
+        return f"{head} — додайте {src} у «Курси валют» Minerva або переведіть базові ціни в {home_currency()}"
+    return (f"{head} у «Курсах валют» Minerva — додайте {dst} там або виберіть «Курс для цін DigiKey»: "
+            "онлайн ЄЦБ чи свій")
+
+
 def _ddmmyyyy(iso: str) -> str:
     y, m, d = (iso or "")[:10].split("-") if len(iso or "") >= 10 else ("", "", "")
     return f"{d}.{m}.{y}" if y else iso
@@ -480,8 +492,8 @@ def row_for(listing, rules: Rules, dk_currency: str, dk_tiers=None, cache: dict 
     row.rate = _cached(cache, ("fx", row.minerva_currency, dk_currency), lambda: fx(row.minerva_currency, dk_currency))
     if row.rate is None:
         row.state = "no_rate"
-        row.state_text = (f"немає курсу {row.minerva_currency} → {dk_currency} "
-                          "(«Налаштування цін магазину → Курси валют»)")
+        row.state_text = _cached(cache, ("no_rate", row.minerva_currency, dk_currency),
+                                 lambda: no_rate_text(row.minerva_currency, dk_currency))
         return row
     home = _cached(cache, "home", home_currency)
     purchase_rate = (_cached(cache, ("fx", home, dk_currency), lambda: fx(home, dk_currency))

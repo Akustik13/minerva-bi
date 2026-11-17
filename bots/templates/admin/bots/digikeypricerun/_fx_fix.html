@@ -1,0 +1,20 @@
+{# Курсу ціни Minerva → валюта DigiKey немає (bots/admin_prices.fx_fix): що сталось і як виправити. #}
+{# Кнопка шле форму #dkfx-form (_fx_form.html) — та стоїть поза іншими формами сторінки. #}
+{% if fx_fix %}
+<div class="dkfx" style="margin:0 0 12px;padding:10px 14px;border:1px solid var(--warn,#ffb74d);border-radius:8px;font-size:13px;line-height:1.5">
+  <div style="font-weight:700;color:var(--warn,#ffb74d)">💱 Ціни для DigiKey не рахуються: {{ fx_fix.text }}.</div>
+  <div style="color:var(--text-muted,#9aafbe);margin:2px 0 8px">Ціни Minerva — у {{ fx_fix.missing|join:", " }}, на DigiKey — у
+    <b>{{ fx_fix.cur }}</b> (валюта вашого акаунта продавця). Зараз курс береться: «{{ fx_fix.source }}».
+    Minerva може брати курс сама — довідковий курс Європейського центрального банку, оновлюється щодня.</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+    {% if fx_fix.can %}
+      <button type="submit" form="dkfx-form" name="source" value="online" class="button default"
+        title="«Курс для цін DigiKey» → онлайн ЄЦБ і одразу свіжий курс">🌐 {% if fx_fix.online %}Оновити онлайн-курс ЄЦБ зараз{% else %}Брати онлайн-курс ЄЦБ{% endif %}</button>
+      <a class="button" href="{{ fx_fix.settings_url }}" title="Вписати свій курс для DigiKey">✏️ Свій курс…</a>
+      <a class="button" href="{{ fx_fix.rates_url }}" title="Курс у «Курсах валют» Minerva — той самий, що для магазину">💱 «Курси валют» Minerva</a>
+    {% else %}
+      <span>Змінити, звідки курс, може людина з правом змінювати «💲 Налаштування цін DigiKey».</span>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
