@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils.html import format_html, format_html_join
 
 from inventory.admin import ProductShopFilter
+from inventory.category_badges import CategoryValuesFilter
 from inventory.services.stock import annotate_stock
 from inventory.param_filters import ListingParamFilter, panel_context
 from inventory.thumbs import ListingMediaFilter
@@ -1210,7 +1211,8 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
     list_display_links = ["sku_col"]
     list_editable = ["is_visible", "price"]
     list_filter = [ShopFilter, "is_visible", PromoFilter, LifecycleFilter, "price_source", PriceStateFilter, LotFilter,
-                   StockFilter, "product__category", ListingMediaFilter, ListingParamFilter]   # параметри — останнім
+                   StockFilter, ("product__category", CategoryValuesFilter), ListingMediaFilter,
+                   ListingParamFilter]   # параметри — останнім
     search_fields = ["product__sku", "product__name", "product__name_export", "product__manufacturer"]
     list_select_related = ["shop", "product"]
     list_per_page = 100
@@ -1611,9 +1613,9 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
 
 @admin.register(ShopProduct)
 class ShopProductAdmin(FormActionMixin, admin.ModelAdmin):
-    list_display = ["sku", "name_col", "category", "sale_price", "purchase_price", "shops_col"]
+    list_display = ["sku", "name_col", "category_col", "sale_price", "purchase_price", "shops_col"]
     list_display_links = None
-    list_filter = ["category", ProductShopFilter, "kind", "is_active"]
+    list_filter = [("category", CategoryValuesFilter), ProductShopFilter, "kind", "is_active"]
     search_fields = ["sku", "sku_short", "name", "name_export", "manufacturer"]
     list_per_page = 100
     ordering = ["category", "sku"]
@@ -1626,11 +1628,18 @@ class ShopProductAdmin(FormActionMixin, admin.ModelAdmin):
         return False
 
     def get_queryset(self, request):
-        return super().get_queryset(request).prefetch_related("shop_listings__shop").select_related("dk_listing")
+        from inventory.category_badges import annotate
+        qs = super().get_queryset(request).prefetch_related("shop_listings__shop").select_related("dk_listing")
+        return annotate(qs)   # бейдж «Категорія» — без запиту на рядок
 
     @admin.display(description="Назва", ordering="name")
     def name_col(self, obj):
         return (obj.name or "")[:50]
+
+    @admin.display(description="Категорія", ordering="category")
+    def category_col(self, obj):
+        from inventory.category_badges import column
+        return column(obj)
 
     @admin.display(description="У магазинах")
     def shops_col(self, obj):

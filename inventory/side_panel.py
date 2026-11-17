@@ -202,11 +202,13 @@ def _many_places(p) -> bool:
 
 
 def _category_name(p) -> str:
+    """«📡 Антени» — значок і назва категорії (без значка — назва; коду немає в довіднику — сам код)."""
     def load():
         from inventory.models import ProductCategory
         if not p.category:
             return ""
-        return ProductCategory.objects.filter(slug=p.category).values_list("name", flat=True).first() or p.category
+        c = ProductCategory.objects.filter(slug=p.category).only("name", "icon").first()
+        return c.label if c else p.category
     return _memo(p, "category", load)
 
 

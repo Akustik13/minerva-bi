@@ -87,7 +87,7 @@ class LocationSerializer(serializers.ModelSerializer):
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model  = ProductCategory
-        fields = ["slug", "name", "color", "order"]
+        fields = ["slug", "name", "color", "icon", "order"]
 
 
 # ── Інтернет-магазин ──────────────────────────────────────────────────────────

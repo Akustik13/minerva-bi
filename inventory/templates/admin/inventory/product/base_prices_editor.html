@@ -39,11 +39,18 @@
   #bpe .bpe-sub { border-collapse: collapse; margin: 4px 0; }
   #bpe .bpe-sub td, #bpe .bpe-sub th { padding: 3px 6px; border: 0; }
   #bpe .bpe-sub input { width: 90px; text-align: right; }
+  #bpe .bpe-sub td.sum { text-align: right; white-space: nowrap; font-weight: 600; }
   #bpe .bpe-shops { margin: 14px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; }
   #bpe .bpe-shop { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin: 6px 0; font-size: 12px; }
   #bpe .bpe-tpl { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--accent, #58a6ff); border-radius: 6px; }
   #bpe .bpe-tpl .bpe-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 4px 0; font-size: 12px; }
   #bpe .bpe-tpl td.eg { color: var(--muted); font-family: monospace; }
+  #bpe .bpe-gen { padding: 6px 0 8px; border-bottom: 1px dashed var(--line); }
+  #bpe .bpe-gen input.g-q { width: 260px; text-align: left; }
+  #bpe .bpe-gen input.g-disc { width: 52px; text-align: right; }
+  #bpe .bpe-gen .g-preset { background: var(--bg-card, #1a2535); color: var(--text, #c9d8e4); border: 1px solid var(--line);
+    border-radius: 12px; padding: 2px 10px; font-size: 11px; cursor: pointer; }
+  #bpe .bpe-gen .g-preset:hover { border-color: var(--accent, #58a6ff); }
   #bpe .bpe-foot { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-top: 12px; }
   #bpe .bpe-msg { color: #ffb74d; font-weight: 600; }
   #bpe .bpe-err { color: #e57373; }
@@ -67,6 +74,13 @@
     <div class="bpe-row"><b>📐 Ступені цін для позначених товарів</b>
       <label><input type="radio" name="tpl-mode" value="disc" checked> знижка від ціни за 1 шт. (у кожного товару своя ціна)</label>
       <label><input type="radio" name="tpl-mode" value="price"> однакові ціни для всіх</label></div>
+    <div class="bpe-row bpe-gen"><b>📈 Згенерувати знижки:</b>
+      <span>кількості, шт. <input type="text" class="g-q" aria-label="Кількості, шт." placeholder="1, 10, 25, 50, 100, 250, 500, 1000"></span>
+      <span id="g-presets"></span>
+      <span>знижка на найбільшу <input type="text" class="g-disc" inputmode="decimal" aria-label="Знижка на найбільшу кількість, %"> %</span>
+      <label><input type="radio" name="g-curve" value="smooth" checked> плавно — як на DigiKey</label>
+      <label><input type="radio" name="g-curve" value="even"> рівними кроками</label>
+      <button type="button" class="bpe-b g-fill" title="Знижки для цих кількостей — у таблицю шаблону нижче; потім «Застосувати до позначених»">Заповнити шаблон</button></div>
     <table class="bpe-sub"><thead><tr><th>Від, шт.</th><th id="tpl-h"></th><th id="tpl-eg"></th><th></th></tr></thead>
       <tbody id="tpl-body"></tbody></table>
     <div class="bpe-row">
@@ -139,6 +153,10 @@
   function num(v) { v = String(v == null ? '' : v).trim().replace(/\s/g, '').replace(',', '.'); return v === '' ? NaN : Number(v); }
   function fmt(n) { return (Math.round(n * 10000) / 10000).toFixed(4).replace(/\.?0+$/, ''); }
   function money(n) { return n.toFixed(2).replace('.', ','); }
+  function total(n) {                 // сума за кількість: 15 000,00
+    var s = n.toFixed(2).split('.');
+    return s[0].replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0') + ',' + s[1];
+  }
   function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
   function roundMode(v, mode) {
     if (!mode || mode === 'none' || !(v > 0)) return v;
@@ -149,6 +167,7 @@
     }
     var step = Number(mode); return Math.round(v / step) * step;
   }
+{% include "admin/inventory/product/_tier_gen.js" %}
   function rate(from, to) {
     from = (from || '').toUpperCase(); to = (to || '').toUpperCase();
     if (from === to) return 1;
@@ -229,10 +248,11 @@
       var d = b > 0 && r.p > 0 && r.q > 1 ? Math.round((1 - r.p / b) * 1000) / 10 : '';
       return '<tr><td><input type="text" class="d-q" data-i="' + i + '" value="' + r.q + '"></td>' +
              '<td><input type="text" class="d-p" data-i="' + i + '" value="' + (r.p > 0 ? fmt(r.p) : '') + '"></td>' +
+             '<td class="sum" title="Скільки коштує вся ця кількість: кількість × ціна за шт.">' + (r.q >= 1 && r.p > 0 ? total(r.q * r.p) + ' ' + esc(it.currency) : '') + '</td>' +
              '<td><input type="text" class="d-d" data-i="' + i + '" value="' + String(d).replace('.', ',') + '"' + (r.q === 1 ? ' disabled' : '') + ' placeholder="—"></td>' +
              '<td><button type="button" class="bpe-b d-del" data-i="' + i + '" title="Видалити ступінь">×</button></td></tr>';
     }).join('');
-    return '<table class="bpe-sub"><thead><tr><th>Від, шт.</th><th>Ціна за шт.</th><th>Знижка від 1 шт., %</th><th></th></tr></thead>' +
+    return '<table class="bpe-sub"><thead><tr><th>Від, шт.</th><th>Ціна за шт.</th><th style="text-align:right">Сума</th><th>Знижка від 1 шт., %</th><th></th></tr></thead>' +
            '<tbody>' + rows + '</tbody></table><button type="button" class="bpe-b d-add">+ Додати ступінь</button>';
   }
   function render(it) {
@@ -428,6 +448,29 @@
       return;
     }
     tplState(''); tplDraw();
+  });
+  // ── 📈 Генератор знижок для шаблону (функції — _tier_gen.js) ──
+  var genRow = tplBox.querySelector('.bpe-gen');
+  document.getElementById('g-presets').innerHTML = tierPresetsHtml((cfg.template || []).length
+    ? [{ label: 'Як у шаблоні магазину', q: [1].concat((cfg.template || []).map(function (t) { return t.min_qty; })) }] : []);
+  genRow.querySelector('.g-q').value = TIER_PRESETS[0].q.join(', ');
+  genRow.querySelector('.g-disc').value = String((cfg.template || []).reduce(function (m, t) { return Math.max(m, Number(t.discount) || 0); }, 0) || 20).replace('.', ',');
+  genRow.addEventListener('click', function (e) {
+    var t = e.target;
+    if (t.tagName === 'BUTTON') e.stopPropagation();     // не до обробника шаблону — він стер би повідомлення
+    if (t.classList.contains('g-preset')) { genRow.querySelector('.g-q').value = t.getAttribute('data-q'); return; }
+    if (!t.classList.contains('g-fill')) return;
+    var qs = tierQtys(genRow.querySelector('.g-q').value), md = num(genRow.querySelector('.g-disc').value);
+    if (qs.length < 2) return tplState('Додайте хоча б одну кількість, більшу за 1 шт.', true);
+    if (!(md > 0 && md < 100)) return tplState('Знижка на найбільшу кількість — від 0 до 99 %.', true);
+    var curve = genRow.querySelector('input[name="g-curve"]:checked').value;
+    var plan = tierPlan(qs, 100, md, curve, function (v) { return v; });   // ціна 100 = знижки у %
+    tpl.disc = plan.rows.filter(function (r) { return r.q > 1; }).map(function (r) { return { q: r.q, v: r.d }; });
+    tplBox.querySelector('input[name="tpl-mode"][value="disc"]').checked = true;
+    tpl.priceEdited = false;
+    tplDraw();
+    tplState('Шаблон заповнено: ' + tpl.disc.length + ' ступенів до −' + String(md).replace('.', ',') + ' % — перевірте й «Застосувати до позначених».' +
+             (tpl.disc.length + 1 > TIER_DK_MAX ? ' DigiKey приймає до ' + TIER_DK_MAX + ' ступенів.' : ''));
   });
   $('.b-rnd').addEventListener('click', function () { each(function (it) { eachPrice(it, function (p) { return p; }); }); tell(''); });
   $('.b-conv').addEventListener('click', function () {

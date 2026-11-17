@@ -107,6 +107,9 @@
 .sv-name { font-size: 11px; color: var(--text-dim); margin-top: 1px;
            max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sv-cat { font-size: 10px; color: var(--text-dim); }
+.sv-cat-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px;
+  vertical-align: 0; box-shadow: 0 0 0 1px var(--border-strong, rgba(0,0,0,.2)); }
+.sv-cat-unknown { font-style: italic; }
 
 /* ── Stock numbers ── */
 .sv-num { font-weight: 700; font-size: 14px; }
@@ -273,6 +276,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
   <div class="sv-filters" id="sv-cat-filters" style="margin-top:4px"></div>
   <!-- Technical parameters of the chosen category (built by JS) -->
   {{ params|json_script:"sv-params-data" }}
+  {{ cats|json_script:"sv-cats-data" }}
   <div class="sv-params" id="sv-param-panel"></div>
 
   <!-- Search -->
@@ -727,14 +731,22 @@ var _svi = {
     applyVisibility();
   };
 
-  /* Build category buttons from data-cat attributes */
+  /* Build category buttons from data-cat attributes: значок, назва й колір — з «Категорій товарів»
+     (inventory/category_badges.info), у їхньому порядку; коди без категорії — після них */
   (function buildCatFilters() {
+    var INFO = {};
+    try { INFO = JSON.parse((document.getElementById('sv-cats-data') || {}).textContent || '{}') || {}; } catch (e) {}
+    var rank = {};
+    Object.keys(INFO).forEach(function(k, i) { rank[k] = i; });
     var catSet = {};
     rows.forEach(function(r) {
       var c = (r.dataset.cat || '').trim();
       if (c) catSet[c] = true;
     });
-    var cats = Object.keys(catSet).sort();
+    var cats = Object.keys(catSet).sort(function(a, b) {
+      var ra = a in rank ? rank[a] : 1e6, rb = b in rank ? rank[b] : 1e6;
+      return ra - rb || (a < b ? -1 : a > b ? 1 : 0);
+    });
     var wrap = document.getElementById('sv-cat-filters');
     if (!wrap || !cats.length) return;
 
@@ -747,7 +759,19 @@ var _svi = {
     cats.forEach(function(cat) {
       var btn = document.createElement('button');
       btn.className = 'sv-filter-btn' + (activeCategory === cat ? ' active' : '');
-      btn.textContent = cat;
+      var c = INFO[cat];
+      btn.setAttribute('translate', 'no');
+      btn.title = c ? c.slug : cat;
+      if (c) {
+        var dot = document.createElement('span');
+        dot.className = 'sv-cat-dot';
+        dot.style.background = c.color;
+        btn.appendChild(dot);
+        btn.appendChild(document.createTextNode(c.label));
+      } else {
+        btn.classList.add('sv-cat-unknown');
+        btn.textContent = cat;
+      }
       btn.onclick = function() { svCatFilter(cat, btn); };
       wrap.appendChild(btn);
     });
