@@ -2145,6 +2145,17 @@ class ProductAdminForm(forms.ModelForm):
         if inst and inst.pk:
             self.initial["base_prices_text"] = format_text(inst.base_prices)
             self.initial["base_currency"] = inst.base_price_currency
+        if "shop_qty_choices" in self.fields:    # лот у магазинах: «1000; 5000; 10000» замість JSON
+            from shop.admin_lots import ChoicesField
+            old = self.fields["shop_qty_choices"]
+            self.fields["shop_qty_choices"] = ChoicesField(label=old.label, help_text=old.help_text)
+
+    def clean(self):
+        data = super().clean()
+        if "shop_min_qty" in self.fields and "shop_qty_step" in self.fields:
+            from shop.admin_lots import clean_rule
+            clean_rule(self, "shop_min_qty", "shop_qty_step")
+        return data
 
     def clean_base_prices_text(self):
         from .services.base_prices import parse_text
@@ -2443,6 +2454,12 @@ class ProductAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
         return shop_prices_panel(obj)
     shop_listings_info.short_description = "Магазини"
 
+    @admin.display(description="Що може замовити покупець")
+    def shop_lot_info(self, obj):
+        """Лот у магазинах за замовчуванням, свої лоти магазинів, MOQ DigiKey (shop/admin_lots.py)."""
+        from shop.admin_lots import product_panel
+        return product_panel(obj)
+
     @admin.display(description="DigiKey")
     def dk_price_panel(self, obj):
         """Зараз на DigiKey → стане з цін Minerva, «✓ Оновити на DigiKey зараз» (bots/admin_prices.py)."""
@@ -2453,7 +2470,7 @@ class ProductAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
     readonly_fields = ("stock_qty", "reserved_qty", "incoming_qty", "buildable_qty",
                        "set_stock_link", "reorder_info", "label_detail", "bom_availability",
                        "image_preview", "datasheet_link", "movement_history", "shop_listings_info",
-                       "base_prices_info", "shop_media_panel", "dk_price_panel", "weight_panel")
+                       "shop_lot_info", "base_prices_info", "shop_media_panel", "dk_price_panel", "weight_panel")
     fieldsets = (
         (None, {"fields": ("sku", "sku_short", "name", "category",
                             "kind", "bom_type", "unit_type", "is_active")}),
@@ -2476,8 +2493,10 @@ class ProductAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
                            "Магазини з джерелом ціни «базові» оновлюються автоматично.",
         }),
         ("🏪 Інтернет-магазини", {
-            "fields": ("shop_listings_info",),
-            "description": "Асортимент, ціни і ступені цін кожного магазину — розділ «🏪 Інтернет-магазин».",
+            "fields": ("shop_listings_info", ("shop_min_qty", "shop_qty_step", "shop_qty_choices"), "shop_lot_info"),
+            "description": "Асортимент, ціни і ступені цін кожного магазину — розділ «🏪 Інтернет-магазин». "
+                           "Мінімальне замовлення, крок і «лише ці кількості» діють у всіх магазинах; позиція "
+                           "магазину може задати свій лот.",
         }),
         ("💲 Ціна на DigiKey", {
             "fields": ("dk_price_panel",),

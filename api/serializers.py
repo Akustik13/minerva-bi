@@ -116,13 +116,34 @@ class ShopProductSerializer(serializers.ModelSerializer):
     media = serializers.SerializerMethodField(
         help_text="Перевірені фото й даташит {image, datasheet}: {sha256, size, content_type, ext, source url|file, "
                   "stale, updated_at, url} або null (немає — сайт показує свій файл); media = null — вимкнено в Minerva")
+    min_qty = serializers.SerializerMethodField(
+        help_text="Найменша кількість, яку можна замовити (лот); 1 — без обмежень")
+    qty_step = serializers.SerializerMethodField(
+        help_text="Крок від min_qty: min_qty 1000 і крок 1000 → 1000, 2000, 3000…; 1 — будь-яка кількість")
+    qty_choices = serializers.SerializerMethodField(
+        help_text="Лише ці кількості [1000, 5000, 10000] (тоді min_qty / qty_step не діють); [] — без списку")
 
     class Meta:
         model  = Product
         fields = ["sku", "name", "name_export", "category", "unit_type", "manufacturer",
                   "price", "price_breaks", "price_origin", "offer", "is_new", "lifecycle_status", "successor",
+                  "min_qty", "qty_step", "qty_choices",
                   "base_prices", "available", "incoming", "in_stock", "lead_time_days",
                   "net_weight_g", "image_url", "datasheet_url", "media", "tech_attributes", "last_movement_at"]
+
+    def _lot(self, obj):
+        from shop.lots import payload, product_rule, rule_for
+        listing = self._listing(obj)
+        return payload(rule_for(listing) if listing else product_rule(obj))
+
+    def get_min_qty(self, obj):
+        return self._lot(obj)["min_qty"]
+
+    def get_qty_step(self, obj):
+        return self._lot(obj)["qty_step"]
+
+    def get_qty_choices(self, obj):
+        return self._lot(obj)["qty_choices"]
 
     def get_media(self, obj):
         from shop import media
@@ -176,7 +197,10 @@ class ShopProductSerializer(serializers.ModelSerializer):
 
     def get_base_prices(self, obj):
         from inventory.services.base_prices import normalize
-        rows = normalize(obj.base_prices)
+        from shop.lots import cut, product_rule, rule_for
+        listing = self._listing(obj)
+        # з лотом — без ціни за 1 шт. і ступенів нижче лоту (як price_breaks)
+        rows = cut(normalize(obj.base_prices), rule_for(listing) if listing else product_rule(obj))
         if not rows:
             return None
         return {"currency": obj.base_price_currency,
@@ -242,6 +266,21 @@ def base_prices_payload(product):
     }
 
 
+def _hide_below_lot(obj, data) -> None:
+    """Ключ сайту магазину: товар продається лотом (shop/lots.py) — без ціни за 1 шт. («Ціна продажу») і ступенів
+    базових цін нижче лоту. Лот — позиції магазину ключа (prefetch `_shop_listing`), інакше з картки товару."""
+    from shop.lots import cut, product_rule, rule_for
+    own = getattr(obj, "_shop_listing", None)
+    rule = rule_for(own[0]) if own else product_rule(obj)
+    if rule.any:
+        return
+    if "sale_price" in data:
+        data["sale_price"] = None
+    base = data.get("base_prices")
+    if base and base.get("price_breaks"):
+        base["price_breaks"] = cut(base["price_breaks"], rule)
+
+
 class ProductSerializer(serializers.ModelSerializer):
     image_url     = serializers.SerializerMethodField()
     datasheet_url = serializers.SerializerMethodField()
@@ -268,6 +307,7 @@ class ProductSerializer(serializers.ModelSerializer):
         if self.context.get("public_only"):
             for name in self.INTERNAL_FIELDS:
                 data.pop(name, None)
+            _hide_below_lot(obj, data)
         return data
 
     def get_tech_attributes(self, obj):

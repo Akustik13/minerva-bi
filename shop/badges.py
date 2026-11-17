@@ -20,6 +20,10 @@ def title(listing) -> str:
              f"{price:.2f} {shop.currency}" if price is not None else "ціна за запитом"]
     if listing.price_source == "base":
         parts.append("базові ціни")
+    from .lots import rule_for
+    lot = rule_for(listing).text()
+    if lot:
+        parts.append(f"лот {lot}")
     if not shop.is_active:
         parts.append("магазин вимкнено")
     return " · ".join(parts)

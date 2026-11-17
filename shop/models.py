@@ -384,6 +384,20 @@ class ShopListing(models.Model):
         verbose_name="Заміна в цьому магазині",
         help_text="Порожньо — рекомендована заміна з картки товару.",
     )
+    # Лот у цьому магазині (shop/lots.py): хоч одне поле задано — своє правило, інакше — з картки товару
+    min_qty = models.PositiveIntegerField(
+        "Мін. замовлення, шт.", null=True, blank=True, validators=[MinValueValidator(1)],
+        help_text="Менше покупець замовити не може; ціна за 1 шт. і ступені нижче на сайті не показуються. "
+                  "Порожньо — як у картці товару; 1 — будь-яка кількість у цьому магазині.",
+    )
+    qty_step = models.PositiveIntegerField(
+        "Крок, шт.", null=True, blank=True, validators=[MinValueValidator(1)],
+        help_text="Від мінімуму кроками: мін. 1000 і крок 1000 → 1000, 2000, 3000… Порожньо або 1 — будь-яка кількість.",
+    )
+    qty_choices = models.JSONField(
+        "Лише ці кількості", default=list, blank=True,
+        help_text="Напр. «1000; 5000; 10000» — покупець вибирає одну з них (мінімум і крок тоді не діють).",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

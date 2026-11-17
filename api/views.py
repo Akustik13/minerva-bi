@@ -311,7 +311,11 @@ class ProductViewSet(NoDeleteMixin, viewsets.ModelViewSet):
         qs = Product.objects.all().order_by("sku")
         shop = _bound_shop(self.request)
         if shop is not None:     # ключ сайту — лише товари, видимі в його магазині (каталог — /shop/products/)
-            qs = qs.filter(shop_listings__shop=shop, shop_listings__is_visible=True).distinct()
+            from django.db.models import Prefetch
+            from shop.models import ShopListing
+            qs = (qs.filter(shop_listings__shop=shop, shop_listings__is_visible=True).distinct()
+                  .prefetch_related(Prefetch("shop_listings", queryset=ShopListing.objects.filter(shop=shop),
+                                             to_attr="_shop_listing")))   # лот магазину (shop/lots.py)
         # Фільтри in_stock/low_stock/changed_since потребують анотацій
         if self.request.method == "GET":
             qs = stock_service.annotate_stock(qs)
@@ -456,10 +460,15 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
                 if not (listing and product.is_active):
                     errors.append({"line": i, "sku": raw, "error": "Товар недоступний в інтернет-магазині"})
                     continue
+                from shop.lots import rule_for
                 from shop.services import regular_price_breaks, unit_price_for
                 breaks = regular_price_breaks(listing)
                 if not breaks:
                     errors.append({"line": i, "sku": raw, "error": "Ціна не задана — товар лише за запитом"})
+                    continue
+                lot = rule_for(listing).problem(ln["qty"])    # лот, крок, «лише ці кількості»
+                if lot:
+                    errors.append({"line": i, "sku": raw, **lot})
                     continue
                 if unit_price_for(listing, ln["qty"]) is None:     # менше за мінімальну кількість першої ціни
                     first = min(b["min_qty"] for b in breaks) if isinstance(breaks[0], dict) else None

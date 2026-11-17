@@ -15,6 +15,7 @@ from inventory.param_filters import ListingParamFilter, panel_context
 from inventory.thumbs import ListingMediaFilter
 
 from . import services
+from .admin_lots import ListingLotForm, LotFilter, LotForm, apply_lot_form, listing_panel, lot_cell
 from .admin_payments import ShopForm, stripe_tools
 from .models import (ShippingZone, Shop, ShopListing, ShopPriceTier, ShopProduct, ShopSearchQuery, ShopSettings,
                      ShopStaff)
@@ -1203,12 +1204,13 @@ class ShopPriceTierInline(admin.TabularInline):
 
 @admin.register(ShopListing)
 class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
+    form = ListingLotForm
     list_display = ["sku_col", "media_col", "name_col", "shop", "is_visible", "price", "promo_col", "source_col",
-                    "sale_price_col", "purchase_col", "margin_col", "tiers_col", "available_col"]
+                    "sale_price_col", "purchase_col", "margin_col", "tiers_col", "lot_col", "available_col"]
     list_display_links = ["sku_col"]
     list_editable = ["is_visible", "price"]
-    list_filter = [ShopFilter, "is_visible", PromoFilter, LifecycleFilter, "price_source", PriceStateFilter, StockFilter,
-                   "product__category", ListingMediaFilter, ListingParamFilter]   # параметри — останнім
+    list_filter = [ShopFilter, "is_visible", PromoFilter, LifecycleFilter, "price_source", PriceStateFilter, LotFilter,
+                   StockFilter, "product__category", ListingMediaFilter, ListingParamFilter]   # параметри — останнім
     search_fields = ["product__sku", "product__name", "product__name_export", "product__manufacturer"]
     list_select_related = ["shop", "product"]
     list_per_page = 100
@@ -1217,20 +1219,21 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
     inlines = [ShopPriceTierInline]
     fields = ["shop", "product", "is_visible", "price", "price_source", "price_factor",
               ("discount_percent", "discount_until"), "new_until", ("lifecycle_status", "successor"),
+              ("min_qty", "qty_step", "qty_choices"), "lot_preview",
               "breaks_preview", "base_prices_preview"]
     autocomplete_fields = ["successor"]
-    readonly_fields = ["breaks_preview", "base_prices_preview"]
+    readonly_fields = ["lot_preview", "breaks_preview", "base_prices_preview"]
     actions = ["action_show", "action_hide", "action_set_price", "action_adjust", "action_markup",
                "action_offer", "action_offer_clear", "action_new", "action_new_clear", "action_lifecycle",
                "action_base", "action_manual",
-               "action_tiers_default", "action_tiers_custom", "action_tiers_clear",
+               "action_tiers_default", "action_tiers_custom", "action_tiers_clear", "action_lot",
                "action_reset_to_sale", "action_round", "action_copy", "delete_selected"]
     # Групи у випадаючому меню «Дія» (optgroup); дії поза групами — в «Інше»
     ACTION_GROUPS = [
         ("👁 Видимість", ["action_show", "action_hide"]),
         ("💶 Ціна", ["action_set_price", "action_adjust", "action_markup", "action_base", "action_manual",
                     "action_reset_to_sale", "action_round"]),
-        ("📊 Ступені цін", ["action_tiers_default", "action_tiers_custom", "action_tiers_clear"]),
+        ("📊 Ступені цін", ["action_tiers_default", "action_tiers_custom", "action_tiers_clear", "action_lot"]),
         ("🏷 Акції та новинки", ["action_offer", "action_offer_clear", "action_new", "action_new_clear"]),
         ("♻️ Статус", ["action_lifecycle"]),
         ("📋 Інше", ["action_copy", "delete_selected"]),
@@ -1398,6 +1401,14 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
             return "—"
         return ", ".join(f"{t.min_qty}+: {t.unit_price:.2f}" for t in tiers[:4]) + (" …" if len(tiers) > 4 else "")
 
+    @admin.display(description="Лот")
+    def lot_col(self, obj):
+        return lot_cell(obj)
+
+    @admin.display(description="Що може замовити покупець")
+    def lot_preview(self, obj):
+        return listing_panel(obj)
+
     @admin.display(description="На складі")
     def available_col(self, obj):
         if getattr(self, "_stock", None) is None:
@@ -1452,15 +1463,20 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
             return "Ціна не задана — на сайті «Ціна за запитом»"
         note = format_html('<div style="margin-top:6px;font-size:12px;opacity:.85">{} Валюта магазину: {}.</div>',
                            self._origin_note(obj), obj.shop.currency)
+        from .lots import rule_for
+        exact = bool(rule_for(obj).choices)     # «лише ці кількості» — рядок на кількість, не «від»
+
+        def qty(q):
+            return f"{q} шт." if exact else f"від {q} шт."
         info = services.offer_info(obj)
         if info:
             regular = {r["min_qty"]: r["unit_price"] for r in info["regular_price_breaks"]}
-            body = format_html_join("", "<tr><td>від {} шт.</td><td><s>{}</s></td><td><b>{}</b></td></tr>", (
-                (r["min_qty"], f'{regular[r["min_qty"]]:.2f}', f'{r["unit_price"]:.2f}') for r in rows))
+            body = format_html_join("", "<tr><td>{}</td><td><s>{}</s></td><td><b>{}</b></td></tr>", (
+                (qty(r["min_qty"]), f'{regular[r["min_qty"]]:.2f}', f'{r["unit_price"]:.2f}') for r in rows))
             return format_html("<table><tr><th>Кількість</th><th>Звичайна</th><th>Акція −{} %</th></tr>{}</table>{}",
                                f"{info['percent'].normalize():f}", body, note)
-        body = format_html_join("", "<tr><td>від {} шт.</td><td>{} {}</td></tr>",
-                                ((r["min_qty"], f'{r["unit_price"]:.2f}', obj.shop.currency) for r in rows))
+        body = format_html_join("", "<tr><td>{}</td><td>{} {}</td></tr>",
+                                ((qty(r["min_qty"]), f'{r["unit_price"]:.2f}', obj.shop.currency) for r in rows))
         return format_html("<table><tr><th>Кількість</th><th>Ціна/шт. нетто</th></tr>{}</table>{}", body, note)
 
     # ── Дії ──────────────────────────────────────────────────────────────────
@@ -1568,6 +1584,11 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
     @admin.action(description="🧹 Видалити ступені цін")
     def action_tiers_clear(self, request, queryset):
         self.message_user(request, f"Видалено ступенів: {services.clear_tiers(queryset)}")
+
+    @admin.action(description="📦 Мін. замовлення / крок / лише ці кількості…", permissions=["change"])
+    def action_lot(self, request, queryset):
+        return self._form_action(request, queryset, LotForm, "Лот для вибраних позицій",
+            lambda qs, d: f"Лот змінено: {apply_lot_form(qs, d)} позицій")
 
     @admin.action(description="↩️ Ціна = ціна продажу товару")
     def action_reset_to_sale(self, request, queryset):

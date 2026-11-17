@@ -597,15 +597,23 @@ def _shops_part(p, request):
     listings = _shop_listings(p)
     if not listings:
         return _group("🏪 Магазини", sp.empty("У магазинах товару немає."))
+    from shop.lots import rule_for
+    from shop.services import regular_price_breaks
     today = timezone.localdate()
     rows = []
     for l in listings:
-        price = l.effective_price
+        lot = rule_for(l)
+        if lot.any:
+            price = l.effective_price
+        else:   # з лотом — ціна, що діє на лот (ціни за 1 шт. покупець не бачить)
+            first = regular_price_breaks(l)
+            price = first[0]["unit_price"] if first else None
         right = sp.data(sp.money(price, l.shop.currency)) if price is not None else _ui("ціна за запитом")
         discount = _num(l.discount_percent)
         on_sale = discount > 0 and (l.discount_until is None or l.discount_until >= today)
         note = _dot([_tone("показується", "ok") if l.is_visible else _tone("сховано", "muted"),
                      "базові ціни" if l.price_source == "base" else "",
+                     f"📦 {lot.text()}" if not lot.any else "",
                      f"акція −{sp.qty(discount)} %" if on_sale else "",
                      "магазин вимкнено" if not l.shop.is_active else ""])
         rows.append(_line(sp.admin_link(request, l, l.shop.name), right, note))

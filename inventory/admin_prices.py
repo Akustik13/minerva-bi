@@ -52,7 +52,10 @@ def _price_text(listing) -> str:
     if price is None:
         return "ціна за запитом"
     tiers = len(listing.tiers.all())
-    return f"{price:.2f} {listing.shop.currency}" + (f" · ступенів {tiers}" if tiers else "")
+    from shop.lots import rule_for
+    lot = rule_for(listing).text()
+    return (f"{price:.2f} {listing.shop.currency}" + (f" · ступенів {tiers}" if tiers else "")
+            + (f" · 📦 {lot}" if lot else ""))
 
 
 # ── Картка товару: «🏪 Інтернет-магазини» ─────────────────────────────────────

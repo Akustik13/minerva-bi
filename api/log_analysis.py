@@ -134,6 +134,8 @@ CODE_TEXT = {
     "already_shipped": "замовлення вже відправлене",
     "no_shop": "для ключа не налаштовано магазин",
     "below_min_qty": "менше за мінімальну кількість",
+    "qty_not_in_step": "кількість не за кроком лоту",
+    "qty_not_in_choices": "кількості немає в списку дозволених",
     "shipping_not_available": "доставка в цю країну недоступна",
     "payment_method_not_allowed": "спосіб оплати вимкнено",
     "payment_processing": "оплата вже обробляється",

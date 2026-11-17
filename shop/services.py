@@ -86,8 +86,8 @@ def _fallback_base_tiers(listing) -> list[dict]:
     return out
 
 
-def regular_price_breaks(listing) -> list[dict]:
-    """[{min_qty, unit_price}] без акції, починаючи з 1 шт.; порожньо, якщо в позиції немає ціни.
+def all_price_breaks(listing) -> list[dict]:
+    """[{min_qty, unit_price}] без акції й без лоту, починаючи з 1 шт.; порожньо, якщо в позиції немає ціни.
     Ціна: своя ціна позиції → «Ціна продажу» товару → базові ціни товару (за курсом)."""
     base = listing.effective_price
     if base is None:
@@ -97,6 +97,13 @@ def regular_price_breaks(listing) -> list[dict]:
         if t.min_qty > 1:
             tiers.append({"min_qty": t.min_qty, "unit_price": t.unit_price})
     return tiers
+
+
+def regular_price_breaks(listing) -> list[dict]:
+    """Ціни без акції, як бачить покупець: з лотом (shop/lots.py) — від мінімального замовлення / лише
+    кількості списку, ціна за 1 шт. і ступені нижче лоту не публікуються."""
+    from .lots import cut, rule_for
+    return cut(all_price_breaks(listing), rule_for(listing))
 
 
 def offer_percent(listing, today=None) -> Decimal | None:
@@ -291,6 +298,20 @@ def set_new(listings, until=None) -> int:
 
 
 @transaction.atomic
+def set_lot(listings, min_qty=None, step=None, choices=None) -> int:
+    """Лот для вибраних позицій (shop/lots.py). Усе порожнє — як у картці товару. Пише лише змінене."""
+    choices = list(choices or [])
+    n = 0
+    for l in listings:
+        if (l.min_qty, l.qty_step, list(l.qty_choices or [])) == (min_qty, step, choices):
+            continue
+        l.min_qty, l.qty_step, l.qty_choices = min_qty, step, choices
+        l.save(update_fields=["min_qty", "qty_step", "qty_choices", "updated_at"])
+        n += 1
+    return n
+
+
+@transaction.atomic
 def set_visibility(listings, visible: bool) -> int:
     n = 0
     for l in listings:
@@ -348,6 +369,7 @@ def copy_listings(listings, target: Shop, factor=Decimal("1"), with_tiers: bool 
         dst.is_visible = src.is_visible
         dst.price = round_price(Decimal(base) * factor, rounding) if base is not None else None
         dst.price_source = ShopListing.PRICE_MANUAL
+        dst.min_qty, dst.qty_step, dst.qty_choices = src.min_qty, src.qty_step, list(src.qty_choices or [])
         dst.save()
         if with_tiers:
             for t in dst.tiers.all():

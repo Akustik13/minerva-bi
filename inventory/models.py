@@ -150,6 +150,20 @@ class Product(models.Model):
         "Ціна в магазині (нетто)", max_digits=18, decimal_places=4, null=True, blank=True,
         help_text="Порожньо — використовується «Ціна продажу».",
     )
+    # Лот в інтернет-магазинах за замовчуванням (shop/lots.py); позиція магазину може задати свій
+    shop_min_qty = models.PositiveIntegerField(
+        "Мін. замовлення в магазинах, шт.", default=1, validators=[MinValueValidator(1)],
+        help_text="Менше покупець замовити не може; ціна за 1 шт. і ступені нижче на сайті не показуються. "
+                  "1 — без обмежень.",
+    )
+    shop_qty_step = models.PositiveIntegerField(
+        "Крок, шт.", default=1, validators=[MinValueValidator(1)],
+        help_text="Від мінімуму кроками: мін. 1000 і крок 1000 → 1000, 2000, 3000… 1 — будь-яка кількість.",
+    )
+    shop_qty_choices = models.JSONField(
+        "Лише ці кількості", default=list, blank=True,
+        help_text="Напр. «1000; 5000; 10000» — покупець вибирає одну з них (мінімум і крок тоді не діють).",
+    )
 
     # ── Митне оформлення ─────────────────────────────────────────────────────
     hs_code           = models.CharField("HS-код (митний)", max_length=20, blank=True, default="")
