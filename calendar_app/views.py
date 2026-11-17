@@ -78,6 +78,7 @@ def calendar_view(request):
     for ev in events:
         _event_display(ev, {cat['id']: type('C', (), cat)() for cat in custom_cats})
     _meeting_links(request.user, events)        # 🎙 у рядках списку — для своїх зустрічей з часом
+    _attach_invites(events)
 
     cal        = _cal.Calendar(firstweekday=0)
     raw_weeks  = cal.monthdayscalendar(year, month)
@@ -129,6 +130,8 @@ def calendar_view(request):
         'invites':            _invites(request.user),
         'deadlines_pending':  _deadlines_pending(request.user),
         'order_hidden':       hidden_count(request.user),
+        'outgoing_cancels':   _outgoing_cancels(request.user),
+        'open_invite':        request.GET.get('invite', '') if str(request.GET.get('invite', '')).isdigit() else '',
         'is_nav_sidebar_enabled': True,
     })
 
@@ -188,6 +191,27 @@ def _deadlines_pending(user):
 def _invites(user):
     from calendar_app import invites
     return invites.pending(user)
+
+
+def _attach_invites(events):
+    """«👥 3 · ✅ 2 ⏳ 1» у рядку події й адреси, яким піде «скасовано» при видаленні (outgoing_invites)."""
+    from calendar_app import outgoing_invites as oi
+    from calendar_app.models import OutgoingInvite
+    by_event = {inv.event_id: inv for inv in OutgoingInvite.objects.filter(event__in=events)
+                .prefetch_related('attendees')}
+    for ev in events:
+        inv = by_event.get(ev.pk)
+        ev.inv_badge = oi.badge(inv) if inv else ''
+        ev.inv_cancel = ', '.join(oi.cancel_targets(ev, inv)) if inv else ''
+
+
+def _outgoing_cancels(user):
+    from calendar_app import outgoing_invites as oi
+    out = []
+    for inv in oi.pending_cancels(user):
+        out.append({'pk': inv.pk, 'title': (inv.sent or {}).get('title') or inv.uid,
+                    'to': ', '.join(a.email for a in inv.attendees.all() if a.invited_at), 'error': inv.last_error})
+    return out
 
 
 @staff_member_required
@@ -256,6 +280,7 @@ def event_detail_api(request, pk):
         'sender':       _sender(request.user, ev),
         'custom_cat_id': ev.custom_category_id,
         **_meeting_urls(request.user, ev),
+        'invite':       _invite_brief(request.user, ev),
     })
 
 
@@ -327,6 +352,18 @@ def _meeting_urls(user, ev) -> dict:
     """record_url / meeting_url для вікна події (calendar.html showEventPopup)."""
     _meeting_links(user, [ev])
     return {'record_url': ev.mt_record, 'meeting_url': ev.mt_open}
+
+
+def _invite_brief(user, ev):
+    """Блок «👥 Учасники» у вікні події: хто запрошений і що відповів (outgoing_invites)."""
+    from calendar_app import outgoing_invites as oi
+    try:
+        st = oi.state(user, ev)
+    except Exception:  # noqa: BLE001 — вікно події не падає через запрошення
+        return {}
+    keep = ('can', 'why', 'status', 'status_label', 'changed', 'attendees', 'join_url', 'location', 'last_sent',
+            'error', 'cancel_pending', 'past')
+    return {k: st.get(k) for k in keep if k in st}
 
 
 def _sender(user, ev):

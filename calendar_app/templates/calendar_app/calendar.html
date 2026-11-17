@@ -239,6 +239,37 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
 .cal-block-preview{border-top:1px solid var(--border-strong);border-bottom:1px solid var(--border-strong);padding:8px 0;margin-bottom:12px;color:var(--text-muted)}
 .cal-block-preview ul{margin:6px 0 0;padding-left:18px;max-height:220px;overflow:auto}
 .cal-block-btns{display:flex;gap:8px;flex-wrap:wrap}
+/* ── 👥 Учасники й запрошення (calendar_app/outgoing_invites.py) ── */
+.cal-pi-list{font-size:12px;color:var(--text-muted);line-height:1.6;margin-bottom:6px}
+.cal-pi-warn{color:#d97706}
+.cal-invd-box{max-width:640px}
+.invd-status{font-size:12px;color:var(--text-muted);margin:-4px 0 10px}
+.invd-status .warn{color:#d97706}
+.invd-grid{display:flex;flex-direction:column;gap:9px}
+.invd-grid label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--text-muted)}
+.invd-grid input,.invd-grid select,.invd-grid textarea{padding:6px 8px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:13px;font-family:inherit}
+.invd-row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.invd-row label{flex:1;min-width:150px}
+.invd-row label.invd-chk{flex:0 0 auto;min-width:0;flex-direction:row;align-items:center;gap:5px;padding-bottom:7px}
+.invd-lbl{font-size:12px;color:var(--text-muted);margin-bottom:3px}
+.invd-people{display:flex;flex-direction:column;gap:2px;margin-bottom:5px}
+.invd-p{display:flex;gap:8px;align-items:baseline;font-size:13px;padding:3px 6px;border-radius:6px;background:rgba(128,128,128,.08)}
+.invd-p .who{flex:1;min-width:0;overflow-wrap:anywhere}
+.invd-p .sub{font-size:11px;color:var(--text-muted)}
+.invd-p.removed .who{text-decoration:line-through;opacity:.6}
+.invd-p button{border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:13px}
+.invd-add{position:relative;display:flex;gap:6px}
+.invd-add input{flex:1}
+.invd-add button{border:1px solid var(--border-strong);border-radius:6px;background:none;color:var(--text);cursor:pointer;padding:0 10px}
+.invd-sugg{position:absolute;left:0;right:40px;top:100%;z-index:3;background:var(--bg-card);border:1px solid var(--border-strong);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.25);max-height:220px;overflow:auto}
+.invd-sugg[hidden]{display:none}
+.invd-sugg div{padding:5px 8px;cursor:pointer;font-size:12px}
+.invd-sugg div:hover,.invd-sugg div.on{background:rgba(26,115,232,.12)}
+.invd-sugg small{color:var(--text-muted)}
+.invd-hint{font-size:11px;color:var(--text-muted);margin-top:-5px}
+.invd-msg{font-size:12px;margin:10px 0;min-height:16px}
+.invd-msg.err{color:#e53935}
+.cal-inv-no.danger{color:#e53935}
 </style>
 {% endblock %}
 
@@ -261,10 +292,25 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
       <a href="/calendar/connections/" class="cal-done-toggle" title="Google, Outlook, підписки">🔗 Календарі</a>
       <a href="/calendar/cleanup/" class="cal-done-toggle" title="Прибрати спам і події від відправників, від яких ви більше не хочете термінів — спершу видно, що саме прибереться">🧹 Почистити</a>
       {% if wt %}<button class="cal-done-toggle" id="cal-wt-toggle" onclick="wtToggle()" title="Показати/приховати робочий час askDANTE">⏱ Робочий час</button>{% endif %}
+      <button type="button" class="cal-done-toggle" onclick="invOpen(0)" title="Нова зустріч і запрошення учасникам з вашої скриньки (Outlook / Google покажуть «Прийняти / Відхилити»)">🤝 + Зустріч з учасниками</button>
       <a href="/admin/calendar_app/calendarevent/add/" class="cal-add-btn">+ Подія</a>
     </div>
   </div>
 
+  {% if outgoing_cancels %}
+  <div class="cal-inv" id="cal-ocx">
+    <div class="cal-inv-head"><b>⚠️ Зустріч видалено, а лист «скасовано» учасникам не надіслано</b></div>
+    {% for c in outgoing_cancels %}
+    <div class="cal-inv-row" id="ocx-{{ c.pk }}">
+      <div class="cal-inv-main"><b translate="no">{{ c.title }}</b> <span class="cal-wt-muted" translate="no">{{ c.to }}</span>{% if c.error %} <span class="cal-wt-muted">· {{ c.error }}</span>{% endif %}</div>
+      <div class="cal-inv-btns">
+        <button class="cal-inv-ok" data-to="{{ c.to }}" onclick="ocxDo(this, {{ c.pk }}, 'retry')">✉️ Надіслати «скасовано»</button>
+        <button class="cal-inv-no" onclick="ocxDo(this, {{ c.pk }}, 'drop')" title="Учасники не дізнаються, що зустрічі не буде">✕ Не надсилати</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
   {% if order_hidden %}<div class="cal-inv">📦 Сховано дедлайнів замовлень, до яких ще далеко: {{ order_hidden }} — з'являться, коли строк наблизиться. <a href="/calendar/settings/#orders">Що показувати →</a></div>{% endif %}
   {% if deadlines_pending %}<div class="cal-inv"><b>🔎 Терміни з пошти на перевірку: {{ deadlines_pending }}</b> <a href="/calendar/deadlines/">переглянути й занести →</a></div>{% endif %}
   {% if invites %}
@@ -453,6 +499,7 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
        id="ev-{{ ev.pk }}"
        data-day="{{ ev.start_at|date:'j' }}"
        data-type="{{ ev.display_type_key }}"
+       data-invited="{{ ev.inv_cancel }}"
        onclick="rowClick(event, {{ ev.pk }})">
     <!-- Bulk checkbox -->
     <div class="cal-row-check">
@@ -468,6 +515,7 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
       <div class="cal-event-meta">
         📅 {{ ev.start_at|date:"d.m.Y H:i" }}
         {% if ev.crm_customer %} · 👤 {{ ev.crm_customer }}{% endif %}
+        {% if ev.inv_badge %} · <a href="#" onclick="event.stopPropagation();invOpen({{ ev.pk }});return false" title="Учасники й відповіді">{{ ev.inv_badge }}</a>{% endif %}
         {% if ev.description %}<br>{{ ev.description|truncatechars:80 }}{% endif %}
       </div>
     </div>
@@ -535,6 +583,10 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
       <button class="cal-pm-btn danger" onclick="calBlock({event: _popupPk}, 'spam')" title="Лист — спам: відправник у Спам у пошті, з календаря все прибрано">🗑 Це спам</button>
     </div>
   </div>
+  <div id="cal-popup-inv" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--border-strong)">
+    <div id="cal-pi-list" class="cal-pi-list"></div>
+    <button class="cal-pm-btn" id="cal-pi-btn" onclick="invOpen(_popupPk)">👥 Запросити учасників…</button>
+  </div>
   <div style="margin-top:10px;border-top:1px solid var(--border-strong);padding-top:8px">
     <div style="font-size:10px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Категорія</div>
     <div id="cal-popup-types" style="display:flex;flex-wrap:wrap;gap:4px"></div>
@@ -555,6 +607,47 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
   </div>
   <div id="cal-popup-rec-more" style="display:none;margin-top:6px;text-align:right;font-size:11px">
     <a id="cal-popup-rec-more-link" href="#" target="_blank" rel="noopener" style="color:var(--text-muted);text-decoration:underline">записати ще одну</a>
+  </div>
+</div>
+
+<!-- ── 👥 Учасники й запрошення (iCalendar REQUEST з вашої скриньки) ── -->
+<div id="cal-invd" class="cal-block-wrap" hidden>
+  <div class="cal-block-box cal-invd-box" role="dialog" aria-labelledby="invd-h">
+    <h4 id="invd-h">👥 Учасники й запрошення</h4>
+    <div id="invd-status" class="invd-status"></div>
+    <div class="invd-grid">
+      <label>Назва<input id="invd-name" maxlength="300" translate="no"></label>
+      <div class="invd-row">
+        <label>Початок<input id="invd-start" type="datetime-local"></label>
+        <label>Кінець<input id="invd-end" type="datetime-local"></label>
+        <label class="invd-chk"><input type="checkbox" id="invd-allday" onchange="invAllDay()"> Весь день</label>
+      </div>
+      <div>
+        <div class="invd-lbl">Учасники</div>
+        <div id="invd-people" class="invd-people" translate="no"></div>
+        <div class="invd-add">
+          <input id="invd-addr" autocomplete="off" placeholder="email або ім'я — підказки з адресної книги й CRM" aria-label="Додати учасника">
+          <button type="button" onclick="invAddTyped()" title="Додати">＋</button>
+          <div id="invd-sugg" class="invd-sugg" hidden translate="no"></div>
+        </div>
+      </div>
+      <label>Посилання на зустріч (Teams / Zoom / Google Meet)<input id="invd-url" type="url" maxlength="1000" placeholder="https://teams.live.com/meet/…" translate="no"></label>
+      <div class="invd-hint">Створіть зустріч у Teams, Zoom чи Google Meet і вставте сюди посилання — Minerva посилань не створює.</div>
+      <label>Місце (необов'язково)<input id="invd-loc" maxlength="500" translate="no"></label>
+      <label>Повідомлення учасникам (необов'язково)<textarea id="invd-note" rows="3" translate="no"></textarea></label>
+      <div class="invd-row">
+        <label>Зі скриньки<select id="invd-acc" translate="no"></select></label>
+        <label>Мова листа<select id="invd-lang"></select></label>
+      </div>
+    </div>
+    <div id="invd-msg" class="invd-msg"></div>
+    <div class="cal-block-btns">
+      <button class="cal-inv-ok" id="invd-send" onclick="invSend(false)">✉️ Надіслати запрошення</button>
+      <button class="cal-inv-no" id="invd-save" onclick="invSave()" title="Учасникам нічого не надсилається">💾 Зберегти без надсилання</button>
+      <button class="cal-inv-no" id="invd-check" onclick="invCheck()" title="Знайти відповіді учасників у вже отриманих листах">↻ Перевірити відповіді</button>
+      <button class="cal-inv-no danger" id="invd-cancel" onclick="invCancel()">✖ Скасувати зустріч…</button>
+      <button class="cal-inv-no" onclick="invClose()">Закрити</button>
+    </div>
   </div>
 </div>
 
@@ -875,10 +968,12 @@ function toggleSelectAll() {
   onCheckChange();
 }
 async function deleteEventSingle(pk, btn) {
-  if (!confirm('Видалити цю подію?')) return;
+  var r0 = document.getElementById('ev-' + pk), invited = r0 ? r0.dataset.invited : '';
+  if (!confirm(invited ? 'Видалити зустріч?\n\nУчасникам піде лист «Скасовано»:\n' + invited : 'Видалити цю подію?')) return;
   btn.disabled = true;
   var d = await _bulkApi({pks: [pk], action: 'delete'});
   if (!d.ok) { btn.disabled = false; return; }
+  if (invited) { location.reload(); return; }
   var row  = document.getElementById('ev-' + pk);
   var chip = document.querySelector('.cal-chip[data-pk="' + pk + '"]');
   if (row)  row.remove();
@@ -974,9 +1069,13 @@ async function bulkMarkDone() {
 async function bulkDelete() {
   var pks = _getCheckedPks();
   if (!pks.length) return;
-  if (!confirm('Видалити ' + pks.length + ' подій? Цю дію неможливо скасувати.')) return;
+  var invited = pks.map(function(pk){ var r = document.getElementById('ev-' + pk); return r ? r.dataset.invited : ''; })
+                   .filter(Boolean);
+  if (!confirm('Видалити ' + pks.length + ' подій? Цю дію неможливо скасувати.'
+               + (invited.length ? '\n\nУчасникам зустрічей піде лист «Скасовано»:\n' + invited.join('\n') : ''))) return;
   var d = await _bulkApi({pks, action:'delete'});
   if (!d.ok) return;
+  if (invited.length) { location.reload(); return; }
   pks.forEach(function(pk){
     var row  = document.getElementById('ev-' + pk);
     var chip = document.querySelector('.cal-chip[data-pk="' + pk + '"]');
@@ -1069,6 +1168,7 @@ async function showEventPopup(ev, pk) {
     } else {
       pm.style.display = 'none';
     }
+    _popupInvite(d.invite || {});
     buildPopupTypes(d.type_key);
     var doneBtn = document.getElementById('cal-popup-done-btn');
     if (doneBtn) {
@@ -1350,6 +1450,318 @@ async function invDecide(pk, action) {
     if (!document.querySelector('.cal-inv-row')) { var box = document.getElementById('cal-inv'); if (box) box.remove(); }
   } catch (e) { alert('Немає зв\'язку з Minerva'); row.querySelectorAll('button').forEach(function(b){ b.disabled = false; }); }
 }
+/* ─── 👥 Учасники й запрошення (calendar_app/outgoing_invites.py) ─────────── */
+var INV_YEAR = {{ year }}, INV_MONTH = {{ month }};
+var _inv = {pk: 0, st: null, people: [], dirty: false};
+var INV_KIND = {'new': 'Запрошення', 'update': 'Оновлене запрошення', 'added': 'Запрошення новим учасникам',
+                'resend': 'Запрошення ще раз'};
+var INV_FIELDS = {title: 'назву', start: 'початок', end: 'кінець', all_day: 'весь день', location: 'місце',
+                  join_url: 'посилання', note: 'повідомлення'};
+function _invEl(id) { return document.getElementById(id); }
+function _invMsg(text, err) { var m = _invEl('invd-msg'); m.textContent = text || ''; m.classList.toggle('err', !!err); }
+function _popupInvite(inv) {
+  var box = _invEl('cal-popup-inv'), list = _invEl('cal-pi-list'), btn = _invEl('cal-pi-btn');
+  var people = (inv.attendees || []).filter(function(a){ return !a.removed; });
+  if (!inv.can && !people.length && !inv.why) { box.style.display = 'none'; return; }
+  box.style.display = '';
+  var html = '';
+  if (people.length) {
+    html += '<b>👥 Учасники</b>' + (inv.status_label ? ' · ' + _blkEsc(inv.status_label) : '') + '<br>'
+      + people.map(function(a){ return _blkEsc(a.icon) + ' <span translate="no">' + _blkEsc(a.name || a.email) + '</span>'; }).join('<br>');
+  }
+  if (inv.status === 'sent' && inv.changed && inv.changed.length)
+    html += '<div class="cal-pi-warn">⚠ Змінено після надсилання — учасники ще бачать старе</div>';
+  if (!inv.can && inv.why) html += '<div>' + _blkEsc(inv.why) + '</div>';
+  list.innerHTML = html;
+  btn.style.display = inv.can ? '' : 'none';
+  btn.textContent = !people.length ? '👥 Запросити учасників…'
+    : (inv.status === 'sent' && inv.changed && inv.changed.length ? '♻ Надіслати оновлення…' : '👥 Учасники й запрошення…');
+}
+function _invPad(n) { return (n < 10 ? '0' : '') + n; }
+function _invDefaultStart() {
+  var d = new Date();
+  if (_selDay) d = new Date(INV_YEAR, INV_MONTH - 1, _selDay);
+  else d.setDate(d.getDate() + 1);
+  var now = new Date(), hour = 10;
+  if (d.toDateString() === now.toDateString()) {        // сьогодні — найближча повна година, а не минула 10:00
+    hour = now.getHours() + 1;
+    if (hour > 22) { d.setDate(d.getDate() + 1); hour = 10; }
+  }
+  return d.getFullYear() + '-' + _invPad(d.getMonth() + 1) + '-' + _invPad(d.getDate()) + 'T' + _invPad(hour) + ':00';
+}
+async function invOpen(pk) {
+  if (typeof closePopup === 'function') closePopup();
+  _inv = {pk: pk || 0, st: null, people: [], dirty: false};
+  _invEl('cal-invd').hidden = false;
+  _invMsg('⏳ …');
+  try {
+    var d = await (await fetch('/calendar/event/' + _inv.pk + '/invite/', {credentials: 'same-origin'})).json();
+    if (!d.ok) { _invMsg('⚠️ ' + (d.error || 'не вдалося'), true); return; }
+    invRender(d.state, true);
+    _invMsg('');
+  } catch (e) { _invMsg('⚠️ немає зв\'язку з Minerva', true); }
+}
+function invRender(st, fields) {
+  _inv.st = st;
+  if (st.event) _inv.pk = st.event;
+  if (fields) {
+    _invEl('invd-name').value = st.title || '';
+    _invEl('invd-allday').checked = !!st.all_day;
+    invAllDay(true);
+    var start = st.start || _invDefaultStart();
+    _invEl('invd-start').value = st.all_day ? start.slice(0, 10) : start;
+    var end = st.end;
+    if (!end && !st.event && !st.all_day) {
+      var h = parseInt(start.slice(11, 13), 10) + 1;
+      end = start.slice(0, 11) + _invPad(Math.min(h, 23)) + start.slice(13);
+    }
+    _invEl('invd-end').value = end || '';
+    _invEl('invd-url').value = st.join_url || '';
+    _invEl('invd-loc').value = st.location || '';
+    _invEl('invd-note').value = st.note || '';
+    var acc = _invEl('invd-acc');
+    acc.innerHTML = '';
+    (st.accounts || []).forEach(function(a){
+      var o = document.createElement('option'); o.value = a.pk;
+      o.textContent = a.name ? a.name + ' <' + a.email + '>' : a.email;
+      if (String(a.pk) === String(st.account)) o.selected = true;
+      acc.appendChild(o);
+    });
+    var lang = _invEl('invd-lang');
+    lang.innerHTML = '';
+    (st.langs || []).forEach(function(l){
+      var o = document.createElement('option'); o.value = l.key; o.textContent = l.label;
+      if (l.key === (st.lang || 'de_en')) o.selected = true;
+      lang.appendChild(o);
+    });
+    _inv.people = (st.attendees || []).map(function(a){ return Object.assign({}, a); });
+    invPeople();
+  }
+  var s = [], changed = (st.changed || []).map(function(k){ return INV_FIELDS[k] || k; });
+  if (!st.can && st.why) s.push(_blkEsc('⛔ ' + st.why));
+  if (st.status === 'sent') {
+    s.push(_blkEsc('✉️ Надіслано ' + st.first_sent + (st.last_sent && st.last_sent !== st.first_sent ? ' · востаннє ' + st.last_sent : '')));
+    if (changed.length) s.push('<span class="warn">' + _blkEsc('⚠ Змінено після надсилання (' + changed.join(', ') + ') — учасники ще бачать старе') + '</span>');
+  } else if (st.status === 'draft') s.push(_blkEsc('📝 Ще не надіслано'));
+  else if (st.status === 'cancelled') s.push(_blkEsc('✖ Зустріч скасовано — учасники отримали «скасовано»'));
+  if (st.cancel_pending) s.push('<span class="warn">' + _blkEsc('⚠ «Скасовано» ще не надіслано') + '</span>');
+  if (st.error) s.push('<span class="warn">' + _blkEsc('⚠ ' + st.error) + '</span>');
+  _invEl('invd-status').innerHTML = s.join('<br>');
+  var sent = st.status === 'sent';
+  _invEl('invd-send').textContent = sent && changed.length ? '♻ Надіслати оновлення'
+    : (st.status === 'cancelled' ? '✉️ Запросити знову' : (sent ? '✉️ Надіслати' : '✉️ Надіслати запрошення'));
+  ['invd-send', 'invd-save'].forEach(function(id){ _invEl(id).disabled = !st.can; });
+  _invEl('invd-check').style.display = st.status === 'sent' || st.status === 'cancelled' ? '' : 'none';
+  _invEl('invd-cancel').style.display = sent && st.can ? '' : 'none';
+}
+function invPeople() {
+  var box = _invEl('invd-people');
+  box.innerHTML = '';
+  if (!_inv.people.length) { box.innerHTML = '<div class="invd-hint">' + _blkEsc('Ще нікого — додайте email нижче.') + '</div>'; return; }
+  _inv.people.forEach(function(p, i){
+    var row = document.createElement('div');
+    row.className = 'invd-p' + (p.removed ? ' removed' : '');
+    var sub = p.removed ? 'отримає «скасовано» при надсиланні'
+      : (p.invited ? (p.label || '') + (p.responded && p.partstat !== 'needs-action' ? ' · ' + p.responded : '') : 'ще не запрошено');
+    if (p.comment && !p.removed) sub += ' · ' + p.comment;
+    row.innerHTML = '<span>' + _blkEsc(p.removed ? '—' : (p.invited ? (p.icon || '⏳') : '＋')) + '</span>'
+      + '<span class="who">' + _blkEsc(p.name ? p.name + ' <' + p.email + '>' : p.email)
+      + '<br><span class="sub">' + _blkEsc(sub) + '</span></span>';
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = p.removed ? '↩' : '✕';
+    b.title = p.removed ? 'Повернути' : 'Прибрати';
+    b.onclick = function(){
+      if (p.removed) p.removed = false;
+      else if (p.invited && _inv.st && _inv.st.status === 'sent') p.removed = true;
+      else _inv.people.splice(i, 1);
+      invPeople();
+    };
+    row.appendChild(b);
+    box.appendChild(row);
+  });
+}
+function _invAdd(email, name) {
+  email = (email || '').trim().toLowerCase();
+  if (!/^[^@\s<>,;]+@[^@\s<>,;]+\.[^@\s<>,;]+$/.test(email)) return false;
+  var have = _inv.people.find(function(p){ return p.email === email; });
+  if (have) { have.removed = false; }
+  else _inv.people.push({email: email, name: (name || '').trim(), invited: false, removed: false});
+  invPeople();
+  return true;
+}
+function invAddTyped() {
+  var inp = _invEl('invd-addr'), bad = [];
+  inp.value.split(/[,;\n]+/).forEach(function(part){
+    part = part.trim();
+    if (!part) return;
+    var m = part.match(/^(.*)<([^>]+)>$/);
+    if (!(m ? _invAdd(m[2], m[1].replace(/"/g, '')) : _invAdd(part, ''))) bad.push(part);
+  });
+  inp.value = bad.join(', ');
+  invSuggHide();
+  _invMsg(bad.length ? '⚠️ Незрозуміла адреса: ' + bad.join(', ') : '', bad.length > 0);
+}
+var _invSuggT = null;
+function invSuggHide() { var s = _invEl('invd-sugg'); if (s) s.hidden = true; }
+(function(){
+  var inp = _invEl('invd-addr');
+  inp.addEventListener('keydown', function(e){
+    if (e.key === 'Enter' || e.key === ',' || e.key === ';') {
+      e.preventDefault();
+      var on = document.querySelector('#invd-sugg div.on');
+      if (on && !_invEl('invd-sugg').hidden) on.click(); else invAddTyped();
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      var items = Array.from(document.querySelectorAll('#invd-sugg div'));
+      if (!items.length) return;
+      e.preventDefault();
+      var i = items.findIndex(function(x){ return x.classList.contains('on'); });
+      items.forEach(function(x){ x.classList.remove('on'); });
+      i = e.key === 'ArrowDown' ? Math.min(i + 1, items.length - 1) : Math.max(i - 1, 0);
+      items[i].classList.add('on');
+    } else if (e.key === 'Escape') {
+      invSuggHide();
+    }
+  });
+  inp.addEventListener('input', function(){
+    clearTimeout(_invSuggT);
+    var q = inp.value.trim();
+    if (q.length < 2 || /[,;]/.test(q)) { invSuggHide(); return; }
+    _invSuggT = setTimeout(async function(){
+      try {
+        var d = await (await fetch('/email/crm-contacts/?q=' + encodeURIComponent(q), {credentials: 'same-origin'})).json();
+        var box = _invEl('invd-sugg');
+        box.innerHTML = '';
+        (d.contacts || []).slice(0, 8).forEach(function(c){
+          var row = document.createElement('div');
+          row.innerHTML = _blkEsc(c.name ? c.name + ' <' + c.email + '>' : c.email) + ' <small>' + _blkEsc(c.source || '') + '</small>';
+          row.onmousedown = function(e){ e.preventDefault(); };
+          row.onclick = function(){ _invAdd(c.email, c.name); inp.value = ''; invSuggHide(); inp.focus(); };
+          box.appendChild(row);
+        });
+        box.hidden = !box.children.length;
+      } catch (e) { invSuggHide(); }
+    }, 200);
+  });
+  inp.addEventListener('blur', function(){ setTimeout(invSuggHide, 150); });
+})();
+function invAllDay(keep) {
+  var on = _invEl('invd-allday').checked;
+  ['invd-start', 'invd-end'].forEach(function(id){
+    var el = _invEl(id), v = el.value;
+    el.type = on ? 'date' : 'datetime-local';
+    if (keep) return;
+    if (on) el.value = v ? v.slice(0, 10) : '';
+    else el.value = v ? v.slice(0, 10) + (id === 'invd-start' ? 'T10:00' : 'T11:00') : '';
+  });
+}
+function _invData(action) {
+  return {action: action, title: _invEl('invd-name').value, start: _invEl('invd-start').value,
+          end: _invEl('invd-end').value, all_day: _invEl('invd-allday').checked,
+          attendees: _inv.people.filter(function(p){ return !p.removed; }).map(function(p){ return {email: p.email, name: p.name || ''}; }),
+          location: _invEl('invd-loc').value, join_url: _invEl('invd-url').value.trim(), note: _invEl('invd-note').value,
+          account: _invEl('invd-acc').value, lang: _invEl('invd-lang').value};
+}
+async function _invPost(body) {
+  var r = await fetch('/calendar/event/' + _inv.pk + '/invite/', {method: 'POST', credentials: 'same-origin',
+    headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  var d = await r.json();
+  if (d.state) {                       // стан з сервера (і після помилки): статус, кнопки; поля не чіпаємо
+    if (d.state.event) _inv.pk = d.state.event;
+    _inv.st = d.state;
+  }
+  return d;
+}
+function _invBusy(on) { document.querySelectorAll('#cal-invd .cal-block-btns button').forEach(function(b){ b.disabled = on; }); }
+function _invDone() { _invBusy(false); if (_inv.st) invRender(_inv.st, false); }
+async function invSend(resend) {
+  if (_invEl('invd-addr').value.trim()) invAddTyped();
+  _invBusy(true); _invMsg('⏳ Перевіряю, кому що піде…');
+  try {
+    var body = _invData('preview'); body.resend = !!resend;
+    var d = await _invPost(body);
+    if (!d.ok) { _invMsg('⚠️ ' + (d.error || 'не вдалося'), true); return; }
+    var p = d.plan;
+    if (p.kind === 'none' && !p.cancel.length) {
+      _invMsg('');
+      if (confirm('Нічого не змінилось — усі учасники вже мають це запрошення.\n\nНадіслати всім ще раз?')) { _invDone(); return invSend(true); }
+      return;
+    }
+    var lines = [];
+    if (p.past) lines.push('⚠ Зустріч уже минула.');
+    if (p.request.length) lines.push((INV_KIND[p.kind] || 'Запрошення') + ' піде з ' + p.account + ':\n  ' + p.request.join('\n  '));
+    if (p.cancel.length) lines.push('Лист «Скасовано» отримають прибрані:\n  ' + p.cancel.join('\n  '));
+    if (p.time_changed) lines.push('Час змінено — учасники відповідатимуть заново.');
+    if (!confirm(lines.join('\n\n') + '\n\nНадіслати?')) { _invMsg(''); return; }
+    _invMsg('⏳ Надсилаю…');
+    body = _invData('send'); body.resend = !!resend; body.expect = p.request.concat(p.cancel);
+    d = await _invPost(body);
+    if (!d.ok) { _invMsg('⚠️ ' + (d.error || 'не вдалося'), true); return; }
+    _inv.dirty = true;
+    invRender(d.state, true);
+    _invMsg('✅ Надіслано' + (d.to.length ? ': ' + d.to.join(', ') : '') + (d.cancelled.length ? ' · «скасовано»: ' + d.cancelled.join(', ') : ''));
+  } catch (e) { _invMsg('⚠️ немає зв\'язку з Minerva', true); }
+  finally { _invDone(); }
+}
+async function invSave() {
+  if (_invEl('invd-addr').value.trim()) invAddTyped();
+  _invBusy(true);
+  try {
+    var d = await _invPost(_invData('save'));
+    if (!d.ok) { _invMsg('⚠️ ' + (d.error || 'не вдалося'), true); return; }
+    _inv.dirty = true;
+    invRender(d.state, true);
+    _invMsg('💾 Збережено — учасникам нічого не надіслано');
+  } catch (e) { _invMsg('⚠️ немає зв\'язку з Minerva', true); }
+  finally { _invDone(); }
+}
+async function invCheck() {
+  _invBusy(true);
+  try {
+    var d = await _invPost({action: 'check'});
+    if (!d.ok) { _invMsg('⚠️ ' + (d.error || 'не вдалося'), true); return; }
+    _inv.st = d.state;
+    _inv.people = (d.state.attendees || []).map(function(a){ return Object.assign({}, a); });
+    invPeople();
+    _invMsg(d.found ? '✅ Знайдено відповідей: ' + d.found : 'Нових відповідей у пошті немає');
+    if (d.found) _inv.dirty = true;
+  } catch (e) { _invMsg('⚠️ немає зв\'язку з Minerva', true); }
+  finally { _invDone(); }
+}
+async function invCancel() {
+  var to = ((_inv.st && _inv.st.attendees) || []).filter(function(a){ return a.invited; }).map(function(a){ return a.email; });
+  if (!confirm('Скасувати зустріч?\n\nЛист «Скасовано» отримають:\n  ' + to.join('\n  ') + '\n\nПодія в календарі стане «✖ Скасовано».')) return;
+  _invBusy(true);
+  try {
+    var d = await _invPost({action: 'cancel'});
+    if (!d.ok) { _invMsg('⚠️ ' + (d.error || 'не вдалося'), true); return; }
+    _inv.dirty = true;
+    invRender(d.state, true);
+    _invMsg('✖ Скасовано — лист надіслано: ' + d.to.join(', '));
+  } catch (e) { _invMsg('⚠️ немає зв\'язку з Minerva', true); }
+  finally { _invDone(); }
+}
+function invClose() {
+  _invEl('cal-invd').hidden = true;
+  invSuggHide();
+  if (_inv.dirty) location.reload();
+}
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape' && !_invEl('cal-invd').hidden && _invEl('invd-sugg').hidden) invClose();
+});
+async function ocxDo(btn, pk, action) {
+  if (action === 'retry' && !confirm('Надіслати лист «Скасовано»:\n' + (btn.dataset.to || '') + '?')) return;
+  if (action === 'drop' && !confirm('Не надсилати «Скасовано»? Учасники не дізнаються, що зустрічі не буде.')) return;
+  btn.disabled = true;
+  try {
+    var d = await (await fetch('/calendar/outgoing/' + pk + '/' + action + '/', {method: 'POST', credentials: 'same-origin',
+      headers: {'X-CSRFToken': CSRF}})).json();
+    if (!d.ok) { alert('❌ ' + (d.error || 'Помилка')); btn.disabled = false; return; }
+    var row = document.getElementById('ocx-' + pk); if (row) row.remove();
+    if (!document.querySelector('#cal-ocx .cal-inv-row')) { var box = document.getElementById('cal-ocx'); if (box) box.remove(); }
+  } catch (e) { alert('Немає зв\'язку з Minerva'); btn.disabled = false; }
+}
+{% if open_invite %}document.addEventListener('DOMContentLoaded', function(){ invOpen({{ open_invite }}); });{% endif %}
 {% if wt %}
 /* ─── ⏱ Робочий час askDANTE ────────────────────────────── */
 var WT_DAYS = JSON.parse(document.getElementById('wt-days').textContent);

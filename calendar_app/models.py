@@ -205,6 +205,77 @@ class MeetingInvite(models.Model):
         return f'{self.title} ({self.start_at:%d.%m.%Y %H:%M})'
 
 
+class OutgoingInvite(models.Model):
+    """Запрошення на зустріч, яке надсилаємо МИ (організатор — скринька людини): iCalendar REQUEST / CANCEL учасникам,
+    відповіді (REPLY) повертаються в InviteAttendee. Одне на подію, UID не змінюється. Логіка —
+    calendar_app/outgoing_invites.py."""
+    DRAFT, SENT, CANCELLED = 'draft', 'sent', 'cancelled'
+    STATUS_CHOICES = [(DRAFT, '📝 Ще не надіслано'), (SENT, '✉️ Надіслано'), (CANCELLED, '✖ Скасовано')]
+    LANGS = [('de_en', 'Deutsch + English'), ('de', 'Deutsch'), ('en', 'English'), ('uk', 'Українська')]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='outgoing_invites')
+    event = models.OneToOneField(CalendarEvent, null=True, blank=True, on_delete=models.SET_NULL,
+                                 related_name='outgoing_invite', verbose_name='Подія календаря')
+    account = models.ForeignKey('email_assistant.EmailAccount', null=True, blank=True, on_delete=models.SET_NULL,
+                                related_name='+', verbose_name='Скринька (організатор)')
+    uid = models.CharField('UID зустрічі', max_length=255, unique=True)
+    sequence = models.PositiveIntegerField('Версія (SEQUENCE)', default=0)
+    rsvp_sequence = models.PositiveIntegerField(
+        default=0, help_text='Відповіді на версії, старші за цю (до зміни часу), не враховуються.')
+    status = models.CharField('Стан', max_length=10, choices=STATUS_CHOICES, default=DRAFT, db_index=True)
+    location = models.CharField('Місце', max_length=500, blank=True, default='')
+    join_url = models.CharField('Посилання на зустріч (Teams / Zoom / Meet)', max_length=1000, blank=True, default='')
+    note = models.TextField('Повідомлення учасникам', blank=True, default='')
+    lang = models.CharField('Мова листа', max_length=5, choices=LANGS, default='de_en')
+    sent = models.JSONField('Що зараз в учасників', default=dict, blank=True,
+                            help_text='Назва, час, місце, посилання останнього надісланого — для «♻ Надіслати '
+                                      'оновлення» і скасування після видалення події.')
+    first_sent_at = models.DateTimeField('Уперше надіслано', null=True, blank=True)
+    last_sent_at = models.DateTimeField('Востаннє надіслано', null=True, blank=True)
+    cancel_pending = models.BooleanField(
+        'Скасування ще не надіслано', default=False,
+        help_text='Подію видалено, а лист «скасовано» учасникам не пішов (збій пошти) — повтор у календарі.')
+    last_error = models.CharField('Остання помилка', max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Запрошення від нас'
+        verbose_name_plural = '✉️ Запрошення, надіслані з Minerva'
+        ordering = ['-pk']
+
+    def __str__(self):
+        return (self.sent or {}).get('title') or (self.event.title if self.event_id else self.uid)
+
+
+class InviteAttendee(models.Model):
+    """Учасник нашого запрошення і його відповідь (iCalendar REPLY з листа)."""
+    NEEDS, ACCEPTED, TENTATIVE, DECLINED, DELEGATED = 'needs-action', 'accepted', 'tentative', 'declined', 'delegated'
+    PARTSTATS = [(NEEDS, '⏳ Ще не відповів'), (ACCEPTED, '✅ Буде'), (TENTATIVE, '❔ Можливо'),
+                 (DECLINED, '✕ Відхилив'), (DELEGATED, '↪ Передав іншому')]
+
+    invite = models.ForeignKey(OutgoingInvite, on_delete=models.CASCADE, related_name='attendees')
+    email = models.CharField('Email', max_length=254)
+    name = models.CharField("Ім'я", max_length=200, blank=True, default='')
+    partstat = models.CharField('Відповідь', max_length=14, choices=PARTSTATS, default=NEEDS)
+    invited_at = models.DateTimeField('Отримав запрошення', null=True, blank=True,
+                                      help_text='Порожньо — ще не надіслано саме йому.')
+    removed = models.BooleanField('Прибрано зі списку', default=False,
+                                  help_text='Отримає «скасовано» з наступним надсиланням.')
+    responded_at = models.DateTimeField('Коли відповів', null=True, blank=True)
+    comment = models.CharField('Коментар', max_length=500, blank=True, default='')
+    reply_message = models.ForeignKey('email_assistant.EmailMessage', null=True, blank=True,
+                                      on_delete=models.SET_NULL, related_name='+', verbose_name='Лист-відповідь')
+
+    class Meta:
+        verbose_name = 'Учасник зустрічі'
+        verbose_name_plural = 'Учасники зустрічі'
+        ordering = ['pk']
+        unique_together = [('invite', 'email')]
+
+    def __str__(self):
+        return f'{self.email} ({self.get_partstat_display()})'
+
+
 class FoundDeadline(models.Model):
     """Термін, знайдений у листі (пошук в архіві пошти за маскою, calendar_app/deadlines.py). У календар — після ✓
     (або «без підтвердження»); «✕» не повертається. quote — дослівна цитата з листа (перевіряється)."""
