@@ -171,8 +171,11 @@
       </table>
     </details>
     {% endif %}
-    {% if v.product_sum.unknown %}<div class="dv-muted" style="margin-top:8px">Числові параметри (частота, тип, розміри…) DigiKey через API не повертає —
-      «API не віддає» тут не помилка; що зараз на DigiKey, видно на сторінці товару на digikey.com.</div>{% endif %}
+    {% if v.product_sum.unknown %}<div class="dv-note" style="margin-top:8px">Числові параметри (частота, допуск, напруга, корпус…)
+      Minerva надсилає з кодами каталогу DigiKey, але DigiKey їх через API не повертає — і на supplier.digikey.com
+      (Products → Edit Product → Technical Attributes) вони бувають порожні: технічні атрибути DigiKey приймає лише
+      значеннями зі своїх списків. Порожньо там — заповніть списки на порталі (або шаблоном DigiKey через
+      marketplaceprodinfo@digikey.com) і перевірте «📋 Custom Fields» у налаштуваннях DigiKey: які поля API приймає.</div>{% endif %}
     <div class="dv-muted" style="margin-top:8px">Товар (опис, категорію, параметри) DigiKey змінює лише після перевірки — надсилається цілком,
       і до затвердження діє теперішня версія (на supplier.digikey.com: Products → Pending).</div>
     {% if can_change and v.product and v.product_sum.diff %}

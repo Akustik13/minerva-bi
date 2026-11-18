@@ -15,6 +15,8 @@ from inventory.services.stock import annotate_stock
 from inventory.param_filters import ListingParamFilter, panel_context
 from inventory.thumbs import ListingMediaFilter
 
+from core.admin_actions import GroupedActionsMixin
+
 from . import services
 from .admin_lots import ListingLotForm, LotFilter, LotForm, apply_lot_form, listing_panel, lot_cell
 from .admin_payments import ShopForm, stripe_tools
@@ -1065,13 +1067,29 @@ class BasePriceForm(forms.Form):
 
 class AddToShopForm(forms.Form):
     shop = forms.ModelChoiceField(label="Магазин", queryset=Shop.objects.all())
-    visible = forms.BooleanField(label="Одразу показувати", required=False, initial=True)
+    visible = forms.BooleanField(label="Одразу показувати", required=False, initial=True,
+                                 help_text="Сховані в цьому магазині товари теж знову стануть видимими.")
     price_source = forms.ChoiceField(label="Ціна", choices=[
         ("sale", "«Ціна продажу» товару (можна змінити пізніше)"),
         ("markup", "Закупівля + націнка з налаштувань"),
         ("base", "Базові ціни товару зі ступенями (оновлюються автоматично)"),
-    ], initial="sale", widget=forms.RadioSelect)
+    ], initial="sale", widget=forms.RadioSelect,
+        help_text="Лише для нових позицій — ціни товарів, що вже є в магазині, не змінюються.")
     with_tiers = forms.BooleanField(label="Згенерувати ступені цін за шаблоном", required=False, initial=True)
+
+
+def publish_action(modeladmin, request, queryset, title="Опублікувати в інтернет-магазині"):
+    """Масова дія товарів (каталог магазину, список товарів складу): форма AddToShopForm → shop/publish.py —
+    позиції, видимість, а фото й даташити одразу на сайт."""
+    from . import publish
+
+    def apply(qs, d):
+        res = publish.publish(d["shop"], qs, d["visible"], d["price_source"], d["with_tiers"],
+                              by=request.user.get_username())
+        return publish.message(d["shop"], res)
+    default = Shop.objects.filter(is_default=True).first()
+    return FormActionMixin._form_action(modeladmin, request, queryset, AddToShopForm, title, apply,
+                                        initial={"shop": default.pk if default else None, "price_source": "base"})
 
 
 class FormActionMixin:
@@ -1204,7 +1222,7 @@ class ShopPriceTierInline(admin.TabularInline):
 
 
 @admin.register(ShopListing)
-class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
+class ShopListingAdmin(GroupedActionsMixin, FormActionMixin, admin.ModelAdmin):
     form = ListingLotForm
     list_display = ["sku_col", "media_col", "name_col", "shop", "is_visible", "price", "promo_col", "source_col",
                     "sale_price_col", "purchase_col", "margin_col", "tiers_col", "lot_col", "available_col"]
@@ -1235,27 +1253,12 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
         ("👁 Видимість", ["action_show", "action_hide"]),
         ("💶 Ціна", ["action_set_price", "action_adjust", "action_markup", "action_base", "action_manual",
                     "action_reset_to_sale", "action_round"]),
-        ("📊 Ступені цін", ["action_tiers_default", "action_tiers_custom", "action_tiers_clear", "action_lot"]),
+        ("📊 Ступені цін", ["action_tiers_default", "action_tiers_custom", "action_tiers_clear"]),
+        ("📦 Лот і кількості", ["action_lot"]),
         ("🏷 Акції та новинки", ["action_offer", "action_offer_clear", "action_new", "action_new_clear"]),
         ("♻️ Статус", ["action_lifecycle"]),
         ("📋 Інше", ["action_copy", "delete_selected"]),
     ]
-
-    def get_action_choices(self, request, default_choices=None):
-        from django.db.models import BLANK_CHOICE_DASH
-        flat = super().get_action_choices(request, BLANK_CHOICE_DASH if default_choices is None else default_choices)
-        blank = [c for c in flat if not c[0]]
-        desc = {name: label for name, label in flat if name}
-        grouped, used = list(blank), set()
-        for title, names in self.ACTION_GROUPS:
-            items = [(n, desc[n]) for n in names if n in desc]
-            if items:
-                grouped.append((title, items))
-                used.update(n for n, _ in items)
-        rest = [(n, d) for n, d in desc.items() if n not in used]
-        if rest:
-            grouped.append(("📋 Інше", rest))
-        return grouped
 
     def save_model(self, request, obj, form, change):
         """Ручна зміна ціни від'єднує позицію від базових цін; % або перемикання — перерахунок."""
@@ -1648,15 +1651,7 @@ class ShopProductAdmin(FormActionMixin, admin.ModelAdmin):
 
     @admin.action(description="➕ Додати в магазин…")
     def action_add_to_shop(self, request, queryset):
-        def apply(qs, d):
-            markup = ShopSettings.get().default_markup if d["price_source"] == "markup" else None
-            base = d["price_source"] == "base"
-            added, existed = services.add_products(d["shop"], qs, d["visible"], markup,
-                                                   d["with_tiers"] and not base, base=base)
-            return f"Додано в «{d['shop']}»: {added}, вже були в магазині: {existed}"
-        default = Shop.objects.filter(is_default=True).first()
-        return self._form_action(request, queryset, AddToShopForm, "Додати товари в магазин", apply,
-                                 initial={"shop": default.pk if default else None})
+        return publish_action(self, request, queryset, "Додати товари в магазин")   # + фото й дані одразу на сайт
 
 
 from . import admin_accounts  # noqa: E402,F401  — акаунти покупців (особистий кабінет)

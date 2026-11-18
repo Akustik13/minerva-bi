@@ -297,3 +297,27 @@ class MoqAndPhotoViewTests(ToolsBase):
                 mock.patch("bots.services.dk_marketplace.fetch_product_by_sku", return_value=product):
             v = dk_view.live(self.listing)
         self.assertEqual({r["key"]: r for r in v["product_rows"]}["imageUrl"].get("note", ""), "")
+
+
+class AttrsHonestTests(ToolsBase):
+    """Технічні атрибути, яких DigiKey не повертає: не «це не помилка», а «перевірте на порталі»; «📋 Custom Fields»
+    показує тип, право запису й пари «назва=код» полів-списків."""
+
+    def test_numeric_attr_not_returned_text(self):
+        product = {"_id": "p-1", "categoryId": "855", "imageUrl": "", "additionalFields": []}
+        with mock.patch("bots.services.dk_prices._fetch_one", return_value=offer()), \
+                mock.patch("bots.services.dk_marketplace.fetch_product_by_sku", return_value=product):
+            v = dk_view.live(self.listing)
+        row = {r["key"]: r for r in v["attr_rows"]}["attr:139"]
+        self.assertEqual(row["state"], "unknown")
+        self.assertIn("supplier.digikey.com", row["dk"])
+
+    def test_custom_fields_list_shows_label_code_pairs(self):
+        self.admin()
+        fields = [{"code": "2049", "name": "Tolerance", "fieldType": "SingleLabelCodeList", "permissionLevel": "ReadWrite",
+                   "required": False, "fieldLabelCodePairs": [{"label": "±10%", "code": "1131"}]}]
+        with mock.patch("bots.services.dk_marketplace.fetch_custom_fields", return_value=fields):
+            r = self.client.get("/admin/bots/digikeyconfig/custom-fields/", follow=True)
+        text = " ".join(str(m) for m in r.context["messages"])
+        self.assertIn("code=2049 | Tolerance | SingleLabelCodeList | ReadWrite", text)
+        self.assertIn("±10%=1131", text)

@@ -229,8 +229,9 @@ def admin_actions(panel, ma, request) -> list:
     if ma is None:
         return []
     try:
+        from core.admin_actions import flat_choices
         actions = ma.get_actions(request)
-        choices = ma.get_action_choices(request)
+        choices = flat_choices(ma.get_action_choices(request))   # меню «Дія» може бути з групами (optgroup)
     except Exception as exc:  # noqa: BLE001
         logger.warning("side panel admin actions %s failed: %s", ma.opts.label_lower, exc)
         return []

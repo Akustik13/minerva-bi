@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from core.admin_actions import GroupedActionsMixin
 from core.mixins import AuditableMixin
 from decimal import Decimal, InvalidOperation
 import re
@@ -2238,7 +2239,7 @@ class ProductCategoryForm(forms.Form):
 
 
 @admin.register(Product)
-class ProductAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
+class ProductAdmin(GroupedActionsMixin, ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
     projects_block_kind = "product"            # «📁 Проєкти» (projects/panels.py)
     projects_block_after = "📦 Availability"
     change_list_template = "admin/inventory/product/change_list.html"
@@ -2256,7 +2257,8 @@ class ProductAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
     form          = ProductAdminForm
     actions       = ["action_set_category", "action_set_lifecycle", "action_archive", "action_unarchive", "action_base_editor", "action_base_from_dk",
                      "action_base_to_home", "action_sale_price_from_base", "action_media_links", "action_shared_media",
-                     "bulk_sync_digikey_attrs", "action_dk_prices", "action_dk_from_stock", "action_agent_task"]
+                     "bulk_sync_digikey_attrs", "action_dk_prices", "action_dk_from_stock", "action_agent_task",
+                     "action_publish_shop"]
 
     @admin.display(description=_("Категорія"), ordering="category")
     def category_col(self, obj):
@@ -2306,6 +2308,25 @@ class ProductAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
         """Сторінка нового завдання агенту (agent/admin.py) з цими товарами; право — у самій сторінці."""
         url = reverse("admin:agent_agenttask_add")
         return redirect(f"{url}?ids=" + ",".join(str(pk) for pk in queryset.values_list("pk", flat=True)[:1000]))
+
+    @admin.action(description="🏪 Опублікувати в інтернет-магазині…", permissions=["shop"])
+    def action_publish_shop(self, request, queryset):
+        """Позиції магазину (ціна, ступені, видимість) + фото й даташити одразу на сайт — shop/publish.py."""
+        from shop.admin import publish_action
+        return publish_action(self, request, queryset)
+
+    def has_shop_permission(self, request):
+        return request.user.has_perm("shop.add_shoplisting") and request.user.has_perm("shop.change_shoplisting")
+
+    # Меню «Дія» — групами (core/admin_actions.py)
+    ACTION_GROUPS = [
+        ("📦 Товар", ["action_set_category", "action_set_lifecycle", "action_archive", "action_unarchive"]),
+        ("🏪 Інтернет-магазин", ["action_publish_shop"]),
+        ("💰 Ціни", ["action_base_editor", "action_base_to_home", "action_sale_price_from_base"]),
+        ("🖼 Фото й даташити", ["action_media_links", "action_shared_media"]),
+        ("🛒 DigiKey", ["action_dk_from_stock", "action_dk_prices", "action_base_from_dk", "bulk_sync_digikey_attrs"]),
+        ("🤖 Агент", ["action_agent_task"]),
+    ]
 
     # ── Масові дії: категорія, ціни DigiKey ──────────────────────────────────
     # Дії, що змінюють товари, — permissions=["change"] (хто товари лише переглядає, їх не бачить і не запустить);

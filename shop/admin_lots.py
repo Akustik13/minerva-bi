@@ -129,6 +129,8 @@ def lot_cell(listing):
 
 
 def _examples(rule) -> str:
+    if not rule.choices and rule.step <= 1:      # без кроку — не «1 000, 1 001, 1 002 …»
+        return f"{lots._n(rule.min_qty)} шт. або більше"
     vals = rule.examples(lots.EXAMPLES if not rule.choices else lots.MAX_CHOICES)
     more = "" if rule.choices else " …"
     return ", ".join(lots._n(v) for v in vals) + more
