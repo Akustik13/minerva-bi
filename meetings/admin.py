@@ -14,6 +14,7 @@
   <pk>/retry/                POST «🔄 Спробувати ще раз»
   <pk>/moments/              POST JSON «🔄 Знайти ключові моменти ще раз» — Claude у Minerva (meetings/ai_moments.py)
   <pk>/fix/                  POST JSON «✏️ Виправити помилки розпізнавання» — Claude пропонує правки (meetings/ai_fix.py)
+  <pk>/brief/                POST JSON «📝 Скласти підсумок і звірити з агендою» — Claude (meetings/ai_brief.py)
   <pk>/fix/decide/           POST JSON ✓ / ✕ / ↶ правок розшифровки → свіжа панель і рядки
   <pk>/continue/             GET підготовка продовження («… (продовження)»)
   <pk>/remove/               POST «🗑 Видалити нараду»
@@ -167,6 +168,7 @@ class MeetingAdmin(admin.ModelAdmin):
             path("<int:pk>/retry/", w(self.retry_view), name="meetings_meeting_retry"),
             path("<int:pk>/moments/", w(self.moments_view), name="meetings_meeting_moments"),
             path("<int:pk>/fix/", w(self.fix_view), name="meetings_meeting_fix"),
+            path("<int:pk>/brief/", w(self.brief_view), name="meetings_meeting_brief"),
             path("<int:pk>/fix/decide/", w(self.fix_decide_view), name="meetings_meeting_fix_decide"),
             path("<int:pk>/continue/", w(self.continue_view), name="meetings_meeting_continue"),
             path("<int:pk>/remove/", w(self.remove_view), name="meetings_meeting_remove"),
@@ -310,7 +312,8 @@ class MeetingAdmin(admin.ModelAdmin):
 
     def agenda_view(self, request, pk):
         """📋 Агенда: POST JSON {action: add {text, parent} | edit {item, text, note, tr_text, tr_note} | status {item,
-        status} | move {item, delta} | remove {item} | suggest | take {ref} | take_all | tr_lang {lang} | translate}
+        status} | move {item, delta} | remove {item} | suggest | take {ref} | take_all | tr_lang {lang} | translate |
+        ai_ok {item} | ai_no {item} | ai_all — ✓ / ✕ звірки з розшифровкою (meetings/ai_brief.py)}
         → {ok, html} — свіжий блок агенди (з підказками після suggest / take, поки вони є; translate — 🌐 перекласти
         під пунктами те, чого ще немає, translated — скільки); send {to: [...], extra, lang, ai} → {ok, compose} —
         чернетка листа з агендою у власній скриньці. Лише власник з правом змінювати наради."""
@@ -354,6 +357,10 @@ class MeetingAdmin(admin.ModelAdmin):
                 suggestions = agenda.suggest(user, m) if action == "take" else None
             elif action == "suggest":
                 suggestions = agenda.suggest(user, m)
+            elif action in ("ai_ok", "ai_no", "ai_all"):
+                from . import ai_brief
+                extra["changed"] = ai_brief.decide(user, m, {"ai_ok": "accept", "ai_no": "dismiss",
+                                                             "ai_all": "accept_all"}[action], item)
             else:
                 return JsonResponse({"ok": False, "error": "Невідома дія"}, status=400)
         except MeetingError as e:
@@ -525,6 +532,25 @@ class MeetingAdmin(admin.ModelAdmin):
         try:
             st = ai_fix.start(m, request.user, str(data.get("model") or ""),
                               data.get("consent") in (True, "1", "true", "on"))
+        except MeetingError as e:
+            return JsonResponse({"ok": False, "error": str(e)}, status=400)
+        return JsonResponse({"ok": True, "state": st})
+
+    def brief_view(self, request, pk):
+        """POST JSON {model, consent, lang} → «📝 Скласти підсумок і звірити з агендою»: Claude у фоні
+        (meetings/ai_brief.py); хід — status/ (ai_brief)."""
+        from . import ai_brief
+        refused = _post_only(request)
+        if refused:
+            return refused
+        m = services.get_own(request.user, pk)
+        refused = self._change_refused(request, m, as_json=True)
+        if refused:
+            return refused
+        data = _json_body(request)
+        try:
+            st = ai_brief.start(m, request.user, str(data.get("model") or ""),
+                                data.get("consent") in (True, "1", "true", "on"), str(data.get("lang") or "uk"))
         except MeetingError as e:
             return JsonResponse({"ok": False, "error": str(e)}, status=400)
         return JsonResponse({"ok": True, "state": st})

@@ -216,6 +216,8 @@ def status_json(m) -> dict:
     out["lines"] = progress_lines(m)
     out["ai_moments"] = ai_moments.state(m)
     out["ai_fix"] = ai_fix.state(m)
+    from . import ai_brief
+    out["ai_brief"] = ai_brief.state(m)
     return out
 
 
@@ -473,11 +475,19 @@ def render_item(user, m, item, base=None, staff=None, pj=None) -> str:
 
 
 def agenda_context(user, m, suggestions=None) -> dict:
-    """📋 Агенда (meetings/agenda.py): пункти, скільки обговорили, підказки (None — не показувати)."""
+    """📋 Агенда (meetings/agenda.py): пункти, скільки обговорили, підказки (None — не показувати); ai — звірка з
+    розшифровкою під пунктом (meetings/ai_brief.hints), check — її підсумок над агендою."""
+    from . import ai_brief
     rows = agenda.items(m)
     projects = agenda._projects(user, m)
     tr = agenda.tr_info(m, rows)
-    return {"rows": rows, "progress": agenda.progress(m, rows), "copy": agenda.copy_text(m, rows),
+    found = ai_brief.hints(m, rows)
+    for r in rows:
+        r.ai = found.get(r.pk)
+    check = ai_brief.summary_of(m)
+    if check is not None:
+        check["waiting"] = sum(1 for h in found.values() if h["ok"])
+    return {"rows": rows, "progress": agenda.progress(m, rows), "copy": agenda.copy_text(m, rows), "check": check,
             "tr": tr, "copy_tr": agenda.copy_text(m, rows, tr["lang"]) if tr["lang"] else "",
             "url": url("admin:meetings_meeting_agenda", m.pk), "can": can_change(user),
             "can_suggest": can_change(user) and user.has_perm("projects.view_project"), "projects": len(projects),
@@ -519,7 +529,8 @@ def log_lines(m) -> list:
             from . import ai_moments
             where = "у Minerva" if e.get("where") == "minerva" else "на RAG-ПК"
             model = ai_moments.SHORT.get(e.get("model"), e.get("model") or "Claude")
-            what = ("перевірено на помилки розпізнавання" if e.get("task") == "fix" else "оброблено")
+            what = {"fix": "перевірено на помилки розпізнавання",
+                    "brief": "підсумовано й звірено з агендою"}.get(e.get("task"), "оброблено")
             text = (f"☁️ Текст розшифровки {what} в {model} (Anthropic, США) {where} — учасники погодились "
                     f"(підтвердив той, хто записав)")
         else:
@@ -619,6 +630,32 @@ def ai_box(user, m) -> dict | None:
             "open": (m.has_transcript and (not m.items.exists()))}
 
 
+def cloud_consent(m) -> str:
+    """Коли учасники вже погодились на обробку тексту в хмарі (перший запис «cloud» протоколу згоди) — «18.11.2026
+    15:36», інакше ''. Тоді галочки згоди в «🔄 / ✏️ / 📝» уже стоять (кожна передача все одно пишеться в протокол)."""
+    for e in m.consent_log or []:
+        if isinstance(e, dict) and e.get("kind") == "cloud":
+            at = services._parse_dt(e.get("at"))
+            return f"{local(at):%d.%m.%Y %H:%M}" if at else "раніше"
+    return ""
+
+
+def brief_box(user, m) -> dict | None:
+    """«📝 Підсумок наради» (meetings/ai_brief.py): збережений підсумок (усім, хто бачить сторінку — власнику) і
+    «📝 Скласти підсумок і звірити з агендою» — лише з правом змінювати, коли розшифровка є."""
+    from . import ai_brief
+    if not m.has_transcript:
+        return None
+    view = ai_brief.view(m)
+    can = bool(m.transcript_at) and can_change(user)
+    if view is None and not can:
+        return None
+    return {"view": view, "can": can, "models": list(ai_brief.MODELS.items()), "default": ai_brief.DEFAULT,
+            "langs": list(ai_brief.LANGS.items()), "lang": (view or {}).get("lang") or "uk",
+            "available": ai_brief.available(), "consent_text": ai_brief.CONSENT_TEXT, "state": ai_brief.state(m),
+            "url": url("admin:meetings_meeting_brief", m.pk), "open": view is None}
+
+
 def fix_box(user, m, tr) -> dict | None:
     """«✏️ Виправити помилки розпізнавання» (meetings/ai_fix.py): запуск і ✓ / ✕ / ↶ — лише власнику з правом
     змінювати; правки «було → стало» з панеллю й позначками в тексті."""
@@ -686,6 +723,7 @@ def page_context(user, m, settings=None) -> dict:
         **projects_context(user, m, pj, tr),
         "transcript_model": tr.model if tr else "",
         "moments_model": tr.moments_model if tr else "", "ai_box": ai_box(user, m), "fix": fix_box(user, m, tr),
+        "brief": brief_box(user, m), "cloud_ok": cloud_consent(m),
         "kb": knowledge.parts_state(m, user) if m.approved_at else None, "kb_text": KB_TEXT,
         "agenda": agenda_context(user, m),
         "consent_lang_label": CONSENT_LANG_LABELS.get(m.consent_lang, ""), "log": log_lines(m),

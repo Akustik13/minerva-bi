@@ -105,6 +105,21 @@ def build(meeting, segments, groups=None) -> list:
             for n, (project, text) in enumerate(chunks, 1)]
 
 
+def brief_part(meeting):
+    """📝 Підсумок наради (meetings/ai_brief.py) — окремою частиною «🎙 Нарада P-… · ДД.ММ.РРРР · підсумок» з
+    головним проєктом; немає підсумку — None."""
+    from rag_assistant.knowledge import TEXT_MAX
+    from . import ai_brief
+    view = ai_brief.view(meeting)
+    if not view or view.get("empty"):
+        return None
+    project = meeting.project if meeting.project_id else None
+    code = f" {project.code}" if project is not None else ""
+    title = f"🎙 Нарада{code} · {meeting.day:%d.%m.%Y} · підсумок"[:300]
+    text = f"🎙 Підсумок наради {meeting.day:%d.%m.%Y} (тези, складені AI з розшифровки).\n{view['text']}"
+    return title, text[:TEXT_MAX], project
+
+
 def publish(meeting) -> list:
     """Затвердити розшифровку як приватні документи бази знань власника (повторно — оновити ті самі частини;
     зайві старі прибираються). Хто може — перевіряє сторінка (лише власник). → pk документів."""
@@ -124,10 +139,13 @@ def publish(meeting) -> list:
     pre = prefix(m)
     old = {i.source_key: i for i in KnowledgeItem.objects.filter(source_key__startswith=pre)}
     pks = []
+    rows = [(f"{pre}{n}", title, text, project) for n, (title, text, project) in enumerate(parts, 1)]
+    summary = brief_part(m)
+    if summary:
+        rows.append((f"{pre}brief", *summary))
     with transaction.atomic():
         with knowledge_items.quiet():
-            for n, (title, text, project) in enumerate(parts, 1):
-                key = f"{pre}{n}"
+            for key, title, text, project in rows:
                 item = old.pop(key, None) or KnowledgeItem(source_key=key)
                 item.kind, item.auto, item.visibility = KnowledgeItem.MEETING, True, KnowledgeItem.PRIVATE
                 if project is not None and project.pk != m.project_id and project.customer_id:

@@ -297,3 +297,25 @@ span.mt-ag-box { cursor: default; text-align: center; color: var(--text-muted); 
 .mt-fix { padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; line-height: 1.6; }
 .mt-fix .button { padding: 1px 8px; margin-left: 4px; }
 .mt-fix s { color: var(--text-muted); }
+
+/* 📝 Підсумок наради (meetings/ai_brief.py) і 🤖 звірка агенди з розшифровкою */
+.mt-brief-about { margin: 0 0 6px; font-size: 13.5px; }
+.mt-brief-list { margin: 0 0 4px; padding-left: 20px; font-size: 13.5px; line-height: 1.5; }
+.mt-brief-list li { margin: 2px 0; }
+.mt-brief-meta { color: var(--text-muted); font-size: 12.5px; white-space: nowrap; }
+.mt-brief-agreements li::marker, .mt-brief-tasks li::marker { color: var(--ok); }
+.mt-brief-risks li::marker { color: var(--err); }
+.mt-brief-open li::marker { color: var(--warn); }
+.mt-ag-check { margin: 4px 0 8px; padding: 6px 10px; border-radius: 6px; font-size: 13px;
+  background: color-mix(in srgb, var(--link-fg) 10%, transparent); }
+.mt-ag-check .button { margin-left: 6px; }
+.mt-ag-check > .mt-muted { margin-top: 2px; font-size: 12px; }
+.mt-ag-hint { margin: 3px 0 0; padding: 2px 8px; border-radius: 6px; font-size: 12.5px; border-left: 3px solid var(--border-strong);
+  background: var(--bg-hover); }
+.mt-ag-hint-done { border-left-color: var(--ok); }
+.mt-ag-hint-partly { border-left-color: var(--warn); }
+.mt-ag-hint-no { border-left-color: var(--text-muted); color: var(--text-muted); }
+.mt-ag-hbtn { margin-left: 6px; padding: 1px 8px; border-radius: 6px; border: 1px solid var(--border-strong);
+  background: var(--bg-card); color: var(--text); cursor: pointer; font-size: 12px; }
+.mt-ag-hbtn.mt-ag-hok { border-color: color-mix(in srgb, var(--ok) 60%, transparent);
+  background: color-mix(in srgb, var(--ok) 16%, transparent); font-weight: 600; }

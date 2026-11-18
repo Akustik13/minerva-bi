@@ -4,6 +4,13 @@
          data-ag-copy-tr="{{ agenda.copy_tr }}" data-ag-tr="{{ agenda.tr.lang }}" data-ag-tr-missing="{{ agenda.tr.missing }}">
   <h2>📋 Агенда{% if agenda.progress.total %} <span class="mt-muted">· обговорили {{ agenda.progress.done }} з {{ agenda.progress.total }}</span>{% endif %}</h2>
   <p class="mt-muted">{% if agenda.after %}Відмітьте ☑, що обговорили, і ✏️ — що вирішили. Не обговорене запропонується до наступної наради цього проєкту.{% else %}Що обговорити, щоб нічого не забути. Бачите лише ви. На нараді тримайте цю сторінку відкритою (можна на телефоні) і відмічайте ☑.{% endif %}</p>
+  {% if agenda.check %}
+    <div class="mt-ag-check">🤖 <b>Звірка з розшифровкою</b> <span class="mt-muted">(<span translate="no">{{ agenda.check.label }}</span>)</span>:
+      обговорили {{ agenda.check.done }} · частково {{ agenda.check.partly }} · не обговорили {{ agenda.check.no }}
+      {% if agenda.can and agenda.check.waiting %}<button type="button" class="button mt-primary" data-ag-act="ai_all" title="Відмітити ☑ обговорене й записати «що вирішили» там, де ви ще нічого не написали">✓ Прийняти всі пропозиції ({{ agenda.check.waiting }})</button>{% endif %}
+      <div class="mt-muted">Пропозиції — під пунктами. ✓ — ☑ і «що вирішили» (ваш текст не перезаписується), ✕ — не те. Не обговорене лишається відкритим і запропонується до наступної наради.</div>
+    </div>
+  {% endif %}
   {% if agenda.can %}
     <div class="mt-ag-trbar">
       <label>🌐 Переклад під пунктами:
@@ -32,6 +39,14 @@
               {% if i.note %}<span class="mt-ag-note">✍️ <span translate="no">{{ i.note }}</span></span>{% endif %}
               {% if i.tr_note %}<span class="mt-ag-note mt-ag-note-tr{% if i.tr_stale %} mt-ag-tr-old{% endif %}"><span class="mt-ag-tr-lang">{{ agenda.tr.short }}</span><span translate="no" lang="{{ agenda.tr.lang }}">{{ i.tr_note }}</span></span>{% endif %}
             </div>
+            {% if i.ai %}
+              <div class="mt-ag-hint mt-ag-hint-{{ i.ai.status }}">🤖 <b>{{ i.ai.label }}</b>{% if i.ai.result %} · <span translate="no">{{ i.ai.result }}</span>{% endif %}{% if i.ai.time %} <a class="mt-time" href="#t={{ i.ai.second }}">[{{ i.ai.time }}]</a>{% endif %}
+                {% if i.ai.note_kept %}<span class="mt-muted">(ваше «що вирішили» лишиться)</span>{% endif %}
+                {% if i.ai.kids_open %}<span class="mt-muted">— ☑ стане, коли закриєте підпункти {{ i.ai.kids_open|join:", " }}</span>{% endif %}
+                {% if i.ai.status == "no" %}<span class="mt-muted">— перенесеться на наступну нараду</span>{% endif %}
+                {% if agenda.can and not i.frozen %}{% if i.ai.ok %}<button type="button" class="mt-ag-hbtn mt-ag-hok" data-ag-act="ai_ok" title="{% if i.ai.status == 'done' %}Відмітити ☑ і записати «що вирішили»{% else %}Записати в «що вирішили» — пункт лишається відкритим{% endif %}">✓ {{ i.ai.ok }}</button>{% endif %}<button type="button" class="mt-ag-hbtn" data-ag-act="ai_no" title="Не те — сховати пропозицію">✕</button>{% endif %}
+              </div>
+            {% endif %}
             {% if i.file_list %}<div class="mt-ag-files">{% for f in i.file_list %}{% include "admin/meetings/meeting/_agenda_file.html" %}{% endfor %}</div>{% endif %}
             {% if agenda.can and not i.frozen %}
               <form class="mt-ag-edit" data-ag-edit hidden>

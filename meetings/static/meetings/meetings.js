@@ -364,6 +364,53 @@
     });
   }
 
+  // ── 📝 Підсумок наради й звірка з агендою — Claude у Minerva (meetings/ai_brief.py): запуск і хід (status/ → ai_brief) ──
+  var briefBox = document.getElementById('mt-brief');
+  if (briefBox) {
+    var briefState = document.getElementById('mt-brief-state');
+    var briefCfgEl = document.getElementById('mt-config'), briefCfg = null;
+    try { briefCfg = briefCfgEl ? JSON.parse(briefCfgEl.textContent) : null; } catch (err) { briefCfg = null; }
+    var briefPoll = function () {
+      if (!briefCfg || !briefCfg.status_url) return;
+      fetch(briefCfg.status_url, {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+        .then(function (r) { return r.json(); })
+        .then(function (s) {
+          var st = s && s.ai_brief;
+          if (!st || st.state === 'running') { setTimeout(briefPoll, 4000); return; }
+          if (st.state === 'done') { location.hash = 'brief'; location.reload(); return; }
+          if (briefState) briefState.textContent = '⚠️ ' + (st.error || 'Не вдалося');
+          var b = briefBox.querySelector('[data-mt-brief-start]');
+          if (b) b.disabled = false;
+        }, function () { setTimeout(briefPoll, 8000); });
+    };
+    if (briefState && briefState.getAttribute('data-state') === 'running') setTimeout(briefPoll, 4000);
+    briefBox.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-mt-brief-start]');
+      if (!b) return;
+      var picked = briefBox.querySelector('input[name=mt-brief-model]:checked');
+      var lang = briefBox.querySelector('input[name=mt-brief-lang]:checked');
+      var consent = document.getElementById('mt-brief-consent');
+      if (!consent || !consent.checked) {
+        if (briefState) briefState.textContent = '⚠️ Поставте галочку згоди учасників на обробку в хмарі.';
+        if (consent) consent.focus();
+        return;
+      }
+      b.disabled = true;
+      if (briefState) briefState.textContent = '⏳ Надсилаю розшифровку й агенду…';
+      post(b.getAttribute('data-url'), {model: picked ? picked.value : '', lang: lang ? lang.value : 'uk',
+                                        consent: true}).then(function (res) {
+        if (!res || !res.ok) {
+          b.disabled = false;
+          if (briefState) briefState.textContent = '⚠️ ' + ((res && res.error) || 'Не вдалося');
+          return;
+        }
+        if (res.state && res.state.state === 'done') { location.hash = 'brief'; location.reload(); return; }
+        if (briefState) briefState.textContent = '⏳ ' + ((res.state && res.state.label) || 'Claude') + ' складає підсумок… (зазвичай 1–2 хв; сторінку можна не тримати відкритою)';
+        setTimeout(briefPoll, 4000);
+      });
+    });
+  }
+
   // ── ✏️ Помилки розпізнавання — Claude у Minerva (meetings/ai_fix.py): запуск, хід (status/ → ai_fix), ✓ / ✕ / ↶ ──
   var fixBox = document.getElementById('mt-fix');
   if (fixBox) {
@@ -547,7 +594,7 @@
   // 🌐 переклад під пунктами: після змін (AUTO_TR) — одним запитом, поки людина пише далі; відповідь, старіша за вже
   // показану, не малюється; що людина саме вводить (поля, відкриті форми, фокус) — лишається після оновлення блоку
   var agSeq = 0, agShown = 0, trBusy = false, trAgain = false;
-  var AUTO_TR = {add: 1, edit: 1, take: 1, take_all: 1, tr_lang: 1};
+  var AUTO_TR = {add: 1, edit: 1, take: 1, take_all: 1, tr_lang: 1, ai_ok: 1, ai_all: 1};
   function agKey(el) {
     var row = el.closest('[data-ag]'), sub = el.closest('[data-ag-subadd]');
     var kind = el.closest('[data-ag-edit]') ? 'edit' : el.closest('[data-ag-send]') ? 'send' : sub ? 'sub'
@@ -797,6 +844,12 @@
       if (sug) sug.remove();
     } else if (act === 'translate') {
       autoTranslate(true);
+    } else if (act === 'ai_ok' || act === 'ai_no') {           // 🤖 звірка з розшифровкою (meetings/ai_brief.py)
+      agendaSend({action: act, item: id});
+    } else if (act === 'ai_all') {
+      agendaSend({action: 'ai_all'}).then(function (j) {
+        if (j && j.ok) toast('✓ Пунктів агенди оновлено: ' + (j.changed || 0));
+      });
     } else if (act === 'tr_suggest') {
       agendaSend({action: 'tr_lang', lang: b.getAttribute('data-lang')});
     } else if (act === 'copy' || act === 'copy_tr') {
