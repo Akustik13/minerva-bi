@@ -586,9 +586,12 @@ def build_context(inv: SalesInvoice, s: InvoiceSettings | None = None) -> dict:
     rate = inv.effective_vat_rate.normalize()
     return {
         "L": L, "H": H, "lang": lang, "currency": inv.currency,
-        "number": inv.number, "date": vals["date"], "service_date": _date(inv.service_date, lang),
-        "due_date": vals["due_date"], "customer_number": inv.customer_number, "order_ref": inv.order_ref,
-        "customer_po": inv.customer_po,
+        "number": inv.number, "date": vals["date"],
+        # рядки під «Rechnung» — лише ті, що ввімкнено в налаштуваннях (у текстах {due_date} діє завжди)
+        "service_date": _date(inv.service_date, lang) if s.show_service_date else "",
+        "due_date": vals["due_date"] if s.show_due_date else "",
+        "customer_number": inv.customer_number if s.show_customer_number else "", "order_ref": inv.order_ref,
+        "customer_po": inv.customer_po if s.show_customer_po else "",
         "bill": address_view(inv.bill_to or {}, lang), "salutation": doc._listing(salutation(inv.bill_to or {}, lang)),
         "seller": seller(lang), "F": footer(lang), "ship_line": ship_line, "ship_text": ship_text,
         "rows": items, "has_shipping": bool(ship_cost), "shipping_pos": len(items) + 1,
@@ -696,6 +699,11 @@ def render_docx(inv: SalesInvoice) -> bytes:
     return _render(template_path(s), build_context(inv, s))
 
 
+def sample_signer(s: InvoiceSettings) -> str:
+    """Підписант прикладу — справжній (налаштування рахунків → останній CI / Packing List → налаштування компанії)."""
+    return s.signer_name or last_signer()[0] or _ceo(_company()) or ""
+
+
 def sample_invoice(lang: str = "de") -> SalesInvoice:
     """Приклад (не зберігається) — для перегляду шаблону, перевірки завантаженого й тестового листа."""
     s = InvoiceSettings.get()
@@ -712,7 +720,7 @@ def sample_invoice(lang: str = "de") -> SalesInvoice:
                {"description": "Filter 2.7–3.65 GHz", "part_no": "FT220407", "qty": 2, "unit_price": "48.9"}],
         shipping_cost=Decimal("12.90"), vat_mode="domestic", vat_rate=Decimal("19"), payment_method="invoice",
         pay_kind="invoice",
-        signer_name=s.signer_name or "Max Muster", signer_position=s.signer_position or "Geschäftsführer")
+        signer_name=sample_signer(s), signer_position=s.signer_position or "")
     for k, v in standard_texts(lang, "domestic", "invoice", s).items():
         setattr(inv, k, v)
     if lang != "de":

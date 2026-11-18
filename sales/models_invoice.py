@@ -131,6 +131,16 @@ class InvoiceSettings(models.Model):
     order_button = models.CharField(
         "Клік «🧾 Rechnung» у картці замовлення", max_length=10, choices=ORDER_BUTTON, default="quick",
         help_text="Правий клік на кнопці — інший варіант.")
+    # Рядки під «Rechnung» (номер, дата й Bestellnummer — завжди): за замовчуванням як просив користувач
+    show_service_date = models.BooleanField(
+        "Показувати Leistungsdatum", default=False,
+        help_text="За § 14 UStG дата поставки має бути в рахунку — рядком або приміткою "
+                  "«Leistungsdatum entspricht dem Rechnungsdatum» (напр. у «Вступі»).")
+    show_customer_number = models.BooleanField("Показувати Kundennummer", default=True)
+    show_customer_po = models.BooleanField("Показувати Ihre Bestellnummer (номер замовлення клієнта)", default=False)
+    show_due_date = models.BooleanField(
+        "Показувати Zahlbar bis", default=False,
+        help_text="Строк оплати й так є в тексті оплати («bis zum …»).")
     due_days = models.PositiveSmallIntegerField("Оплатити протягом, днів (рахунок)", default=14)
     prepayment_due_days = models.PositiveSmallIntegerField("Оплатити протягом, днів (передоплата)", default=7)
     vat_rate = models.DecimalField("Ставка ПДВ за замовчуванням, %", max_digits=5, decimal_places=2,

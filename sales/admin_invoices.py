@@ -34,6 +34,11 @@ class InvoiceSettingsAdmin(admin.ModelAdmin):
             "description": "Замовлення з інтернет-магазину — номер магазину CI-&lt;Kundennummer&gt;-NNN (той самий, що в "
                            "Commercial Invoice й у кабінеті покупця). Інші — префікс + номер замовлення.",
         }),
+        ("🧾 Рядки під «Rechnung»", {
+            "fields": ("show_service_date", "show_customer_number", "show_customer_po", "show_due_date"),
+            "description": "Rechnungsnummer, Rechnungsdatum і Bestellnummer показуються завжди; решта — за галочками "
+                           "(і лише коли заповнено в рахунку).",
+        }),
         ("📅 Строки й ПДВ", {
             "fields": ("due_days", "prepayment_due_days", "vat_rate", "home_country"),
         }),

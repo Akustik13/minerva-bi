@@ -2122,6 +2122,7 @@
 {"uk": "Rear Door / Задній вхід", "en": "Rear Door / Rear entrance", "de": "Rear Door / Hintereingang"}
 {"uk": "Reception / Приймальна", "en": "Reception / Reception desk", "de": "Reception / Empfang"}
 {"uk": "Rechnung (рахунок)", "en": "Rechnung (invoice)", "de": "Rechnung"}
+{"uk": "Rechnungsnummer, Rechnungsdatum і Bestellnummer показуються завжди; решта — за галочками (і лише коли заповнено в рахунку).", "en": "Rechnungsnummer, Rechnungsdatum and Bestellnummer are always shown; the rest — by the checkboxes (and only when filled in the invoice).", "de": "Rechnungsnummer, Rechnungsdatum und Bestellnummer werden immer angezeigt; der Rest — per Häkchen (und nur, wenn in der Rechnung ausgefüllt)."}
 {"uk": "Repair — ремонт / гарантія", "en": "Repair — repair / warranty", "de": "Repair — Reparatur / Garantie"}
 {"uk": "ReportLab не встановлено. Виконайте: pip install reportlab", "en": "ReportLab is not installed. Run: pip install reportlab", "de": "ReportLab ist nicht installiert. Führen Sie aus: pip install reportlab"}
 {"uk": "Return (повернення)", "en": "Return (returned goods)", "de": "Return (Rücksendung)"}
@@ -7318,6 +7319,7 @@
 {"uk": "ЗНАЙДЕНО В БАЗІ ЗНАНЬ (інші листування — для контексту, можуть бути старішими за листи проєкту)", "en": "FOUND IN THE KNOWLEDGE BASE (other correspondence — for context, may be older than the project e-mails)", "de": "IN DER WISSENSDATENBANK GEFUNDEN (andere Korrespondenz — als Kontext, kann älter sein als die Projekt-E-Mails)"}
 {"uk": "За", "en": "Over", "de": "In"}
 {"uk": "За {0} год DigiKey так і не показав нових цін", "en": "In {0} h DigiKey never showed the new prices", "de": "Innerhalb von {0} Std. hat DigiKey die neuen Preise nie angezeigt"}
+{"uk": "За § 14 UStG дата поставки має бути в рахунку — рядком або приміткою «Leistungsdatum entspricht dem Rechnungsdatum» (напр. у «Вступі»).", "en": "Under § 14 UStG the date of supply must be on the invoice — as a line or as the note “Leistungsdatum entspricht dem Rechnungsdatum” (e.g. in the “Introduction”).", "de": "Nach § 14 UStG muss das Leistungsdatum in der Rechnung stehen — als Zeile oder als Hinweis „Leistungsdatum entspricht dem Rechnungsdatum“ (z. B. in der „Einleitung“)."}
 {"uk": "За активністю в Minerva (перша й остання дія дня)", "en": "By activity in Minerva (first and last action of the day)", "de": "Nach Aktivität in Minerva (erste und letzte Aktion des Tages)"}
 {"uk": "За бажанням: реєстрація, вхід, статус замовлень і кошик на сайті — «Особистий кабінет покупців».", "en": "Optional: registration, sign-in, order status and cart on the site — “Customer account area”.", "de": "Optional: Registrierung, Anmeldung, Auftragsstatus und Warenkorb auf der Website – „Kundenkonto-Bereich“."}
 {"uk": "За бажанням: розпізнавання частоти й роз'єму в запиті, схожі товари, кабелі, «часто купують разом» (без AI, безкоштовно) або ще й AI-підказки чи підказки нашого RAG.", "en": "Optional: recognition of frequency and connector in the query, similar products, cables, “frequently bought together” (no AI, free) or also AI suggestions or suggestions from our RAG.", "de": "Optional: Erkennung von Frequenz und Steckverbinder in der Anfrage, ähnliche Artikel, Kabel, „häufig zusammen gekauft“ (ohne KI, kostenlos) oder zusätzlich KI-Vorschläge bzw. Vorschläge unseres RAG."}
@@ -13623,8 +13625,12 @@
 {"uk": "Показати/приховати виконані події", "en": "Show/hide done events", "de": "Erledigte Termine ein-/ausblenden"}
 {"uk": "Показати/приховати робочий час askDANTE", "en": "Show/hide askDANTE working time", "de": "askDANTE-Arbeitszeit ein-/ausblenden"}
 {"uk": "Показувати", "en": "Show", "de": "Anzeigen"}
+{"uk": "Показувати Ihre Bestellnummer (номер замовлення клієнта)", "en": "Show “Ihre Bestellnummer” (customer's order number)", "de": "„Ihre Bestellnummer“ anzeigen (Bestellnummer des Kunden)"}
+{"uk": "Показувати Kundennummer", "en": "Show customer number (Kundennummer)", "de": "Kundennummer anzeigen"}
+{"uk": "Показувати Leistungsdatum", "en": "Show Leistungsdatum (date of supply)", "de": "Leistungsdatum anzeigen"}
 {"uk": "Показувати Minerva на цьому телефоні як на ПК (назад — кнопка «📱 Телефон» унизу ліворуч)", "en": "Show Minerva on this phone like on a PC (to go back — the «📱 Phone» button at the bottom left)", "de": "Minerva auf diesem Handy wie am PC anzeigen (zurück — Schaltfläche «📱 Handy» unten links)"}
 {"uk": "Показувати SKU в листі", "en": "Show SKU in the e-mail", "de": "SKU in der E-Mail anzeigen"}
+{"uk": "Показувати Zahlbar bis", "en": "Show “Zahlbar bis” (payment due)", "de": "„Zahlbar bis“ anzeigen"}
 {"uk": "Показувати «Автоматичні документи» в картці замовлення", "en": "Show “Automatic documents” in the order card", "de": "„Automatische Dokumente“ in der Auftragskarte anzeigen"}
 {"uk": "Показувати в календарі Minerva", "en": "Show in the Minerva calendar", "de": "Im Minerva-Kalender anzeigen"}
 {"uk": "Показувати в касі", "en": "Show at checkout", "de": "An der Kasse anzeigen"}
@@ -15488,6 +15494,7 @@
 {"uk": "Рядки замовлення", "en": "Order lines", "de": "Auftragspositionen"}
 {"uk": "Рядки замовлення ({0})", "en": "Order lines ({0})", "de": "Auftragszeilen ({0})"}
 {"uk": "Рядки замовлень", "en": "Order lines", "de": "Auftragspositionen"}
+{"uk": "Рядки під «Rechnung»", "en": "Lines under “Rechnung”", "de": "Zeilen unter „Rechnung“"}
 {"uk": "Рядки рахунку", "en": "Invoice lines", "de": "Rechnungspositionen"}
 {"uk": "Рядки таблиці не знайдено: {0}", "en": "Table rows not found: {0}", "de": "Tabellenzeilen nicht gefunden: {0}"}
 {"uk": "Рядки таблиці позицій — між окремими рядками-маркерами", "en": "Rows of the lines table — between separate marker rows", "de": "Zeilen der Positionstabelle — zwischen separaten Markierungszeilen"}
@@ -16515,6 +16522,7 @@
 {"uk": "Строк минув", "en": "Expired", "de": "Abgelaufen"}
 {"uk": "Строк на DigiKey", "en": "Lead time on DigiKey", "de": "Lieferzeit bei DigiKey"}
 {"uk": "Строк на DigiKey, днів", "en": "Lead time on DigiKey, days", "de": "Lieferzeit bei DigiKey, Tage"}
+{"uk": "Строк оплати й так є в тексті оплати («bis zum …»).", "en": "The due date is already in the payment text (“bis zum …”).", "de": "Das Zahlungsziel steht bereits im Zahlungstext („bis zum …“)."}
 {"uk": "Строк поставки", "en": "Delivery time", "de": "Lieferzeit"}
 {"uk": "Строк поставки позиції", "en": "Line delivery time", "de": "Lieferzeit der Position"}
 {"uk": "Строк проєкту минув {0} ({1} тому)", "en": "Project deadline passed {0} ({1} ago)", "de": "Projektfrist am {0} abgelaufen (vor {1})"}

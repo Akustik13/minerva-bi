@@ -613,3 +613,33 @@ class CashOnDeliveryApiTests(TestCase):
         ok = self.order("WS-COD-2")
         self.assertEqual(ok.status_code, 201, ok.content)
         self.assertEqual(SalesOrder.objects.get(order_number=ok.json()["order_number"]).payment_method, "cod")
+
+
+class MetaLinesTests(_Base):
+    """Рядки під «Rechnung»: номер, дата, Bestellnummer — завжди; Kundennummer — за замовчуванням так;
+    Ihre Bestellnummer, Leistungsdatum, Zahlbar bis — лише з галочками в налаштуваннях."""
+
+    def test_defaults_and_switches(self):
+        inv = svc.sample_invoice()
+        text = docx_text(svc._render(svc.template_path(), svc.build_context(inv)))
+        for shown in ("Rechnungsnummer:", "Rechnungsdatum:", "Kundennummer:", "Bestellnummer:\tPO-31728-001"):
+            self.assertIn(shown, text)
+        for hidden in ("Ihre Bestellnummer", "Leistungsdatum", "Zahlbar bis"):
+            self.assertNotIn(hidden, text)
+        self.assertIn("bis zum", str(svc.build_context(inv)["payment_text"]))     # строк — у тексті оплати
+        InvoiceSettings.objects.filter(pk=1).update(show_service_date=True, show_customer_po=True, show_due_date=True,
+                                                    show_customer_number=False)
+        text = docx_text(svc._render(svc.template_path(), svc.build_context(inv)))
+        for shown in ("Ihre Bestellnummer:\t4500012345", "Leistungsdatum:", "Zahlbar bis:"):
+            self.assertIn(shown, text)
+        self.assertNotIn("Kundennummer", text)
+
+    def test_sample_uses_real_signer(self):
+        from accounting.models import CompanySettings
+        c = CompanySettings.get()
+        c.ceo_name = "Dr.-Ing. Sergey Sevskiy, Geschäftsführer"
+        c.save()
+        with mock.patch("sales.invoice_service.last_signer", return_value=("", "")):
+            self.assertEqual(svc.sample_invoice().signer_name, "Dr.-Ing. Sergey Sevskiy")
+        InvoiceSettings.objects.filter(pk=1).update(signer_name="Anna Chef")
+        self.assertEqual(svc.sample_invoice().signer_name, "Anna Chef")

@@ -18,7 +18,8 @@ related: sales/orders, sales/order-documents, sales/commercial-invoices, shop/nu
   USt-IdNr) у полі 8,5 см — під віконце конверта;
 - праворуч — ваша фірма, **«Ansprechpartner»** (підписант), Tel. / Fax / Mob, E-Mail / Internet, St.-Nr. і
   USt-IdNr.;
-- **«Rechnung»**, номер, дата, Kundennummer, Bestellnummer, Leistungsdatum, «Zahlbar bis» (лише заповнені);
+- **«Rechnung»**, Rechnungsnummer, Rechnungsdatum, Kundennummer, Bestellnummer; Leistungsdatum, «Ihre
+  Bestellnummer» і «Zahlbar bis» — лише якщо ввімкнено в налаштуваннях (блок «🧾 Рядки під «Rechnung»»);
 - звертання **«Sehr geehrter Herr …,»** і вступ «gemäß Ihrer Bestellung **PO-…** berechnen wir Ihnen die folgenden
   Positionen:»;
 - таблиця **Pos. · Beschreibung · Menge · Einzelpreis · Betrag** з рядком **«Versandkosten»** і сумами в самій
@@ -154,6 +155,9 @@ Minerva може сама надсилати рахунок покупцю, ко
 [⚙️ Налаштування рахунків](/admin/sales/invoicesettings/) (кнопка також на сторінці «🧾 Рахунки»):
 
 - **префікс номера** (для замовлень не з сайту), **мова за замовчуванням**, **назва файлу** (`Rechnung_{number}`);
+- **рядки під «Rechnung»** — Kundennummer (за замовчуванням так), Leistungsdatum, Ihre Bestellnummer, Zahlbar bis
+  (за замовчуванням ні; строк оплати й так є в тексті оплати). ⚠️ За § 14 UStG дата поставки має бути в рахунку:
+  без рядка Leistungsdatum допишіть у «Вступ» «Leistungsdatum entspricht dem Rechnungsdatum» або ввімкніть рядок;
 - **клік «🧾 Rechnung» у картці замовлення** — одразу сформувати (за замовчуванням) або відкрити форму;
 - **строки** — оплата за рахунком (14 днів) і передоплата (7 днів), **ставка ПДВ**, **країна фірми** (для вибору ПДВ);
 - **підписант** — порожньо — як в останньому Commercial Invoice / Packing List;
