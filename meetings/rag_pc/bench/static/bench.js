@@ -266,6 +266,17 @@ const toDb = (x) => (x > 0 ? 20 * Math.log10(x) : -Infinity);
 const meterPct = (db) => (Number.isFinite(db) ? Math.max(0, Math.min(100, (db + 70) / 70 * 100)) : 0); // -70..0 dBFS
 const SKIP_MS = 500;    // power-on thump of the device and the start-up gap of system echo cancellation
 const HEARD = 0.01;     // ≈ -40 dBFS: a 100 ms frame with real sound in it
+/* The picker opens on «Весь екран» (displaySurface: 'monitor'): a desktop meeting app (Teams / Zoom) plays the other
+ * side's voices from another process, so its WINDOW gives a silent audio track (user test 18.11: window — only the
+ * microphone was heard, entire screen — both). A browser tab keeps working («Поділитися звуком вкладки»). */
+const DISPLAY_OPTIONS = {
+  video: {displaySurface: 'monitor', frameRate: {ideal: 1, max: 5}},
+  audio: {echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false},
+  systemAudio: 'include', windowAudio: 'window', selfBrowserSurface: 'exclude', surfaceSwitching: 'include',
+  monitorTypeSurfaces: 'include', preferCurrentTab: false,
+};
+const SURFACE_TEXT = {monitor: 'весь екран', window: 'вікно програми', browser: 'вкладка браузера'};
+const WINDOW_SILENT_MS = 8000;   // a window without meeting sound for this long — say why and offer «весь екран»
 const HEARD_FRAMES = 3; // ... at least 300 ms of such frames, so one click is not "heard"
 
 function micConstraints(proc, deviceId) {
@@ -552,10 +563,21 @@ function watchSilence(levels) {
   if (Live.mode !== 'meeting' && Live.micFrames < HEARD_FRAMES && age > 12000) {
     warn.push(`🎤 Мікрофон «${Live.micLabel || '?'}» досі не чув вас — скажіть кілька слів. Якщо смужка «Ви» не рухається, зупиніть запис і натисніть «🔎 Знайти мікрофон».`);
   }
-  if (Live.mode !== 'mic' && Live.meetingFrames < HEARD_FRAMES && age > 20000) {
-    warn.push('🖥 Звуку наради ще не було — у вибраній вкладці чи вікні нічого не звучить або не поставлено галочку «Поділитися звуком».' +
+  const since = Date.now() - (Live.sourceAt || Live.started);
+  let noMeeting = false;
+  if (Live.mode !== 'mic' && Live.meetingFrames < HEARD_FRAMES && Live.surface === 'window' && since > WINDOW_SILENT_MS) {
+    noMeeting = true;
+    warn.push('🖥 З вибраного вікна звуку наради немає. Програма Teams / Zoom грає голоси співрозмовників не з цього' +
+      ' вікна, тому браузер їх не чує. Натисніть «🖥 Змінити джерело звуку наради» і виберіть «Весь екран» з галочкою' +
+      ' «Поділитися системним звуком» — запис продовжиться без зупинки.');
+  } else if (Live.mode !== 'mic' && Live.meetingFrames < HEARD_FRAMES && since > 20000) {
+    noMeeting = true;
+    warn.push('🖥 Звуку наради ще не було — у вибраній вкладці чи вікні нічого не звучить або не поставлено галочку' +
+      ' «Поділитися звуком». Якщо співрозмовники вже говорили — «🖥 Змінити джерело звуку наради».' +
       (Live.outputHint ? ' ' + Live.outputHint : ''));
   }
+  const sw = $('#lv-switch');
+  if (sw) sw.classList.toggle('attn', noMeeting);
   const box = $('#lv-warn');
   const text = warn.join(' ');
   if (box.textContent !== text) { box.textContent = text; box.hidden = !text; }
@@ -572,7 +594,8 @@ async function outputHint(display) {
   const comm = outs.find((d) => d.deviceId === 'communications');
   if (!def || !comm || def.groupId === comm.groupId) return '';
   return `Увага: «Весь екран» бере звук лише з виводу за замовчуванням («${stripRole(def.label)}»), а програма наради може грати у` +
-    ` «пристрій зв’язку» («${stripRole(comm.label)}»). Тоді виберіть вікно програми зі «звуком вікна» або зробіть один пристрій і тим, і тим.`;
+    ` «пристрій зв’язку» («${stripRole(comm.label)}»). Тоді в Teams / Zoom (Налаштування → Пристрої → Динамік) виберіть` +
+    ` «${stripRole(def.label)}» або в Windows зробіть один пристрій і тим, і тим.`;
 }
 
 function browserName() {
@@ -616,10 +639,14 @@ async function buildGraph(display, mic) {
   };
   Live.micGain = null;
   if (mic) { const m = mono(); ctx.createMediaStreamSource(mic).connect(m); m.connect(merger, 0, 0); Live.micGain = m; }
+  Live.displayGain = null;
+  Live.displaySource = null;
   if (display) {
     const d = mono();
-    ctx.createMediaStreamSource(new MediaStream(display.getAudioTracks())).connect(d);
+    Live.displaySource = ctx.createMediaStreamSource(new MediaStream(display.getAudioTracks()));
+    Live.displaySource.connect(d);
     d.connect(merger, 0, 1);
+    Live.displayGain = d;
   }
   const node = new AudioWorkletNode(ctx, 'capture', {numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1],
     channelCount: 2, channelCountMode: 'explicit', channelInterpretation: 'discrete'});
@@ -658,6 +685,8 @@ function meters(levels) {
 
 function setLiveButtons(running) {
   $('#lv-start').disabled = running;
+  const sw = $('#lv-switch');
+  if (sw) { sw.hidden = !running || Live.mode === 'mic'; sw.classList.remove('attn'); }
   $('#lv-stop').disabled = !running;
   $('#lv-mark').disabled = !running;
   $('#lv-pause').disabled = !running;
@@ -709,12 +738,7 @@ async function liveBegin() {
   let display = null, mic = null;
   try {
     if (mode !== 'mic') {
-      display = await navigator.mediaDevices.getDisplayMedia({
-        video: {frameRate: {ideal: 1, max: 5}},
-        audio: {echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false},
-        systemAudio: 'include', windowAudio: 'window', selfBrowserSurface: 'exclude', surfaceSwitching: 'include',
-        preferCurrentTab: false,
-      });
+      display = await navigator.mediaDevices.getDisplayMedia(DISPLAY_OPTIONS);
       if (!display.getAudioTracks().length) {
         stopTracks(display);
         hint('Звуку немає: у вікні вибору поставте галочку «Поділитися звуком» (звук вкладки або системний звук).');
@@ -746,15 +770,54 @@ async function liveBegin() {
   const t0 = Date.now();
   Object.assign(Live, {running: true, stopping: false, failed: false, ready: false, queue: [], partial: {}, sid: null,
     started: t0, mode, micFrames: 0, meetingFrames: 0, micLabel: micTrack ? micTrack.label : '', outputHint: outHint,
-    capture, micLost: '', paused: false, pausedAt: 0, pausedMs: 0, heardAt: {L: t0, R: t0}, capWarned: false});
+    capture, micLost: '', paused: false, pausedAt: 0, pausedMs: 0, heardAt: {L: t0, R: t0}, capWarned: false,
+    display, surface: surfaceOf(display), sourceAt: t0, displayEnded: () => liveStop('Показ звуку зупинено в браузері.')});
   $('#lv-lines').replaceChildren();
   $('#lv-saved').hidden = true;
   $('#lv-stats').textContent = '';
   setLiveButtons(true);
   Live.timer = setInterval(tickTimer, 500);
   connect(mode, engine);
-  if (display) display.getAudioTracks()[0].addEventListener('ended', () => liveStop('Показ звуку зупинено в браузері.'));
+  if (display) display.getAudioTracks()[0].addEventListener('ended', Live.displayEnded);
   if (micTrack) watchMic(micTrack);
+}
+
+function surfaceOf(display) {
+  const v = display && display.getVideoTracks()[0];
+  return (v && v.getSettings ? v.getSettings().displaySurface : '') || '';
+}
+
+/** «🖥 Змінити джерело звуку наради»: a new picker (the click is the user gesture it needs), the meeting channel R
+ * is rewired to the new source — the recording, its time and the microphone go on without a stop. */
+async function switchDisplay() {
+  if (!Live.running || Live.stopping || !Live.ctx || !Live.displayGain) return;
+  let next;
+  try { next = await navigator.mediaDevices.getDisplayMedia(DISPLAY_OPTIONS); } catch (e) {
+    if (e.name !== 'NotAllowedError') hint(`Не вдалося змінити джерело звуку: ${e.message}`, true);
+    return;
+  }
+  if (!next.getAudioTracks().length) {
+    stopTracks(next);
+    hint('Звуку немає: у вікні вибору поставте галочку «Поділитися звуком» (системний звук або звук вкладки). Запис іде далі з попереднім джерелом.', true);
+    return;
+  }
+  if (!Live.running || Live.stopping || !Live.ctx || !Live.displayGain) { stopTracks(next); return; }
+  const old = Live.display;
+  const oldTrack = old && old.getAudioTracks()[0];
+  if (oldTrack && Live.displayEnded) oldTrack.removeEventListener('ended', Live.displayEnded);
+  if (Live.displaySource) Live.displaySource.disconnect();
+  Live.displaySource = Live.ctx.createMediaStreamSource(new MediaStream(next.getAudioTracks()));
+  Live.displaySource.connect(Live.displayGain);
+  stopTracks(old);
+  Live.streams = Live.streams.filter((s) => s !== old).concat([next]);
+  const now = Date.now();
+  Object.assign(Live, {display: next, surface: surfaceOf(next), sourceAt: now, meetingFrames: 0});
+  Live.heardAt.R = now;
+  next.getAudioTracks()[0].addEventListener('ended', Live.displayEnded);
+  Live.outputHint = await outputHint(next);
+  const what = SURFACE_TEXT[Live.surface] || 'інше джерело';
+  hint(`● Іде запис · 🖥 звук наради тепер: ${what} (змінено о ${clock((now - Live.started) / 1000)})`, true);
+  sendMark(`джерело звуку наради: ${what}`, true);
 }
 
 // ---- the microphone during a recording: unplugged / muted is said at once (review 10.11: a Bluetooth headset that
@@ -2393,6 +2456,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#lv-stop').addEventListener('click', () => liveStop(''));
   $('#lv-mark').addEventListener('click', () => sendMark(''));
   $('#lv-pause').addEventListener('click', togglePause);
+  $('#lv-switch').addEventListener('click', switchDisplay);
   $('#mn-join').addEventListener('click', () => { sendMark('consent_join'); hint('🙋 Позначено: новий учасник погодився.', true); });
   $('#mn-ok').addEventListener('click', () => { sendMark('consent_ok'); hint('✅ Позначено: згоду підтверджено вголос.', true); });
   $('#mn-discard').addEventListener('click', liveDiscard);

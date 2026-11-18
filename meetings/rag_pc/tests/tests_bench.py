@@ -1474,7 +1474,7 @@ class LinkPipelineTests(LinkTestBase):
         self.assertEqual(sync["sessions"][0], {"meeting": 12, "uid": UID, "session": sid,
                                                "token_sha256": __import__("hashlib").sha256(PUSH.encode()).hexdigest(),
                                                "stage": "done", "progress": None, "queue_pos": 0, "audio_on_bench": False})
-        self.assertEqual(sync["bench"], {"version": "0.3.5", "live_busy": False, "queue": 0, "outbox": 0, "failed": 0,
+        self.assertEqual(sync["bench"], {"version": "0.3.6", "live_busy": False, "queue": 0, "outbox": 0, "failed": 0,
                                          "last_error": "", "retention_days": 30, "standalone": False})
 
     async def test_empty_transcript_and_audio_text(self):
@@ -2524,7 +2524,7 @@ class QuickStartPageTests(unittest.TestCase):
     def test_assets_carry_the_version(self):
         from bench import VERSION
 
-        self.assertEqual(VERSION, "0.3.5")
+        self.assertEqual(VERSION, "0.3.6")
         self.assertIn(f"/static/bench.js?v={VERSION}", self.html)
         self.assertIn(f"/static/bench.css?v={VERSION}", self.html)
 
@@ -2539,6 +2539,23 @@ class QuickStartPageTests(unittest.TestCase):
         self.assertIn('<nav class="tabs"', main)                       # hidden together with <main> in the error view
         for test_only in ("upload", "list", "metrics", "help"):
             self.assertIn(f'data-tab="{test_only}" class="stage0"', nav)
+
+    def test_meeting_sound_source_defaults_to_entire_screen_and_can_be_switched(self):
+        """0.3.6: the Teams / Zoom WINDOW gives a silent track (user test 18.11) — the picker opens on «Весь екран»,
+        a silent window is named within seconds, «🖥 Змінити джерело звуку наради» rewires channel R mid-recording."""
+        opts = self.js.split("const DISPLAY_OPTIONS = {", 1)[1].split("};", 1)[0]
+        self.assertIn("displaySurface: 'monitor'", opts)
+        self.assertIn("systemAudio: 'include'", opts)
+        self.assertEqual(self.js.count("getDisplayMedia(DISPLAY_OPTIONS)"), 2)        # початок запису й заміна джерела
+        self.assertNotIn("getDisplayMedia({", self.js)
+        self.assertIn('id="lv-switch"', self.html)
+        switch = self.js.split("async function switchDisplay() {", 1)[1].split("\n}\n", 1)[0]
+        self.assertIn("Live.displaySource.disconnect()", switch)
+        self.assertIn("connect(Live.displayGain)", switch)
+        self.assertIn("removeEventListener('ended', Live.displayEnded)", switch)      # стара доріжка не зупиняє запис
+        self.assertIn("sendMark(", switch)
+        self.assertIn("Live.surface === 'window'", self.js)
+        self.assertIn("Не вікно програми", self.html)
 
     def test_start_keeps_consent_and_the_click(self):
         start = self.js.split("function quickStart() {", 1)[1].split("\n}\n", 1)[0]

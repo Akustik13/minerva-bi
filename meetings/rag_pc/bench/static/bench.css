@@ -55,6 +55,8 @@ button.danger { border-color: var(--bad); }
 .hint.bad { color: var(--bad); }
 .hint.warn { color: var(--warn); }
 #lv-warn { border: 1px solid var(--warn); border-radius: 6px; padding: 6px 10px; }
+#lv-switch { margin-top: 6px; }
+#lv-switch.attn { border-color: var(--warn); box-shadow: 0 0 0 2px var(--warn); font-weight: 600; }
 .check { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 6px 0; background: var(--bg); }
 .check .meter span { min-width: 24px; }
 .check .num { min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; }

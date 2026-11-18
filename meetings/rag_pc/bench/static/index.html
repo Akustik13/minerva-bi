@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Вікно запису наради</title>
-<link rel="stylesheet" href="/static/bench.css?v=0.3.5">
-<script src="/static/bench.js?v=0.3.5" defer></script>
+<link rel="stylesheet" href="/static/bench.css?v=0.3.6">
+<script src="/static/bench.js?v=0.3.6" defer></script>
 </head>
 <body class="boot">
 <header class="top">
@@ -99,7 +99,8 @@
     </div>
     <div id="q-hint" class="hint" role="status"></div>
     <p id="q-meeting-tip" class="muted">Після ▶ браузер спитає, звідки брати звук наради: Teams / Zoom у браузері —
-      вкладка й «Поділитися звуком вкладки»; програма Teams / Zoom — «Весь екран» і «Поділитися системним звуком».</p>
+      вкладка й «Поділитися звуком вкладки»; програма Teams / Zoom — «Весь екран» і «Поділитися системним звуком»
+      (вікно програми голосів співрозмовників не дає — лише ваш мікрофон).</p>
     <p id="q-all-note" class="muted">Усі налаштування — вкладка «🔴 Наживо». Вибір запам’ятовується на цьому ПК.</p>
   </div>
 </section>
@@ -202,12 +203,15 @@
     </div>
     <div id="lv-hint" class="hint" role="status"></div>
     <div id="lv-warn" class="hint warn" role="alert" hidden></div>
+    <button type="button" id="lv-switch" hidden title="Вибрати інше джерело звуку наради (весь екран, вкладку) — запис не зупиняється">🖥 Змінити джерело звуку наради</button>
     <div id="lv-miclost" class="hint bad" role="alert" hidden></div>
     <details class="howto">
       <summary>Як захопити звук наради</summary>
       <ol>
         <li>Teams, Zoom чи Meet у <b>браузері</b>: у вікні вибору — вкладка наради і галочка «Поділитися звуком вкладки».</li>
-        <li>Програма Teams / Zoom: «Весь екран» і галочка «Поділитися системним звуком».</li>
+        <li>Програма Teams / Zoom: «Весь екран» і галочка «Поділитися системним звуком». <b>Не вікно програми</b>:
+          Teams / Zoom грають голоси співрозмовників з іншого процесу, і вікно дає лише тишу — буде чути тільки ваш мікрофон.</li>
+        <li>Вибрали не те? Під час запису — «🖥 Змінити джерело звуку наради»: запис не зупиняється.</li>
         <li>Найкраще — у гарнітурі: тоді мікрофон не чує динаміків.</li>
         <li>Браузер покаже смугу «Ви показуєте…» — це нормально, відео не зберігається.</li>
       </ol>
