@@ -86,8 +86,14 @@ PLACEHOLDERS = [
     ("{number}", "номер рахунку"), ("{date}", "дата рахунку"), ("{due_date}", "оплатити до"),
     ("{amount}", "сума до оплати (брутто з валютою)"), ("{order}", "номер замовлення"),
     ("{customer}", "компанія або ім'я покупця"), ("{method}", "спосіб оплати"),
+    ("{salutation}", "звертання: «Sehr geehrter Herr …,» / «Dear Mr …,»"), ("{signer}", "підписант"),
+    ("{company}", "назва вашої фірми"),
 ]
-_PH_RE = re.compile(r"\{(number|date|due_date|amount|order|customer|method)\}")
+_PH_RE = re.compile(r"\{(number|date|due_date|amount|order|customer|method|salutation|signer|company)\}")
+ONLINE_METHODS = ("stripe", "paypal")       # рахунок автоматично — лише коли оплату отримано
+BACKGROUND = True                            # тести вимикають — автоматичний лист надсилається одразу
+AUTO_LOCK = "invoice-auto:{pk}"
+AUTO_LOG_MAX = 15
 
 
 class InvoiceError(Exception):
@@ -387,16 +393,20 @@ def method_name(method: str, lang: str) -> str:
     return METHOD_NAMES["de" if lang == "de" else "en"].get(method, method)
 
 
-def values(inv: SalesInvoice) -> dict:
-    """Значення підстановок {number} {date} … для текстів рахунку й листа."""
-    doc, lang = _fmt(), inv.language
+def values(inv: SalesInvoice, lang: str | None = None) -> dict:
+    """Значення підстановок {number} {date} … для текстів рахунку й листа (lang — мова частини тексту)."""
+    doc, lang = _fmt(), lang or inv.language
     bill = inv.bill_to or {}
+    c = _company()
     return {
         "number": inv.number, "date": _date(inv.inv_date, lang), "due_date": _date(inv.due_date, lang),
         "amount": f"{doc._fmt_money(inv.gross_total, lang)} {inv.currency}",
         "order": inv.order_ref or (inv.sales_order.order_number if inv.sales_order_id else ""),
         "customer": bill.get("company") or bill.get("name") or "",
         "method": method_name(inv.payment_method, lang),
+        "salutation": salutation(bill, lang if lang in LABELS else "de"),
+        "signer": inv.signer_name or _ceo(c),
+        "company": (c.legal_name or c.name) if c is not None else "",
     }
 
 
@@ -685,12 +695,12 @@ def render_docx(inv: SalesInvoice) -> bytes:
     return _render(template_path(s), build_context(inv, s))
 
 
-def sample_invoice() -> SalesInvoice:
-    """Приклад (не зберігається) — для перегляду шаблону й перевірки завантаженого."""
+def sample_invoice(lang: str = "de") -> SalesInvoice:
+    """Приклад (не зберігається) — для перегляду шаблону, перевірки завантаженого й тестового листа."""
     s = InvoiceSettings.get()
     inv = SalesInvoice(
         number="CI-31728-001", inv_date=timezone.localdate(), service_date=timezone.localdate(),
-        due_date=timezone.localdate() + timedelta(days=s.due_days), language="de", currency="EUR",
+        due_date=timezone.localdate() + timedelta(days=s.due_days), language=lang, currency="EUR",
         bill_to={"company": "Muster Elektronik GmbH", "name": "Max Mustermann", "salutation": "mr",
                  "street": "Hauptstraße 1", "zip_city": "10115 Berlin", "country": "Deutschland",
                  "vat_id": "DE123456789", "email": "einkauf@example.com"},
@@ -702,8 +712,11 @@ def sample_invoice() -> SalesInvoice:
         shipping_cost=Decimal("12.90"), vat_mode="domestic", vat_rate=Decimal("19"), payment_method="invoice",
         pay_kind="invoice",
         signer_name=s.signer_name or "Max Muster", signer_position=s.signer_position or "Geschäftsführer")
-    for k, v in standard_texts("de", "domestic", "invoice", s).items():
+    for k, v in standard_texts(lang, "domestic", "invoice", s).items():
         setattr(inv, k, v)
+    if lang != "de":
+        inv.bill_to = {**inv.bill_to, "country": "Germany"}
+        inv.ship_to = {**inv.ship_to, "country": "Germany"}
     return inv
 
 
@@ -759,18 +772,20 @@ def copy_to_order(inv: SalesInvoice) -> None:
 # ── Лист ─────────────────────────────────────────────────────────────────────
 
 def attachment(pk) -> dict | None:
+    """Вкладення листа — лише PDF (DOCX покупцю не надсилаємо); PDF ще немає — None."""
     inv = SalesInvoice.objects.filter(pk=pk).first()
-    if inv is None:
+    if inv is None or not inv.pdf_file:
         return None
-    f = inv.pdf_file or inv.docx_file
-    if not f:
-        return None
-    with f.open("rb") as fh:
+    with inv.pdf_file.open("rb") as fh:
         content = fh.read()
-    ext = "pdf" if inv.pdf_file else "docx"
-    ctype = "application/pdf" if ext == "pdf" else \
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    return {"name": f"{file_base(inv)}.{ext}", "content": content, "content_type": ctype}
+    return {"name": f"{file_base(inv)}.pdf", "content": content, "content_type": "application/pdf"}
+
+
+def ensure_pdf(inv: SalesInvoice) -> bool:
+    """PDF є, або сформувати заново (DOCX + PDF); False — PDF не вийшов (на сервері немає LibreOffice)."""
+    if not inv.pdf_file:
+        generate(inv)
+    return bool(inv.pdf_file)
 
 
 def compose_initial(pk, user=None) -> dict:
@@ -778,19 +793,195 @@ def compose_initial(pk, user=None) -> dict:
     import html
     from django.shortcuts import get_object_or_404
     inv = get_object_or_404(SalesInvoice, pk=pk)
-    if not (inv.pdf_file or inv.docx_file) and (user is None or user.has_perm("sales.change_salesinvoice")):
-        generate(inv)
-    s = InvoiceSettings.get()
-    vals = values(inv)
-    lang = inv.language if inv.language in LANG_CODES else "de"
-    subject = fill(s.text("email_subject", "de" if lang == "de_en" else lang), vals)
-    if lang == "de_en":
-        subject = " / ".join(x for x in (fill(s.email_subject_de, vals), fill(s.email_subject_en, vals)) if x)
-    body = fill(s.text("email_body", lang), vals)
+    if not inv.pdf_file and (user is None or user.has_perm("sales.change_salesinvoice")):
+        ensure_pdf(inv)                        # поштою — лише PDF
+    subject, body = mail_text(inv)
     att = attachment(inv.pk)
-    to = (inv.bill_to or {}).get("email") or (inv.sales_order.email if inv.sales_order_id else "") or ""
-    return {"to": to, "subject": subject, "body_html": html.escape(body).replace("\n", "<br>"),
+    return {"to": recipient(inv), "subject": subject, "body_html": html.escape(body).replace("\n", "<br>"),
             "att_refs": [{"ref": f"invoice:{inv.pk}", "name": att["name"]}] if att else []}
+
+
+def recipient(inv: SalesInvoice) -> str:
+    return (inv.bill_to or {}).get("email") or (inv.sales_order.email if inv.sales_order_id else "") or ""
+
+
+def mail_text(inv: SalesInvoice, s: InvoiceSettings | None = None) -> tuple[str, str]:
+    """(тема, текст) листа з рахунком мовою рахунку; «Deutsch + English» — обидві частини, кожна своєю мовою."""
+    s = s or InvoiceSettings.get()
+    lang = inv.language if inv.language in LANG_CODES else "de"
+    parts = ("de", "en") if lang == "de_en" else (lang,)
+    subject = " / ".join(x for x in (fill(getattr(s, f"email_subject_{x}"), values(inv, x)) for x in parts) if x)
+    body = "\n\n".join(x for x in (fill(getattr(s, f"email_body_{x}"), values(inv, x)).strip() for x in parts) if x)
+    return subject, body
+
+
+def _shop_of(order):
+    try:
+        from shop.models import ShopOrder
+    except ImportError:
+        return None
+    info = ShopOrder.objects.filter(order=order).select_related("shop").first() if order is not None else None
+    return info.shop if info is not None else None
+
+
+def default_shop():
+    try:
+        from shop.models import Shop
+    except ImportError:
+        return None
+    return Shop.objects.filter(is_default=True).first() or Shop.objects.order_by("pk").first()
+
+
+def send_mail(inv: SalesInvoice, to: str, shop, *, subject_prefix: str = "", files: list | None = None) -> None:
+    """Лист покупцю з рахунком у вкладенні — з пошти магазину (призначення «notices», як «Оплату отримано»:
+    скринька магазину або SMTP сповіщень), Reply-To і прихована копія — як у листах магазину. Помилки — винятком."""
+    import html
+    from django.core.mail import EmailMultiAlternatives
+    from shop import mail as shop_mail
+    subject, body = mail_text(inv)
+    cfg = shop_mail.smtp_settings(shop, "notices")
+    msg = EmailMultiAlternatives(
+        subject=subject_prefix + subject, body=body, from_email=cfg["from"], to=[to],
+        connection=shop_mail._connection(cfg), reply_to=[shop.mail_reply_to] if shop.mail_reply_to else None,
+        bcc=shop_mail.addresses(shop.mail_bcc) or None)
+    msg.attach_alternative('<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.45">'
+                           + html.escape(body).replace("\n", "<br>") + "</div>", "text/html")
+    for item in files if files is not None else [attachment(inv.pk)]:
+        if item:
+            msg.attach(item["name"], item["content"], item["content_type"])
+    shop_mail._deliver(msg, cfg)
+    logger.info("invoice %s mailed to %s (%s)", inv.number, to, shop.slug)
+
+
+# ── Автоматично покупцю (замовлення з інтернет-магазину) ─────────────────────
+
+def _log_auto(order, result: str, to: str = "", number: str = "") -> None:
+    """Журнал останніх автоматичних листів (InvoiceSettings.auto_log) — UPDATE, налаштування не перезаписуються."""
+    entry = {"at": timezone.now().isoformat(timespec="seconds"), "order": getattr(order, "order_number", ""),
+             "order_pk": getattr(order, "pk", None), "number": number, "to": to, "result": result}
+    log = list(InvoiceSettings.objects.filter(pk=1).values_list("auto_log", flat=True).first() or [])
+    InvoiceSettings.objects.filter(pk=1).update(auto_log=([entry] + log)[:AUTO_LOG_MAX])
+
+
+AUTO_TEXT = {
+    "sent": "надіслано", "no_email": "немає email покупця", "no_pdf": "немає PDF (на сервері немає LibreOffice)",
+    "not_configured": "не налаштовано пошту магазину",
+}
+
+
+def auto_send(order_pk) -> str:
+    """Рахунок покупцю автоматично: лише замовлення інтернет-магазину (продаж, не скасоване), один раз на
+    замовлення. Онлайн-оплата — лише оплачене (тоді текст «вже оплачено»). Повертає результат (і в журнал):
+    off / gone / not_shop / skip / wait_payment / busy / already / no_email / no_pdf / sent / error: …"""
+    from shop import mail as shop_mail
+    from .models import SalesOrder
+    s = InvoiceSettings.get()
+    if not s.auto_send:
+        return "off"
+    order = SalesOrder.objects.filter(pk=order_pk).first()
+    if order is None:
+        return "gone"
+    shop = _shop_of(order)
+    if shop is None:
+        return "not_shop"
+    if order.status == "cancelled" or (order.document_type or "SALE") != "SALE":
+        return "skip"
+    if order.payment_method in ONLINE_METHODS and order.payment_status != "paid":
+        return "wait_payment"
+    from core.shared_cache import cache
+    lock = AUTO_LOCK.format(pk=order.pk)
+    if not cache.add(lock, 1, 600):
+        return "busy"
+    inv, result = None, ""
+    try:
+        inv = order.sales_invoices.order_by("-pk").first()
+        if inv is not None and inv.sent_at:
+            return "already"
+        if inv is None:
+            inv, _ = quick_from_order(order)
+        elif order.payment_status == "paid" and inv.pay_kind != "paid":   # рахунок створили до оплати
+            inv.pay_kind, inv.due_date, inv.payment_method = "paid", None, order.payment_method or inv.payment_method
+            inv.payment_text = standard_texts(inv.language, inv.vat_mode, "paid", s)["payment_text"]
+            inv.save()
+            generate(inv)
+        elif not inv.pdf_file:
+            generate(inv)
+        to = recipient(inv)
+        if not to:
+            result = "no_email"
+        elif not inv.pdf_file:
+            result = "no_pdf"                  # покупцю — лише PDF, не DOCX
+        else:
+            send_mail(inv, to, shop)
+            mark_sent(inv.pk, to)
+            result = "sent"
+        _log_auto(order, result, to, inv.number)
+        return result
+    except shop_mail.MailNotConfigured as e:
+        logger.warning("invoice auto-send for %s: %s", order.order_number, e)
+        _log_auto(order, "not_configured", number=getattr(inv, "number", ""))
+        return "not_configured"
+    except Exception as e:  # noqa: BLE001 — замовлення вже прийнято; причина — у журналі на сторінці рахунків
+        logger.exception("invoice auto-send for %s failed", order.order_number)
+        _log_auto(order, f"error: {e}"[:200], number=getattr(inv, "number", ""))
+        return f"error: {e}"
+    finally:
+        cache.delete(lock)
+
+
+def _worth_trying(order_pk) -> bool:
+    """Швидка перевірка до фонового потоку (імпорт сотень замовлень не запускає сотні потоків): увімкнено, замовлення
+    інтернет-магазину, ще немає надісланого рахунку."""
+    if not InvoiceSettings.objects.filter(pk=1, auto_send=True).exists():
+        return False
+    try:
+        from shop.models import ShopOrder
+    except ImportError:
+        return False
+    return (ShopOrder.objects.filter(order_id=order_pk).exists()
+            and not SalesInvoice.objects.filter(sales_order_id=order_pk, sent_at__isnull=False).exists())
+
+
+def start_auto_send(order_pk) -> None:
+    """Після commit (сигнал замовлення): у фоні — сайт не чекає на LibreOffice і SMTP; у тестах — одразу."""
+    if not _worth_trying(order_pk):
+        return
+    if not BACKGROUND:
+        auto_send(order_pk)
+        return
+    import threading
+
+    def work():
+        from django.db import connection
+        try:
+            auto_send(order_pk)
+        except Exception:  # noqa: BLE001
+            logger.exception("invoice auto-send #%s", order_pk)
+        finally:
+            connection.close()
+    threading.Thread(target=work, name=f"invoice-auto-{order_pk}", daemon=True).start()
+
+
+def send_test(to: str, lang: str = "de") -> str:
+    """Тестовий лист: приклад рахунку (вигадані дані покупця, ваша фірма й шаблон) — так, як його отримає покупець,
+    з тієї ж пошти магазину. Нічого не зберігає. Повертає, з якої адреси пішов лист."""
+    from shop import mail as shop_mail
+    shop = default_shop()
+    if shop is None:
+        raise InvoiceError("Немає інтернет-магазину — рахунки покупцям надсилаються з його пошти.")
+    inv = sample_invoice(lang if lang in LANG_CODES else "de")
+    data = render_docx(inv)
+    pdf = None
+    try:
+        from documents.service import _convert_to_pdf
+        pdf = _convert_to_pdf(data)
+    except Exception as e:  # noqa: BLE001 — без LibreOffice — DOCX
+        logger.warning("invoice test mail: PDF failed: %s", e)
+    if not pdf:
+        raise InvoiceError("PDF не сформовано — на сервері немає LibreOffice (поштою надсилається лише PDF).")
+    item = {"name": f"{file_base(inv)}.pdf", "content": pdf, "content_type": "application/pdf"}
+    send_mail(inv, to, shop, subject_prefix="[TEST] ", files=[item])
+    return shop_mail.smtp_settings(shop, "notices")["from"]
 
 
 def mark_sent(pk, to: str = "") -> None:

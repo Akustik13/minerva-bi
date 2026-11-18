@@ -8,7 +8,8 @@ from django.utils.html import format_html
 from .models_invoice import InvoiceSettings, SalesInvoice
 
 PLACEHOLDER_HELP = ("Підстановки: {number} — номер, {date} — дата, {due_date} — оплатити до, {amount} — сума брутто з "
-                    "валютою, {order} — номер замовлення, {customer} — покупець, {method} — спосіб оплати.")
+                    "валютою, {order} — номер замовлення, {customer} — покупець, {method} — спосіб оплати, "
+                    "{salutation} — звертання, {signer} — підписант, {company} — ваша фірма.")
 
 
 @admin.register(SalesInvoice)
@@ -50,8 +51,10 @@ class InvoiceSettingsAdmin(admin.ModelAdmin):
             "description": PLACEHOLDER_HELP,
         }),
         ("✉️ Лист з рахунком", {
-            "fields": ("email_subject_de", "email_body_de", "email_subject_en", "email_body_en"),
-            "description": PLACEHOLDER_HELP + " «Deutsch + English» — обидва тексти.",
+            "fields": ("auto_send", "email_subject_de", "email_body_de", "email_subject_en", "email_body_en"),
+            "description": PLACEHOLDER_HELP + " «Deutsch + English» — обидва тексти. Тестовий лист і журнал "
+                           "автоматичних листів — <a href=\"/rechnungen/#auto\">🧾 Рахунки → «✉️ Рахунок покупцю "
+                           "автоматично»</a>.",
         }),
         ("📄 Шаблон", {
             "fields": ("template_info",),
@@ -79,7 +82,7 @@ class InvoiceSettingsAdmin(admin.ModelAdmin):
         return redirect(reverse("admin:sales_invoicesettings_change", args=[obj.pk]))
 
 
-ORDER_BUTTON_JS = '<script src="/static/admin/js/ri_order_button.js?v=1" defer></script>'
+ORDER_BUTTON_JS = '<script src="/static/admin/js/ri_order_button.js?v=2" defer></script>'
 
 
 def order_button(order, last, style: str) -> str:
@@ -89,14 +92,14 @@ def order_button(order, last, style: str) -> str:
     from django.utils.html import escape
     if last is not None:
         attrs = {"data-ri-menu": "1", "data-ri-open": f"/rechnungen/{last.pk}/",
-                 "data-ri-again": f"/rechnungen/new/?order={order.pk}&again=1"}
-        if last.pdf_file:
-            attrs["data-ri-pdf"] = f"/rechnungen/{last.pk}/file/pdf/"
+                 "data-ri-again": f"/rechnungen/new/?order={order.pk}&again=1",
+                 "data-ri-regen": f"/rechnungen/{last.pk}/regenerate/",
+                 "data-ri-pdf": f"/rechnungen/{last.pk}/file/pdf/"}         # PDF ще немає — сформується при відкритті
         if last.pdf_file or last.docx_file:
             attrs["data-ri-mail"] = f"/email/compose/?invoice={last.pk}"
         data = " ".join(f'{k}="{escape(v)}"' for k, v in attrs.items())
         html = (f'<a href="/rechnungen/{last.pk}/" style="{style}" {data} '
-                f'title="Відкрити рахунок · правий клік — PDF, лист, ще один рахунок">'
+                f'title="Відкрити рахунок · правий клік — PDF, перегенерувати, лист, ще один рахунок">'
                 f'🧾 Rechnung <span translate="no">{escape(last.number)}</span></a>')
     else:
         mode = InvoiceSettings.get().order_button

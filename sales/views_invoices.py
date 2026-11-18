@@ -69,9 +69,31 @@ def invoice_list(request):
         **admin.site.each_context(request), "title": "Рахунки (Rechnung)",
         "invoices": list(qs[:LIST_LIMIT]), "search": search, "limit": LIST_LIMIT, "can": _can(request),
         "template_kind": svc.template_kind(s), "template_vars": svc.TEMPLATE_VARS,
-        "company_missing": svc.company_missing(),
+        "company_missing": svc.company_missing(), "auto": _auto_ctx(request, s),
         "placeholders": svc.PLACEHOLDERS,
     })
+
+
+def _auto_ctx(request, s):
+    """Картка «✉️ Рахунок покупцю автоматично»: стан, з якої адреси, журнал останніх листів."""
+    from shop import mail as shop_mail
+    shop = svc.default_shop()
+    try:
+        sender = shop_mail.describe_sender(shop, "notices") if shop is not None else ""
+    except Exception:  # noqa: BLE001
+        sender = ""
+    log = []
+    for e in (s.auto_log or [])[:svc.AUTO_LOG_MAX]:
+        res = e.get("result", "")
+        try:
+            from django.utils import timezone
+            from django.utils.dateparse import parse_datetime
+            at = timezone.localtime(parse_datetime(e.get("at", ""))).strftime("%d.%m.%Y %H:%M")
+        except (TypeError, ValueError):
+            at = e.get("at", "")
+        log.append({**e, "ok": res == "sent", "text": svc.AUTO_TEXT.get(res, res), "at_text": at})
+    return {"on": s.auto_send, "shop": shop, "sender": sender, "log": log,
+            "test_to": request.user.email or "", "can_change": request.user.has_perm("sales.change_invoicesettings")}
 
 
 def _form_ctx(request, inv, order=None, pay_kind="invoice", errors=None):
@@ -192,10 +214,34 @@ def invoice_file(request, pk, kind):
     if kind not in ("pdf", "docx"):
         raise Http404
     inv = get_object_or_404(SalesInvoice, pk=pk)
+    if kind == "pdf" and not inv.pdf_file and request.user.has_perm("sales.change_salesinvoice"):
+        try:                                   # PDF ще немає — сформувати одразу
+            svc.generate(inv)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("invoice %s: PDF on demand failed: %s", inv.number, e)
     f = inv.pdf_file if kind == "pdf" else inv.docx_file
     if not f:
-        raise Http404("Файл ще не сформовано")
+        raise Http404("Файл ще не сформовано" + (" — на сервері немає LibreOffice для PDF" if kind == "pdf" else ""))
     return FileResponse(f.open("rb"), as_attachment=kind != "pdf", filename=f"{svc.file_base(inv)}.{kind}")
+
+
+@_staff
+@require_POST
+def invoice_regenerate(request, pk):
+    """«♻ Перегенерувати»: DOCX + PDF заново з поточним шаблоном і даними рахунку; open=pdf — одразу PDF."""
+    _need(request, "sales.change_salesinvoice")
+    inv = get_object_or_404(SalesInvoice, pk=pk)
+    try:
+        svc.generate(inv)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("invoice %s regeneration failed", inv.pk)
+        messages.error(request, f"❌ Рахунок {inv.number} не сформовано: {e}")
+        return redirect(BASE)
+    if request.POST.get("open") == "pdf" and inv.pdf_file:
+        return redirect(f"{BASE}{inv.pk}/file/pdf/")
+    messages.success(request, f"♻ Рахунок {inv.number} сформовано заново"
+                     + (" (DOCX + PDF)." if inv.pdf_file else " (лише DOCX — на сервері немає LibreOffice для PDF)."))
+    return redirect(request.POST.get("next") if request.POST.get("next") == f"{BASE}{inv.pk}/" else BASE)
 
 
 @_staff
@@ -213,6 +259,42 @@ def invoice_delete(request, pk):
     inv.delete()
     messages.success(request, f"🗑️ Рахунок {number} видалено (копії в документах замовлення лишились).")
     return redirect(BASE)
+
+
+@_staff
+@require_POST
+def auto_toggle(request):
+    """Увімкнути / вимкнути «Надсилати рахунок покупцю автоматично»."""
+    _need(request, "sales.change_invoicesettings")
+    on = request.POST.get("on") == "1"
+    InvoiceSettings.get()
+    InvoiceSettings.objects.filter(pk=1).update(auto_send=on)
+    messages.success(request, "✅ Рахунок покупцю автоматично: увімкнено — для нових замовлень з сайту." if on
+                     else "⏸ Рахунок покупцю автоматично: вимкнено.")
+    return redirect(f"{BASE}#auto")
+
+
+@_staff
+@require_POST
+def test_mail(request):
+    """Тестовий лист з прикладом рахунку — на вказану адресу (так, як його отримає покупець)."""
+    _need(request, "sales.change_invoicesettings")
+    from django.core.validators import validate_email
+    from django.core.exceptions import ValidationError
+    to = (request.POST.get("to") or "").strip()
+    try:
+        validate_email(to)
+    except ValidationError:
+        messages.error(request, "❌ Вкажіть правильну адресу для тестового листа.")
+        return redirect(f"{BASE}#auto")
+    try:
+        sender = svc.send_test(to, request.POST.get("lang") or "de")
+    except Exception as e:  # noqa: BLE001 — SMTP, немає магазину чи шаблону: показати причину
+        logger.warning("invoice test mail to %s failed: %s", to, e)
+        messages.error(request, f"❌ Тестовий лист не надіслано: {e}")
+        return redirect(f"{BASE}#auto")
+    messages.success(request, f"✉️ Тестовий лист з прикладом рахунку надіслано на {to} (від {sender}).")
+    return redirect(f"{BASE}#auto")
 
 
 @_staff

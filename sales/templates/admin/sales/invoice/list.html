@@ -49,11 +49,17 @@
           <td style="text-align:right;white-space:nowrap" translate="no">{{ inv.gross_total }} {{ inv.currency }}</td>
           <td>{% if inv.sent_at %}<span class="ri-pill ok" title="{{ inv.sent_to }}">✉️ {{ inv.sent_at|date:"d.m.Y" }}</span>{% else %}<span class="ri-muted">—</span>{% endif %}</td>
           <td style="white-space:nowrap">
-            {% if inv.pdf_file %}<a class="ri-btn sm" href="/rechnungen/{{ inv.pk }}/file/pdf/" target="_blank">PDF</a>{% endif %}
-            {% if inv.docx_file %}<a class="ri-btn sm" href="/rechnungen/{{ inv.pk }}/file/docx/">DOCX</a>{% endif %}
+            {% if inv.pdf_file or can.change %}<a class="ri-btn sm" href="/rechnungen/{{ inv.pk }}/file/pdf/" target="_blank" title="{% if inv.pdf_file %}Відкрити PDF{% else %}Сформувати PDF і відкрити{% endif %}">PDF</a>{% endif %}
+            {% if can.change %}
+            <form method="post" action="/rechnungen/{{ inv.pk }}/regenerate/" target="_blank" style="display:inline">
+              {% csrf_token %}<input type="hidden" name="open" value="pdf">
+              <button class="ri-btn sm" type="submit" title="Сформувати заново з поточним шаблоном і відкрити PDF">♻ Перегенерувати</button>
+            </form>
+            {% endif %}
+            {% if inv.docx_file %}<a class="ri-btn sm" href="/rechnungen/{{ inv.pk }}/file/docx/" title="Word — для правок; покупцю надсилається PDF">DOCX</a>{% endif %}
           </td>
           <td style="white-space:nowrap;text-align:right">
-            {% if inv.pdf_file or inv.docx_file %}<a class="ri-btn sm" href="/email/compose/?invoice={{ inv.pk }}" target="_blank" title="Лист покупцю з рахунком у вкладенні">✉️ Надіслати</a>{% endif %}
+            {% if inv.pdf_file or can.change %}<a class="ri-btn sm" href="/email/compose/?invoice={{ inv.pk }}" target="_blank" title="Лист покупцю з рахунком PDF у вкладенні">✉️ Надіслати</a>{% endif %}
             <a class="ri-btn sm" href="/rechnungen/{{ inv.pk }}/">✏️</a>
             {% if can.delete %}
             <form method="post" action="/rechnungen/{{ inv.pk }}/delete/" style="display:inline"
@@ -70,6 +76,48 @@
     {% if invoices|length >= limit %}<p class="ri-muted">Показано останні {{ limit }} — знайдіть потрібний пошуком.</p>{% endif %}
     {% else %}
       <div class="ri-muted">{% if search %}Нічого не знайдено.{% else %}Рахунків ще немає. Введіть номер замовлення вище.{% endif %}</div>
+    {% endif %}
+  </div>
+
+  <div class="ri-card" id="auto">
+    <div class="ri-card-title">✉️ Рахунок покупцю автоматично
+      <span class="ri-pill{% if auto.on %} ok{% endif %}" style="margin-left:6px">{% if auto.on %}увімкнено{% else %}вимкнено{% endif %}</span>
+      {% if auto.can_change %}
+      <form method="post" action="/rechnungen/auto/" style="margin-left:auto">{% csrf_token %}
+        <input type="hidden" name="on" value="{% if auto.on %}0{% else %}1{% endif %}">
+        <button class="ri-btn sm{% if not auto.on %} primary{% endif %}" type="submit">{% if auto.on %}⏸ Вимкнути{% else %}▶ Увімкнути{% endif %}</button>
+      </form>
+      {% endif %}
+    </div>
+    <p style="margin:0 0 8px;color:var(--text)">Замовлення з інтернет-магазину: Minerva сама формує рахунок і надсилає його покупцю листом з PDF у вкладенні —
+      Vorkasse й рахунок одразу після замовлення, онлайн-оплата (Stripe, PayPal) — коли оплату отримано (тоді в рахунку «вже оплачено»).
+      Один раз на замовлення; покупцям з Німеччини, Австрії, Швейцарії — німецькою, іншим — англійською.</p>
+    <p class="ri-muted" style="margin:0 0 10px">{% if auto.shop %}Відправник: <span translate="no">{{ auto.sender }}</span> — як інші листи покупцям магазину «<span translate="no">{{ auto.shop.name }}</span>» (змінити — картка магазину, «✉️ Пошта магазину»).{% else %}⚠️ Немає інтернет-магазину — листи надсилаються з його пошти.{% endif %}
+      Тема й текст листа — у «⚙️ Налаштування рахунків».</p>
+    {% if auto.can_change %}
+    <form method="post" action="/rechnungen/test-mail/" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      {% csrf_token %}
+      <input class="ri-input" type="email" name="to" value="{{ auto.test_to }}" placeholder="ваша адреса" required style="max-width:260px" translate="no">
+      <select class="ri-input" name="lang" style="width:auto">
+        <option value="de">Deutsch</option><option value="en">English</option><option value="de_en">Deutsch + English</option>
+      </select>
+      <button class="ri-btn" type="submit">✉️ Надіслати тестовий лист</button>
+      <span class="ri-muted">приклад рахунку з вигаданим покупцем — так, як його отримає клієнт</span>
+    </form>
+    {% endif %}
+    {% if auto.log %}
+    <details>
+      <summary style="cursor:pointer;color:var(--link-fg);font-size:13px">Останні автоматичні листи ({{ auto.log|length }})</summary>
+      <table class="ri-table" style="margin-top:6px">
+        <tbody>{% for e in auto.log %}<tr>
+          <td style="white-space:nowrap" translate="no">{{ e.at_text }}</td>
+          <td translate="no">{% if e.order_pk %}<a href="/admin/sales/salesorder/{{ e.order_pk }}/change/">{{ e.order }}</a>{% else %}{{ e.order }}{% endif %}</td>
+          <td translate="no">{{ e.number }}</td>
+          <td translate="no">{{ e.to }}</td>
+          <td>{% if e.ok %}<span class="ri-pill ok">✉️ надіслано</span>{% else %}⚠️ {{ e.text }}{% endif %}</td>
+        </tr>{% endfor %}</tbody>
+      </table>
+    </details>
     {% endif %}
   </div>
 

@@ -140,9 +140,9 @@
 
     <div class="ri-actions">
       {% if editable %}<button type="submit" class="ri-btn primary">📄 Зберегти й сформувати</button>{% endif %}
-      {% if inv.pdf_file %}<a class="ri-btn" href="/rechnungen/{{ inv.pk }}/file/pdf/" target="_blank">PDF</a>{% endif %}
+      {% if inv.pk %}{% if inv.pdf_file or can.change %}<a class="ri-btn" href="/rechnungen/{{ inv.pk }}/file/pdf/" target="_blank">PDF</a>{% endif %}{% endif %}
       {% if inv.docx_file %}<a class="ri-btn" href="/rechnungen/{{ inv.pk }}/file/docx/">DOCX</a>{% endif %}
-      {% if inv.pk and inv.pdf_file or inv.pk and inv.docx_file %}<a class="ri-btn" href="/email/compose/?invoice={{ inv.pk }}" target="_blank">✉️ Надіслати покупцю</a>{% endif %}
+      {% if inv.pk %}{% if inv.pdf_file or can.change %}<a class="ri-btn" href="/email/compose/?invoice={{ inv.pk }}" target="_blank" title="Лист покупцю з рахунком PDF у вкладенні">✉️ Надіслати покупцю</a>{% endif %}{% endif %}
       {% if inv.pk and order and can.add %}<a class="ri-btn" href="/rechnungen/new/?order={{ order.pk }}&again=1">＋ Ще один рахунок</a>{% endif %}
       <a class="ri-btn" href="/rechnungen/">← До списку</a>
     </div>

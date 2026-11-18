@@ -26,6 +26,10 @@ DEFAULT_TEXTS = {
                          "following account:",
     "outro_de": "Diese Rechnung wurde elektronisch erstellt und ist ohne Unterschrift gültig.",
     "outro_en": "This invoice was created electronically and is valid without a signature.",
+    "email_body_de": "{salutation}\n\nanbei erhalten Sie unsere Rechnung {number} zu Ihrer Bestellung {order} über "
+                     "{amount}.\n\nMit freundlichen Grüßen\n{signer}\n{company}",
+    "email_body_en": "{salutation}\n\nPlease find attached our invoice {number} for your order {order} amounting to "
+                     "{amount}.\n\nKind regards\n{signer}\n{company}",
 }
 VAT_MODES = [
     ("domestic", "З ПДВ (Німеччина / покупець без USt-IdNr)"),
@@ -165,14 +169,14 @@ class InvoiceSettings(models.Model):
                                         default="Rechnung {number}")
     email_subject_en = models.CharField("Тема листа (EN)", max_length=200, blank=True,
                                         default="Invoice {number}")
-    email_body_de = models.TextField(
-        "Текст листа (DE)", blank=True,
-        default="Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie unsere Rechnung {number} zu Ihrer Bestellung "
-                "{order} über {amount}.\n\nMit freundlichen Grüßen")
-    email_body_en = models.TextField(
-        "Текст листа (EN)", blank=True,
-        default="Dear Sir or Madam,\n\nplease find attached our invoice {number} for your order {order} "
-                "amounting to {amount}.\n\nKind regards")
+    email_body_de = models.TextField("Текст листа (DE)", blank=True, default=DEFAULT_TEXTS["email_body_de"])
+    email_body_en = models.TextField("Текст листа (EN)", blank=True, default=DEFAULT_TEXTS["email_body_en"])
+    auto_send = models.BooleanField(
+        "Надсилати рахунок покупцю автоматично", default=False,
+        help_text="Замовлення з інтернет-магазину: Vorkasse й рахунок — одразу після замовлення, онлайн-оплата "
+                  "(Stripe, PayPal) — коли оплату отримано. Лист — з пошти магазину, рахунок PDF у вкладенні, "
+                  "один раз на замовлення.")
+    auto_log = models.JSONField("Останні автоматичні листи", default=list, blank=True)
     file_name = models.CharField("Назва файлу", max_length=80, default="Rechnung_{number}",
                                  help_text="{number}, {order} — без розширення. Файл іде й у документи замовлення "
                                            "(і в кабінет покупця сайту).")

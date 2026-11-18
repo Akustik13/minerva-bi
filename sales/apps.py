@@ -6,3 +6,4 @@ class SalesConfig(AppConfig):
 
     def ready(self):
         import sales.signals  # noqa
+        import sales.invoice_signals  # noqa — 🧾 рахунок покупцю автоматично

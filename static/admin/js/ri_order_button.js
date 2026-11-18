@@ -3,12 +3,16 @@
  * правий клік — інші варіанти (window.MVMenu, static/admin/js/mv_menu.js). */
 (function(){
   if (window._riOrderBtn) return; window._riOrderBtn = 1;
-  function post(url){
+  function post(url, extra, target){
     var tok = (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value ||
               (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
     var f = document.createElement('form'); f.method = 'post'; f.action = url; f.style.display = 'none';
-    var i = document.createElement('input'); i.type = 'hidden'; i.name = 'csrfmiddlewaretoken'; i.value = tok;
-    f.appendChild(i); document.body.appendChild(f); f.submit();
+    if (target) f.target = target;
+    var fields = Object.assign({csrfmiddlewaretoken: tok}, extra || {});
+    Object.keys(fields).forEach(function(k){
+      var i = document.createElement('input'); i.type = 'hidden'; i.name = k; i.value = fields[k]; f.appendChild(i);
+    });
+    document.body.appendChild(f); f.submit(); f.remove();
   }
   function quick(a){
     if (a.dataset.busy) return;
@@ -32,6 +36,8 @@
     } else {
       items.push({label: '✏️ Відкрити рахунок', href: d.riOpen});
       if (d.riPdf) items.push({label: '📄 Відкрити PDF', href: d.riPdf, target: '_blank'});
+      if (d.riRegen) items.push({label: '♻ Перегенерувати й відкрити PDF',
+                                 onSelect: function(){ post(d.riRegen, {open: 'pdf'}, '_blank'); }});
       if (d.riMail) items.push({label: '✉️ Надіслати покупцю', href: d.riMail, target: '_blank'});
       items.push({label: '＋ Ще один рахунок', href: d.riAgain});
     }

@@ -256,7 +256,7 @@ class PageTests(_Base):
         self.assertContains(page, "Тексти рахунку")
 
 
-@mock.patch("documents.service._convert_to_pdf", return_value=None)
+@mock.patch("documents.service._convert_to_pdf", return_value=b"%PDF-1.4 test")
 class MailTests(_Base):
     def test_attachment_ref_needs_right_and_marks_sent(self, _pdf):
         from email_assistant import attachments
@@ -267,7 +267,7 @@ class MailTests(_Base):
         self.assertIsNone(attachments.load_ref(acc, f"invoice:{inv.pk}"))
         acc.user = self.boss
         item = attachments.load_ref(acc, f"invoice:{inv.pk}")
-        self.assertEqual(item["name"], "Rechnung_CI-31728-001.docx")
+        self.assertEqual((item["name"], item["content_type"]), ("Rechnung_CI-31728-001.pdf", "application/pdf"))
         self.assertEqual(svc.mark_sent_refs([f"invoice:{inv.pk}"], "a@b.c", user=stranger), 0)
         self.assertEqual(svc.mark_sent_refs([f"invoice:{inv.pk}"], "a@b.c", user=self.boss), 1)
         inv.refresh_from_db()
@@ -280,7 +280,18 @@ class MailTests(_Base):
         self.assertEqual(data["to"], "rechnung@fogra.example")
         self.assertEqual(data["subject"], "Rechnung CI-31728-001")
         self.assertIn("164,10 EUR", data["body_html"])
-        self.assertEqual(data["att_refs"], [{"ref": f"invoice:{inv.pk}", "name": "Rechnung_CI-31728-001.docx"}])
+        self.assertEqual(data["att_refs"], [{"ref": f"invoice:{inv.pk}", "name": "Rechnung_CI-31728-001.pdf"}])
+
+    def test_only_pdf_goes_by_mail(self, _pdf):
+        """Поштою — лише PDF: без PDF (немає LibreOffice) вкладення немає, DOCX не надсилається."""
+        _pdf.return_value = None
+        inv = svc.generate(svc.create_from_order(self.order, self.boss))
+        self.assertTrue(inv.docx_file and not inv.pdf_file)
+        self.assertIsNone(svc.attachment(inv.pk))
+        self.assertEqual(svc.compose_initial(inv.pk, self.boss)["att_refs"], [])
+        _pdf.return_value = b"%PDF-1.4 test"
+        data = svc.compose_initial(inv.pk, self.boss)                       # PDF формується сам перед листом
+        self.assertEqual(data["att_refs"][0]["name"], "Rechnung_CI-31728-001.pdf")
 
     def test_media_folder_is_sales(self, _pdf):
         from tabele.media import _allowed
@@ -321,6 +332,7 @@ class QuickFromOrderTests(_Base):
         html = order_button(self.order, inv, "")
         self.assertIn(f'href="/rechnungen/{inv.pk}/"', html)
         self.assertIn(f'data-ri-pdf="/rechnungen/{inv.pk}/file/pdf/"', html)
+        self.assertIn(f'data-ri-regen="/rechnungen/{inv.pk}/regenerate/"', html)
         self.assertNotIn("data-ri-quick=", html.split("<script>")[0])     # є рахунок — лише відкрити
         self.client.force_login(self.boss)
         page = self.client.get(f"/admin/sales/salesorder/{self.order.pk}/change/")
@@ -398,3 +410,131 @@ class LetterLayoutTests(_Base):
         self.assertEqual((s.intro_de, s.outro_en), (mig.NEW["intro"][0], "Own closing"))   # змінене людиною — як є
         self.assertEqual(inv.intro_text, mig.NEW["intro"][0] + "\n" + mig.NEW["intro"][1])
         self.assertEqual((inv.payment_text, inv.pay_kind), (mig.NEW["pay_prepayment"][0], "prepayment"))
+
+
+@mock.patch("documents.service._convert_to_pdf", return_value=b"%PDF-1.4 test")
+class AutoSendTests(_Base):
+    """🧾 Рахунок покупцю автоматично: замовлення з сайту → лист з PDF з пошти магазину, один раз."""
+
+    def setUp(self):
+        super().setUp()
+        from config.models import NotificationSettings
+        ns = NotificationSettings.get()
+        ns.email_host, ns.email_from = "smtp.example.com", "shop@example.com"
+        ns.save()
+        self.shop.mail_bcc = "buchhaltung@example.com"
+        self.shop.save()
+        svc.BACKGROUND = False
+        self.addCleanup(setattr, svc, "BACKGROUND", True)
+        InvoiceSettings.get()
+        InvoiceSettings.objects.filter(pk=1).update(auto_send=True)
+        from django.core import mail
+        self.outbox = mail.outbox
+        self.outbox.clear()
+
+    def new_order(self, number, **fields):
+        data = {"source": "sevskiy_de", "order_number": number, "client": "Fogra e.V.", "contact_name": "Anna Muster",
+                "email": "einkauf@fogra.example", "addr_country": "DE", "currency": "EUR",
+                "payment_method": "prepayment", "payment_status": "unpaid", **fields}
+        with self.captureOnCommitCallbacks(execute=True):
+            order = SalesOrder.objects.create(**data)
+            ShopOrder.objects.create(order=order, shop=self.shop, billing=BILLING, vat_rate=Decimal("19"))
+            SalesOrderLine.objects.create(order=order, product=Product.objects.get(sku="AN-1"), sku_raw="AN-1",
+                                          qty=Decimal("1"), unit_price=Decimal("10"), total_price=Decimal("10"),
+                                          currency="EUR")
+        return order
+
+    def test_vorkasse_order_gets_invoice_once(self, _pdf):
+        order = self.new_order("PO-31728-002")
+        self.assertEqual(len(self.outbox), 1)
+        msg = self.outbox[0]
+        inv = SalesInvoice.objects.get(sales_order=order)
+        self.assertEqual(msg.to, ["rechnung@fogra.example"])                  # email з адреси рахунку на сайті
+        self.assertEqual(msg.bcc, ["buchhaltung@example.com"])               # прихована копія магазину
+        self.assertEqual(msg.subject, f"Rechnung {inv.number}")
+        self.assertIn("Sehr geehrte Damen und Herren,", msg.body)
+        self.assertIn(f"{inv.number} zu Ihrer Bestellung PO-31728-002", msg.body)
+        self.assertEqual(msg.attachments[0][0], f"Rechnung_{inv.number}.pdf")
+        self.assertIsNotNone(inv.sent_at)
+        self.assertEqual(InvoiceSettings.get().auto_log[0]["result"], "sent")
+        self.assertEqual(svc.auto_send(order.pk), "already")                  # другий раз — нічого
+        self.assertEqual(len(self.outbox), 1)
+
+    def test_stripe_waits_for_payment_then_paid_text(self, _pdf):
+        order = self.new_order("PO-31728-003", payment_method="stripe", payment_status="pending")
+        self.assertEqual(self.outbox, [])
+        self.assertFalse(SalesInvoice.objects.filter(sales_order=order).exists())
+        order.payment_status = "paid"
+        with self.captureOnCommitCallbacks(execute=True):
+            order.save(update_fields=["payment_status"])
+        self.assertEqual(len(self.outbox), 1)
+        inv = SalesInvoice.objects.get(sales_order=order)
+        self.assertEqual(inv.pay_kind, "paid")
+        self.assertIn("bereits bezahlt", inv.payment_text)
+        with self.captureOnCommitCallbacks(execute=True):                   # ще раз «оплачено» — без нового листа
+            order.save()
+        self.assertEqual(len(self.outbox), 1)
+
+    def test_off_foreign_and_without_pdf(self, _pdf):
+        InvoiceSettings.objects.filter(pk=1).update(auto_send=False)
+        self.new_order("PO-31728-004")
+        self.assertEqual(self.outbox, [])
+        InvoiceSettings.objects.filter(pk=1).update(auto_send=True)
+        plain = SalesOrder.objects.create(source="manual", order_number="M-9", client="X", email="x@y.z")
+        self.assertEqual(svc.auto_send(plain.pk), "not_shop")
+        _pdf.return_value = None                                                 # без LibreOffice — покупцю DOCX не шлемо
+        order = self.new_order("PO-31728-005")
+        self.assertEqual(self.outbox, [])
+        self.assertEqual(InvoiceSettings.get().auto_log[0]["result"], "no_pdf")
+        self.assertIsNone(SalesInvoice.objects.get(sales_order=order).sent_at)
+
+    def test_english_mail_for_foreign_buyer(self, _pdf):
+        ShopOrder.objects.filter(order=self.order).update(billing={**BILLING, "country": "FR", "vat_id": "FR1"},
+                                                           vat_rate=0)
+        self.order.refresh_from_db()
+        self.assertEqual(svc.auto_send(self.order.pk), "sent")
+        msg = self.outbox[0]
+        self.assertTrue(msg.subject.startswith("Invoice "))
+        self.assertIn("Dear Sir or Madam,", msg.body)
+        self.assertIn("Kind regards", msg.body)
+
+    def test_test_mail_and_toggle(self, _pdf):
+        self.client.force_login(self.boss)
+        resp = self.client.post("/rechnungen/test-mail/", {"to": "me@example.com", "lang": "en"})
+        self.assertRedirects(resp, "/rechnungen/#auto", fetch_redirect_response=False)
+        msg = self.outbox[0]
+        self.assertEqual((msg.to, msg.subject[:7]), (["me@example.com"], "[TEST] "))
+        self.assertTrue(msg.attachments[0][0].endswith(".pdf"))
+        self.assertIn("Dear Mr Mustermann,", msg.body)
+        self.assertFalse(SalesInvoice.objects.exists())                          # нічого не збережено
+        self.client.post("/rechnungen/auto/", {"on": "0"})
+        self.assertFalse(InvoiceSettings.get().auto_send)
+        self.client.force_login(person("vika"))
+        self.assertEqual(self.client.post("/rechnungen/test-mail/", {"to": "a@b.c"}).status_code, 403)
+        self.assertEqual(self.client.post("/rechnungen/auto/", {"on": "1"}).status_code, 403)
+        self.assertFalse(InvoiceSettings.get().auto_send)
+
+
+@mock.patch("documents.service._convert_to_pdf", return_value=b"%PDF-1.4 test")
+class RegenerateTests(_Base):
+    def test_regenerate_and_pdf_on_demand(self, _pdf):
+        _pdf.return_value = None
+        inv = svc.generate(svc.create_from_order(self.order, self.boss))
+        self.assertFalse(inv.pdf_file)
+        _pdf.return_value = b"%PDF-1.4 test"
+        self.client.force_login(self.boss)
+        resp = self.client.get(f"/rechnungen/{inv.pk}/file/pdf/")              # PDF ще немає — формується одразу
+        self.assertEqual((resp.status_code, resp["Content-Type"]), (200, "application/pdf"))
+        resp.close()
+        inv.refresh_from_db()
+        old = inv.pdf_file.name
+        resp = self.client.post(f"/rechnungen/{inv.pk}/regenerate/", {"open": "pdf"})
+        self.assertRedirects(resp, f"/rechnungen/{inv.pk}/file/pdf/", fetch_redirect_response=False)
+        resp = self.client.post(f"/rechnungen/{inv.pk}/regenerate/")
+        self.assertRedirects(resp, "/rechnungen/", fetch_redirect_response=False)
+        inv.refresh_from_db()
+        self.assertTrue(inv.pdf_file)
+        self.assertEqual(self.client.get(f"/rechnungen/{inv.pk}/regenerate/").status_code, 405)
+        self.client.force_login(person("vika"))
+        self.assertEqual(self.client.post(f"/rechnungen/{inv.pk}/regenerate/").status_code, 403)
+        self.assertTrue(old)
