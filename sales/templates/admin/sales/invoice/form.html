@@ -1,0 +1,232 @@
+{% extends "admin/base_site.html" %}
+{% load l10n %}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo; Продажі &rsaquo; <a href="/rechnungen/">Рахунки (Rechnung)</a>
+  {% if order %}&rsaquo; <a href="{% url 'admin:sales_salesorder_change' order.pk %}" translate="no">{{ order.order_number }}</a>{% endif %}
+  &rsaquo; <span translate="no">{{ title }}</span>
+</div>
+{% endblock %}
+{% block extrahead %}{{ block.super }}{% include "admin/sales/invoice/_styles.html" %}{% endblock %}
+
+{% block content %}
+{% with editable=can.change %}
+<div class="ri-wrap">
+  <h1 style="margin:0 0 6px;color:var(--text)">🧾 <span translate="no">{{ title }}</span></h1>
+  <p class="ri-muted" style="margin:0 0 18px">
+    {% if order %}Замовлення <a href="{% url 'admin:sales_salesorder_change' order.pk %}" style="color:var(--link-fg)" translate="no">{{ order.order_number }}</a> ·{% endif %}
+    «Зберегти й сформувати» робить DOCX і PDF на бланку фірми{% if order %} і кладе копію в «Документи замовлення» (замовлення з сайту — і в кабінет покупця){% endif %}.
+    {% if inv.sent_at %}<span class="ri-pill ok">✉️ надіслано {{ inv.sent_at|date:"d.m.Y H:i" }}{% if inv.sent_to %} → <span translate="no">{{ inv.sent_to }}</span>{% endif %}</span>{% endif %}
+  </p>
+
+  <form method="post" id="ri-form" action="{% if inv.pk %}/rechnungen/{{ inv.pk }}/{% else %}/rechnungen/new/{% if order %}?order={{ order.pk }}{% endif %}{% endif %}">
+    {% csrf_token %}
+    {% if order %}<input type="hidden" name="order_id" value="{{ order.pk }}">{% endif %}
+    <input type="hidden" name="lines" id="ri-lines-json">
+    <fieldset {% if not editable %}disabled{% endif %} style="border:0;padding:0;margin:0;min-width:0">
+
+    <div class="ri-card">
+      <div class="ri-card-title">🧾 Документ</div>
+      <div class="ri-grid">
+        <div class="ri-field"><label class="ri-label">Номер рахунку</label>
+          <input class="ri-input" name="number" value="{{ inv.number }}" placeholder="{{ number_hint }}" maxlength="40" translate="no">
+          {% if number_hint %}<span class="ri-muted">{{ number_hint }}. Порожньо — автоматично.</span>{% endif %}</div>
+        <div class="ri-field"><label class="ri-label">Дата рахунку</label>
+          <input class="ri-input" type="date" name="inv_date" value="{{ inv.inv_date|date:'Y-m-d' }}" required></div>
+        <div class="ri-field"><label class="ri-label">Дата поставки (Lieferdatum)</label>
+          <input class="ri-input" type="date" name="service_date" value="{{ inv.service_date|date:'Y-m-d' }}"></div>
+        <div class="ri-field"><label class="ri-label">Оплатити до</label>
+          <input class="ri-input" type="date" name="due_date" id="ri-due" value="{{ inv.due_date|date:'Y-m-d' }}"></div>
+        <div class="ri-field"><label class="ri-label">Мова документа</label>
+          <select class="ri-input" name="language" id="ri-lang">
+            {% for code, label in langs %}<option value="{{ code }}" {% if code == inv.language %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select></div>
+        <div class="ri-field"><label class="ri-label">Валюта</label>
+          <input class="ri-input" name="currency" id="ri-currency" value="{{ inv.currency }}" maxlength="3" style="text-transform:uppercase" required translate="no"></div>
+        <div class="ri-field"><label class="ri-label">Kundennummer</label>
+          <input class="ri-input" name="customer_number" value="{{ inv.customer_number }}" translate="no"></div>
+        <div class="ri-field"><label class="ri-label">Замовлення (номер)</label>
+          <input class="ri-input" name="order_ref" value="{{ inv.order_ref }}" translate="no"></div>
+        <div class="ri-field"><label class="ri-label">Номер замовлення клієнта</label>
+          <input class="ri-input" name="customer_po" value="{{ inv.customer_po }}" placeholder="Ihre Bestellnummer" translate="no"></div>
+      </div>
+    </div>
+
+    <div class="ri-card">
+      <div class="ri-card-title">📬 Рахунок на (Rechnungsempfänger)</div>
+      <div class="ri-grid">
+        <div class="ri-field"><label class="ri-label">Компанія</label><input class="ri-input" name="bill_company" value="{{ inv.bill_to.company }}" translate="no"></div>
+        <div class="ri-field"><label class="ri-label">Ім'я (контакт)</label><input class="ri-input" name="bill_name" value="{{ inv.bill_to.name }}" translate="no"></div>
+        <div class="ri-field" style="grid-column:1/-1"><label class="ri-label">Вулиця, будинок</label><input class="ri-input" name="bill_street" value="{{ inv.bill_to.street }}" translate="no"></div>
+        <div class="ri-field"><label class="ri-label">Індекс, місто</label><input class="ri-input" name="bill_zip_city" value="{{ inv.bill_to.zip_city }}" translate="no"></div>
+        <div class="ri-field"><label class="ri-label">Країна</label><input class="ri-input" name="bill_country" value="{{ inv.bill_to.country }}" translate="no"></div>
+        <div class="ri-field"><label class="ri-label">USt-IdNr / VAT ID</label><input class="ri-input" name="bill_vat_id" value="{{ inv.bill_to.vat_id }}" translate="no"></div>
+        <div class="ri-field"><label class="ri-label">Email (сюди надсилається рахунок)</label><input class="ri-input" type="email" name="bill_email" value="{{ inv.bill_to.email }}" translate="no"></div>
+      </div>
+      <details {% if inv.ship_to %}open{% endif %} style="margin-top:12px">
+        <summary style="cursor:pointer;color:var(--link-fg);font-size:13px">🚚 Доставка на іншу адресу (Lieferadresse)</summary>
+        <div class="ri-grid" style="margin-top:10px">
+          <div class="ri-field"><label class="ri-label">Компанія</label><input class="ri-input" name="ship_company" value="{{ inv.ship_to.company }}" translate="no"></div>
+          <div class="ri-field"><label class="ri-label">Ім'я</label><input class="ri-input" name="ship_name" value="{{ inv.ship_to.name }}" translate="no"></div>
+          <div class="ri-field"><label class="ri-label">Вулиця, будинок</label><input class="ri-input" name="ship_street" value="{{ inv.ship_to.street }}" translate="no"></div>
+          <div class="ri-field"><label class="ri-label">Індекс, місто</label><input class="ri-input" name="ship_zip_city" value="{{ inv.ship_to.zip_city }}" translate="no"></div>
+          <div class="ri-field"><label class="ri-label">Країна</label><input class="ri-input" name="ship_country" value="{{ inv.ship_to.country }}" translate="no"></div>
+        </div>
+        <p class="ri-muted" style="margin:8px 0 0">Порожньо — доставка на адресу рахунку (рядка «Lieferadresse» у документі не буде).</p>
+      </details>
+    </div>
+
+    <div class="ri-card">
+      <div class="ri-card-title">📦 Позиції</div>
+      <div class="ri-scroll"><table class="ri-lines"><thead><tr>
+        <th>Pos.</th><th>Опис</th><th>Артикул</th><th>К-сть</th><th>Од.</th><th>Ціна за од. (нетто)</th><th style="text-align:right">Сума</th><th></th>
+      </tr></thead><tbody id="ri-lines"></tbody></table></div>
+      <button type="button" class="ri-btn sm" style="margin-top:6px" onclick="riAddLine()">＋ Позиція</button>
+      <div class="ri-totals">
+        <span>Товари (нетто):</span><b id="ri-goods" style="text-align:right" translate="no"></b>
+        <label for="ri-shipping">Доставка (нетто):</label>
+        {% localize off %}<input class="ri-input" name="shipping_cost" id="ri-shipping" value="{{ inv.shipping_cost }}" inputmode="decimal" style="text-align:right">{% endlocalize %}
+        <span>Разом нетто:</span><b id="ri-net" style="text-align:right" translate="no"></b>
+        <select class="ri-input" name="vat_mode" id="ri-vatmode" style="justify-self:end;width:auto">
+          {% for code, label in vat_modes %}<option value="{{ code }}" {% if code == inv.vat_mode %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+        <span style="display:flex;gap:6px;align-items:center;justify-content:flex-end">
+          {% localize off %}<input class="ri-input" name="vat_rate" id="ri-rate" value="{{ inv.vat_rate }}" inputmode="decimal" style="width:70px;text-align:right">{% endlocalize %} %
+        </span>
+        <span>ПДВ (MwSt.):</span><b id="ri-vat" style="text-align:right" translate="no"></b>
+        <span class="big">До оплати (брутто):</span><b class="big" id="ri-gross" style="text-align:right" translate="no"></b>
+      </div>
+    </div>
+
+    <div class="ri-card">
+      <div class="ri-card-title">💳 Оплата й тексти</div>
+      <div class="ri-grid" style="margin-bottom:12px">
+        <div class="ri-field"><label class="ri-label">Спосіб оплати</label>
+          <select class="ri-input" name="payment_method">
+            {% for code, label in methods %}<option value="{{ code }}" {% if code == inv.payment_method %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select></div>
+        <div class="ri-field"><label class="ri-label">Текст оплати</label>
+          <select class="ri-input" name="pay_kind" id="ri-kind">
+            {% for code, label in pay_kinds %}<option value="{{ code }}" {% if code == pay_kind %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select></div>
+      </div>
+      <div class="ri-grid" style="grid-template-columns:1fr">
+        <div class="ri-field"><label class="ri-label">Вступ (над таблицею)</label><textarea class="ri-input" name="intro_text" data-text="intro_text" rows="2">{{ inv.intro_text }}</textarea></div>
+        <div class="ri-field"><label class="ri-label">Примітка про ПДВ</label><textarea class="ri-input" name="vat_note" data-text="vat_note" rows="2">{{ inv.vat_note }}</textarea></div>
+        <div class="ri-field"><label class="ri-label">Оплата</label><textarea class="ri-input" name="payment_text" data-text="payment_text" rows="2">{{ inv.payment_text }}</textarea></div>
+        <div class="ri-field"><label class="ri-label">Завершення</label><textarea class="ri-input" name="outro_text" data-text="outro_text" rows="2">{{ inv.outro_text }}</textarea></div>
+      </div>
+      <p class="ri-muted" style="margin:8px 0 0">Підстановки:
+        {% for var, desc in placeholders %}<code translate="no" title="{{ desc }}">{{ var }}</code> {% endfor %}
+        — заповнюються під час формування. Стандартні тексти міняються разом із мовою, ПДВ і «Текстом оплати»; змінені вручну лишаються.
+        <button type="button" class="ri-btn sm" onclick="riTexts(true)">↺ Стандартні тексти</button>
+        {% if can.settings %}<a href="{{ settings_url }}" style="color:var(--link-fg)">⚙️ Змінити стандартні</a>{% endif %}</p>
+    </div>
+
+    <div class="ri-card">
+      <div class="ri-card-title">✍️ Підпис</div>
+      <div class="ri-grid">
+        <div class="ri-field"><label class="ri-label">Ім'я</label><input class="ri-input" name="signer_name" value="{{ inv.signer_name }}" translate="no"></div>
+        <div class="ri-field"><label class="ri-label">Посада</label><input class="ri-input" name="signer_position" value="{{ inv.signer_position }}" translate="no"></div>
+      </div>
+    </div>
+    </fieldset>
+
+    <div class="ri-actions">
+      {% if editable %}<button type="submit" class="ri-btn primary">📄 Зберегти й сформувати</button>{% endif %}
+      {% if inv.pdf_file %}<a class="ri-btn" href="/rechnungen/{{ inv.pk }}/file/pdf/" target="_blank">PDF</a>{% endif %}
+      {% if inv.docx_file %}<a class="ri-btn" href="/rechnungen/{{ inv.pk }}/file/docx/">DOCX</a>{% endif %}
+      {% if inv.pk and inv.pdf_file or inv.pk and inv.docx_file %}<a class="ri-btn" href="/email/compose/?invoice={{ inv.pk }}" target="_blank">✉️ Надіслати покупцю</a>{% endif %}
+      {% if inv.pk and order and can.add %}<a class="ri-btn" href="/rechnungen/new/?order={{ order.pk }}&again=1">＋ Ще один рахунок</a>{% endif %}
+      <a class="ri-btn" href="/rechnungen/">← До списку</a>
+    </div>
+  </form>
+</div>
+{% endwith %}
+
+{{ lines|json_script:"ri-lines-data" }}
+{{ texts|json_script:"ri-texts-data" }}
+<script>
+(function(){
+  var lines = JSON.parse(document.getElementById('ri-lines-data').textContent) || [];
+  var TEXTS = JSON.parse(document.getElementById('ri-texts-data').textContent) || {};
+  var body = document.getElementById('ri-lines');
+  var form = document.getElementById('ri-form');
+  function num(v){ var f = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isNaN(f) ? 0 : f; }
+  function r2(v){ return Math.round(v * 100) / 100; }
+  function money(v){ return r2(v).toFixed(2); }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function inp(j, k, v, style){
+    return '<input class="ri-input" data-l="'+j+'" data-k="'+k+'" value="'+esc(v)+'"'+(style ? ' style="'+style+'"' : '')+' translate="no">';
+  }
+  function totals(){
+    var cur = document.getElementById('ri-currency').value.toUpperCase();
+    var goods = lines.reduce(function(s, l){ return s + r2(num(l.qty) * num(l.unit_price)); }, 0);
+    var net = goods + num(document.getElementById('ri-shipping').value);
+    var mode = document.getElementById('ri-vatmode').value;
+    var rate = mode === 'domestic' ? num(document.getElementById('ri-rate').value) : 0;
+    document.getElementById('ri-rate').disabled = mode !== 'domestic';
+    var vat = r2(net * rate / 100);
+    document.getElementById('ri-goods').textContent = money(goods) + ' ' + cur;
+    document.getElementById('ri-net').textContent = money(net) + ' ' + cur;
+    document.getElementById('ri-vat').textContent = money(vat) + ' ' + cur + ' (' + rate + ' %)';
+    document.getElementById('ri-gross').textContent = money(net + vat) + ' ' + cur;
+  }
+  function render(){
+    var html = '';
+    lines.forEach(function(l, j){
+      html += '<tr><td class="num">' + (j + 1) + '</td>'
+        + '<td>' + inp(j, 'description', l.description) + '</td>'
+        + '<td style="width:150px">' + inp(j, 'part_no', l.part_no) + '</td>'
+        + '<td style="width:80px">' + inp(j, 'qty', l.qty, 'text-align:right') + '</td>'
+        + '<td style="width:60px">' + inp(j, 'unit', l.unit) + '</td>'
+        + '<td style="width:120px">' + inp(j, 'unit_price', l.unit_price, 'text-align:right') + '</td>'
+        + '<td class="num" translate="no">' + money(num(l.qty) * num(l.unit_price)) + '</td>'
+        + '<td><button type="button" class="ri-btn sm danger" onclick="riDelLine(' + j + ')" title="Прибрати">✕</button></td></tr>';
+    });
+    body.innerHTML = html;
+    totals();
+  }
+  body.addEventListener('input', function(e){
+    var el = e.target; if (el.dataset.l === undefined) return;
+    lines[el.dataset.l][el.dataset.k] = el.value;
+    totals();
+  });
+  body.addEventListener('change', function(e){ if (e.target.dataset.k) render(); });
+  ['ri-shipping', 'ri-currency', 'ri-rate'].forEach(function(id){ document.getElementById(id).addEventListener('input', totals); });
+  window.riAddLine = function(){ lines.push({description:'', part_no:'', qty:1, unit:'', unit_price:0}); render(); };
+  window.riDelLine = function(j){ lines.splice(j, 1); render(); };
+
+  /* стандартні тексти: поле, що досі має якийсь стандартний текст (або порожнє), міняється разом із мовою / ПДВ / оплатою */
+  function std(){
+    var lang = document.getElementById('ri-lang').value, vm = document.getElementById('ri-vatmode').value,
+        kind = document.getElementById('ri-kind').value;
+    return ((TEXTS[lang] || {})[vm] || {})[kind] || {};
+  }
+  function isStandard(key, value){
+    var v = (value || '').trim();
+    if (!v) return true;
+    return Object.keys(TEXTS).some(function(lang){ return Object.keys(TEXTS[lang]).some(function(vm){
+      return Object.keys(TEXTS[lang][vm]).some(function(k){ return (TEXTS[lang][vm][k][key] || '').trim() === v; }); }); });
+  }
+  window.riTexts = function(force){
+    var t = std();
+    form.querySelectorAll('[data-text]').forEach(function(el){
+      var key = el.dataset.text;
+      if (key in t && (force || isStandard(key, el.value))) el.value = t[key];
+    });
+  };
+  ['ri-lang', 'ri-vatmode', 'ri-kind'].forEach(function(id){
+    document.getElementById(id).addEventListener('change', function(){ riTexts(false); totals(); });
+  });
+  form.addEventListener('submit', function(){
+    document.getElementById('ri-rate').disabled = false;
+    document.getElementById('ri-lines-json').value = JSON.stringify(lines);
+  });
+  render();
+})();
+</script>
+{% endblock %}

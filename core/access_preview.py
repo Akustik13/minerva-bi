@@ -24,6 +24,7 @@ PAGES = [
     ("✉️ Пошта", "/email/", "email_assistant"),
     ("📅 Календар", "/calendar/", "calendar_app"),
     ("📝 Angebote", "/offers/", "offers"),
+    ("🧾 Рахунки (Rechnung)", "/rechnungen/", "sales"),
     ("📦 Packing Lists", "/packing-lists/", "shipping"),
     ("🧾 Commercial Invoices", "/commercial-invoices/", "shipping"),
     ("🏷️ Етикетки DYMO", "/labels/", "labels_app"),

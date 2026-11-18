@@ -6,7 +6,7 @@ where: 🛒 Продажі → Замовлення → картка замов�
 urls: /admin/sales/salesorder/, /admin/config/documentsettings/, /admin/documents/documenttemplate/
 roles: адміністратор, менеджер
 keywords: документи, папка замовлення, PDF, Auftragsbestätigung, Order Confirmation, OC, Proforma, PI, пакувальний лист, Packing List, Lieferschein, CN23, митна декларація, Zoll, завантажити файл, Word шаблон, рахунок, Rechnung, вкладення листа, з пошти, ABD, Ausfuhrbegleitdokument
-related: sales/orders, sales/commercial-invoices, sales/packing-lists, sales/settings, labels/order-label, shop/numbering
+related: sales/orders, sales/invoices, sales/commercial-invoices, sales/packing-lists, sales/settings, labels/order-label, shop/numbering
 ---
 
 ## Що це
@@ -127,6 +127,8 @@ Lieferschein постачальника. Minerva може сама поклас�
 - **«📋 Packing List (свій шаблон)»** і **«💵 Commercial Invoice (свій шаблон)»** — форми з даними замовлення →
   DOCX і PDF у папку замовлення. Якщо документ уже є — поруч **«✏️ PL #…»** / **«✏️ Invoice #…»**.
   Докладно — [Packing Lists](guide:sales/packing-lists), [Commercial Invoices](guide:sales/commercial-invoices).
+- **«🧾 Rechnung (рахунок)»** — рахунок покупцю на бланку фірми (номер магазину, ПДВ, тексти DE / EN), PDF — у
+  документи замовлення й кабінет покупця. Докладно — [Рахунки (Rechnung)](guide:sales/invoices).
 - Нижче — кнопки ваших шаблонів документів з розділу **📄 Документи → Шаблони**
   ([відкрити](/admin/documents/documenttemplate/)), **«+ Шаблон»** — додати новий, **🔄** — оновити список.
   Згенеровані файли видно під кнопками й в [архіві документів](/admin/documents/generateddocument/).

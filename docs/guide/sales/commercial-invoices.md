@@ -6,7 +6,7 @@ where: 🚚 Доставка → 🧾 Інвойси → 💵 Загальні (
 urls: /commercial-invoices/
 roles: адміністратор, менеджер
 keywords: Commercial Invoice, комерційний інвойс, інвойс, Handelsrechnung, митниця, Zoll, customs, HS-код, Tariff Number, країна походження, Incoterms, export, Word шаблон, бланк
-related: sales/packing-lists, sales/order-documents, shipping/shipments, shipping/ups, offers/settings, shop/numbering
+related: sales/invoices, sales/packing-lists, sales/order-documents, shipping/shipments, shipping/ups, offers/settings, shop/numbering
 ---
 
 ## Що це

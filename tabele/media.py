@@ -19,7 +19,8 @@ from django.views.static import serve
 
 PUBLIC = ("products/", "thumbs/", "shop_media/", "config/", "accounting/logos/", "supplier_categories/")
 MODULES = (                          # тека → розділ Minerva (перший збіг)
-    ("orders/", "sales"), ("offers/", "offers"), ("accounting/", "accounting"),
+    ("orders/", "sales"), ("sales_invoices/", "sales"), ("invoice_templates/", "sales"), ("offers/", "offers"),
+    ("accounting/", "accounting"),
     ("invoices/", "shipping"), ("packing_lists/", "shipping"), ("commercial_invoices/", "shipping"),
     ("shipments/", "shipping"), ("shipping/", "shipping"), ("generated_documents/", "documents"), ("document_templates/", "documents"),
     ("scraper/", "scraper_hub"), ("rfq_diagrams/", "inventory"), ("purchase_orders/", "inventory"),

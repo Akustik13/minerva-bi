@@ -103,6 +103,14 @@ def after_sent(scheduled, result):
             mark_sent_refs(offer_refs, result.get('message_id', ''), user=scheduled.account.user)
     except Exception as e:  # noqa: BLE001
         logger.warning('send_scheduled pk=%s: Angebot не позначено надісланим: %s', scheduled.pk, e)
+    invoice_refs = [i['ref'] for i in items if str(i.get('ref', '')).startswith('invoice:')]
+    try:
+        if invoice_refs:   # 🧾 рахунок у запланованому листі — «надіслано» (право — у mark_sent_refs)
+            from sales.invoice_service import mark_sent_refs as invoice_sent
+            invoice_sent(invoice_refs, scheduled.to_emails if isinstance(scheduled.to_emails, str) else
+                         ', '.join(scheduled.to_emails or []), user=scheduled.account.user)
+    except Exception as e:  # noqa: BLE001
+        logger.warning('send_scheduled pk=%s: рахунок не позначено надісланим: %s', scheduled.pk, e)
     attachments.remove_stored(items)
     opts = scheduled.send_options or {}
     if opts.get('read_receipt') or opts.get('remind_days'):   # 📬 / ⏰ — копію з «Надісланих» прив'яже sync

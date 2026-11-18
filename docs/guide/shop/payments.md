@@ -6,7 +6,7 @@ where: 🏪 Інтернет-магазин → 🏬 Магазини → кар
 urls: /admin/shop/shop/, /admin/shop/shoppayment/
 roles: адміністратор, менеджер
 keywords: оплата, payment, Stripe, Kreditkarte, картка, Apple Pay, Google Pay, SEPA, Klarna, передоплата, Vorkasse, рахунок, Kauf auf Rechnung, вебхук Stripe, sk_test, Zahlung erhalten, оплачено, повернено
-related: shop/overview, shop/mail, shop/customer-accounts, crm/customers
+related: shop/overview, shop/mail, shop/customer-accounts, crm/customers, sales/invoices
 ---
 
 ## Що це
@@ -108,6 +108,9 @@ email / Telegram ([Пошта магазину](guide:shop/mail)). Скасув�
 > «💳 Онлайн-оплати» запису немає. Спосіб і стан оплати видно в замовленні (бейдж «💳 …» у списку, блок «💳 Оплата
 > й рахунок» у картці, лист «🆕 Нове замовлення» — [Замовлення](guide:sales/orders)); прийшов переказ — поставте
 > «Статус оплати» → «Оплачено».
+>
+> Рахунок із реквізитами для переказу — [Рахунки (Rechnung)](guide:sales/invoices): текст «Vorkasse» і строк
+> оплати Minerva підставляє за способом оплати замовлення.
 
 ## Список «💳 Онлайн-оплати»
 

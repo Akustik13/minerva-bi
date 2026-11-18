@@ -1,0 +1,116 @@
+{% extends "admin/base_site.html" %}
+{% block title %}Рахунки (Rechnung) | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Домівка</a> &rsaquo; Продажі &rsaquo; Рахунки (Rechnung)</div>
+{% endblock %}
+{% block extrahead %}{{ block.super }}{% include "admin/sales/invoice/_styles.html" %}{% endblock %}
+
+{% block content %}
+<div class="ri-wrap">
+  <h1 style="margin:0 0 6px;color:var(--text)">🧾 Рахунки (Rechnung)</h1>
+  <p class="ri-muted" style="margin:0 0 18px">Рахунки покупцям на бланку фірми — з логотипом, реквізитами, печаткою й підписом.
+    Замовлення з інтернет-магазину отримують номер магазину (CI-&lt;Kundennummer&gt;-NNN), решта — префікс + номер замовлення.
+    Для митниці — <a href="/commercial-invoices/">💵 Commercial Invoices</a>.</p>
+
+  {% if can.add %}
+  <div class="ri-card">
+    <div class="ri-card-title">➕ Новий рахунок</div>
+    <form method="get" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input class="ri-input" name="order" placeholder="Номер замовлення, напр. PO-31728-001" required style="max-width:300px">
+      <button class="ri-btn primary" type="submit">Відкрити форму →</button>
+      <a class="ri-btn" href="/rechnungen/new/">Без замовлення</a>
+    </form>
+    <p class="ri-muted" style="margin:10px 0 0">Із замовлення підставляються адреса рахунку з сайту (компанія, USt-IdNr), адреса доставки, якщо інша,
+      позиції, доставка, ПДВ (Reverse Charge / експорт — автоматично), мова, строк і текст оплати за способом оплати. Усе можна змінити.</p>
+  </div>
+  {% endif %}
+
+  <div class="ri-card">
+    <div class="ri-card-title">📁 Рахунки ({{ invoices|length }})
+      <form method="get" style="margin-left:auto;display:flex;gap:6px">
+        <input class="ri-input" name="q" value="{{ search }}" placeholder="Номер, замовлення, покупець" style="width:240px;text-transform:none">
+        <button class="ri-btn sm" type="submit">🔍</button>
+      </form>
+    </div>
+    {% if invoices %}
+    <div class="ri-scroll">
+    <table class="ri-table">
+      <thead><tr>
+        <th>№</th><th>Дата</th><th>Замовлення</th><th>Рахунок на</th><th style="text-align:right">Брутто</th><th>Надіслано</th><th>Файли</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for inv in invoices %}
+        <tr>
+          <td translate="no" style="white-space:nowrap"><a href="/rechnungen/{{ inv.pk }}/"><b>{{ inv.number }}</b></a></td>
+          <td style="white-space:nowrap">{{ inv.inv_date|date:"d.m.Y" }}</td>
+          <td translate="no">{% if inv.sales_order %}<a href="{% url 'admin:sales_salesorder_change' inv.sales_order.pk %}">{{ inv.sales_order.order_number }}</a>{% else %}{{ inv.order_ref|default:"—" }}{% endif %}</td>
+          <td translate="no">{{ inv.bill_to.company|default:inv.bill_to.name|default:"—" }}<div class="ri-muted">{{ inv.bill_to.country }}</div></td>
+          <td style="text-align:right;white-space:nowrap" translate="no">{{ inv.gross_total }} {{ inv.currency }}</td>
+          <td>{% if inv.sent_at %}<span class="ri-pill ok" title="{{ inv.sent_to }}">✉️ {{ inv.sent_at|date:"d.m.Y" }}</span>{% else %}<span class="ri-muted">—</span>{% endif %}</td>
+          <td style="white-space:nowrap">
+            {% if inv.pdf_file %}<a class="ri-btn sm" href="/rechnungen/{{ inv.pk }}/file/pdf/" target="_blank">PDF</a>{% endif %}
+            {% if inv.docx_file %}<a class="ri-btn sm" href="/rechnungen/{{ inv.pk }}/file/docx/">DOCX</a>{% endif %}
+          </td>
+          <td style="white-space:nowrap;text-align:right">
+            {% if inv.pdf_file or inv.docx_file %}<a class="ri-btn sm" href="/email/compose/?invoice={{ inv.pk }}" target="_blank" title="Лист покупцю з рахунком у вкладенні">✉️ Надіслати</a>{% endif %}
+            <a class="ri-btn sm" href="/rechnungen/{{ inv.pk }}/">✏️</a>
+            {% if can.delete %}
+            <form method="post" action="/rechnungen/{{ inv.pk }}/delete/" style="display:inline"
+                  onsubmit="return confirm('Видалити рахунок {{ inv.number|escapejs }}?')">
+              {% csrf_token %}<button class="ri-btn sm danger" type="submit" title="Видалити">🗑️</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% if invoices|length >= limit %}<p class="ri-muted">Показано останні {{ limit }} — знайдіть потрібний пошуком.</p>{% endif %}
+    {% else %}
+      <div class="ri-muted">{% if search %}Нічого не знайдено.{% else %}Рахунків ще немає. Введіть номер замовлення вище.{% endif %}</div>
+    {% endif %}
+  </div>
+
+  <div class="ri-card" id="template">
+    <div class="ri-card-title">📄 Шаблон Word
+      {% if can.settings %}<a class="ri-btn sm" href="/admin/sales/invoicesettings/" style="margin-left:auto">⚙️ Налаштування рахунків</a>{% endif %}
+    </div>
+    <p style="margin:0 0 12px;color:var(--text)">Зараз: <b>{% if template_kind == "custom" %}власний (завантажений){% elif template_kind == "blank" %}на бланку Commercial Invoice — логотип, реквізити, печатка й підпис{% else %}простий (без бланка){% endif %}</b>.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <a class="ri-btn" href="/rechnungen/template/sample/?pdf=1" target="_blank">👁 Приклад рахунку</a>
+      <a class="ri-btn" href="/rechnungen/template/download/">⬇️ Завантажити поточний шаблон</a>
+      {% if can.template %}
+      <form method="post" action="/rechnungen/template/upload/" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center">
+        {% csrf_token %}
+        <input type="file" name="template" accept=".docx" required style="color:var(--text);font-size:12px">
+        <button class="ri-btn" type="submit">⬆️ Завантажити свій</button>
+      </form>
+      {% if template_kind == "custom" %}
+      <form method="post" action="/rechnungen/template/reset/" onsubmit="return confirm('Повернути шаблон на бланку Commercial Invoice?')">
+        {% csrf_token %}<button class="ri-btn" type="submit">↩️ Бланк Commercial Invoice</button>
+      </form>
+      {% endif %}
+      {% endif %}
+    </div>
+    <p class="ri-muted" style="margin:12px 0 8px">Як змінити оформлення: завантажте поточний шаблон, змініть у Word шрифти, тексти, розташування,
+      не чіпаючи змінних {% verbatim %}<code>{{ … }}</code> і <code>{%p … %}</code> / <code>{%tr … %}</code>{% endverbatim %}, і завантажте назад —
+      перед збереженням шаблон перевіряється на прикладі. Бланк (логотип, нижній колонтитул, печатка, підпис) береться з шаблону Commercial Invoice:
+      змінили там — шаблон рахунку перебудується сам. Тексти, строки, банк, підписант і лист — у «⚙️ Налаштування рахунків».</p>
+    <details>
+      <summary style="cursor:pointer;color:var(--link-fg);font-size:13px">📚 Змінні шаблону й підстановки в текстах</summary>
+      <div class="ri-scroll" style="margin-top:8px">
+      <table class="ri-table ri-vars">
+        <thead><tr><th>Змінна шаблону</th><th>Що підставляється</th></tr></thead>
+        <tbody>{% for var, desc in template_vars %}<tr><td translate="no"><code>{{ var }}</code></td><td>{{ desc }}</td></tr>{% endfor %}</tbody>
+      </table>
+      <table class="ri-table ri-vars" style="margin-top:10px">
+        <thead><tr><th>У текстах рахунку й листа</th><th>Що підставляється</th></tr></thead>
+        <tbody>{% for var, desc in placeholders %}<tr><td translate="no"><code>{{ var }}</code></td><td>{{ desc }}</td></tr>{% endfor %}</tbody>
+      </table>
+      </div>
+    </details>
+  </div>
+</div>
+{% endblock %}

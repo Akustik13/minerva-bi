@@ -1266,6 +1266,7 @@ window.MV_GROUPS = [
       { href:'/offers/',                                        icon:'📝', label:'📝 Angebote — огляд', app:'offers' },
       { href:'/offers/quick/',                                  icon:'⚡', label:'⚡ Новий Angebot',     app:'offers' },
       { href:'/offers/quick/#template',                         icon:'📄', label:'📄 Шаблон Angebot (Word)', app:'offers' },
+      { href:'/rechnungen/',                                    icon:'🧾', label:'🧾 Рахунки (Rechnung)', app:'sales' },
     ], apps:['sales','offers'] },
   { id:'shop', icon:'🏪', label:'🏪 Інтернет-магазин',
     links:[
@@ -1703,6 +1704,7 @@ document.addEventListener('DOMContentLoaded', function(){
     '/invoices/':                                 'shipping',
     '/packing-lists/':                            'shipping',
     '/commercial-invoices/':                      'shipping',
+    '/rechnungen/':                               'sales',
   };
   var _curPath = window.location.pathname;
   var _activeGroup = null;

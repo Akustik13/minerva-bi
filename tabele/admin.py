@@ -76,7 +76,8 @@ def _get_app_list(self, request, app_label=None):
         'email_assistant': ['emailaccount', 'emailsettings', 'mailcategory', 'emailmessage', 'emailthread'],
         'agent':           ['agenttask', 'agentschedule', 'agentrule', 'agentrun'],
         'suppliers':       ['supplierrequest', 'suppliercategory'],
-        'sales': ['salesorder', 'salesorderline', 'salessource', 'salescategory', 'salessettings'],
+        'sales': ['salesorder', 'salesorderline', 'salessource', 'salescategory', 'salessettings',
+                  'invoicesettings'],
         'inventory': ['product', 'productcategory', 'productalias', 'location',
                       'inventorytransaction', 'reorderproxy', 'supplier',
                       'purchaseorder', 'purchaseorderline'],
@@ -94,6 +95,7 @@ def _get_app_list(self, request, app_label=None):
     # Моделі що реєструються в admin але не показуються в сайдбарі
     model_exclude = {
         'shipping': ['trackingrule', 'trackingattemptlog'],
+        'sales': ['salesinvoice'],   # 🧾 Рахунки — посилання /rechnungen/ у групі «Продажі» (base_site.html)
     }
 
     app_list = []

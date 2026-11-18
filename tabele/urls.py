@@ -125,6 +125,7 @@ urlpatterns = [
     path("invoices/", include("shipping.urls_invoices")),
     path("packing-lists/", include("shipping.urls_packing_lists")),
     path("commercial-invoices/", include("shipping.urls_commercial_invoices")),
+    path("rechnungen/", include("sales.urls_invoices")),        # 🧾 Рахунки (Rechnung) — sales/invoice_service.py
     path("api/v1/", include("api.urls")),
     path("api-auth/", include("rest_framework.urls")),
 ] + [

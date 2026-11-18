@@ -6,7 +6,7 @@ where: 🏪 Інтернет-магазин → 🔢 Kundennummern; ⚙️ На�
 urls: /admin/shop/customernumber/, /admin/shop/shopsettings/
 roles: адміністратор, менеджер
 keywords: Kundennummer, номер клієнта, customer number, Bestellnummer, номер замовлення, PO, Auftragsbestätigung, OC, Rechnung, CI, Proforma, PI, Lieferschein, PL, нумерація документів, номер документа
-related: shop/customer-accounts, shop/test-shop, sales/order-documents, sales/commercial-invoices, sales/packing-lists
+related: shop/customer-accounts, shop/test-shop, sales/order-documents, sales/invoices, sales/commercial-invoices, sales/packing-lists
 ---
 
 ## Що це
@@ -38,7 +38,7 @@ B2B — на компанію), спільну для всіх магазині�
   надіслав замовлення, лишається як «Номер від сайту» — повторне надсилання того самого не створює дубля.
 - **OC, CI, PI, PL** — коли ви вперше створюєте документ замовлення: кнопки **«✅ Auftragsbestätigung»**,
   **«📄 Proforma Invoice»**, **«📋 Пакувальний лист»** у картці замовлення
-  ([Документи замовлення](guide:sales/order-documents)), [Commercial Invoices](guide:sales/commercial-invoices),
+  ([Документи замовлення](guide:sales/order-documents)), [Commercial Invoices](guide:sales/commercial-invoices), [Рахунки](guide:sales/invoices),
   [Packing Lists](guide:sales/packing-lists). Номер видається **один раз** — повторне створення документа бере
   той самий номер.
 

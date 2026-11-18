@@ -448,3 +448,6 @@ class SalesSettings(models.Model):
     def save(self, *args, **kwargs):
         self.pk = 1
         super().save(*args, **kwargs)
+
+
+from .models_invoice import InvoiceSettings, SalesInvoice  # noqa: E402,F401  — рахунки (Rechnung), sales/invoice_service.py

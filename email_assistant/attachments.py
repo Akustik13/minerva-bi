@@ -140,7 +140,8 @@ def can_attach(account, kind: str) -> bool:
     user = getattr(account, 'user', None)
     if user is None:
         return False
-    perm = {'offer': 'offers.view_offer', 'offerint': 'offers.view_offer', 'order': 'sales.view_salesorder'}.get(kind)
+    perm = {'offer': 'offers.view_offer', 'offerint': 'offers.view_offer', 'order': 'sales.view_salesorder',
+            'invoice': 'sales.view_salesinvoice'}.get(kind)
     return perm is None or user.has_perm(perm)
 
 
@@ -152,7 +153,7 @@ def load_ref(account, ref: str):
 
     kind, _, rest = (ref or '').partition(':')
     try:
-        if kind in ('offer', 'offerint', 'order') and not can_attach(account, kind):
+        if kind in ('offer', 'offerint', 'order', 'invoice') and not can_attach(account, kind):
             logger.warning('attachment ref %s: no permission for %s', ref, getattr(account, 'user', None))
             return None
         if kind == 'draft':   # файл / документ, уже збережений у чернетці цієї скриньки
@@ -163,6 +164,9 @@ def load_ref(account, ref: str):
         if kind in ('offer', 'offerint'):   # документ версії Angebot (PDF / DOCX); offerint — колезі, без «надіслано»
             from offers.services import revision_attachment
             return revision_attachment(int(rest))
+        if kind == 'invoice':   # 🧾 рахунок (PDF, інакше DOCX) — sales/invoice_service.py
+            from sales.invoice_service import attachment as invoice_attachment
+            return invoice_attachment(int(rest))
         if kind == 'order':
             pk, _, name = rest.partition(':')
             order = SalesOrder.objects.filter(pk=int(pk)).first()

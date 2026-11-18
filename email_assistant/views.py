@@ -1361,6 +1361,7 @@ def compose_view(request):
     reply_to_pk = request.GET.get('reply_to')
     forward_pk  = request.GET.get('forward')
     offer_pk    = request.GET.get('offer')
+    invoice_pk  = request.GET.get('invoice')
     draft_pk    = request.GET.get('draft')
     reply_to    = None
     initial     = {}
@@ -1443,7 +1444,15 @@ def compose_view(request):
                 continue
             initial[key] = value
 
-    if not (reply_to_pk or forward_pk or offer_pk or draft):   # посилання mailto: з листа — ?to=&cc=&subject=&body=
+    if invoice_pk and str(invoice_pk).isdigit() and request.method != 'POST':
+        # 🧾 рахунок листом покупцю (sales/invoice_service.compose_initial): кому, тема, текст, PDF
+        if not request.user.has_perm('sales.view_salesinvoice'):
+            from django.core.exceptions import PermissionDenied
+            raise PermissionDenied('Немає доступу до рахунків')
+        from sales.invoice_service import compose_initial as invoice_compose
+        initial.update(invoice_compose(int(invoice_pk), request.user))
+
+    if not (reply_to_pk or forward_pk or offer_pk or invoice_pk or draft):   # посилання mailto: з листа — ?to=&cc=&subject=&body=
         for key in ('to', 'cc', 'subject'):
             if request.GET.get(key):
                 initial[key] = request.GET[key][:500]
@@ -1567,6 +1576,10 @@ def _handle_send(request, account, reply_to=None):
         if offer_refs:   # надіслано документ Angebot → версія «надіслана» (незмінна)
             from offers.services import mark_sent_refs
             mark_sent_refs(offer_refs, result.get('message_id', ''), user=request.user)
+        invoice_refs = [r for r in request.POST.getlist('att_ref') if r.startswith('invoice:')]
+        if invoice_refs:   # 🧾 рахунок надіслано → «✉️ надіслано» в рахунку
+            from sales.invoice_service import mark_sent_refs as invoice_sent
+            invoice_sent(invoice_refs, ', '.join(to_list), user=request.user)
         if request.POST.get('draft_pk'):   # лист із чернетки пішов — чернетка (і її файли) більше не потрібна
             from email_assistant import drafts as _drafts
             _drafts.discard(account, request.POST['draft_pk'], how='sent', text=body,

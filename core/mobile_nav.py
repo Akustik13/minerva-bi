@@ -21,6 +21,7 @@ ITEMS = {
     "calendar":  ("📅", "Календар", "/calendar/", "module:calendar_app"),
     "customers": ("👥", "Клієнти", "/admin/crm/customer/", "crm.view_customer"),
     "offers":    ("📝", "Angebote", "/offers/", "offers.view_offer"),
+    "invoices":  ("🧾", "Рахунки", "/rechnungen/", "sales.view_salesinvoice"),
     "shipments": ("🚚", "Відправлення", "/admin/shipping/shipment/", "shipping.view_shipment"),
     "purchases": ("🧾", "Закупівлі", "/admin/inventory/purchaseorder/", "inventory.view_purchaseorder"),
     "suppliers": ("🏭", "Постачальники", "/admin/inventory/supplier/", "inventory.view_supplier"),
