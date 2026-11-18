@@ -682,12 +682,14 @@ class DigiKeyListing(models.Model):
                 attrs.append({"code": code_str, "type": "String", "value": str(value)})
                 added_codes.add(code_str)
         # нечислові поля (rohsStatus…) — лише ті, що DigiKey дозволяє заповнити (dk_from_stock.writable_codes)
-        from bots.services.dk_from_stock import writable_codes
+        from bots.services.dk_from_stock import list_code, writable_codes
         writable = writable_codes()
         for code, value in (self.dk_attributes or {}).items():
             if code in writable and code not in added_codes and value not in (None, '', '-'):
                 attrs.append({"code": code, "type": "String", "value": str(value)})
                 added_codes.add(code)
+        for a in attrs:          # поля-списки — кодом DigiKey (назву «RoHS3 Compliant» DigiKey не зберігає)
+            a["value"] = list_code(a["code"], a["value"])
         return attrs
 
 

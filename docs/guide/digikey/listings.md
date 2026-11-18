@@ -5,7 +5,7 @@ summary: Ваші товари на DigiKey Marketplace у Minerva — ліст�
 where: 🛒 DigiKey → Лістинги (підключення — 🛒 DigiKey → Налаштування → Підключення DigiKey)
 urls: /admin/bots/digikeylisting/, /admin/bots/digikeylisting/add/, /admin/bots/digikeylisting/from-stock/, /admin/bots/digikeylisting/dk-diff/, /admin/bots/digikeylisting/lead-times/, /admin/bots/digikeyconfig/
 roles: адміністратор, менеджер
-keywords: DigiKey, Marketplace, лістинг, Min Quantity Alert, мін. залишок алерт, мінімальне замовлення, MOQ, термін відправки, строк відвантаження, залишок для DigiKey, даташит для DigiKey, цінові тири, ціна за штуку, сума за кількість, ціна за 1000, listing, що бачить DigiKey, звірка, не дійшло, строк відвантаження, lead time, leadTimeToShip, зі складу, обов'язкові поля, RoHS, етапи з DigiKey, офер, offer, Supplier SKU, опублікувати, staged, затвердження, стягнути з DigiKey, залишок на DigiKey, атрибути DigiKey, additionalFields, MOQ, Excel, OAuth
+keywords: DigiKey, Marketplace, лістинг, технічні атрибути, Technical Attributes, Custom Fields, код зі списку, Min Quantity Alert, мін. залишок алерт, мінімальне замовлення, MOQ, термін відправки, строк відвантаження, залишок для DigiKey, даташит для DigiKey, цінові тири, ціна за штуку, сума за кількість, ціна за 1000, listing, що бачить DigiKey, звірка, не дійшло, строк відвантаження, lead time, leadTimeToShip, зі складу, обов'язкові поля, RoHS, етапи з DigiKey, офер, offer, Supplier SKU, опублікувати, staged, затвердження, стягнути з DigiKey, залишок на DigiKey, атрибути DigiKey, additionalFields, MOQ, Excel, OAuth
 related: inventory/ai-fill, digikey/prices, digikey/media, digikey/orders, inventory/products, shop/catalog-prices
 ---
 
@@ -350,6 +350,19 @@ Minerva»**, дія **«⏱ Строк відвантаження (масово)
 за першу кількість у цінах (4000), алерт 0 — не надсилає (без алерту), алерт менший за MOQ — надсилає рівним MOQ. На
 кроці «Офер» дорожньої карти видно, що піде («MOQ 4000 … алерт залишку ≤ 4000 шт.»), а перевірка якості пропонує
 поставити MOQ 4000 і в картці. Достатньо ще раз натиснути **«📦 Створити Offer»**.
+
+**Технічні атрибути «стягуються» з DigiKey, а передати їх не виходить — чому?** Це два різні API DigiKey.
+«📥 Стягнути з DigiKey» читає **каталог DigiKey** (ProductSearch — дані, які DigiKey сам веде для номера виробника),
+а надсилає Minerva через **Marketplace API** (товари продавця). Marketplace API приймає лише поля зі списку
+«📋 Custom Fields» (налаштування DigiKey): даташит, Lifecycle, пакування, країна походження, RoHS, REACH, HTS, ECCN,
+MSL, вага й кілька інших. Технічних атрибутів (Tolerance, Voltage – Rated, Frequency…) там немає — їх DigiKey
+заповнює на порталі (supplier.digikey.com → Products → Edit Product → **Technical Attributes**, зі списків) або з
+шаблону, надісланого на marketplaceprodinfo@digikey.com. У Minerva вони лишаються в параметрах товару (сторінка
+«🔷 Зі складу на DigiKey» так і позначає: «технічний параметр: DigiKey через API його не приймає»).
+
+**Поля-списки DigiKey (RoHS, REACH, країна, пакування, одиниця ваги)** зберігають **код**, а не назву: RoHS3
+Compliant = `ROHS3 COMPLIANT`, Germany = `DE`, Grams = `g`. У Minerva видно назву, на DigiKey іде код зі списку —
+список полів і пари «назва=код» Minerva бере з останнього **«📋 Custom Fields»** (кнопка ще й оновлює його).
 
 **Де задати мінімальне замовлення й термін відправки?** Нова картка — на сторінці «🔷 Зі складу на DigiKey»
 («Мін. замовлення (MOQ), шт.», «Відвантаження, днів»). Наявний лістинг — у картці → **«🛒 Offer (Пропозиція)»** →

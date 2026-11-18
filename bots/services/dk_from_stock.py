@@ -90,19 +90,48 @@ def field_defs(config=None, refresh=False) -> dict:
         if refresh:
             raise
         return cached or {}
+    return remember_fields(raw)
+
+
+def remember_fields(raw) -> dict:
+    """Сирий список GET /custom/fields → {code: {code, name, type, required, values, pairs}} у кеш (без Invisible /
+    ReadOnly). values — що показувати людині (значення списку або назви пар), pairs — [[назва, код]] полів-списків
+    (SingleLabelCodeList…): DigiKey зберігає код («RoHS3 Compliant» → «ROHS3 COMPLIANT», «Germany» → «DE»)."""
     out = {}
-    for f in raw:
+    for f in raw or []:
         code = str(f.get("code") or "").strip()
         if not code or f.get("permissionLevel") in ("Invisible", "ReadOnly"):
             continue
         values = [str(v.get("value") if isinstance(v, dict) else v) for v in (f.get("fieldValues") or [])]
         values += [str(p.get("label") or p.get("code")) for p in (f.get("fieldLabelCodePairs") or [])
                    if isinstance(p, dict)]
+        pairs = [[str(p.get("label") or p.get("code")), str(p.get("code") or p.get("label"))]
+                 for p in (f.get("fieldLabelCodePairs") or []) if isinstance(p, dict) and (p.get("code") or p.get("label"))]
         out[code] = {"code": code, "name": f.get("name") or code, "type": f.get("fieldType") or "Text",
                      "required": bool(f.get("required")),
-                     "values": list(dict.fromkeys(v for v in values if v and v != "None"))}
+                     "values": list(dict.fromkeys(v for v in values if v and v != "None")), "pairs": pairs}
     _cache().set(FIELDS_CACHE_KEY, out, FIELDS_TTL)
     return out
+
+
+def list_code(code, value):
+    """Значення поля-списку DigiKey → його код (за назвою чи кодом, без регістру й розділювачів), як DigiKey його
+    зберігає: «RoHS3 Compliant» → «ROHS3 COMPLIANT», «Germany» → «DE», «Tape & Reel (TR)» → «TAPE & REEL (TR)».
+    Поле не список, пар ще не отримано, значення не зі списку — як є. Без мережі (останній список полів)."""
+    if value in (None, ""):
+        return value
+    d = (_cache().get(FIELDS_CACHE_KEY) or {}).get(str(code)) or {}
+    pairs = d.get("pairs") or []
+    want = _norm(value)
+    if not pairs or not want:
+        return value
+    for _label, c in pairs:
+        if _norm(c) == want:
+            return c
+    for label, c in pairs:
+        if _norm(label) == want:
+            return c
+    return value
 
 
 def writable_codes() -> set:
