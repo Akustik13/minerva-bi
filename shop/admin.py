@@ -311,7 +311,7 @@ class ShopAdmin(admin.ModelAdmin):
                            "Листи покупцям надсилає Minerva — з «✉️ Пошта магазину» вище.",
         }),
         ("💳 Способи оплати на сайті", {
-            "fields": ["payment_methods", "payment_default"],
+            "fields": ["payment_methods", "payment_default", "invoice_auto_send"],
             "description": "Які способи оплати бачить покупець у касі. Minerva також перевіряє вибір у кожному "
                            "замовленні: вимкнений спосіб не приймається.",
         }),
@@ -354,6 +354,8 @@ class ShopAdmin(admin.ModelAdmin):
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
+        if "invoice_auto_send" in form.base_fields:   # налаштування рахунків — лише з правом на них
+            form.base_fields["invoice_auto_send"].disabled = not request.user.has_perm("sales.change_invoicesettings")
         widget = form.base_fields.get("mail_sender") and form.base_fields["mail_sender"].widget
         if widget is not None:  # акаунти пошти створюються в розділі «Email», не звідси
             widget.can_add_related = widget.can_change_related = widget.can_delete_related = False
@@ -785,6 +787,11 @@ class ShopAdmin(admin.ModelAdmin):
         return super().render_change_form(request, context, *args, **kwargs)
 
     def save_model(self, request, obj, form, change):
+        field = form.fields.get("invoice_auto_send")
+        if field is not None and not field.disabled and "invoice_auto_send" in form.cleaned_data:
+            from sales.models_invoice import InvoiceSettings   # спільне для всіх магазинів (🧾 Рахунки)
+            InvoiceSettings.get()
+            InvoiceSettings.objects.filter(pk=1).update(auto_send=bool(form.cleaned_data["invoice_auto_send"]))
         if change and any(k.startswith("route_") for k in request.POST):   # меню «З якої адреси» в «Що звідки йде»
             from . import mail_map
             mail_map.save_routes(obj, request.POST)

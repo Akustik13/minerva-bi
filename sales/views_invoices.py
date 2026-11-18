@@ -220,8 +220,12 @@ def invoice_file(request, pk, kind):
         except Exception as e:  # noqa: BLE001
             logger.warning("invoice %s: PDF on demand failed: %s", inv.number, e)
     f = inv.pdf_file if kind == "pdf" else inv.docx_file
+    if not f and kind == "pdf" and request.user.has_perm("sales.change_salesinvoice"):
+        messages.error(request, f"❌ PDF рахунку {inv.number} не сформовано: LibreOffice на сервері не зміг "
+                                "перетворити DOCX (причина — у журналі сервера). DOCX можна завантажити.")
+        return redirect(BASE)
     if not f:
-        raise Http404("Файл ще не сформовано" + (" — на сервері немає LibreOffice для PDF" if kind == "pdf" else ""))
+        raise Http404("Файл ще не сформовано")
     return FileResponse(f.open("rb"), as_attachment=kind != "pdf", filename=f"{svc.file_base(inv)}.{kind}")
 
 
@@ -312,11 +316,7 @@ def template_sample(request):
     _need(request, "sales.view_salesinvoice")
     data = svc._render(svc.template_path(), svc.build_context(svc.sample_invoice()))
     if request.GET.get("pdf"):
-        from documents.service import _convert_to_pdf
-        try:
-            pdf = _convert_to_pdf(data)
-        except Exception:  # noqa: BLE001
-            pdf = None
+        pdf = svc.pdf_from_bytes(data, "Rechnung_Beispiel")
         if pdf:
             resp = HttpResponse(pdf, content_type="application/pdf")
             resp["Content-Disposition"] = 'inline; filename="Rechnung_Beispiel.pdf"'

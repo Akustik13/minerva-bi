@@ -229,7 +229,7 @@ class Shop(models.Model):
     payment_methods = models.JSONField(
         "Способи оплати на сайті", default=list, blank=True,
         help_text="Що бачить покупець у касі, у цьому порядку (перший — вибраний за замовчуванням): "
-                  "prepayment, invoice, stripe. Порожньо — як у налаштуваннях сайту (shop-config.php).",
+                  "prepayment, invoice, cod, stripe. Порожньо — як у налаштуваннях сайту (shop-config.php).",
     )
     # ── Онлайн-оплата Stripe (shop/payments.py) ──
     stripe_enabled = models.BooleanField(
@@ -325,6 +325,7 @@ class Shop(models.Model):
             raise ValidationError({"free_shipping_threshold": "Вкажіть поріг безкоштовної доставки."})
 
     PAYMENT_CHOICES = [("prepayment", "Передоплата (Vorkasse, переказ)"), ("invoice", "Рахунок (Kauf auf Rechnung)"),
+                       ("cod", "Накладений платіж (Nachnahme) — оплата при отриманні"),
                        ("stripe", "Онлайн через Stripe (картки, Apple / Google Pay, SEPA …)")]
 
     def save(self, *args, **kwargs):

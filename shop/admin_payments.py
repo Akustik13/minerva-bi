@@ -44,7 +44,14 @@ class ShopForm(forms.ModelForm):
         label="Показувати в касі", required=False, choices=Shop.PAYMENT_CHOICES,
         widget=forms.CheckboxSelectMultiple,
         help_text="Що покупець бачить на сайті. Stripe — лише з ключем (блок «💳 Оплата Stripe» нижче). "
-                  "Банківські реквізити для передоплати й строк оплати рахунку — у shop-config.php сайту.")
+                  "Банківські реквізити для передоплати й строк оплати рахунку — у shop-config.php сайту. "
+                  "Накладений платіж (Nachnahme) каса сайту покаже після оновлення сайту (клас оплати «cod»); "
+                  "до того сайт його просто пропускає.")
+    invoice_auto_send = forms.BooleanField(
+        label="🧾 Надсилати рахунок покупцю автоматично", required=False,
+        help_text="Для замовлень з інтернет-магазину (спільне для всіх магазинів): Vorkasse, рахунок і Nachnahme — "
+                  "одразу після замовлення, Stripe — після оплати; рахунок PDF листом з пошти магазину. Тестовий лист "
+                  "і журнал — <a href=\"/rechnungen/#auto\">🧾 Рахунки → «✉️ Рахунок покупцю автоматично»</a>.")
     payment_default = forms.ChoiceField(
         label="Вибрано за замовчуванням", required=False, choices=[("", "— перший зі списку —")] + Shop.PAYMENT_CHOICES)
 
@@ -66,6 +73,12 @@ class ShopForm(forms.ModelForm):
                 ["prepayment", "invoice"] + (["stripe"] if getattr(self.instance, "stripe_enabled", False) else []))
         if "payment_default" in self.fields and methods:
             self.initial["payment_default"] = methods[0]
+        if "invoice_auto_send" in self.fields:
+            try:
+                from sales.models_invoice import InvoiceSettings
+                self.initial["invoice_auto_send"] = InvoiceSettings.get().auto_send
+            except Exception:  # noqa: BLE001 — без рахунків (sales) — без перемикача
+                self.fields.pop("invoice_auto_send")
 
     def _keep(self, name, prefixes, hint):
         value = (self.cleaned_data.get(name) or "").strip()

@@ -164,6 +164,8 @@ class DocumentTests(_Base):
     def test_generate_copies_to_order_folder(self, _pdf):
         inv = svc.generate(svc.create_from_order(self.order, self.boss))
         self.assertTrue(inv.docx_file and inv.pdf_file)
+        path = _pdf.call_args.args[0]                    # LibreOffice отримує ШЛЯХ до збереженого DOCX, не байти
+        self.assertTrue(isinstance(path, str) and path.endswith(".docx"), path)
         folder = Path(MEDIA) / "orders" / "sevskiy_de" / "PO-31728-001"
         self.assertTrue((folder / "Rechnung_CI-31728-001.pdf").exists())
         from shop.accounts import order_documents
@@ -538,3 +540,66 @@ class RegenerateTests(_Base):
         self.client.force_login(person("vika"))
         self.assertEqual(self.client.post(f"/rechnungen/{inv.pk}/regenerate/").status_code, 403)
         self.assertTrue(old)
+
+
+class CashOnDeliveryTests(_Base):
+    """Накладений платіж (Nachnahme): спосіб оплати магазину, рахунок без банківських реквізитів і строку."""
+
+    def test_invoice_for_cod_order(self):
+        from accounting.models import CompanySettings
+        c = CompanySettings.get()
+        c.iban = "DE35700100800607738803"
+        c.save()
+        self.order.payment_method = "cod"
+        self.order.save()
+        data = svc.initial_data(self.order)
+        self.assertEqual((data["pay_kind"], data["due_date"]), ("cod", None))
+        self.assertIn("Nachnahme", data["payment_text"])
+        inv = svc.create_from_order(self.order, self.boss)
+        ctx = svc.build_context(inv)
+        self.assertEqual(ctx["bank"], [])                                       # платить кур'єру — без реквізитів
+        self.assertIn("164,10 EUR", str(ctx["payment_text"]))
+        self.assertEqual(svc.method_name("cod", "en"), "cash on delivery")
+        self.assertIn("Накладений платіж (Nachnahme)", self.order.get_payment_method_display())
+
+    def test_shop_card_toggle_writes_invoice_settings(self):
+        from django.contrib import admin
+        from django.test import RequestFactory
+        from shop.admin_payments import ShopForm
+        InvoiceSettings.get()
+        self.assertFalse(ShopForm(instance=self.shop).initial["invoice_auto_send"])
+        ma = admin.site._registry[Shop]
+        request = RequestFactory().get("/")
+        request.user = self.boss
+        self.assertFalse(ma.get_form(request, self.shop).base_fields["invoice_auto_send"].disabled)
+        form = ShopForm(instance=self.shop)
+        form.cleaned_data = {"invoice_auto_send": True}
+        ma.save_model(request, self.shop, form, True)
+        self.assertTrue(InvoiceSettings.get().auto_send)
+        request.user = person("vika")                                          # без права на налаштування рахунків
+        self.assertTrue(ma.get_form(request, self.shop).base_fields["invoice_auto_send"].disabled)
+
+
+class CashOnDeliveryApiTests(TestCase):
+    """Сайт надсилає замовлення з payment_method «cod» — Minerva приймає, коли Nachnahme увімкнено в магазині."""
+
+    def setUp(self):
+        from shop.tests_accounts import AccountTestCase
+        AccountTestCase.setUp(self)
+
+    def order(self, number):
+        return self.c.post("/api/v1/orders/", {
+            "order_number": number, "client": "Firma GmbH", "contact_name": "Anna", "email": "anna@firma.de",
+            "addr_country": "DE", "shop": True, "lines": [{"sku": "AN-1", "qty": 2}], "vat_rate": "19",
+            "payment_method": "cod", "payment_status": "unpaid"}, format="json")
+
+    def test_cod_only_when_enabled_in_shop(self):
+        self.shop.payment_methods = ["prepayment", "invoice"]
+        self.shop.save()
+        refused = self.order("WS-COD-1")
+        self.assertEqual((refused.status_code, refused.json()["code"]), (400, "payment_method_not_allowed"))
+        self.shop.payment_methods = ["prepayment", "cod"]
+        self.shop.save()
+        ok = self.order("WS-COD-2")
+        self.assertEqual(ok.status_code, 201, ok.content)
+        self.assertEqual(SalesOrder.objects.get(order_number=ok.json()["order_number"]).payment_method, "cod")

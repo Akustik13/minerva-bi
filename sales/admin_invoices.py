@@ -41,12 +41,12 @@ class InvoiceSettingsAdmin(admin.ModelAdmin):
             "fields": ("signer_name", "signer_position", "payment_info"),
         }),
         ("🇩🇪 Тексти рахунку — Deutsch", {
-            "fields": ("intro_de", "pay_invoice_de", "pay_prepayment_de", "pay_paid_de", "vat_reverse_de",
+            "fields": ("intro_de", "pay_invoice_de", "pay_prepayment_de", "pay_cod_de", "pay_paid_de", "vat_reverse_de",
                        "vat_export_de", "outro_de"),
             "description": PLACEHOLDER_HELP,
         }),
         ("🇬🇧 Тексти рахунку — English", {
-            "fields": ("intro_en", "pay_invoice_en", "pay_prepayment_en", "pay_paid_en", "vat_reverse_en",
+            "fields": ("intro_en", "pay_invoice_en", "pay_prepayment_en", "pay_cod_en", "pay_paid_en", "vat_reverse_en",
                        "vat_export_en", "outro_en"),
             "description": PLACEHOLDER_HELP,
         }),

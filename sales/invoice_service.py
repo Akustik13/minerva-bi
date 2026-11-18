@@ -34,7 +34,8 @@ logger = logging.getLogger(__name__)
 GERMAN_COUNTRIES = ("DE", "AT", "CH", "LI")
 LANG_CODES = [c for c, _ in LANGS]
 VAT_CODES = [c for c, _ in VAT_MODES]
-PAY_KINDS = ("invoice", "prepayment", "paid")
+PAY_KINDS = ("invoice", "prepayment", "cod", "paid")
+NO_BANK = ("paid", "cod")                    # уже оплачено / платить кур'єру — без банківських реквізитів
 UNITS = {"de": "Stk.", "en": "pcs", "de_en": "Stk."}
 
 LABELS = {
@@ -76,9 +77,9 @@ SALUTATIONS = [("", "—"), ("mr", "Herr / Mr"), ("ms", "Frau / Ms")]
 NO_ORDER_INTRO = {"de": "wir berechnen Ihnen die folgenden Positionen:",
                   "en": "We invoice you for the following items:"}
 METHOD_NAMES = {
-    "de": {"invoice": "Rechnung", "prepayment": "Vorkasse", "paypal": "PayPal",
+    "de": {"invoice": "Rechnung", "prepayment": "Vorkasse", "cod": "Nachnahme", "paypal": "PayPal",
            "stripe": "Kreditkarte / Online (Stripe)", "other": "Sonstige"},
-    "en": {"invoice": "invoice", "prepayment": "prepayment", "paypal": "PayPal",
+    "en": {"invoice": "invoice", "prepayment": "prepayment", "cod": "cash on delivery", "paypal": "PayPal",
            "stripe": "credit card / online (Stripe)", "other": "other"},
 }
 TEXT_KEYS = ("intro", "payment", "vat_note", "outro")
@@ -140,14 +141,14 @@ def vat_for(country: str, vat_id: str, site_rate=None, s: InvoiceSettings | None
 def pay_kind(method: str, status: str) -> str:
     if status == "paid":
         return "paid"
-    return "prepayment" if method == "prepayment" else "invoice"
+    return method if method in ("prepayment", "cod") else "invoice"
 
 
 def due_for(kind: str, start: date, s: InvoiceSettings | None = None):
     """Оплатити до: за рахунком — через `due_days`; передоплата — лише коли текст передоплати має {due_date}
     («vorab» без дати — як у зразку); уже оплачено — без строку."""
     s = s or InvoiceSettings.get()
-    if kind == "paid":
+    if kind in ("paid", "cod"):
         return None
     if kind == "prepayment":
         texts = (s.pay_prepayment_de or "") + (s.pay_prepayment_en or "")
@@ -599,7 +600,7 @@ def build_context(inv: SalesInvoice, s: InvoiceSettings | None = None) -> dict:
         "payment_text": doc._listing(fill(inv.payment_text, vals)),
         "vat_note": doc._listing(fill(inv.vat_note, vals)),
         "outro": doc._listing(fill(inv.outro_text, vals)),
-        "bank": bank_rows(s, lang) if inv.pay_kind != "paid" else [], "wide_bank": lang != "de",
+        "bank": bank_rows(s, lang) if inv.pay_kind not in NO_BANK else [], "wide_bank": lang != "de",
         "signer": inv.signer_name or _ceo(_company()), "signer_position": inv.signer_position,
     }
 
@@ -734,9 +735,30 @@ def file_base(inv: SalesInvoice, s: InvoiceSettings | None = None) -> str:
     return name[:120]
 
 
+def pdf_from_docx(path: str) -> bytes | None:
+    """PDF з файлу DOCX через LibreOffice (documents.service._convert_to_pdf приймає ШЛЯХ до файлу, не байти);
+    None — немає LibreOffice або конвертація не вдалася (причина — у журналі)."""
+    from documents.service import _convert_to_pdf
+    try:
+        return _convert_to_pdf(str(path))
+    except Exception as e:  # noqa: BLE001
+        logger.warning("invoice PDF from %s failed: %s", path, e)
+        return None
+
+
+def pdf_from_bytes(data: bytes, name: str = "Rechnung") -> bytes | None:
+    """PDF з DOCX у пам'яті (приклад, тестовий лист): тимчасовий файл → pdf_from_docx."""
+    import os
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, f"{name}.docx")
+        with open(path, "wb") as fh:
+            fh.write(data)
+        return pdf_from_docx(path)
+
+
 def generate(inv: SalesInvoice) -> SalesInvoice:
     """DOCX (+ PDF, якщо є LibreOffice); копія в документи замовлення (media/orders/{джерело}/{номер}/)."""
-    from documents.service import _convert_to_pdf
     s = InvoiceSettings.get()
     data = render_docx(inv)
     base = file_base(inv, s)
@@ -744,11 +766,7 @@ def generate(inv: SalesInvoice) -> SalesInvoice:
         if f:
             f.delete(save=False)
     inv.docx_file.save(f"{base}.docx", ContentFile(data), save=False)
-    pdf = None
-    try:
-        pdf = _convert_to_pdf(data)
-    except Exception as e:  # noqa: BLE001 — без LibreOffice — лише DOCX
-        logger.warning("invoice %s: PDF failed: %s", inv.number, e)
+    pdf = pdf_from_docx(inv.docx_file.path)    # без LibreOffice — лише DOCX
     if pdf:
         inv.pdf_file.save(f"{base}.pdf", ContentFile(pdf), save=False)
     inv.save(update_fields=["docx_file", "pdf_file", "updated_at"])
@@ -970,13 +988,7 @@ def send_test(to: str, lang: str = "de") -> str:
     if shop is None:
         raise InvoiceError("Немає інтернет-магазину — рахунки покупцям надсилаються з його пошти.")
     inv = sample_invoice(lang if lang in LANG_CODES else "de")
-    data = render_docx(inv)
-    pdf = None
-    try:
-        from documents.service import _convert_to_pdf
-        pdf = _convert_to_pdf(data)
-    except Exception as e:  # noqa: BLE001 — без LibreOffice — DOCX
-        logger.warning("invoice test mail: PDF failed: %s", e)
+    pdf = pdf_from_bytes(render_docx(inv), file_base(inv))
     if not pdf:
         raise InvoiceError("PDF не сформовано — на сервері немає LibreOffice (поштою надсилається лише PDF).")
     item = {"name": f"{file_base(inv)}.pdf", "content": pdf, "content_type": "application/pdf"}

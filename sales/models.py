@@ -104,6 +104,7 @@ class SalesOrder(models.Model):
         ("",           "—"),
         ("invoice",    "Рахунок (Rechnung)"),
         ("prepayment", "Передоплата (Vorkasse)"),
+        ("cod",        "Накладений платіж (Nachnahme)"),
         ("paypal",     "PayPal"),
         ("stripe",     "Stripe"),
         ("other",      "Інше"),
