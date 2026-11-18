@@ -603,3 +603,51 @@ svg.pjz-grab { cursor: grabbing; }
 .pjc-inv-choose .pjc-inv-r { border: 1px dashed var(--border-strong); margin-top: 4px; }
 .pjc-inv-others { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; font-size: 12.5px; }
 .pjc-inv-others select { padding: 2px 6px; }
+
+/* 📅 Звірка плану з нарадою (projects/plan_review.py, _replan.html): пропозиції — пунктиром фіолетовим на обох
+   діаграмах, ✓ / ✕ — у блоці; 🕘 Історія змін плану (plan_history.py) */
+.pjc { --pjr-prop: #a371f7; }
+html[data-theme="light"] .pjc, html[data-theme="hc-light"] .pjc { --pjr-prop: #8250df; }
+.pjg .pjg-ghost { fill: color-mix(in srgb, var(--pjr-prop) 18%, transparent); stroke: var(--pjr-prop); stroke-width: 1.6; stroke-dasharray: 4 2; }
+.pjg .pjg-ghost-del { stroke: var(--pjr-prop); stroke-width: 2.4; stroke-dasharray: 5 3; }
+.pjg .pjg-ghost-lab { fill: var(--pjr-prop); font-size: 10.5px; font-weight: 700; }
+.pjg .pjg-ghost-bg { fill: color-mix(in srgb, var(--pjr-prop) 8%, transparent); }
+.pjg .pjg-ghost-t { fill: var(--pjr-prop); font-style: italic; }
+.pjg2-prop { fill: color-mix(in srgb, var(--pjr-prop) 18%, transparent); stroke: var(--pjr-prop); stroke-width: 1.6; stroke-dasharray: 4 2; }
+.pjg2-propdel { stroke: var(--pjr-prop); stroke-width: 2.4; stroke-dasharray: 5 3; }
+.pjg2-proplab { fill: var(--pjr-prop); font-size: 10.5px; font-weight: 700; }
+.pjg2-proprow .pjg2-td { fill: var(--pjr-prop); font-style: italic; }
+.pjg2-proprow .pjg2-rb { fill: color-mix(in srgb, var(--pjr-prop) 8%, transparent); }
+.pjr2 { margin: 0 0 10px; padding: 8px 10px; border: 1px dashed var(--pjr-prop); border-radius: 8px; }
+.pjr2-focus { box-shadow: 0 0 0 2px var(--pjr-prop); }
+.pjr2-head { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; font-weight: 600; }
+.pjr2-err { color: var(--err); }
+.pjr2-sum { margin: 6px 0; }
+.pjr2-list { list-style: none; margin: 6px 0 0; padding: 0; }
+.pjr2-row { display: flex; gap: 8px; align-items: flex-start; padding: 6px; border-top: 1px solid var(--border); }
+.pjr2-row:first-child { border-top: none; }
+.pjr2-ic { width: 1.4em; text-align: center; flex: none; }
+.pjr2-body { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.pjr2-src { font-size: 12.5px; margin-top: 2px; }
+.pjr2-stale { font-size: 12.5px; color: var(--warn); margin-top: 2px; }
+.pjr2-acts { display: inline-flex; gap: 4px; flex: none; }
+.pjr2-state { font-size: 12px; white-space: nowrap; opacity: .85; flex: none; }
+.pjr2-applied { opacity: .75; }
+.pjr2-rejected { opacity: .6; }
+.pjr2-rejected .pjr2-body b { text-decoration: line-through; }
+.pjr2-failed { background: color-mix(in srgb, var(--err) 8%, transparent); border-radius: 6px; }
+.pjr2-foot { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: 8px; }
+.pjr2-start { margin-top: 6px; }
+.pjr2-start summary { cursor: pointer; font-weight: 600; }
+.pjr2-form { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: 8px 0 4px; }
+.pjr2-form select { max-width: 100%; }
+.pjr2-consent { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; }
+.pjh { margin: 0 0 10px; }
+.pjh summary { cursor: pointer; font-weight: 600; }
+.pjh-list { list-style: none; margin: 6px 0 0; padding: 0; }
+.pjh-list > li { list-style: none; padding: 6px 0; border-top: 1px solid var(--border); }
+.pjh-head { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; font-size: 12.5px; }
+.pjh-head time { font-variant-numeric: tabular-nums; font-weight: 600; }
+.pjh-src { font-size: 11.5px; padding: 0 7px; border-radius: 10px; background: color-mix(in srgb, var(--text-muted) 18%, transparent); }
+.pjh-meeting, .pjh-ai { background: color-mix(in srgb, var(--pjr-prop) 22%, transparent); }
+.pjh-lines { margin: 3px 0 0 18px; padding: 0; font-size: 12.5px; overflow-wrap: anywhere; }

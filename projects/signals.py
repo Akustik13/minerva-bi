@@ -9,12 +9,12 @@ import logging
 
 from django.db import transaction
 from django.db.models import Q
-from django.db.models.signals import post_delete, post_save
+from django.db.models.signals import post_delete, post_save, pre_delete, pre_save
 from django.dispatch import receiver
 
 from email_assistant.models import EmailMessage
 
-from .models import Project, ProjectHighlight, ProjectLink
+from .models import Project, ProjectHighlight, ProjectLink, ProjectPhase, ProjectStep
 
 logger = logging.getLogger(__name__)
 
@@ -142,3 +142,67 @@ def invite_changed(sender, instance, **kwargs):
             state.mark_dirty(list(Project.objects.filter(customer_id=instance.crm_customer_id,
                                                          status__in=Project.OPEN_STATUSES).values_list("pk", flat=True)))
     _safe("dirty (invite)", run)
+
+
+# 🕘 Історія змін плану (projects/plan_history.py): збій запису історії не заважає зберегти крок чи фазу
+def _history(what, fn, *args):
+    try:
+        fn(*args)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("projects plan history (%s): %s", what, e)
+
+
+@receiver(pre_save, sender=ProjectStep, dispatch_uid="plan_history_step_pre")
+def plan_step_before(sender, instance, update_fields=None, **kwargs):
+    if kwargs.get("raw"):
+        return
+    from . import plan_history
+    _history("step pre", plan_history.step_pre_save, instance, update_fields)
+
+
+@receiver(post_save, sender=ProjectStep, dispatch_uid="plan_history_step_post")
+def plan_step_saved(sender, instance, created, **kwargs):
+    if kwargs.get("raw"):
+        return
+    from . import plan_history
+    _history("step", plan_history.step_post_save, instance, created)
+
+
+@receiver(post_delete, sender=ProjectStep, dispatch_uid="plan_history_step_delete")
+def plan_step_deleted(sender, instance, **kwargs):
+    from . import plan_history
+    _history("step delete", plan_history.step_post_delete, instance)
+
+
+@receiver(pre_save, sender=ProjectPhase, dispatch_uid="plan_history_phase_pre")
+def plan_phase_before(sender, instance, update_fields=None, **kwargs):
+    if kwargs.get("raw"):
+        return
+    from . import plan_history
+    _history("phase pre", plan_history.phase_pre_save, instance, update_fields)
+
+
+@receiver(post_save, sender=ProjectPhase, dispatch_uid="plan_history_phase_post")
+def plan_phase_saved(sender, instance, created, **kwargs):
+    if kwargs.get("raw"):
+        return
+    from . import plan_history
+    _history("phase", plan_history.phase_post_save, instance, created)
+
+
+@receiver(post_delete, sender=ProjectPhase, dispatch_uid="plan_history_phase_delete")
+def plan_phase_deleted(sender, instance, **kwargs):
+    from . import plan_history
+    _history("phase delete", plan_history.phase_post_delete, instance)
+
+
+@receiver(pre_delete, sender=Project, dispatch_uid="plan_history_project_deleting")
+def plan_project_deleting(sender, instance, **kwargs):
+    from . import plan_history
+    plan_history.project_deleting(instance.pk)
+
+
+@receiver(post_delete, sender=Project, dispatch_uid="plan_history_project_deleted")
+def plan_project_deleted(sender, instance, **kwargs):
+    from . import plan_history
+    plan_history.project_deleting(instance.pk, on=False)

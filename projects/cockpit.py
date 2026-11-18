@@ -227,17 +227,33 @@ def _strip(plan) -> list:
     return out
 
 
-def _plan_context(project, facts, today, can_change=False) -> dict:
-    """Вкладка «📅 План»: смуга фаз, Гант, дані вікна кроку (лише тому, хто може змінювати проєкт)."""
+def _replan_context(project, user, can_change) -> dict:
+    """«📅 Звірити план з нарадою» і «🕘 Історія змін плану» (projects/plan_review.py, plan_history.py); «привиди»
+    пропозицій на діаграмах — лише тому, хто звіряв. Збій — без блоку, пульт працює."""
+    try:
+        from . import plan_review
+        out = plan_review.cockpit(project, user, can_change)
+        review = plan_review.active(project, user) if out.get("review") else None
+        out["ghosts"] = plan_review.ghosts(review) if review is not None else None
+        return out
+    except Exception:  # noqa: BLE001
+        logger.exception("project plan review block %s", project.pk)
+        return {"meetings": [], "review": None, "history": [], "ghosts": None}
+
+
+def _plan_context(project, facts, today, can_change=False, ghosts=None) -> dict:
+    """Вкладка «📅 План»: смуга фаз, Гант, дані вікна кроку (лише тому, хто може змінювати проєкт); ghosts — зміни
+    звірки з нарадою, що чекають ✓ / ✕ (plan_review.ghosts)."""
     from . import gantt, plan as plan_mod
     p = facts.get("plan")
     if p is None or not p.has_plan:
         return {"has_plan": False, "templates": [
             {"id": t.pk, "name": t.name, "counts": plan_mod.template_counts(t), "description": t.description}
             for t in plan_mod.templates()] if can_change else []}
-    return {"has_plan": True, "strip": _strip(p), "gantt": gantt.render(project, p, today, editable=can_change),
-            "gantt_brief": gantt.render(project, p, today, editable=can_change, brief=True),
-            "classic": gantt.classic_data(project, p, today),
+    return {"has_plan": True, "strip": _strip(p),
+            "gantt": gantt.render(project, p, today, editable=can_change, ghosts=ghosts),
+            "gantt_brief": gantt.render(project, p, today, editable=can_change, brief=True, ghosts=ghosts),
+            "classic": gantt.classic_data(project, p, today, ghosts=ghosts),
             "end": p.end, "base_end": p.base_end,
             "late": bool(project.due_date and p.end and p.end > project.due_date),
             "baseline_at": project.baseline_at, "data": plan_mod.editor_data(project, p) if can_change else None,
@@ -341,7 +357,8 @@ def context(project, user, range_key="all", notice="") -> dict:
     pk = project.pk
     can_change = bool(user and user.has_perm("projects.change_project"))
     attention = _acts(attention, can_change)
-    plan = _plan_context(project, facts, today, can_change)
+    replan = _replan_context(project, user, can_change)
+    plan = _plan_context(project, facts, today, can_change, replan.get("ghosts"))
     ai = _ai_context(project, user, can_change)
     if plan.get("data") is not None:
         plan["data"]["agent"] = bool(ai.get("agent"))
@@ -374,6 +391,7 @@ def context(project, user, range_key="all", notice="") -> dict:
         "sourcing": _sourcing_context(project, user),
         "meetings": _meetings_context(project, user, meetings, facts, today),
         "invites": _invites_context(project, user, facts),
+        "replan": replan,
         "status": _status_context(project, user, facts, st, today, can_change),
         "urls": {"cockpit": reverse("projects:cockpit", args=[pk]), "highlight": reverse("projects:highlight", args=[pk]),
                  "mail_handled": reverse("projects:mail_handled", args=[pk]),
@@ -383,6 +401,8 @@ def context(project, user, range_key="all", notice="") -> dict:
                  "export": reverse("projects:export", args=[pk]),
                  "export_names": reverse("projects:export_names", args=[pk]),
                  "invite": reverse("projects:invite", args=[pk]),
+                 "plan_review": reverse("projects:plan_review", args=[pk]),
+                 "plan_review_base": f"/projects/api/project/{pk}/plan/review/",
                  "party_suggest": reverse("projects:party_suggest", args=[pk]),
                  "party_base": f"/projects/api/project/{pk}/party/",
                  "risk": reverse("projects:risk", args=[pk]), "status_save": reverse("projects:status", args=[pk]),

@@ -10,7 +10,7 @@
      data-plan-save-all="{{ urls.plan_save_all }}" data-plan-revise="{{ urls.plan_revise }}"{% if ai.on %} data-ai-on="1"{% endif %}
      data-ai-scan="{{ urls.ai_scan }}" data-ai-plan="{{ urls.ai_plan }}" data-ai-risks="{{ urls.ai_risks }}" data-ai-plan-apply="{{ urls.ai_plan_apply }}"
      data-ai-base="{{ urls.ai_base }}" data-forgotten="{{ urls.forgotten }}" data-forgotten-decide="{{ urls.forgotten_decide }}"
-     data-events="{{ urls.events }}" data-event-link="{{ urls.event_link }}" data-mail-handled="{{ urls.mail_handled }}" data-event-note="{{ urls.event_note }}" data-party="{{ urls.party }}" data-sourcing="{{ urls.sourcing }}" data-export="{{ urls.export }}" data-export-names="{{ urls.export_names }}" data-invite="{{ urls.invite }}" data-names-script="{{ names_script }}" data-party-base="{{ urls.party_base }}" data-party-suggest="{{ urls.party_suggest }}"
+     data-events="{{ urls.events }}" data-event-link="{{ urls.event_link }}" data-mail-handled="{{ urls.mail_handled }}" data-event-note="{{ urls.event_note }}" data-party="{{ urls.party }}" data-sourcing="{{ urls.sourcing }}" data-export="{{ urls.export }}" data-export-names="{{ urls.export_names }}" data-invite="{{ urls.invite }}" data-plan-review="{{ urls.plan_review }}" data-plan-review-base="{{ urls.plan_review_base }}" data-names-script="{{ names_script }}" data-party-base="{{ urls.party_base }}" data-party-suggest="{{ urls.party_suggest }}"
      data-ai-settings="{{ urls.ai_settings }}" data-ai-since="{{ ai.since|date:'Y-m-d' }}" data-start="{{ start|date:'Y-m-d' }}"
      data-steps="{{ plan.steps|default:0 }}"{% if can_change %}
      data-name="{{ project.name }}"{% endif %}>
@@ -397,6 +397,7 @@
 
     <div class="pjc-pane" data-pjc-pane="plan">
       {% if plan.has_plan %}
+        {% include "admin/projects/project/_replan.html" %}
         <div class="pjc-ptools">
           {% if can_change %}
             <button type="button" class="pjc-b pri" data-pje-open

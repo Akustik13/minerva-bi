@@ -571,12 +571,78 @@ def invite_view(request, pk):
     return _cockpit(request, project, invites.notice(what, result), {"declined": result["declined"]})
 
 
+@staff_member_required
+@require_POST
+def plan_review_view(request, pk):
+    """📅 Звірити план з нарадою: {meeting, model, consent} → Claude у фоні (projects/plan_review.py) → свіжий пульт;
+    стан — plan_review_state_view."""
+    from . import plan_review
+    from .models import PlanReview
+    project = _project_for_change(request, pk)
+    body = _body(request)
+    try:
+        review = plan_review.start(project, request.user, body.get("meeting"), str(body.get("model") or ""),
+                                   bool(body.get("consent")))
+    except ValueError as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=400)
+    notice = ("🧠 Звіряю план з нарадою — зазвичай хвилина-дві, сторінку можна не оновлювати"
+              if review.status == PlanReview.RUNNING else "")
+    return _cockpit(request, project, notice, {"review": review.pk, "status": review.status})
+
+
+@staff_member_required
+@require_GET
+def plan_review_state_view(request, pk, rid):
+    """Стан звірки (опитування, поки Claude думає): {status, error}. Лише своя звірка."""
+    from django.http import Http404
+
+    from . import plan_review
+    project = _project_for_change(request, pk)
+    try:
+        review = plan_review.review_for(project, request.user, rid)
+    except ValueError:
+        raise Http404 from None
+    plan_review.running(project, request.user)                # зависла — у помилку
+    review.refresh_from_db()
+    return JsonResponse({"ok": True, "status": review.status, "error": review.error})
+
+
+@staff_member_required
+@require_POST
+def plan_review_decide_view(request, pk, rid):
+    """✓ / ✕ пропозицій звірки: {action: apply | reject, ids: [id] | "all"} → свіжий пульт."""
+    from . import plan_review
+    from .models import PlanReview
+    project = _project_for_change(request, pk)
+    body = _body(request)
+    try:
+        review = plan_review.review_for(project, request.user, rid)
+        if review.status != PlanReview.READY:
+            raise plan_review.ReviewError("Звірку вже розглянуто — оновіть сторінку")
+        ids = None if body.get("ids") == "all" else [i for i in (body.get("ids") or []) if str(i).isdigit()]
+        if ids == []:
+            raise plan_review.ReviewError("Виберіть зміну")
+        if body.get("action") == "apply":
+            out = plan_review.apply(project, request.user, review, ids)
+            notice = (f"✓ Застосовано змін: {out['applied']}" if out["applied"] else "Нічого не застосовано") + \
+                (f" · ⚠️ не вдалося: {out['failed']} — причина біля зміни" if out["failed"] else "")
+        elif body.get("action") == "reject":
+            notice = f"✕ Відхилено змін: {plan_review.reject(project, request.user, review, ids)}"
+        else:
+            raise plan_review.ReviewError("Невідома дія")
+    except ValueError as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=400)
+    return _cockpit(request, project, notice)
+
+
 def _plan_action(request, pk, fn):
     """Дія плану, ризику чи статусу: право змінювати проєкт; помилка даних (PlanError, RiskError, ValueError) →
     400 з поясненням; успіх → свіжий пульт."""
+    from . import plan_history
     project = _project_for_change(request, pk)
     try:
-        notice = fn(project, _body(request))
+        with plan_history.context(user=request.user):         # 🕘 історія змін плану: хто, одна дія — разом
+            notice = fn(project, _body(request))
     except ValueError as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=400)
     return _cockpit(request, project, notice)

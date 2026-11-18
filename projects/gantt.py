@@ -6,7 +6,7 @@
 вікно кроку чи фази (data-step / data-phase, JS — projects/static/projects/pj.js: ще й перетягування смуг за
 data-ppd / data-day0 і правий клік); підказка рядка — <title>. brief — «Коротко»: лише фази й віхи (◆).
 """
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django.utils import timezone
 from django.utils.html import escape
@@ -47,13 +47,58 @@ def _fmt(d) -> str:
     return d.strftime("%d.%m") if d else ""
 
 
-def render(project, plan, today=None, editable=False, brief=False) -> str:
+def _gd(v):
+    try:
+        return date.fromisoformat(v) if v else None
+    except ValueError:
+        return None
+
+
+def _ghost_rows(plan, ghosts, brief=False) -> list:
+    """Рядки діаграми з пропозиціями звірки (projects/plan_review.ghosts): новий крок — одразу після кроку, за яким
+    його поставили (інакше — у кінці своєї фази), нова фаза — в кінці з її кроками. ("phase" | "step" | "ghost" |
+    "ghost_phase", об'єкт)"""
+    gh = ghosts or {}
+    added = [a for a in gh.get("added") or [] if not brief or a.get("kind") == ProjectStep.MILESTONE]
+    step_ids = {c.step.pk for c in plan.steps}
+    placed, rows = set(), []
+    for pc in plan.phases:
+        rows.append(("phase", pc))
+        ph_pk = pc.phase.pk if pc.phase else None
+        for c in pc.steps:
+            if not brief or c.step.kind == ProjectStep.MILESTONE:
+                rows.append(("step", c))
+            for a in added:
+                if a.get("after") == c.step.pk and a["change"] not in placed:
+                    rows.append(("ghost", a))
+                    placed.add(a["change"])
+        for a in added:
+            if (a["change"] not in placed and a.get("after") not in step_ids and not a.get("new_phase")
+                    and a.get("phase") == ph_pk):
+                rows.append(("ghost", a))
+                placed.add(a["change"])
+    for np in gh.get("new_phases") or []:
+        rows.append(("ghost_phase", np))
+        for a in added:
+            if a.get("new_phase") == np["key"] and a["change"] not in placed:
+                rows.append(("ghost", a))
+                placed.add(a["change"])
+    rows += [("ghost", a) for a in added if a["change"] not in placed]
+    return rows
+
+
+def render(project, plan, today=None, editable=False, brief=False, ghosts=None) -> str:
+    """ghosts — пропозиції звірки з нарадою (plan_review.ghosts): інші дати пунктиром іншим кольором, нові кроки й
+    фази — рядками-привидами «＋», прибрати — перекреслено. Нічого з цього не можна тягнути: ✓ / ✕ — у звірці."""
     today = today or timezone.localdate()
     if not plan.has_plan:
         return ""
+    gh = ghosts or {}
     dates = [today]
     for c in plan.steps:
         dates += [d for d in (c.start, c.end, c.step.baseline_start, c.step.baseline_end) if d]
+    for g in list((gh.get("steps") or {}).values()) + list(gh.get("added") or []):
+        dates += [d for d in (_gd(g.get("start")), _gd(g.get("end"))) if d]
     for pc in plan.phases:
         dates += [d for d in (pc.start, pc.end) if d]
     if project.due_date:
@@ -67,10 +112,7 @@ def render(project, plan, today=None, editable=False, brief=False) -> str:
     def x(d):
         return X0 + (d - start).days * ppd
 
-    rows = []                      # ("phase", PhaseCalc) | ("step", StepCalc)
-    for pc in plan.phases:
-        rows.append(("phase", pc))
-        rows += [("step", c) for c in pc.steps if not brief or c.step.kind == ProjectStep.MILESTONE]
+    rows = _ghost_rows(plan, gh, brief)      # ("phase", PhaseCalc) | ("step", StepCalc) | привиди пропозицій
     height = HEAD + len(rows) * RH + 8
     top_of = {}
     focus = ' tabindex="0" role="button"' if editable else ""
@@ -107,6 +149,31 @@ def render(project, plan, today=None, editable=False, brief=False) -> str:
     for i, (kind, item) in enumerate(rows):
         top = HEAD + i * RH
         cy = top + RH / 2
+        if kind == "ghost_phase":
+            out.append(f'<g class="pjg-row pjg-ghost-row" data-change="{item["change"]}"><title>'
+                       f'{escape("Запропоновано з наради: нова фаза «" + item["name"] + "» — ✓ / ✕ у звірці плану")}</title>'
+                       f'<rect x="0" y="{top}" width="{W}" height="{RH}" class="pjg-rowbg pjg-phbg pjg-ghost-bg"/>'
+                       f'<text x="10" y="{_n(cy + 4)}" class="pjg-pname pjg-ghost-t">＋ {_name(item["name"], 36)}</text></g>')
+            continue
+        if kind == "ghost":
+            a = item
+            gs, ge = _gd(a.get("start")), _gd(a.get("end"))
+            tip = f"Запропоновано з наради: «{a['title']}» {a.get('label', '')} — ✓ / ✕ у звірці плану"
+            g = [f'<g class="pjg-row pjg-ghost-row" data-change="{a["change"]}"><title>{escape(tip)}</title>',
+                 f'<rect x="0" y="{top}" width="{W}" height="{RH}" class="pjg-rowbg pjg-ghost-bg"/>',
+                 f'<text x="22" y="{_n(cy + 4)}" class="pjg-t pjg-ghost-t">＋ {_name(a["title"], 29)}</text>',
+                 f'<text x="268" y="{_n(cy + 4)}" class="pjg-dates pjg-ghost-t">'
+                 f'{escape(a.get("label", "").replace("＋ ", ""))}</text>']
+            if a.get("kind") == ProjectStep.MILESTONE and ge:
+                mx = x(ge) + ppd / 2
+                g.append(f'<polygon points="{_n(mx)},{_n(cy - 7)} {_n(mx + 7)},{_n(cy)} {_n(mx)},{_n(cy + 7)} '
+                         f'{_n(mx - 7)},{_n(cy)}" class="pjg-ghost"/>')
+            elif gs and ge:
+                g.append(f'<rect x="{_n(x(gs))}" y="{_n(cy - 5.5)}" width="{_n(max(x(ge + timedelta(days=1)) - x(gs), 3))}" '
+                         f'height="11" rx="2.5" class="pjg-ghost"/>')
+            g.append("</g>")
+            out.append("".join(g))
+            continue
         if kind == "phase":
             pc = item
             ph = pc.phase
@@ -125,6 +192,11 @@ def render(project, plan, today=None, editable=False, brief=False) -> str:
             if pc.base_start and pc.base_end:
                 g.append(f'<rect x="{_n(x(pc.base_start))}" y="{_n(cy + 6)}" width="{_n(max(x(pc.base_end + timedelta(days=1)) - x(pc.base_start), 2))}" '
                          f'height="2.5" class="pjg-base"/>')
+            gp = (gh.get("phases") or {}).get(ph.pk) if ph else None
+            if gp:
+                text = "− прибрати фазу" if gp.get("remove") else f"→ «{gp.get('name')}»"
+                g.append(f'<text x="{_n(W - RIGHT - 4)}" y="{_n(cy + 4)}" text-anchor="end" class="pjg-ghost-lab">'
+                         f'{escape(text)}<title>Запропоновано з наради — ✓ / ✕ у звірці плану</title></text>')
             g.append("</g>")
             out.append("".join(g))
             continue
@@ -187,6 +259,7 @@ def render(project, plan, today=None, editable=False, brief=False) -> str:
                 sx = (x(c.end) + ppd / 2 - 9 if s.kind == ProjectStep.MILESTONE else x(c.start)) - 14
                 g.append(f'<text x="{_n(sx)}" y="{_n(cy + 4)}" class="pjg-ext{" pjg-ext-late" if late else ""}">'
                          f'<title>{escape("; ".join(tips))}</title>⛓</text>')
+        g += _ghost_on_step((gh.get("steps") or {}).get(s.pk), c, x, ppd, cy)
         g.append("</g>")
         out.append("".join(g))
 
@@ -226,11 +299,44 @@ def render(project, plan, today=None, editable=False, brief=False) -> str:
     return "".join(out)
 
 
+def _ghost_on_step(g, c, x, ppd, cy) -> list:
+    """Пропозиція до наявного кроку: нові дати — пунктирна смуга іншим кольором, «прибрати» — перекреслено."""
+    if not g:
+        return []
+    tip = f"Запропоновано з наради: {g.get('label', '')} — ✓ / ✕ у звірці плану"
+    out = []
+    if g.get("remove"):
+        if c.start and c.end:
+            x1, x2 = x(c.start), x(c.end + timedelta(days=1))
+            out.append(f'<line x1="{_n(x1 - 2)}" y1="{_n(cy)}" x2="{_n(x2 + 2)}" y2="{_n(cy)}" class="pjg-ghost-del">'
+                       f'<title>{escape(tip)}</title></line>')
+        anchor = x(c.end + timedelta(days=1)) + 6 if c.end else 300
+    else:
+        gs, ge = _gd(g.get("start")), _gd(g.get("end"))
+        anchor = None
+        if g.get("kind") == ProjectStep.MILESTONE and ge:
+            mx = x(ge) + ppd / 2
+            out.append(f'<polygon points="{_n(mx)},{_n(cy - 7)} {_n(mx + 7)},{_n(cy)} {_n(mx)},{_n(cy + 7)} '
+                       f'{_n(mx - 7)},{_n(cy)}" class="pjg-ghost"><title>{escape(tip)}</title></polygon>')
+            anchor = mx + 10
+        elif gs and ge:
+            gx, gw = x(gs), max(x(ge + timedelta(days=1)) - x(gs), 3)
+            out.append(f'<rect x="{_n(gx)}" y="{_n(cy - 7.5)}" width="{_n(gw)}" height="15" rx="3" class="pjg-ghost">'
+                       f'<title>{escape(tip)}</title></rect>')
+            anchor = gx + gw + 4
+        if anchor is None:
+            anchor = x(c.end + timedelta(days=1)) + 6 if c.end else 300
+    out.append(f'<text x="{_n(min(anchor, W - RIGHT - 60))}" y="{_n(cy + 4)}" class="pjg-ghost-lab">'
+               f'{escape(g.get("label", ""))}</text>')
+    return out
+
+
 # ── 📋 Класична діаграма Ганта (малює браузер — admin/projects/project/change_form.html) ──────────────────────────
 
-def classic_data(project, plan, today=None) -> dict:
+def classic_data(project, plan, today=None, ghosts=None) -> dict:
     """Таблиця кроків з номерами (1, 1.1 …) + смуги: прогноз, базовий план, стан, критичний шлях, попередники.
-    Рядки — у порядку плану (фаза → кроки); крок іншого проєкту в «Попередниках» — його код."""
+    Рядки — у порядку плану (фаза → кроки); крок іншого проєкту в «Попередниках» — його код. ghosts — пропозиції
+    звірки з нарадою: prop у рядку кроку / фази, нові — рядки ghost (pj.js малює пунктиром іншим кольором)."""
     today = today or timezone.localdate()
     rows, number = [], {}
     phase_no = 0
@@ -276,10 +382,55 @@ def classic_data(project, plan, today=None) -> dict:
         if r["type"] == "phase":
             out.append(r)
             out.extend(by_phase.get(r["id"], []))
+    extra = []
+    if ghosts:
+        out, extra = _classic_ghosts(out, ghosts)
     return {"rows": out, "today": today.isoformat(), "due": _iso(project.due_date),
-            "start": _iso(min([c.start for c in plan.steps if c.start] or [today])),
+            "start": _iso(min([c.start for c in plan.steps if c.start] + extra or [today])),
             "end": _iso(max([c.end for c in plan.steps if c.end] + ([project.due_date] if project.due_date else [])
-                            + [today]))}
+                            + extra + [today]))}
+
+
+def _classic_ghosts(rows, gh) -> tuple:
+    """Класична діаграма: prop у рядках кроків і фаз, нові кроки й фази — рядки з ghost (без номера й без
+    перетягування). → (рядки, дати пропозицій для меж шкали)"""
+    steps, phases, added = gh.get("steps") or {}, gh.get("phases") or {}, gh.get("added") or []
+    note = "Запропоновано з наради — ✓ / ✕ у «📅 Звірити план з нарадою»"
+    dates, placed = [], set()
+
+    def ghost_row(a, phase=""):
+        placed.add(a["change"])
+        dates.extend(d for d in (_gd(a.get("start")), _gd(a.get("end"))) if d)
+        days = ((_gd(a["end"]) - _gd(a["start"])).days + 1) if a.get("start") and a.get("end") else 0
+        return {"type": "step", "ghost": True, "id": f"g{a['change']}", "phase": phase, "n": "＋",
+                "title": a["title"], "kind": a.get("kind") or ProjectStep.TASK, "side": "", "who": "",
+                "start": a.get("start") or a.get("end") or "", "end": a.get("end") or "", "status": "todo",
+                "crit": False, "slip": 0, "preds": [], "days": days, "note": note, "label": a.get("label", "")}
+
+    out = []
+    step_ids = {r["id"] for r in rows if r["type"] == "step"}
+    for i, r in enumerate(rows):
+        r = dict(r)
+        if r["type"] == "step" and r["id"] in steps:
+            r["prop"] = steps[r["id"]]
+            dates.extend(d for d in (_gd(r["prop"].get("start")), _gd(r["prop"].get("end"))) if d)
+        elif r["type"] == "phase" and r["id"] in phases:
+            r["prop"] = phases[r["id"]]
+        out.append(r)
+        if r["type"] == "step":
+            out += [ghost_row(a, r["phase"]) for a in added if a.get("after") == r["id"] and a["change"] not in placed]
+        nxt = rows[i + 1] if i + 1 < len(rows) else None
+        if nxt is None or nxt["type"] == "phase":              # кінець фази — її нові кроки без «після»
+            phase_id = r["id"] if r["type"] == "phase" else r.get("phase")
+            out += [ghost_row(a, phase_id or "") for a in added if a["change"] not in placed and not a.get("new_phase")
+                    and a.get("after") not in step_ids and (a.get("phase") or "") == (phase_id or "")]
+    for np in gh.get("new_phases") or []:
+        out.append({"type": "phase", "ghost": True, "id": f"g{np['change']}", "n": "＋", "title": np["name"],
+                    "start": "", "end": "", "status": "todo", "done": 0, "total": 0, "note": note})
+        out += [ghost_row(a, f"g{np['change']}") for a in added if a.get("new_phase") == np["key"]
+                and a["change"] not in placed]
+    out += [ghost_row(a) for a in added if a["change"] not in placed]
+    return out, dates
 
 
 def _iso(d) -> str:

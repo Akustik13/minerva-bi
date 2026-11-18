@@ -722,3 +722,104 @@ class ProjectParty(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.get_role_display()})"
+
+
+class PlanReview(models.Model):
+    """📅 Звірка плану з нарадою (projects/plan_review.py): Claude читає план і підсумок наради (meetings ai_brief) і
+    пропонує зміни (PlanReviewChange). План не змінюється, доки людина не натисне ✓. Нарада — того, хто звіряв (наради
+    особисті); refs — тези підсумку на момент звірки ({B1: {text, section, who, due, second, time}})."""
+    RUNNING, READY, ERROR, DONE = "running", "ready", "error", "done"
+    STATUS_CHOICES = [(RUNNING, "🧠 Звіряє"), (READY, "✋ Чекає рішень"), (ERROR, "⚠️ Помилка"),
+                      (DONE, "✓ Розглянуто")]
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="plan_reviews")
+    meeting = models.ForeignKey("meetings.Meeting", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+                                verbose_name="Нарада")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="+")
+    status = models.CharField("Стан", max_length=10, choices=STATUS_CHOICES, default=RUNNING, db_index=True)
+    model = models.CharField(max_length=60, blank=True, default="")
+    label = models.CharField(max_length=60, blank=True, default="")
+    summary = models.TextField(blank=True, default="")
+    error = models.CharField(max_length=300, blank=True, default="")
+    refs = models.JSONField(default=dict, blank=True)
+    refs_map = models.JSONField(default=dict, blank=True, help_text="{a1: pk кроку, ap1: pk фази} — уже застосовані нові")
+    dropped = models.PositiveIntegerField(default=0)
+    cost = models.FloatField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Звірка плану з нарадою"
+        verbose_name_plural = "📅 Звірки плану з нарадами"
+        ordering = ["-created_at", "-pk"]
+
+    def __str__(self):
+        return f"📅 {self.project_id} · звірка #{self.pk}"
+
+
+class PlanReviewChange(models.Model):
+    """Одна запропонована зміна плану — як у редакторі (plan_editor.clean_changes): op update / add / remove /
+    add_phase / update_phase / remove_phase; target — s<pk> / p<pk> або нове a1 / ap1; data — {set, place_after};
+    before — як було на момент пропозиції; sources — номери тез наради [B…]."""
+    PENDING, APPLIED, REJECTED, FAILED = "pending", "applied", "rejected", "failed"
+    STATUS_CHOICES = [(PENDING, "чекає"), (APPLIED, "✓ застосовано"), (REJECTED, "✕ відхилено"),
+                      (FAILED, "⚠️ не вдалося")]
+
+    review = models.ForeignKey(PlanReview, on_delete=models.CASCADE, related_name="changes")
+    order = models.PositiveIntegerField(default=0)
+    op = models.CharField(max_length=16)
+    target = models.CharField(max_length=16, blank=True, default="")
+    data = models.JSONField(default=dict, blank=True)
+    before = models.JSONField(default=dict, blank=True)
+    why = models.TextField(blank=True, default="")
+    sources = models.JSONField(default=list, blank=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=PENDING, db_index=True)
+    note = models.CharField(max_length=300, blank=True, default="")
+    decided_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="+")
+    decided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Запропонована зміна плану"
+        verbose_name_plural = "Запропоновані зміни плану"
+        ordering = ["review", "order", "pk"]
+
+    def __str__(self):
+        return f"{self.op} {self.target}"
+
+
+class PlanChange(models.Model):
+    """🕘 Історія змін плану (projects/plan_history.py, сигнали кроків і фаз): хто, коли, що було → що стало і звідки
+    (вручну, редактор, шаблон, AI, нарада). before / after — лише змінені поля; title — назва на момент зміни (крок
+    могли прибрати); batch — одна дія людини (зсув фази, шаблон, «✓ Застосувати всі») — разом."""
+    ADD, EDIT, REMOVE, PHASE_ADD, PHASE_EDIT, PHASE_REMOVE = ("add", "edit", "remove", "phase_add", "phase_edit",
+                                                              "phase_remove")
+    ACTION_CHOICES = [(ADD, "＋ крок"), (EDIT, "✏️ крок"), (REMOVE, "− крок"), (PHASE_ADD, "＋ фаза"),
+                      (PHASE_EDIT, "✏️ фаза"), (PHASE_REMOVE, "− фаза")]
+    MANUAL, EDITOR, TEMPLATE, AI, MEETING, SYSTEM = "manual", "editor", "template", "ai", "meeting", "system"
+    SOURCE_CHOICES = [(MANUAL, "✋ вручну"), (EDITOR, "✏️ редактор плану"), (TEMPLATE, "🧩 шаблон"),
+                      (AI, "🧠 AI"), (MEETING, "🎙 з наради"), (SYSTEM, "⚙️ Minerva")]
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="plan_changes")
+    step = models.ForeignKey("ProjectStep", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    phase = models.ForeignKey("ProjectPhase", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    title = models.CharField(max_length=200, blank=True, default="")
+    action = models.CharField(max_length=16, choices=ACTION_CHOICES)
+    before = models.JSONField(default=dict, blank=True)
+    after = models.JSONField(default=dict, blank=True)
+    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default=MANUAL)
+    meeting = models.ForeignKey("meetings.Meeting", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    review = models.ForeignKey(PlanReview, null=True, blank=True, on_delete=models.SET_NULL, related_name="history")
+    batch = models.CharField(max_length=32, blank=True, default="", db_index=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                             related_name="+")
+    at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        verbose_name = "Зміна плану"
+        verbose_name_plural = "🕘 Історія змін плану"
+        ordering = ["-at", "-pk"]
+
+    def __str__(self):
+        return f"🕘 {self.project_id} · {self.action} · {self.title[:40]}"

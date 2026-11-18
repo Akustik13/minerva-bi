@@ -1,0 +1,77 @@
+{# 📅 Звірити план з нарадою (projects/plan_review.py) — лише свої наради й звірки; без <form>, поля без name (пульт #}
+{# усередині форми картки). Назви кроків, тези наради й рядки змін — дані: translate="no". JS — pj.js «звірка плану». #}
+{% with r=replan.review %}
+{% if replan.meetings or r %}
+<div class="pjr2" id="pj-replan" data-review="{% if r %}{{ r.id }}{% endif %}" data-review-status="{% if r %}{{ r.status }}{% endif %}">
+  {% if r and r.status == "running" %}
+    <div class="pjr2-head">🧠 Звіряю план з нарадою{% if r.meeting %} «<span translate="no">{{ r.meeting.title }}</span>»{% endif %} · {{ r.label }}
+      <span class="pjc-sub">зазвичай хвилина-дві — пропозиції з’являться тут і на діаграмах</span></div>
+  {% elif r and r.status == "error" %}
+    <div class="pjr2-head pjr2-err" role="alert">⚠️ Звірка з нарадою не вдалась: {{ r.error }}</div>
+  {% elif r and r.status == "ready" or r and r.status == "done" %}
+    <div class="pjr2-head">{% if r.status == "done" %}✅ Звірено з нарадою{% else %}📅 Пропозиції з наради{% endif %}
+      {% if r.meeting %}<a href="{{ r.meeting.url }}" target="_blank" rel="noopener">«<span translate="no">{{ r.meeting.title }}</span>» {{ r.meeting.day|date:"d.m.Y" }}</a>{% endif %}
+      <span class="pjc-sub">· {{ r.label }} · {{ r.created_at|date:"d.m H:i" }}{% if r.open %} · чекають рішення: {{ r.open }}{% endif %}{% if r.applied %} · застосовано: {{ r.applied }}{% endif %}{% if r.status == "done" and not r.rows %} · план узгоджений з нарадою — змінювати нічого{% endif %}</span></div>
+    {% if r.summary %}<p class="pjr2-sum" translate="no">{{ r.summary }}</p>{% endif %}
+    {% if r.rows %}<ul class="pjr2-list">
+      {% for c in r.rows %}
+        <li class="pjr2-row pjr2-{{ c.status }}" data-change="{{ c.id }}">
+          <span class="pjr2-ic">{{ c.icon }}</span>
+          <div class="pjr2-body">
+            <div><b translate="no">{{ c.title }}</b>{% if c.parts %}: <span translate="no">{{ c.parts|join:" · " }}</span>{% endif %}</div>
+            {% if c.why %}<div class="pjc-sub" translate="no">{{ c.why }}</div>{% endif %}
+            {% for s in c.sources %}<div class="pjr2-src">💬 <span translate="no">«{{ s.text }}»</span>{% if s.url %} <a href="{{ s.url }}" target="_blank" rel="noopener" title="Відкрити це місце в розшифровці наради">{% if s.time %}[{{ s.time }}]{% else %}нарада →{% endif %}</a>{% endif %}</div>{% endfor %}
+            {% if c.stale %}<div class="pjr2-stale">⚠️ {{ c.stale }}</div>{% endif %}
+            {% if c.status == "failed" and c.note %}<div class="pjr2-stale">⚠️ Не вдалося: {{ c.note }}</div>{% endif %}
+          </div>
+          {% if c.open %}
+            <span class="pjr2-acts"><button type="button" class="pjc-b pri" data-pjr2-act="apply" data-ids="{{ c.id }}" title="Застосувати цю зміну до плану">✓</button><button type="button" class="pjc-b" data-pjr2-act="reject" data-ids="{{ c.id }}" title="Не застосовувати">✕</button></span>
+          {% else %}<span class="pjr2-state">{{ c.status_label }}</span>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>{% endif %}
+    <div class="pjr2-foot">
+      {% if r.open %}<button type="button" class="pjc-b pri" data-pjr2-act="apply" data-ids="all" data-confirm="Застосувати до плану всі зміни, що чекають ({{ r.open }})?">✓ Застосувати всі ({{ r.open }})</button>
+        <button type="button" class="pjc-b" data-pjr2-act="reject" data-ids="all">✕ Відхилити решту</button>{% endif %}
+      {% if r.open %}<span class="pjc-sub">Пунктиром іншим кольором — на діаграмах нижче. План змінюється лише після ✓, кожна зміна — в «🕘 Історії змін плану».</span>{% endif %}
+      {% if r.dropped %}<span class="pjc-sub">Без тези наради AI запропонував ще {{ r.dropped }} — їх не показано.</span>{% endif %}
+    </div>
+  {% endif %}
+
+  {% if replan.meetings %}
+    <details class="pjr2-start"{% if not r or r.status != "ready" %} open{% endif %}>
+      <summary>📅 Звірити план з нарадою</summary>
+      {% if replan.available %}
+        <div class="pjr2-form">
+          <select data-pjr2-meeting aria-label="Нарада">{% for m in replan.meetings %}<option value="{{ m.pk }}" data-consent="{{ m.consent }}" translate="no">{{ m.label }}{% if m.reviewed %} · звіряли {{ m.reviewed|date:"d.m" }}{% endif %}</option>{% endfor %}</select>
+          <select data-pjr2-model aria-label="Модель">{% for k, label in replan.models %}<option value="{{ k }}"{% if k == replan.model %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+          <label class="pjr2-consent"><input type="checkbox" data-pjr2-consent{% if replan.meetings.0.consent %} checked{% endif %}> Усі учасники погодились, щоб текст підсумку наради обробився в хмарі (Anthropic, США)</label>
+          <button type="button" class="pjc-b pri" data-pjr2-start>🧠 Звірити</button>
+        </div>
+        <p class="pjc-sub">Claude читає план (кроки, дати, стан) і «📝 Підсумок наради» та пропонує, що змінити: строки, виконане, нові кроки чи віхи — кожну зміну з тезою наради. Галочка стоїть сама, якщо учасники цієї наради вже погодились на хмару. Плату — з бюджету AI.</p>
+      {% else %}
+        <p class="pjc-sub">У Minerva немає ключа Anthropic — адміністратор додає його в «⚙️ Налаштування AI».</p>
+      {% endif %}
+    </details>
+  {% endif %}
+</div>
+{% endif %}
+{% endwith %}
+
+{% if replan.history %}
+<details class="pjh" id="pj-plan-history">
+  <summary>🕘 Історія змін плану <span class="pjc-sub">останні дії: {{ replan.history|length }}</span></summary>
+  <ul class="pjh-list">
+    {% for h in replan.history %}
+      <li>
+        <div class="pjh-head"><time>{{ h.at|date:"d.m.Y H:i" }}</time>
+          <span class="pjh-src pjh-{{ h.source }}">{{ h.source_label }}</span>
+          {% if h.meeting %}{% if h.meeting.url %}<a href="{{ h.meeting.url }}" target="_blank" rel="noopener">«<span translate="no">{{ h.meeting.title }}</span>» {{ h.meeting.day|date:"d.m" }}</a>{% else %}<span class="pjc-sub">нарада {{ h.meeting.day|date:"d.m" }}</span>{% endif %}{% endif %}
+          {% if h.who %}<span class="pjc-sub">· <span translate="no">{{ h.who }}</span></span>{% endif %}
+          {% if h.count > 1 %}<span class="pjc-sub">· змін: {{ h.count }}</span>{% endif %}</div>
+        <ul class="pjh-lines">{% for l in h.lines %}<li translate="no">{{ l }}</li>{% endfor %}{% if h.more %}<li class="pjc-sub">… ще {{ h.more }}</li>{% endif %}</ul>
+      </li>
+    {% endfor %}
+  </ul>
+</details>
+{% endif %}

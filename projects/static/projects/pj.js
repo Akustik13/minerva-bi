@@ -17,7 +17,66 @@
     if (n) n.textContent = text;
   }
   function put(html) {
-    root.innerHTML = html; applyTab(curTab); renderFound(); applyGantt(); applyTimeline(); applyPartyView();
+    root.innerHTML = html; applyTab(curTab); renderFound(); applyGantt(); applyTimeline(); applyPartyView(); replanInit();
+  }
+  // ── 📅 Звірити план з нарадою (_replan.html → api/project/<pk>/plan/review/…): запуск, опитування, ✓ / ✕ ──
+  var replanTimer = 0, replanFocused = false;
+  function replanBox() { return root.querySelector('#pj-replan'); }
+  function replanConsent() {
+    var b = replanBox();
+    var sel = b && b.querySelector('[data-pjr2-meeting]'), box = b && b.querySelector('[data-pjr2-consent]');
+    if (!sel || !box) return;
+    var opt = sel.options[sel.selectedIndex];
+    box.checked = !!(opt && opt.getAttribute('data-consent'));
+  }
+  function replanInit() {
+    var b = replanBox();
+    clearTimeout(replanTimer);
+    if (!b) return;
+    var want = new URLSearchParams(location.search).get('plan_meeting');   // зі сторінки наради: review_url
+    var sel = b.querySelector('[data-pjr2-meeting]');
+    if (want && sel && !sel.dataset.picked) {
+      sel.dataset.picked = '1';
+      if (sel.querySelector('option[value="' + want.replace(/\D/g, '') + '"]')) sel.value = want.replace(/\D/g, '');
+      replanConsent();
+      if (!replanFocused) {
+        replanFocused = true;
+        var det = b.querySelector('.pjr2-start');
+        if (det && b.dataset.reviewStatus !== 'ready') det.open = true;
+        b.classList.add('pjr2-focus');
+        setTimeout(function () { b.scrollIntoView({block: 'center', behavior: 'smooth'}); }, 300);
+      }
+    }
+    if (b.dataset.reviewStatus === 'running') {
+      replanTimer = setTimeout(function () {
+        var base = box() && box().dataset.planReviewBase;
+        if (!base) return;
+        fetch(base + b.dataset.review + '/', {credentials: 'same-origin'})
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            if (j && j.ok && j.status !== 'running') load(range()); else replanInit();
+          }, function () { replanInit(); });
+      }, 4000);
+    }
+  }
+  function replanStart(btn) {
+    var b = replanBox();
+    var meeting = b.querySelector('[data-pjr2-meeting]').value, model = b.querySelector('[data-pjr2-model]').value;
+    var consent = b.querySelector('[data-pjr2-consent]').checked;
+    btn.disabled = true;
+    toast('🧠 Звіряю план з нарадою…');
+    send(box().dataset.planReview, {meeting: meeting, model: model, consent: consent ? 1 : 0}).then(function (j) {
+      if (!done(j)) btn.disabled = false;
+    });
+  }
+  function replanAct(btn) {
+    var b = replanBox(), ids = btn.getAttribute('data-ids');
+    if (btn.getAttribute('data-confirm') && !window.confirm(btn.getAttribute('data-confirm'))) return;
+    btn.disabled = true;
+    send(box().dataset.planReviewBase + b.dataset.review + '/decide/',
+         {action: btn.getAttribute('data-pjr2-act'), ids: ids === 'all' ? 'all' : [ids]}).then(function (j) {
+      if (!done(j)) btn.disabled = false;
+    });
   }
   // ✏️ Редактор плану (pj_editor.js): уся таблиця фаз і кроків, 🧠 «Що змінити в плані»
   function openEditor() {
@@ -155,6 +214,32 @@
     if (drawRaf) return;
     drawRaf = requestAnimationFrame(function () { drawRaf = 0; applyGantt(); });
   }
+  // Пропозиція звірки з нарадою до кроку класичної діаграми: нові дати — пунктиром іншим кольором, «прибрати» —
+  // перекреслено (gantt.classic_data → prop)
+  function propOn(g, r, y, X, ppd) {
+    var p = r.prop, gx, el;
+    var tip = 'Запропоновано з наради: ' + (p.label || '') + ' — ✓ / ✕ у звірці плану';
+    if (p.remove) {
+      var a = X(dnum(r.start)), b = X(dnum(r.end) + 1);
+      el = sv('line', {x1: a - 2, y1: y + 12.5, x2: b + 2, y2: y + 12.5, 'class': 'pjg2-propdel'});
+      gx = b + 6;
+    } else if (p.end) {
+      var e = dnum(p.end);
+      if (p.kind === 'milestone') {
+        var mx = X(e) + ppd / 2;
+        el = sv('path', {d: 'M' + mx + ',' + (y + 2) + ' l10,10 l-10,10 l-10,-10 z', 'class': 'pjg2-prop'});
+        gx = mx + 12;
+      } else {
+        var s = dnum(p.start || p.end);
+        el = sv('rect', {x: X(s), y: y + 2, width: Math.max(X(e + 1) - X(s), 3), height: 21, rx: 4, 'class': 'pjg2-prop'});
+        gx = X(e + 1) + 5;
+      }
+    } else {
+      gx = X(dnum(r.end) + 1) + 6;
+    }
+    if (el) { el.appendChild(sv('title', {}, tip)); g.appendChild(el); }
+    g.appendChild(sv('text', {x: gx, y: y + 9, 'class': 'pjg2-proplab'}, p.label || ''));
+  }
   function classicRows(d) {
     var detail = pref(GD, 'full'), f = folds(), out = [], phase = null;
     (d.rows || []).forEach(function (r) {
@@ -199,8 +284,10 @@
     });
     grid.appendChild(sv('line', {x1: 0, y1: GHEAD - 0.5, x2: leftW, y2: GHEAD - 0.5, 'class': 'pjg2-hl'}));
     rows.forEach(function (r, i) {
-      var y = GHEAD + i * ROW, g = sv('g', {'class': 'pjg2-row pjg2-' + r.type});
-      if (r.type === 'step') {
+      var y = GHEAD + i * ROW, g = sv('g', {'class': 'pjg2-row pjg2-' + r.type + (r.ghost ? ' pjg2-proprow' : '')});
+      if (r.ghost) {
+        // пропозиція звірки з нарадою — без вікна кроку й перетягування (✓ / ✕ — у звірці)
+      } else if (r.type === 'step') {
         g.setAttribute('data-cstep', r.id);
         if (canChange) { g.setAttribute('tabindex', '0'); g.setAttribute('role', 'button'); }
       } else {
@@ -278,6 +365,21 @@
       if (!r.start || !r.end) return;
       var y = GHEAD + i * ROW, s = dnum(r.start), e = dnum(r.end);
       var x1 = X(s), x2 = X(e + 1), g;
+      if (r.ghost) {
+        if (!r.end) return;                       // нова фаза — лише рядок у таблиці, смуги — її нові кроки
+        g = sv('g', {'class': 'pjg2-propbar'});
+        if (r.kind === 'milestone') {
+          var gmx = X(e) + ppd / 2;
+          g.appendChild(sv('path', {d: 'M' + gmx + ',' + (y + 5) + ' l8,8 l-8,8 l-8,-8 z', 'class': 'pjg2-prop'}));
+        } else {
+          g.appendChild(sv('rect', {x: x1, y: y + 5, width: Math.max(x2 - x1, 3), height: 15, rx: 3, 'class': 'pjg2-prop'}));
+        }
+        g.appendChild(sv('text', {x: (r.kind === 'milestone' ? X(e) + ppd / 2 + 11 : x2 + 5), y: y + 17,
+                                  'class': 'pjg2-proplab'}, r.label || ''));
+        g.appendChild(sv('title', {}, r.title + (r.note ? '\n' + r.note : '')));
+        svg.appendChild(g);
+        return;
+      }
       if (r.type === 'phase') {
         var psel = gsel && gsel.type === 'phase' && gsel.id === String(r.id || 'none') && r.id;
         g = sv('g', {'class': 'pjg2-sum pjg2-s-' + r.status + (psel ? ' pjg2-sel pjg2-pdrag' : ''),
@@ -292,6 +394,10 @@
         g.appendChild(sv('path', {d: 'M' + x2 + ',' + (y + 15) + ' l-5,0 l5,6 z', 'class': 'pjg2-sumbar'}));
         g.appendChild(sv('title', {}, r.title + ' · ' + dshort(r.start) + ' – ' + dshort(r.end)
           + (canChange && r.id ? '\nПодвійний клік — виділити фазу й тягнути її разом з кроками' : '')));
+        if (r.prop) {
+          g.appendChild(sv('text', {x: x2 + 8, y: y + 15, 'class': 'pjg2-proplab'},
+                           r.prop.remove ? '− прибрати фазу' : (r.prop.name ? '→ «' + r.prop.name + '»' : '✎ зміна фази')));
+        }
         svg.appendChild(g);
         return;
       }
@@ -328,6 +434,7 @@
         + (r.note ? '\n' + r.note : '')
         + (canChange ? '\nТягніть — нові дати · подвійний клік — тягнути початок і кінець · правий клік — меню' : '')));
       if (canChange && (sel || (r.status !== 'done' && r.status !== 'skipped'))) g.classList.add('pjg2-drag');
+      if (r.prop) propOn(g, r, y, X, ppd);
       svg.appendChild(g);
     });
     // Залежності: від кінця попереднього кроку до початку наступного
@@ -368,7 +475,7 @@
     function phaseOf(r) {
       if (!r) return defaultPhase();
       var ph = r.type === 'phase' ? r.id : r.phase;
-      return ph && ph !== 'none' ? ph : '';
+      return ph && ph !== 'none' && String(ph).charAt(0) !== 'g' ? ph : '';     // g… — нова фаза з пропозиції
     }
     if (gsel && selPos && canChange) selTools(chart, selPos);
     else if (gsel && !selPos) gsel = null;          // виділеного вже немає (видалили, згорнули)
@@ -824,6 +931,7 @@
     applyGantt();
   });
   applyGantt();
+  replanInit();
 
   // ── ⚙️ Поля проєкту: під пультом згорнуті; розгорнуті — коли форма з помилками або людина їх відкрила ──
   var FKEY = 'pj-fields-open';
@@ -2299,7 +2407,7 @@
       '[data-pjc-save-tpl],[data-pjc-tpl-apply],[data-pjc-phase],g[data-step],g[data-phase],[data-pjc-risk],' +
       '[data-pjc-risk-new],[data-pjs-health],[data-pjs-save],[data-pjs-ai],[data-pjc-act],[data-pjc-unmark],' +
       'g[data-party],[data-pjy-new],[data-pjy-suggest],[data-pjx],[data-pjq],[data-pjy-view-btn],[data-pje-open],' +
-      '[data-pjc-inv-act]');
+      '[data-pjc-inv-act],[data-pjr2-start],[data-pjr2-act]');
     if (!t || !root.contains(t)) return;
     var link = e.target.closest('a[href]');
     if (link && link !== t && t.contains(link)) return;   // посилання в рядку («🎙 з наради») відкривається саме
@@ -2312,6 +2420,8 @@
     }
     if (t.hasAttribute('data-pje-open')) { openEditor(); return; }
     if (t.hasAttribute('data-pjc-inv-act')) { inviteAnswer(t); return; }
+    if (t.hasAttribute('data-pjr2-start')) { replanStart(t); return; }
+    if (t.hasAttribute('data-pjr2-act')) { replanAct(t); return; }
     if (t.hasAttribute('data-pjy-new')) { openParty(''); return; }
     if (t.hasAttribute('data-pjy-suggest')) { t.disabled = true; send(box().dataset.partySuggest, {}).then(done); return; }
     if (t.hasAttribute('data-pjx')) { openExport(t.getAttribute('data-pjx')); return; }

@@ -135,7 +135,14 @@ def apply_template(project, template, start=None, user=None) -> int:
 @transaction.atomic
 def apply_plan(project, phases, start=None, user=None, source=ProjectStep.TEMPLATE) -> list:
     """Фази й кроки у форматі шаблону (шаблон або AI-чернетка, projects/ai_plan.py) → порожній план проєкту.
-    → [(крок, опис кроку з phases)]."""
+    → [(крок, опис кроку з phases)]. 🕘 В історії — «шаблон» або «AI», однією дією."""
+    from . import plan_history
+    from .models import PlanChange
+    with plan_history.context(user=user, source=PlanChange.AI if source == ProjectStep.AI else PlanChange.TEMPLATE):
+        return _apply_plan(project, phases, start=start, user=user, source=source)
+
+
+def _apply_plan(project, phases, start=None, user=None, source=ProjectStep.TEMPLATE) -> list:
     from . import schedule
     if ProjectStep.objects.filter(project=project).exists() or ProjectPhase.objects.filter(project=project).exists():
         raise PlanError("У проєкті вже є план — додайте кроки вручну або спершу очистіть план")
@@ -435,7 +442,16 @@ def meeting_step(project, title, *, assignee=None, due=None, side=ProjectStep.WE
                  meeting_second=None, user=None) -> ProjectStep:
     """📅 Крок з пункту наради (meetings/services.accept): як «➕ Крок з листа» — у поточну фазу, після її кроків, від
     сьогодні до строку (немає — на 1 день); хто робить і виконавець (активний співробітник); у примітці — дата наради й
-    дослівна цитата (її можна прибрати разом із нарадою: meetings/services.scrub_quotes)."""
+    дослівна цитата (її можна прибрати разом із нарадою: meetings/services.scrub_quotes). 🕘 В історії — «з наради»."""
+    from . import plan_history
+    from .models import PlanChange
+    with plan_history.context(user=user, source=PlanChange.MEETING, meeting=meeting):
+        return _meeting_step(project, title, assignee=assignee, due=due, side=side, quote=quote, meeting=meeting,
+                             meeting_second=meeting_second, user=user)
+
+
+def _meeting_step(project, title, *, assignee=None, due=None, side=ProjectStep.WE, quote="", meeting=None,
+                  meeting_second=None, user=None) -> ProjectStep:
     from django.contrib.auth import get_user_model
     from . import state
     title = " ".join(str(title or "").split())[:200]

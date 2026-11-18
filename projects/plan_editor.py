@@ -103,11 +103,18 @@ def _after_items(row):
     return out
 
 
-@transaction.atomic
 def save_all(project, payload, user=None) -> dict:
     """Таблиця редактора → план: {phases: [{key, name, icon, gate}], steps: [{key, phase, title, kind, side, start,
     end, duration, status, after: [{key, lag}]}], delete_steps: [id], delete_phases: [id]} — фази й кроки в порядку
-    таблиці. → {added, changed, removed}."""
+    таблиці. → {added, changed, removed}. 🕘 В історії — «редактор плану», однією дією."""
+    from . import plan_history
+    from .models import PlanChange
+    with plan_history.context(user=user, source=PlanChange.EDITOR):
+        return _save_all(project, payload, user=user)
+
+
+@transaction.atomic
+def _save_all(project, payload, user=None) -> dict:
     from . import plan
     phases_in, steps_in = payload.get("phases") or [], payload.get("steps") or []
     if not isinstance(phases_in, list) or not isinstance(steps_in, list):
