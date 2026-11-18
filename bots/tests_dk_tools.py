@@ -263,3 +263,61 @@ class SelectivePushTests(ToolsBase):
                 mock.patch("bots.services.dk_prices._put_offer") as put:
             r = self.client.post(f"{url}push/{self.listing.pk}/", {"what": "fields", "fields": ["quantityAvailable"]})
         self.assertEqual((r.status_code, put.call_count), (302, 1))
+
+
+class MoqAndPhotoViewTests(ToolsBase):
+    """Лістинг 968: у картці MOQ 1, ціни від 1000 → Minerva надсилає MOQ 1000, DigiKey має 1000 — це не «≠»;
+    «Фото (URL)» з mm.digikey.com, а в товарі DigiKey фото немає — підказка про своє фото."""
+
+    def test_moq_compared_with_what_minerva_sends(self):
+        self.listing.dk_prices = [{"qty": 1000, "price": "0.2625"}]
+        rows = {r["key"]: r for r in dk_view.offer_rows(self.listing, offer(
+            minOrderQuantity=1000, prices=[{"quantityBreak": 1000, "price": 0.2625}]))}
+        self.assertEqual(rows["minOrderQuantity"]["state"], "same")
+        self.assertEqual(rows["minOrderQuantity"]["minerva"], 1000)
+        self.assertIn("у картці 1, але ціни лише від 1000", rows["minOrderQuantity"]["note"])
+
+    def test_digikey_catalog_photo_not_shown(self):
+        self.listing.dk_image_url = "https://mm.digikey.com/Volume0/opasdata/x/MFG_ECS-33B-Series.jpg"
+        self.product.image_url = "https://docs.example.com/pictures/crystal.jpg"
+        self.product.save()
+        product = {"_id": "p-1", "categoryId": "855", "description": "Band-pass", "manufacturer": "Sevskiy",
+                   "imageUrl": "", "additionalFields": []}
+        with mock.patch("bots.services.dk_prices._fetch_one", return_value=offer()), \
+                mock.patch("bots.services.dk_marketplace.fetch_product_by_sku", return_value=product):
+            v = dk_view.live(self.listing)
+        photo = {r["key"]: r for r in v["product_rows"]}["imageUrl"]
+        self.assertIn("фото з каталогу DigiKey", photo["note"])
+        self.assertIn("https://docs.example.com/pictures/crystal.jpg", photo["note"])
+
+    def test_own_photo_no_note(self):
+        self.listing.dk_image_url = "https://docs.example.com/pictures/crystal.jpg"
+        product = {"_id": "p-1", "categoryId": "855", "imageUrl": "", "additionalFields": []}
+        with mock.patch("bots.services.dk_prices._fetch_one", return_value=offer()), \
+                mock.patch("bots.services.dk_marketplace.fetch_product_by_sku", return_value=product):
+            v = dk_view.live(self.listing)
+        self.assertEqual({r["key"]: r for r in v["product_rows"]}["imageUrl"].get("note", ""), "")
+
+
+class AttrsHonestTests(ToolsBase):
+    """Технічні атрибути, яких DigiKey не повертає: не «це не помилка», а «перевірте на порталі»; «📋 Custom Fields»
+    показує тип, право запису й пари «назва=код» полів-списків."""
+
+    def test_numeric_attr_not_returned_text(self):
+        product = {"_id": "p-1", "categoryId": "855", "imageUrl": "", "additionalFields": []}
+        with mock.patch("bots.services.dk_prices._fetch_one", return_value=offer()), \
+                mock.patch("bots.services.dk_marketplace.fetch_product_by_sku", return_value=product):
+            v = dk_view.live(self.listing)
+        row = {r["key"]: r for r in v["attr_rows"]}["attr:139"]
+        self.assertEqual(row["state"], "unknown")
+        self.assertIn("supplier.digikey.com", row["dk"])
+
+    def test_custom_fields_list_shows_label_code_pairs(self):
+        self.admin()
+        fields = [{"code": "2049", "name": "Tolerance", "fieldType": "SingleLabelCodeList", "permissionLevel": "ReadWrite",
+                   "required": False, "fieldLabelCodePairs": [{"label": "±10%", "code": "1131"}]}]
+        with mock.patch("bots.services.dk_marketplace.fetch_custom_fields", return_value=fields):
+            r = self.client.get("/admin/bots/digikeyconfig/custom-fields/", follow=True)
+        text = " ".join(str(m) for m in r.context["messages"])
+        self.assertIn("code=2049 | Tolerance | SingleLabelCodeList | ReadWrite", text)
+        self.assertIn("±10%=1131", text)

@@ -1033,14 +1033,21 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             if not fields:
                 self.message_user(request, '⚠️ Поля не знайдено (порожня відповідь)', level='warning')
             else:
+                self.message_user(request, f'📋 DigiKey повернув полів товару: {len(fields)} '
+                                           '(code | назва | тип | право запису | обов\'язкове | значення)',
+                                  level='info')
                 for f in fields:
                     req_mark = '✅ required' if f.get('required') else '—'
-                    vals = ', '.join(f.get('fieldValues', []) or []) or ''
+                    vals = [str(v) for v in (f.get('fieldValues') or []) if v not in (None, '')]
+                    pairs = [f'{p.get("label")}={p.get("code")}' for p in (f.get('fieldLabelCodePairs') or [])
+                             if isinstance(p, dict)]
+                    listed = vals + pairs           # списки: «назва=код» — для полів-списків DigiKey чекає код
+                    more = f' … ще {len(listed) - 12}' if len(listed) > 12 else ''
                     self.message_user(
                         request,
                         f'📋 code={f.get("code","?")} | {f.get("name","?")} | '
-                        f'{f.get("fieldType","?")} | {req_mark}'
-                        + (f' | values: {vals}' if vals else ''),
+                        f'{f.get("fieldType","?")} | {f.get("permissionLevel","?")} | {req_mark}'
+                        + (f' | values: {", ".join(listed[:12])}{more}' if listed else ''),
                         level='info',
                     )
         except DKMarketplaceError as e:

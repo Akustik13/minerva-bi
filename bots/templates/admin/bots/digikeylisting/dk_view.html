@@ -11,6 +11,7 @@
             background: var(--bg-card, #1a2535); }
   .dv-box h3 { margin: 0 0 8px; font-size: 14px; }
   .dv-muted { color: var(--body-quiet-color, #8aa0b4); font-size: 12px; }
+  .dv-note { margin-top: 4px; color: #f5a524; font-size: 12px; font-weight: 600; white-space: normal; word-break: break-word; }
   .dv-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   .dv-table th, .dv-table td { padding: 5px 8px; border-bottom: 1px solid var(--hairline-color, #2b3c52);
                                text-align: left; vertical-align: top; }
@@ -170,8 +171,11 @@
       </table>
     </details>
     {% endif %}
-    {% if v.product_sum.unknown %}<div class="dv-muted" style="margin-top:8px">Числові параметри (частота, тип, розміри…) DigiKey через API не повертає —
-      «API не віддає» тут не помилка; що зараз на DigiKey, видно на сторінці товару на digikey.com.</div>{% endif %}
+    {% if v.product_sum.unknown %}<div class="dv-note" style="margin-top:8px">Числові параметри (частота, допуск, напруга, корпус…)
+      Minerva надсилає з кодами каталогу DigiKey, але DigiKey їх через API не повертає — і на supplier.digikey.com
+      (Products → Edit Product → Technical Attributes) вони бувають порожні: технічні атрибути DigiKey приймає лише
+      значеннями зі своїх списків. Порожньо там — заповніть списки на порталі (або шаблоном DigiKey через
+      marketplaceprodinfo@digikey.com) і перевірте «📋 Custom Fields» у налаштуваннях DigiKey: які поля API приймає.</div>{% endif %}
     <div class="dv-muted" style="margin-top:8px">Товар (опис, категорію, параметри) DigiKey змінює лише після перевірки — надсилається цілком,
       і до затвердження діє теперішня версія (на supplier.digikey.com: Products → Pending).</div>
     {% if can_change and v.product and v.product_sum.diff %}
