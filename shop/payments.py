@@ -72,6 +72,14 @@ def enabled(shop: Shop) -> bool:
     return connected(shop) and bool(shop.stripe_enabled)
 
 
+COD_COUNTRIES = ("DE",)          # накладений платіж (Nachnahme) — лише доставка в Німеччину
+
+
+def cod_refused(method: str, country: str) -> bool:
+    """Nachnahme з доставкою за межі COD_COUNTRIES — не приймається (і каса сайту його там не показує)."""
+    return method == "cod" and (country or "").strip().upper() not in COD_COUNTRIES
+
+
 def site_methods(shop: Shop | None) -> list[str] | None:
     """Способи оплати для каси сайту (порядок = як у магазині); None — сайт бере власні налаштування."""
     if shop is None or not shop.payment_methods:

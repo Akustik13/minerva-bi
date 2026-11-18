@@ -10920,7 +10920,9 @@
 {"uk": "Найчастіше: {0}", "en": "Most frequent: {0}", "de": "Am häufigsten: {0}"}
 {"uk": "Найшвидший", "en": "Fastest", "de": "Schnellster"}
 {"uk": "Накладений платіж (Nachnahme)", "en": "Cash on delivery (Nachnahme)", "de": "Nachnahme"}
+{"uk": "Накладений платіж (Nachnahme) — лише для доставки в Німеччину.", "en": "Cash on delivery (Nachnahme) — only for delivery to Germany.", "de": "Nachnahme — nur für Lieferungen nach Deutschland."}
 {"uk": "Накладений платіж (Nachnahme) — оплата при отриманні", "en": "Cash on delivery (Nachnahme) — pay on receipt", "de": "Nachnahme — Zahlung bei Erhalt"}
+{"uk": "Накладений платіж (Nachnahme) — оплата при отриманні, лише доставка в Німеччину", "en": "Cash on delivery (Nachnahme) — pay on receipt, delivery to Germany only", "de": "Nachnahme — Zahlung bei Erhalt, nur Lieferung nach Deutschland"}
 {"uk": "Накладений платіж / Nachnahme (DE)", "en": "Cash on delivery / Nachnahme (DE)", "de": "Nachnahme (DE)"}
 {"uk": "Накладений платіж / Nachnahme (EN)", "en": "Cash on delivery / Nachnahme (EN)", "de": "Nachnahme (EN)"}
 {"uk": "Накладна (delivery_id)", "en": "Delivery note (delivery_id)", "de": "Lieferschein (delivery_id)"}

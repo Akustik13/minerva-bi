@@ -325,7 +325,7 @@ class Shop(models.Model):
             raise ValidationError({"free_shipping_threshold": "Вкажіть поріг безкоштовної доставки."})
 
     PAYMENT_CHOICES = [("prepayment", "Передоплата (Vorkasse, переказ)"), ("invoice", "Рахунок (Kauf auf Rechnung)"),
-                       ("cod", "Накладений платіж (Nachnahme) — оплата при отриманні"),
+                       ("cod", "Накладений платіж (Nachnahme) — оплата при отриманні, лише доставка в Німеччину"),
                        ("stripe", "Онлайн через Stripe (картки, Apple / Google Pay, SEPA …)")]
 
     def save(self, *args, **kwargs):

@@ -414,6 +414,11 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
                 return Response({"detail": f"Спосіб оплати «{d['payment_method']}» у магазині вимкнено.",
                                  "code": "payment_method_not_allowed", "allowed": allowed},
                                 status=status.HTTP_400_BAD_REQUEST)
+            from shop.payments import COD_COUNTRIES, cod_refused
+            if cod_refused(d.get("payment_method") or "", d.get("addr_country") or ""):
+                return Response({"detail": "Накладений платіж (Nachnahme) — лише для доставки в Німеччину.",
+                                 "code": "cod_country", "countries": list(COD_COUNTRIES)},
+                                status=status.HTTP_400_BAD_REQUEST)
 
         if shop is not None:
             d["source"] = shop.slug  # замовлення магазину: джерело = код магазину (сайт може надсилати старий)

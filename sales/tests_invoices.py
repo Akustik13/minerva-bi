@@ -593,6 +593,16 @@ class CashOnDeliveryApiTests(TestCase):
             "addr_country": "DE", "shop": True, "lines": [{"sku": "AN-1", "qty": 2}], "vat_rate": "19",
             "payment_method": "cod", "payment_status": "unpaid"}, format="json")
 
+    def test_cod_only_for_delivery_to_germany(self):
+        self.shop.payment_methods = ["prepayment", "cod"]
+        self.shop.save()
+        resp = self.c.post("/api/v1/orders/", {
+            "order_number": "WS-COD-AT", "client": "Firma GmbH", "contact_name": "Anna", "email": "anna@firma.at",
+            "addr_country": "AT", "shop": True, "lines": [{"sku": "AN-1", "qty": 2}], "vat_rate": "20",
+            "payment_method": "cod", "payment_status": "unpaid"}, format="json")
+        self.assertEqual((resp.status_code, resp.json()["code"]), (400, "cod_country"))
+        self.assertFalse(SalesOrder.objects.filter(email="anna@firma.at").exists())
+
     def test_cod_only_when_enabled_in_shop(self):
         self.shop.payment_methods = ["prepayment", "invoice"]
         self.shop.save()
