@@ -1198,6 +1198,7 @@
 {"uk": "Claude аналізує цінову стратегію…", "en": "Claude is analyzing the pricing strategy…", "de": "Claude analysiert die Preisstrategie…"}
 {"uk": "Claude аналізує…", "en": "Claude is analyzing…", "de": "Claude analysiert…"}
 {"uk": "Claude звіряє розшифровку з назвами з Minerva — клієнт, проєкти, артикули, учасники, порядок денний — і пропонує правки «було → стало» для слів, які RAG-ПК розпізнав неправильно. Текст змінюється лише після ✓. Надсилається лише текст, без аудіо; ключ Minerva, витрати — у бюджеті AI.", "en": "Claude checks the transcript against names from Minerva — customer, projects, articles, participants, agenda — and suggests “before → after” corrections for words the RAG PC misrecognized. The text changes only after ✓. Only the text is sent, no audio; Minerva’s key, costs count towards the AI budget.", "de": "Claude gleicht das Transkript mit Namen aus Minerva ab — Kunde, Projekte, Artikel, Teilnehmende, Tagesordnung — und schlägt Korrekturen „vorher → nachher“ für Wörter vor, die der RAG-PC falsch erkannt hat. Der Text ändert sich erst nach ✓. Gesendet wird nur Text, kein Audio; Minerva-Schlüssel, Kosten im KI-Budget."}
+{"uk": "Claude порівняє план проєкту з підсумком цієї наради й запропонує зміни — на діаграмі іншим кольором; застосовуєте ви", "en": "Claude compares the project plan with the summary of this meeting and proposes changes — shown on the chart in another colour; you apply them", "de": "Claude vergleicht den Projektplan mit der Zusammenfassung dieser Besprechung und schlägt Änderungen vor — im Diagramm in anderer Farbe; übernehmen tun Sie"}
 {"uk": "Claude читає план (кроки, дати, стан) і «📝 Підсумок наради» та пропонує, що змінити: строки, виконане, нові кроки чи віхи — кожну зміну з тезою наради. Галочка стоїть сама, якщо учасники цієї наради вже погодились на хмару. Плату — з бюджету AI.", "en": "Claude reads the plan (steps, dates, status) and the «📝 Meeting summary» and suggests what to change: dates, what is done, new steps or milestones — each change with a point from the meeting. The box is ticked already if the participants of this meeting agreed to the cloud. Paid from the AI budget.", "de": "Claude liest den Plan (Schritte, Termine, Status) und die «📝 Besprechungszusammenfassung» und schlägt Änderungen vor: Termine, Erledigtes, neue Schritte oder Meilensteine — jede Änderung mit einem Punkt aus der Besprechung. Das Häkchen ist schon gesetzt, wenn die Teilnehmer dieser Besprechung der Cloud zugestimmt haben. Bezahlt aus dem KI-Budget."}
 {"uk": "Claude і RAG разом", "en": "Claude and RAG together", "de": "Claude und RAG zusammen"}
 {"uk": "Client ID не вказано", "en": "Client ID not specified", "de": "Client ID nicht angegeben"}
@@ -8498,6 +8499,7 @@
 {"uk": "Звірити офери", "en": "Reconcile offers", "de": "Offers abgleichen"}
 {"uk": "Звірити офери й записати ID", "en": "Reconcile offers and save IDs", "de": "Offers abgleichen und IDs speichern"}
 {"uk": "Звірити план з нарадою", "en": "Check the plan against a meeting", "de": "Plan mit Besprechung abgleichen"}
+{"uk": "Звірити план проєкту", "en": "Check the project plan", "de": "Projektplan abgleichen"}
 {"uk": "Звірити стрічку бази знань для RAG з поточним станом пошти", "en": "Reconcile the knowledge base feed for RAG with the current state of the mail", "de": "Den Wissensdatenbank-Feed für RAG mit dem aktuellen E-Mail-Stand abgleichen"}
 {"uk": "Звірити стрічку зараз", "en": "Reconcile the feed now", "de": "Feed jetzt abgleichen"}
 {"uk": "Звірити фото й даташити на DigiKey", "en": "Reconcile photos and datasheets on DigiKey", "de": "Fotos und Datenblätter auf DigiKey abgleichen"}
@@ -20226,6 +20228,7 @@
 {"uk": "з таблиці", "en": "from a table", "de": "aus einer Tabelle"}
 {"uk": "з увімкненим правом \"Post Messages\". Без цього надсилання не спрацює.", "en": "with the \"Post Messages\" permission enabled. Without it, sending will not work.", "de": "mit aktiviertem Recht \"Post Messages\". Ohne dieses funktioniert das Senden nicht."}
 {"uk": "з цінами", "en": "with prices", "de": "mit Preisen"}
+{"uk": "з цією нарадою", "en": "against this meeting", "de": "mit dieser Besprechung"}
 {"uk": "з шаблону", "en": "from template", "de": "aus Vorlage"}
 {"uk": "з шаблону — файлу в базі немає", "en": "from a template — there is no file in the database", "de": "aus der Vorlage – es gibt keine Datei in der Datenbank"}
 {"uk": "з шаблону — файлу немає", "en": "from template — no file", "de": "aus Vorlage — keine Datei vorhanden"}
@@ -20549,6 +20552,7 @@
 {"uk": "звуку наради не було", "en": "there was no meeting audio", "de": "kein Besprechungston"}
 {"uk": "звідки", "en": "source", "de": "Herkunft"}
 {"uk": "звідки за {0} днів", "en": "from where in {0} days", "de": "von wo in {0} Tagen"}
+{"uk": "звірено з планом проєкту", "en": "checked against the project plan", "de": "mit dem Projektplan abgeglichen"}
 {"uk": "звірив записи нарад на RAG-ПК", "en": "reconciled the meeting recordings on the RAG PC", "de": "hat die Besprechungsaufnahmen auf dem RAG-PC abgeglichen"}
 {"uk": "звірка записів нарад", "en": "meeting recordings reconciliation", "de": "Abgleich der Besprechungsaufnahmen"}
 {"uk": "звіряли {0}", "en": "checked {0}", "de": "abgeglichen {0}"}

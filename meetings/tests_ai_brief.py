@@ -236,5 +236,16 @@ class PageTests(BriefBase):
         self.assertEqual(self.client.post(url, json.dumps({"model": "claude-sonnet-5-5", "consent": True}),
                                           content_type="application/json").status_code, 404)
 
+    def test_plan_review_link(self):
+        from projects.models import ProjectStep
+        m, _ids = self.made()
+        self.login(self.owner)
+        link = f"/admin/projects/project/{self.project.pk}/change/?plan_meeting={m.pk}#pj-plan"
+        self.assertNotContains(self.client.get(self.url("page", m)), link)        # плану ще немає
+        ProjectStep.objects.create(project=self.project, title="Прототип")
+        page = self.client.get(self.url("page", m))
+        self.assertContains(page, link)
+        self.assertContains(page, "📅 Звірити план проєкту")
+
     def test_url_name(self):
         self.assertEqual(reverse("admin:meetings_meeting_brief", args=[3]), "/admin/meetings/meeting/3/brief/")

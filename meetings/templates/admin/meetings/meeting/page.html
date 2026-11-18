@@ -125,6 +125,7 @@
       <textarea id="mt-brief-text" class="mt-hidden-copy" readonly hidden translate="no">{{ brief.view.text }}</textarea>
       <div class="mt-actions">
         <button type="button" class="button" data-mt-copy="mt-brief-text" title="Підсумок текстом — у лист, чат чи нотатки">📋 Копіювати текстом</button>
+        {% for p in brief.plan %}<a class="button" href="{{ p.url }}" title="Claude порівняє план проєкту з підсумком цієї наради й запропонує зміни — на діаграмі іншим кольором; застосовуєте ви">📅 Звірити план проєкту <span translate="no">{{ p.code }}</span> з цією нарадою</a>{% endfor %}
         {% if brief.mail %}<button type="button" class="button mt-primary" data-mt-brief-mail title="Підсумок і агенда з результатами одним листом — мовою, яку виберете; відкриється у вашій пошті, надсилаєте ви">✉️ Надіслати підсумок листом…</button>{% endif %}
         <span class="mt-muted">Склав <span translate="no">{{ brief.view.label }}</span>{% if brief.view.at %} · {{ brief.view.at|date:"d.m.Y H:i" }}{% endif %}{% if brief.view.cost %} · ${{ brief.view.cost|floatformat:4 }}{% endif %}{% if brief.view.lang_label %} · {{ brief.view.lang_label }}{% endif %}. Звірка з агендою — під пунктами агенди нижче (🤖).</span>
       </div>

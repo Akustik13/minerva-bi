@@ -530,7 +530,8 @@ def log_lines(m) -> list:
             where = "у Minerva" if e.get("where") == "minerva" else "на RAG-ПК"
             model = ai_moments.SHORT.get(e.get("model"), e.get("model") or "Claude")
             what = {"fix": "перевірено на помилки розпізнавання", "brief": "підсумовано й звірено з агендою",
-                    "translate": "перекладено (підсумок для листа)"}.get(e.get("task"), "оброблено")
+                    "translate": "перекладено (підсумок для листа)",
+                    "plan": "звірено з планом проєкту"}.get(e.get("task"), "оброблено")
             text = (f"☁️ Текст розшифровки {what} в {model} (Anthropic, США) {where} — учасники погодились "
                     f"(підтвердив той, хто записав)")
         else:
@@ -653,10 +654,28 @@ def brief_box(user, m) -> dict | None:
     from . import minutes
     return {"view": view, "can": can, "models": list(ai_brief.MODELS.items()), "default": ai_brief.DEFAULT,
             "mail": minutes.form(user, m) if can and view else None,
+            "plan": plan_links(user, m) if can and view and not view.get("empty") else [],
             "send_url": url("admin:meetings_meeting_brief_send", m.pk),
             "langs": list(ai_brief.LANGS.items()), "lang": (view or {}).get("lang") or "uk",
             "available": ai_brief.available(), "consent_text": ai_brief.CONSENT_TEXT, "state": ai_brief.state(m),
             "url": url("admin:meetings_meeting_brief", m.pk), "open": view is None}
+
+
+def plan_links(user, m) -> list:
+    """«📅 Звірити план проєкту P-… з цією нарадою» (projects/plan_review.py): проєкти наради з планом, які людина може
+    змінювати, — коли є «📝 Підсумок наради». [{code, url}]"""
+    if not (user.has_perm("projects.view_project") and user.has_perm("projects.change_project")):
+        return []
+    try:
+        from projects import plan_review
+        from projects.models import ProjectStep
+    except ImportError:
+        return []
+    out = []
+    for project in parts.links(m):
+        if ProjectStep.objects.filter(project=project).exists():
+            out.append({"code": project.code, "url": plan_review.review_url(project, m)})
+    return out
 
 
 def fix_box(user, m, tr) -> dict | None:
