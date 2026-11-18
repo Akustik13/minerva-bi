@@ -17,7 +17,7 @@ from django.views.decorators.http import require_POST
 
 from . import invoice_service as svc
 from .models import SalesOrder
-from .models_invoice import LANGS, VAT_MODES, InvoiceSettings, SalesInvoice
+from .models_invoice import LANGS, PAY_KINDS, VAT_MODES, InvoiceSettings, SalesInvoice
 
 logger = logging.getLogger(__name__)
 BASE = "/rechnungen/"
@@ -69,6 +69,7 @@ def invoice_list(request):
         **admin.site.each_context(request), "title": "Рахунки (Rechnung)",
         "invoices": list(qs[:LIST_LIMIT]), "search": search, "limit": LIST_LIMIT, "can": _can(request),
         "template_kind": svc.template_kind(s), "template_vars": svc.TEMPLATE_VARS,
+        "company_missing": svc.company_missing(),
         "placeholders": svc.PLACEHOLDERS,
     })
 
@@ -78,11 +79,10 @@ def _form_ctx(request, inv, order=None, pay_kind="invoice", errors=None):
         **admin.site.each_context(request),
         "title": f"Рахунок {inv.number}" if inv.pk else "Новий рахунок",
         "inv": inv, "order": order or inv.sales_order, "can": _can(request), "errors": errors or [],
-        "langs": LANGS, "vat_modes": VAT_MODES, "pay_kind": pay_kind,
-        "pay_kinds": [("invoice", "Оплата за рахунком (строк)"), ("prepayment", "Передоплата (Vorkasse)"),
-                      ("paid", "Уже оплачено")],
+        "langs": LANGS, "vat_modes": VAT_MODES, "pay_kind": inv.pay_kind or pay_kind,
+        "pay_kinds": PAY_KINDS, "salutations": svc.SALUTATIONS,
         "methods": SalesOrder.PAYMENT_METHOD_CHOICES,
-        "texts": svc.all_standard_texts(), "lines": inv.lines or [],
+        "texts": svc.all_standard_texts(has_order=bool(order or inv.sales_order_id)), "lines": inv.lines or [],
         "placeholders": svc.PLACEHOLDERS, "number_hint": _number_hint(inv, order),
         "settings_url": "/admin/sales/invoicesettings/",
     }
@@ -181,10 +181,9 @@ def invoice_edit(request, pk):
     inv = get_object_or_404(SalesInvoice.objects.select_related("sales_order"), pk=pk)
     if request.method == "POST":
         _need(request, "sales.change_salesinvoice")
-        return _save(request, inv, inv.sales_order, request.POST.get("pay_kind") or "invoice")
+        return _save(request, inv, inv.sales_order, inv.pay_kind)
     order = inv.sales_order
-    kind = svc.pay_kind(order.payment_method or "", order.payment_status or "") if order is not None else "invoice"
-    return render(request, "admin/sales/invoice/form.html", _form_ctx(request, inv, inv.sales_order, kind))
+    return render(request, "admin/sales/invoice/form.html", _form_ctx(request, inv, inv.sales_order, inv.pay_kind))
 
 
 @_staff

@@ -564,6 +564,7 @@
 {"uk": ". Налаштовується. Cron запускає команду кожні 5 хв, але вона сама перевіряє чи вже час.", "en": ". Configurable. Cron runs the command every 5 minutes, but it checks by itself whether it is time yet.", "de": ". Einstellbar. Cron startet den Befehl alle 5 Minuten, prüft aber selbst, ob es schon Zeit ist."}
 {"uk": ". Наступний номер збільшується автоматично.", "en": ". The next number increases automatically.", "de": ". Die nächste Nummer wird automatisch erhöht."}
 {"uk": ". Натисніть Tab — побачите рамку фокусу.", "en": ". Press Tab — you will see the focus outline.", "de": ". Drücken Sie Tab – Sie sehen den Fokusrahmen."}
+{"uk": ". Не заповнено", "en": ". Not filled in", "de": ". Nicht ausgefüllt"}
 {"uk": ". Не так — виберіть «Хто це» й збережіть.", "en": ". Not right — choose «Who is it» and save.", "de": ". Stimmt nicht — «Wer ist das» wählen und speichern."}
 {"uk": ". Нові: {0}", "en": ". New: {0}", "de": ". Neu: {0}"}
 {"uk": ". Оберіть клієнта → snapshot заповниться автоматично.", "en": ". Select a customer → the snapshot is filled in automatically.", "de": ". Wählen Sie einen Kunden → der Snapshot wird automatisch ausgefüllt."}
@@ -2921,6 +2922,7 @@
 {"uk": "{0} {1} без курсу", "en": "{0} {1} without exchange rate", "de": "{0} {1} ohne Wechselkurs"}
 {"uk": "{0} {1} від {2} шт.", "en": "{0} {1} from {2} pcs", "de": "{0} {1} ab {2} Stk."}
 {"uk": "{0} {1} нетто", "en": "{0} {1} net", "de": "{0} {1} netto"}
+{"uk": "{0} {1} — так само seller.web, seller.tax", "en": "{0} {1} — likewise seller.web, seller.tax", "de": "{0} {1} — ebenso seller.web, seller.tax"}
 {"uk": "{0} {1}/шт", "en": "{0} {1}/pc", "de": "{0} {1}/Stk."}
 {"uk": "{0} {1}: Minerva не відповідає", "en": "{0} {1}: Minerva is not responding", "de": "{0} {1}: Minerva antwortet nicht"}
 {"uk": "{0} {1}: мало бути доставлено {2}", "en": "{0} {1}: was due {2}", "de": "{0} {1}: sollte am {2} zugestellt sein"}
@@ -3485,6 +3487,7 @@
 {"uk": "«Credentials» → «Create OAuth client ID» → Web application → Authorized redirect URI — адреса вище → скопіювати Client ID і Secret сюди.", "en": "“Credentials” → “Create OAuth client ID” → Web application → Authorized redirect URI — the address above → copy the Client ID and Secret here.", "de": "„Credentials“ → „Create OAuth client ID“ → Web application → Authorized redirect URI — die Adresse oben → Client ID und Secret hierher kopieren."}
 {"uk": "«Deutsch + English» — обидва тексти.", "en": "“Deutsch + English” — both texts.", "de": "„Deutsch + English“ — beide Texte."}
 {"uk": "«Deutsch + English» — один документ з підписами обома мовами", "en": "“Deutsch + English” — one document with labels in both languages", "de": "„Deutsch + English“ — ein Dokument mit Beschriftungen in beiden Sprachen"}
+{"uk": "«Lieferadresse: …» (або «wie Rechnungsadresse») / лише адреса", "en": "“Lieferadresse: …” (or “wie Rechnungsadresse”) / address only", "de": "„Lieferadresse: …“ (oder „wie Rechnungsadresse“) / nur die Adresse"}
 {"uk": "«Minerva Пошта» — ваша пошта Minerva в телефоні: та сама скринька, ті самі листи, категорії, AI-відповіді", "en": "«Minerva Mail» — your Minerva mail on the phone: the same mailbox, the same messages, categories, AI replies", "de": "«Minerva Mail» — Ihre Minerva-Mail auf dem Telefon: dasselbe Postfach, dieselben Nachrichten, Kategorien, KI-Antworten"}
 {"uk": "«Minerva Пошта» — ваша пошта Minerva в телефоні: та сама скринька, ті самі листи, категорії, AI-відповіді й доручення агенту, але зручно однією рукою. Телефон працює від вашого імені з вашими правами; пароля скриньки в телефоні немає — лише ключ, який можна відключити тут будь-коли.", "en": "«Minerva Mail» — your Minerva mail on the phone: the same mailbox, the same messages, categories, AI replies and agent rules, but comfortable with one hand. The phone works in your name with your rights; there is no mailbox password on the phone — only a key you can revoke here at any time.", "de": "«Minerva Mail» — Ihre Minerva-Mail auf dem Telefon: dasselbe Postfach, dieselben Nachrichten, Kategorien, KI-Antworten und Agenten-Regeln, aber bequem mit einer Hand. Das Telefon arbeitet in Ihrem Namen mit Ihren Rechten; auf dem Telefon liegt kein Postfach-Passwort — nur ein Schlüssel, den Sie hier jederzeit sperren können."}
 {"uk": "«Minerva врахувала»", "en": "“Minerva took into account”", "de": "„Minerva hat berücksichtigt“"}
@@ -3495,6 +3498,7 @@
 {"uk": "«V» у назві «V, S: Telco …»; порожньо — перша літера імені", "en": "«V» in the title «V, S: Telco …»; empty — first letter of the first name", "de": "«V» im Titel «V, S: Telco …»; leer — erster Buchstabe des Vornamens"}
 {"uk": "«Willkommen», «Zahlung erhalten», пароль змінено, акаунт видалено", "en": "«Willkommen», «Zahlung erhalten», password changed, account deleted", "de": "«Willkommen», «Zahlung erhalten», Passwort geändert, Konto gelöscht"}
 {"uk": "«sku:AMP-100», «order_number:WS-1001», «code:PO-12», «id:5» — кожен запис, який ключ отримав (до 2000; більше — лише кількість у «Записів»)", "en": "“sku:AMP-100”, “order_number:WS-1001”, “code:PO-12”, “id:5” — every record the key received (up to 2000; beyond that only the count in “Records”)", "de": "„sku:AMP-100“, „order_number:WS-1001“, „code:PO-12“, „id:5“ — jeder Datensatz, den der Schlüssel erhalten hat (bis zu 2000; darüber hinaus nur die Anzahl unter „Datensätze“)"}
+{"uk": "«z. Hd. Herrn …» і «Sehr geehrter Herr …,»; без вибору — «Sehr geehrte Damen und Herren,»", "en": "“z. Hd. Herrn …” and “Sehr geehrter Herr …,”; none selected — “Sehr geehrte Damen und Herren,”", "de": "„z. Hd. Herrn …“ und „Sehr geehrter Herr …,“; ohne Auswahl — „Sehr geehrte Damen und Herren,“"}
 {"uk": "«{0}» ({1}) вже є в основного клієнта, а без клієнта цей запис існувати не може. Злиття не виконано.", "en": "“{0}” ({1}) already exists for the primary customer, and this record cannot exist without a customer. Merge not performed.", "de": "„{0}“ ({1}) ist beim Hauptkunden bereits vorhanden, und dieser Datensatz kann ohne Kunden nicht existieren. Zusammenführung nicht durchgeführt."}
 {"uk": "«{0}» ({1}) чекає «{2}» ({3}): прогноз {4}", "en": "“{0}” ({1}) waits for “{2}” ({3}): forecast {4}", "de": "„{0}“ ({1}) wartet auf „{2}“ ({3}): Prognose {4}"}
 {"uk": "«{0}» (бал {1}", "en": "“{0}” (score {1}", "de": "„{0}“ (Punktzahl {1}"}
@@ -3555,6 +3559,7 @@
 {"uk": "«Асортимент і ціни»", "en": "“Range and prices”", "de": "„Sortiment und Preise“"}
 {"uk": "«Асортимент і ціни» → «🔗 Базові ціни товару…» з % (100 = як базова, 95 = на 5 % дешевше). Ціна й ступені позиції далі змінюються разом з базовими цінами товару.", "en": "“Range and prices” → “🔗 Product base prices…” with % (100 = same as base, 95 = 5 % cheaper). The item’s price and price breaks then change together with the product’s base prices.", "de": "„Sortiment und Preise“ → „🔗 Basispreise des Artikels…“ mit % (100 = wie Basispreis, 95 = 5 % günstiger). Preis und Staffelpreise der Position ändern sich danach zusammen mit den Basispreisen des Artikels."}
 {"uk": "«Асортимент і ціни» → дія «♻️ Життєвий цикл лише в цьому магазині…» або поля в позиції. «Як на складі» — статус товару; інше значення перекриває його тільки в цьому магазині (склад не змінюється, бейдж з 🏬).", "en": "“Range and prices” → action “♻️ Lifecycle for this shop only…” or the fields in the item. “As in stock” — the product’s status; any other value overrides it only in this shop (the stock record is not changed, badge with 🏬).", "de": "„Sortiment und Preise“ → Aktion „♻️ Lebenszyklus nur in diesem Shop…“ oder die Felder in der Position. „Wie im Lager“ — der Status des Artikels; ein anderer Wert überschreibt ihn nur in diesem Shop (der Lagerartikel bleibt unverändert, Badge mit 🏬)."}
+{"uk": "«Бухгалтерія → Налаштування компанії»", "en": "“Accounting → Company settings”", "de": "„Buchhaltung → Firmeneinstellungen“"}
 {"uk": "«Виконано» й «Пропущено», поставлені вручну, автоматика не змінює.", "en": "“Done” and “Skipped” set by hand are never changed by automation.", "de": "Von Hand gesetzte Zustände „Erledigt“ und „Übersprungen“ ändert die Automatik nicht."}
 {"uk": "«Впливає на склад» вимкнено для {0} замовлень.", "en": "“Affects stock” turned off for {0} orders.", "de": "„Wirkt auf Lager“ wurde für {0} Aufträge deaktiviert."}
 {"uk": "«Впливає на склад» увімкнено для {0} замовлень.", "en": "“Affects stock” turned on for {0} orders.", "de": "„Wirkt auf Lager“ wurde für {0} Aufträge aktiviert."}
@@ -6359,6 +6364,7 @@
 {"uk": "Дані підтягнуться із замовлення та його відправлення (отримувач, коробки, вага). Усе можна змінити перед генерацією.", "en": "Data will be pulled from the order and its shipment (recipient, boxes, weight). Everything can be changed before generation.", "de": "Die Daten werden aus dem Auftrag und seiner Sendung übernommen (Empfänger, Kartons, Gewicht). Alles kann vor der Erstellung geändert werden."}
 {"uk": "Дані підтягнуться із замовлення та митної декларації відправлення (отримувач, товари, HS-коди, країна, ціни). Усе можна змінити перед генерацією.", "en": "The data is pulled from the order and the shipment's customs declaration (recipient, products, HS codes, country, prices). Everything can be changed before generating.", "de": "Die Daten werden aus dem Auftrag und der Zollerklärung der Sendung übernommen (Empfänger, Artikel, HS-Codes, Land, Preise). Vor der Erzeugung kann alles geändert werden."}
 {"uk": "Дані системи", "en": "System data", "de": "Systemdaten"}
+{"uk": "Дані фірми в рахунку (блок праворуч, банк і нижній колонтитул) беруться з", "en": "Company data in the invoice (block on the right, bank and footer) is taken from", "de": "Firmendaten in der Rechnung (Block rechts, Bank und Fußzeile) stammen aus"}
 {"uk": "Дані → Перевірка (усе ще раз, з підтвердженням) → Готово. ПДВ рахується автоматично: Німеччина 19 %, ЄС з USt-IdNr — reverse charge, решта країн — експорт.", "en": "Details → Review (everything once more, with confirmation) → Done. VAT is calculated automatically: Germany 19 %, EU with USt-IdNr — reverse charge, all other countries — export.", "de": "Daten → Prüfung (noch einmal alles, mit Bestätigung) → Fertig. Die MwSt. wird automatisch berechnet: Deutschland 19 %, EU mit USt-IdNr — Reverse Charge, übrige Länder — Export."}
 {"uk": "Дані: прихований JSON у полі «Країни» і «Винятки» кожної зони (shop/admin.py → CountryPickerWidget).", "en": "Data: hidden JSON in the “Countries” and “Exceptions” fields of each zone (shop/admin.py → CountryPickerWidget).", "de": "Daten: verstecktes JSON in den Feldern „Länder“ und „Ausnahmen“ jeder Zone (shop/admin.py → CountryPickerWidget)."}
 {"uk": "Данія", "en": "Denmark", "de": "Dänemark"}
@@ -15070,6 +15076,7 @@
 {"uk": "Рахунки й оплати", "en": "Invoices and payments", "de": "Rechnungen und Zahlungen"}
 {"uk": "Рахунки нумеруються", "en": "Invoices are numbered", "de": "Rechnungen werden nummeriert"}
 {"uk": "Рахунки покупцям на бланку фірми — з логотипом, реквізитами, печаткою й підписом.", "en": "Invoices to buyers on the company letterhead — with logo, company details, stamp and signature.", "de": "Rechnungen an Käufer auf dem Firmenbriefbogen — mit Logo, Firmendaten, Stempel und Unterschrift."}
+{"uk": "Рахунки покупцям — німецький рахунок-лист на бланку фірми: логотип, дані фірми, банк, без печатки й підпису.", "en": "Invoices to buyers — a German-style invoice letter on the company letterhead: logo, company data, bank, no stamp or signature.", "de": "Rechnungen an Käufer — Rechnung im deutschen Briefformat auf dem Firmenbriefbogen: Logo, Firmendaten, Bank, ohne Stempel und Unterschrift."}
 {"uk": "Рахунки → 📄 Шаблон Word", "en": "Invoices → 📄 Word template", "de": "Rechnungen → 📄 Word-Vorlage"}
 {"uk": "Рахунки, платежі, витрати", "en": "Invoices, payments, expenses", "de": "Rechnungen, Zahlungen, Kosten"}
 {"uk": "Рахунки, платежі, витрати по категоріях", "en": "Invoices, payments, expenses by category", "de": "Rechnungen, Zahlungen, Kosten nach Kategorien"}
@@ -15217,6 +15224,7 @@
 {"uk": "Решта — на підтвердження (захист від масової помилки, напр. неправильного курсу).", "en": "The rest require confirmation (protection against a mass error, e.g. a wrong exchange rate).", "de": "Der Rest erfordert eine Bestätigung (Schutz vor einem Massenfehler, z. B. bei falschem Wechselkurs)."}
 {"uk": "Реєстр модулів", "en": "Module registry", "de": "Modulregister"}
 {"uk": "Реєстр усіх ризиків", "en": "Register of all risks", "de": "Register aller Risiken"}
+{"uk": "Реєстраційний суд", "en": "Registration court", "de": "Registergericht"}
 {"uk": "Реєстраційний суд (напр. Munich, HRB 208657)", "en": "Registry court (e.g. Munich, HRB 208657)", "de": "Registergericht (z. B. Munich, HRB 208657)"}
 {"uk": "Реєстрацію закрито", "en": "Registration is closed", "de": "Registrierung geschlossen"}
 {"uk": "Реєстрацію закрито — {0}", "en": "Registration is closed — {0}", "de": "Registrierung geschlossen — {0}"}
@@ -17513,6 +17521,7 @@
 {"uk": "Уже оплачено", "en": "Already paid", "de": "Bereits bezahlt"}
 {"uk": "Уже оплачено (DE)", "en": "Already paid (DE)", "de": "Bereits bezahlt (DE)"}
 {"uk": "Уже оплачено (EN)", "en": "Already paid (EN)", "de": "Bereits bezahlt (EN)"}
+{"uk": "Уже оплачено — без банківських реквізитів у рахунку.", "en": "Already paid — no bank details in the invoice.", "de": "Bereits bezahlt — keine Bankverbindung in der Rechnung."}
 {"uk": "Уже отримано: закупівля в стані «Отримано» без позицій — склад і «Очікується» не змінюються", "en": "Already received: purchase order in status «Received» without lines — stock and «Expected» do not change", "de": "Bereits erhalten: Bestellung im Status «Erhalten» ohne Positionen — Lager und «Erwartet» ändern sich nicht"}
 {"uk": "Узбекистан", "en": "Uzbekistan", "de": "Usbekistan"}
 {"uk": "Україна", "en": "Ukraine", "de": "Ukraine"}
@@ -19132,6 +19141,7 @@
 {"uk": "адреса має побічні дії", "en": "the address has side effects", "de": "die Adresse hat Nebenwirkungen"}
 {"uk": "адреса не в «Дозволених IP» ключа", "en": "address is not in the key’s “Allowed IPs”", "de": "Adresse nicht in den „Erlaubten IPs“ des Schlüssels"}
 {"uk": "адреса отримувача", "en": "recipient's address", "de": "Adresse des Empfängers"}
+{"uk": "адреса покупця: компанія (або ім'я), «z. Hd. Herrn …», вулиця, індекс і місто, країна", "en": "buyer's address: company (or name), “z. Hd. Herrn …”, street, postcode and city, country", "de": "Adresse des Käufers: Firma (oder Name), „z. Hd. Herrn …“, Straße, PLZ und Ort, Land"}
 {"uk": "адреса рахунку", "en": "billing address", "de": "Rechnungsadresse"}
 {"uk": "адреса, поле або опис", "en": "address, field or description", "de": "Adresse, Feld oder Beschreibung"}
 {"uk": "адреса: {0}", "en": "address: {0}", "de": "Adresse: {0}"}
@@ -19221,6 +19231,7 @@
 {"uk": "бал {0}", "en": "score {0}", "de": "Punktzahl {0}"}
 {"uk": "балом", "en": "score", "de": "Punktzahl"}
 {"uk": "банківські реквізити", "en": "bank details", "de": "Bankverbindung"}
+{"uk": "банківські реквізити (немає, коли вже оплачено)", "en": "bank details (none when already paid)", "de": "Bankverbindung (keine, wenn bereits bezahlt)"}
 {"uk": "бачите лише ви", "en": "only you can see this", "de": "nur Sie sehen das"}
 {"uk": "бачить крізь дані", "en": "sees through data", "de": "blickt durch Daten hindurch"}
 {"uk": "бежевий", "en": "beige", "de": "beige"}
@@ -19558,6 +19569,7 @@
 {"uk": "вставте ключ з Адмін → REST API → API Токени", "en": "paste the key from Admin → REST API → API Tokens", "de": "fügen Sie den Schlüssel aus Admin → REST API → API-Token ein"}
 {"uk": "встановлюється автоматично.", "en": "is set automatically.", "de": "wird automatisch festgelegt."}
 {"uk": "встигає", "en": "on time", "de": "rechtzeitig"}
+{"uk": "вступ ({0} — жирним)", "en": "introduction ({0} — bold)", "de": "Einleitung ({0} — fett)"}
 {"uk": "всього)", "en": "in total)", "de": "insgesamt)"}
 {"uk": "всі", "en": "all", "de": "alle"}
 {"uk": "всі джерела", "en": "all sources", "de": "alle Quellen"}
@@ -20361,6 +20373,7 @@
 {"uk": "зв'язки проєктів", "en": "project links", "de": "Projektverknüpfungen"}
 {"uk": "зведення за розкладом", "en": "summary on schedule", "de": "Übersicht nach Zeitplan"}
 {"uk": "звертався {0}", "en": "contacted {0}", "de": "Zugriff {0}"}
+{"uk": "звертання: «Sehr geehrter Herr …,» або «Sehr geehrte Damen und Herren,»", "en": "salutation: “Sehr geehrter Herr …,” or “Sehr geehrte Damen und Herren,”", "de": "Anrede: „Sehr geehrter Herr …,“ oder „Sehr geehrte Damen und Herren,“"}
 {"uk": "звертається до Stripe", "en": "contacts Stripe", "de": "greift auf Stripe zu"}
 {"uk": "зворотний", "en": "back", "de": "Rückseite"}
 {"uk": "звуку наради не було", "en": "there was no meeting audio", "de": "kein Besprechungston"}
@@ -20406,6 +20419,7 @@
 {"uk": "змінив пароль покупця", "en": "changed a buyer password", "de": "hat ein Käuferpasswort geändert"}
 {"uk": "змінив профіль покупця", "en": "changed a buyer profile", "de": "hat ein Käuferprofil geändert"}
 {"uk": "змінив товар {0}", "en": "changed product {0}", "de": "hat Artikel {0} geändert"}
+{"uk": "змінили там — шаблон рахунку перебудується сам. Дані фірми — з «Бухгалтерія → Налаштування компанії», тексти, строки, банк, підписант і лист — у «⚙️ Налаштування рахунків».", "en": "change it there and the invoice template rebuilds itself. Company data comes from “Accounting → Company settings”; texts, due dates, bank, signer and email — from “⚙️ Invoice settings”.", "de": "dort geändert — die Rechnungsvorlage baut sich selbst neu. Firmendaten stammen aus „Buchhaltung → Firmeneinstellungen“, Texte, Fristen, Bank, Unterzeichner und E-Mail — aus „⚙️ Rechnungseinstellungen“."}
 {"uk": "змінили там — шаблон рахунку перебудується сам. Тексти, строки, банк, підписант і лист — у «⚙️ Налаштування рахунків».", "en": "change it there and the invoice template rebuilds itself. Texts, due dates, bank, signer and email — in “⚙️ Invoice settings”.", "de": "dort geändert — die Rechnungsvorlage baut sich selbst neu. Texte, Fristen, Bank, Unterzeichner und E-Mail — in „⚙️ Rechnungseinstellungen“."}
 {"uk": "змінилось після пропозиції (зараз «{0}») — запустіть завдання ще раз", "en": "changed after the proposal (now “{0}”) — run the task again", "de": "hat sich nach dem Vorschlag geändert (jetzt „{0}“) – starten Sie die Aufgabe erneut"}
 {"uk": "змінити", "en": "change", "de": "ändern"}
@@ -21483,6 +21497,7 @@
 {"uk": "нетто {0} {1}, брутто {2} {3}", "en": "net {0} {1}, gross {2} {3}", "de": "netto {0} {1}, brutto {2} {3}"}
 {"uk": "нетто більше за брутто — генерація заблокована", "en": "net is greater than gross — generation blocked", "de": "Netto ist größer als Brutto — Erstellung gesperrt"}
 {"uk": "неясно", "en": "unclear", "de": "unklar"}
+{"uk": "нижній колонтитул: фірма й реєстрація · офіс · банк", "en": "footer: company and registration · office · bank", "de": "Fußzeile: Firma und Registrierung · Büro · Bank"}
 {"uk": "нижче", "en": "below", "de": "unten"}
 {"uk": "нижче.", "en": "below.", "de": "unten."}
 {"uk": "низька", "en": "low", "de": "niedrig"}
@@ -21827,6 +21842,7 @@
 {"uk": "перегляд → принтер", "en": "preview → printer", "de": "Vorschau → Drucker"}
 {"uk": "переглянути й занести", "en": "review and add", "de": "prüfen und eintragen"}
 {"uk": "перед збереженням шаблон перевіряється на прикладі. Бланк (логотип, нижній колонтитул, печатка, підпис) береться з шаблону Commercial Invoice", "en": "before saving, the template is checked on an example. The letterhead (logo, footer, stamp, signature) comes from the Commercial Invoice template", "de": "vor dem Speichern wird die Vorlage am Beispiel geprüft. Der Briefbogen (Logo, Fußzeile, Stempel, Unterschrift) stammt aus der Commercial-Invoice-Vorlage"}
+{"uk": "перед збереженням шаблон перевіряється на прикладі. Логотип і лінії колонтитулів беруться з бланка Commercial Invoice", "en": "before saving, the template is checked on an example. The logo and header/footer lines come from the Commercial Invoice letterhead", "de": "vor dem Speichern wird die Vorlage am Beispiel geprüft. Logo und Kopf-/Fußzeilenlinien stammen aus dem Briefbogen der Commercial Invoice"}
 {"uk": "перед масовою операцією.", "en": "before a bulk operation.", "de": "vor einem Massenvorgang."}
 {"uk": "перед тестом переконайтесь що у розділі", "en": "before the test make sure that in the section", "de": "stellen Sie vor dem Test sicher, dass im Bereich"}
 {"uk": "передав закупівлю {0}", "en": "transferred purchase order {0}", "de": "hat Bestellung {0} übergeben"}
@@ -21964,6 +21980,7 @@
 {"uk": "позиції", "en": "items", "de": "Positionen"}
 {"uk": "позиції разом із рядком доставки (для простого шаблону)", "en": "items together with the shipping row (for the simple template)", "de": "Positionen samt Versandzeile (für die einfache Vorlage)"}
 {"uk": "позиції, доставка, ПДВ (Reverse Charge / експорт — автоматично), мова, строк і текст оплати за способом оплати. Усе можна змінити.", "en": "items, shipping, VAT (reverse charge / export — automatic), language, due date and payment text by payment method. Everything can be changed.", "de": "Positionen, Versand, MwSt. (Reverse Charge / Ausfuhr — automatisch), Sprache, Frist und Zahlungstext nach Zahlungsart. Alles lässt sich ändern."}
+{"uk": "позиції: l.pos, l.description (з артикулом), l.qty, l.unit_price, l.total", "en": "items: l.pos, l.description (with part number), l.qty, l.unit_price, l.total", "de": "Positionen: l.pos, l.description (mit Artikelnummer), l.qty, l.unit_price, l.total"}
 {"uk": "позиції: l.pos, l.description, l.qty, l.unit_price, l.total", "en": "items: l.pos, l.description, l.qty, l.unit_price, l.total", "de": "Positionen: l.pos, l.description, l.qty, l.unit_price, l.total"}
 {"uk": "позначена для цієї візитки", "en": "ticked for this business card", "de": "für diese Visitenkarte markiert"}
 {"uk": "позначених товарів на цей шаблон?", "en": "marked products to this template?", "de": "markierte Artikel auf diese Vorlage?"}
@@ -22358,6 +22375,7 @@
 {"uk": "підпапок немає", "en": "no subfolders", "de": "keine Unterordner"}
 {"uk": "підпис листа", "en": "e-mail signature", "de": "E-Mail-Signatur"}
 {"uk": "підписант", "en": "signer", "de": "Unterzeichner"}
+{"uk": "підписант («Ansprechpartner» і під «Mit freundlichen Grüßen»)", "en": "signer (“Ansprechpartner” and under “Mit freundlichen Grüßen”)", "de": "Unterzeichner („Ansprechpartner“ und unter „Mit freundlichen Grüßen“)"}
 {"uk": "підписи діаграми, заголовки, стани, дати й текст листа, назви кроків і фаз зі стандартних шаблонів", "en": "diagram labels, headers, statuses, dates and the e-mail text, step and phase names from the standard templates", "de": "Beschriftungen der Grafik, Überschriften, Status, Daten und der E-Mail-Text, Namen von Schritten und Phasen aus den Standardvorlagen"}
 {"uk": "підписи діаграми, заголовки, стани, дати й текст листа, назви кроків і фаз зі стандартних шаблонів; свої назви — як ви їх написали", "en": "diagram labels, headers, statuses, dates and the e-mail text, step and phase names from the standard templates; your own names — as you wrote them", "de": "Beschriftungen der Grafik, Überschriften, Status, Daten und der E-Mail-Text, Namen von Schritten und Phasen aus den Standardvorlagen; eigene Namen — wie Sie sie geschrieben haben"}
 {"uk": "підписи діаграми, заголовки, стани, дати й текст листа; назви кроків, фаз і сторін — як ви їх написали", "en": "diagram labels, headings, statuses, dates and the e-mail text; names of steps, phases and parties stay as you wrote them", "de": "Diagrammbeschriftungen, Überschriften, Status, Termine und E-Mail-Text; Namen von Schritten, Phasen und Beteiligten bleiben, wie Sie sie geschrieben haben"}
@@ -22408,6 +22426,7 @@
 {"uk": "рахунок прив'язався; інакше прикріпіть на", "en": "the invoice got attached; otherwise attach it on", "de": "die Rechnung zugeordnet wurde; sonst hängen Sie sie an auf"}
 {"uk": "рахунок прикріплено до замовлення", "en": "invoice attached to the order", "de": "Rechnung an den Auftrag angehängt"}
 {"uk": "рахунок у замовленні. Не прив'язався — Minerva скаже, і тоді прикріпіть його на", "en": "the invoice in the order. Not attached — Minerva tells you, and then attach it on", "de": "die Rechnung im Auftrag anzeigt. Nicht zugeordnet — Minerva meldet es, dann hängen Sie sie an auf"}
+{"uk": "рахунок-лист на бланку Commercial Invoice — логотип і лінії бланка, дані фірми з налаштувань компанії", "en": "invoice letter on the Commercial Invoice letterhead — logo and lines from the letterhead, company data from the company settings", "de": "Rechnungsbrief auf dem Briefbogen der Commercial Invoice — Logo und Linien vom Briefbogen, Firmendaten aus den Firmeneinstellungen"}
 {"uk": "рахує", "en": "rated with", "de": "berechnet mit"}
 {"uk": "регіон", "en": "region", "de": "Region"}
 {"uk": "редагування", "en": "editing", "de": "Bearbeiten"}
@@ -22482,6 +22501,7 @@
 {"uk": "рядок", "en": "line", "de": "Zeile"}
 {"uk": "рядок {0}: «{1}» — кількість має бути цілою", "en": "line {0}: “{1}” — the quantity must be a whole number", "de": "Zeile {0}: „{1}“ — die Menge muss eine ganze Zahl sein"}
 {"uk": "рядок {0}: «{1}» — товар не знайдено", "en": "line {0}: “{1}” — product not found", "de": "Zeile {0}: „{1}“ — Artikel nicht gefunden"}
+{"uk": "рядок відправника над адресою", "en": "sender line above the address", "de": "Absenderzeile über der Adresse"}
 {"uk": "рівними кроками", "en": "in equal steps", "de": "in gleichen Schritten"}
 {"uk": "різних записів сьогодні", "en": "distinct records today", "de": "verschiedene Datensätze heute"}
 {"uk": "різниця", "en": "difference", "de": "Differenz"}
@@ -22815,6 +22835,7 @@
 {"uk": "так відправляли в {0} ({1} раз.)", "en": "shipped like this to {0} ({1} times)", "de": "so nach {0} versandt ({1}-mal)"}
 {"uk": "так відправляли цьому клієнту ({0} раз.)", "en": "shipped like this to this customer ({0} times)", "de": "so an diesen Kunden versandt ({0}-mal)"}
 {"uk": "так отримає", "en": "this is how it will reach", "de": "so erhält es"}
+{"uk": "так само", "en": "likewise", "de": "ebenso"}
 {"uk": "так — готово; ні — «🔄 Повне підключення» (запис і правила)", "en": "yes — done; no — “🔄 Full connection” (writing and rules)", "de": "ja — fertig; nein — „🔄 Vollständige Verbindung“ (Schreiben und Regeln)"}
 {"uk": "так, перекладати (це коштує грошей)", "en": "yes, translate (this costs money)", "de": "ja, übersetzen (das kostet Geld)"}
 {"uk": "такий тип файлу не індексується", "en": "this file type is not indexed", "de": "dieser Dateityp wird nicht indexiert"}
@@ -23263,6 +23284,7 @@
 {"uk": "фільтрах і виборі категорії: «📡 Антени».", "en": "filters and category selection: «📡 Antennas».", "de": "Filtern und der Kategorieauswahl: «📡 Antennen»."}
 {"uk": "фільтри", "en": "filters", "de": "Filter"}
 {"uk": "фірма", "en": "company", "de": "Firma"}
+{"uk": "фірма (з «Бухгалтерія → Налаштування компанії»)", "en": "company (from “Accounting → Company settings”)", "de": "Firma (aus „Buchhaltung → Firmeneinstellungen“)"}
 {"uk": "характеристики товарів, даташити й наявність на складі", "en": "product specifications, datasheets and stock availability", "de": "Artikeleigenschaften, Datenblätter und Lagerverfügbarkeit"}
 {"uk": "хв", "en": "min", "de": "Min."}
 {"uk": "хв тому", "en": "min ago", "de": "Min. her"}

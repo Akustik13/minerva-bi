@@ -39,29 +39,42 @@ UNITS = {"de": "Stk.", "en": "pcs", "de_en": "Stk."}
 
 LABELS = {
     "de": {
-        "title": "Rechnung", "number": "Rechnungsnummer", "date": "Rechnungsdatum", "service_date": "Lieferdatum",
-        "due_date": "Zahlbar bis", "customer_no": "Kundennummer", "order": "Bestellung", "po": "Ihre Bestellnummer",
-        "bill_to": "Rechnungsempfänger", "ship_to": "Lieferadresse", "contact": "Ansprechpartner",
-        "seller": "Verkäufer", "vat_id": "USt-IdNr.", "shipping_row": "Verpackung und Versand",
-        "total_net": "Gesamtbetrag netto", "vat": "MwSt.", "gross": "Gesamtbetrag brutto",
-        "payment_info": "Bankverbindung", "name": "Name", "position": "Position", "part_no": "Art.-Nr.",
+        "title": "Rechnung", "number": "Rechnungsnummer", "date": "Rechnungsdatum", "service_date": "Leistungsdatum",
+        "due_date": "Zahlbar bis", "customer_no": "Kundennummer", "order": "Bestellnummer", "po": "Ihre Bestellnummer",
+        "ship_to": "Lieferadresse", "same_address": "wie Rechnungsadresse", "contact": "Ansprechpartner",
+        "shipping_row": "Versandkosten", "total_net": "Gesamtsumme netto", "vat": "Umsatzsteuer",
+        "gross": "Gesamtsumme brutto", "regards": "Mit freundlichen Grüßen",
         "h_pos": "Pos.", "h_description": "Beschreibung", "h_qty": "Menge", "h_unit": "Einzelpreis",
-        "h_total": "Gesamt", "bank": "Bank", "holder": "Kontoinhaber",
+        "h_total": "Betrag", "bank": "Bank", "holder": "Kontoinhaber",
+        "attn": "z. Hd.", "mr": "Herrn", "ms": "Frau", "dear_mr": "Sehr geehrter Herr {name},",
+        "dear_ms": "Sehr geehrte Frau {name},", "dear": "Sehr geehrte Damen und Herren,",
+        "tel": "Tel.", "fax": "Fax", "mob": "Mob", "email": "E-Mail", "web": "Internet", "tax_no": "St.-Nr.",
+        "vat_id": "USt-IdNr.", "seat": "Firmensitz", "court": "Registergericht", "ceo": "Geschäftsführer",
+        "office": "Büro in", "page": "Seite",
     },
     "en": {
-        "title": "Invoice", "number": "Invoice No.", "date": "Invoice date", "service_date": "Delivery date",
-        "due_date": "Payment due", "customer_no": "Customer No.", "order": "Order", "po": "Your order No.",
-        "bill_to": "Invoice to", "ship_to": "Delivery address", "contact": "Contact person",
-        "seller": "Seller", "vat_id": "VAT ID", "shipping_row": "Packaging and shipping costs",
-        "total_net": "Total net", "vat": "VAT", "gross": "Total gross",
-        "payment_info": "Bank details", "name": "Name", "position": "Position", "part_no": "Part No.",
+        "title": "Invoice", "number": "Invoice No.", "date": "Invoice date", "service_date": "Date of supply",
+        "due_date": "Payment due", "customer_no": "Customer No.", "order": "Order No.", "po": "Your order No.",
+        "ship_to": "Delivery address", "same_address": "same as invoice address", "contact": "Contact person",
+        "shipping_row": "Shipping costs", "total_net": "Total net", "vat": "VAT", "gross": "Total gross",
+        "regards": "Kind regards",
         "h_pos": "Pos.", "h_description": "Description", "h_qty": "Qty", "h_unit": "Unit price",
-        "h_total": "Total", "bank": "Bank", "holder": "Account holder",
+        "h_total": "Amount", "bank": "Bank", "holder": "Account holder",
+        "attn": "Attn.", "mr": "Mr", "ms": "Ms", "dear_mr": "Dear Mr {name},", "dear_ms": "Dear Ms {name},",
+        "dear": "Dear Sir or Madam,",
+        "tel": "Tel.", "fax": "Fax", "mob": "Mob.", "email": "Email", "web": "Web", "tax_no": "Tax No.",
+        "vat_id": "VAT ID", "seat": "Registered office", "court": "Registration court", "ceo": "Managing director",
+        "office": "Office in", "page": "Page",
     },
 }
+# «Deutsch + English»: підписи «DE / EN»; адреса, звертання до людини й колонтитул — німецькою (звертання — обома)
 LABELS["de_en"] = {k: (v if v == LABELS["en"][k] else f"{v} / {LABELS['en'][k]}") for k, v in LABELS["de"].items()}
-for _k in ("h_description", "h_qty", "h_unit", "h_total"):     # заголовки таблиці: рядок DE, рядок EN
-    LABELS["de_en"][_k] = f"{LABELS['de'][_k]}\n{LABELS['en'][_k]}"
+for _k in ("attn", "mr", "ms", "dear_mr", "dear_ms", "dear", "tel", "fax", "mob", "email", "web", "seat", "court",
+           "ceo", "office", "same_address"):
+    LABELS["de_en"][_k] = LABELS["de"][_k]
+SALUTATIONS = [("", "—"), ("mr", "Herr / Mr"), ("ms", "Frau / Ms")]
+NO_ORDER_INTRO = {"de": "wir berechnen Ihnen die folgenden Positionen:",
+                  "en": "We invoice you for the following items:"}
 METHOD_NAMES = {
     "de": {"invoice": "Rechnung", "prepayment": "Vorkasse", "paypal": "PayPal",
            "stripe": "Kreditkarte / Online (Stripe)", "other": "Sonstige"},
@@ -125,28 +138,37 @@ def pay_kind(method: str, status: str) -> str:
 
 
 def due_for(kind: str, start: date, s: InvoiceSettings | None = None):
+    """Оплатити до: за рахунком — через `due_days`; передоплата — лише коли текст передоплати має {due_date}
+    («vorab» без дати — як у зразку); уже оплачено — без строку."""
     s = s or InvoiceSettings.get()
     if kind == "paid":
         return None
-    return start + timedelta(days=s.prepayment_due_days if kind == "prepayment" else s.due_days)
+    if kind == "prepayment":
+        texts = (s.pay_prepayment_de or "") + (s.pay_prepayment_en or "")
+        return start + timedelta(days=s.prepayment_due_days) if "{due_date}" in texts else None
+    return start + timedelta(days=s.due_days)
 
 
-def standard_texts(lang: str, vat_mode: str, kind: str, s: InvoiceSettings | None = None) -> dict:
-    """Тексти за замовчуванням мовою документа (з підстановками)."""
+def standard_texts(lang: str, vat_mode: str, kind: str, s: InvoiceSettings | None = None,
+                   has_order: bool = True) -> dict:
+    """Тексти за замовчуванням мовою документа (з підстановками). Без замовлення — вступ без «{order}»."""
     s = s or InvoiceSettings.get()
     vat_key = {"reverse_charge": "vat_reverse", "export": "vat_export"}.get(vat_mode)
+    intro = s.text("intro", lang)
+    if not has_order and "{order}" in intro:
+        intro = "\n".join(NO_ORDER_INTRO[x] for x in (("de", "en") if lang == "de_en" else (lang,)))
     return {
-        "intro_text": s.text("intro", lang),
+        "intro_text": intro,
         "payment_text": s.text(f"pay_{kind if kind in PAY_KINDS else 'invoice'}", lang),
         "vat_note": s.text(vat_key, lang) if vat_key else "",
         "outro_text": s.text("outro", lang),
     }
 
 
-def all_standard_texts(s: InvoiceSettings | None = None) -> dict:
+def all_standard_texts(s: InvoiceSettings | None = None, has_order: bool = True) -> dict:
     """Для редактора (JS): {мова: {ПДВ: {спосіб: тексти}}} — стандартні тексти міняються разом з мовою / ПДВ."""
     s = s or InvoiceSettings.get()
-    return {lang: {vm: {k: standard_texts(lang, vm, k, s) for k in PAY_KINDS} for vm in VAT_CODES}
+    return {lang: {vm: {k: standard_texts(lang, vm, k, s, has_order) for k in PAY_KINDS} for vm in VAT_CODES}
             for lang in LANG_CODES}
 
 
@@ -280,7 +302,7 @@ def initial_data(order=None, s: InvoiceSettings | None = None) -> dict:
             "bill_to": {}, "ship_to": {}, "customer_number": "", "order_ref": "", "customer_po": "", "lines": [],
             "shipping_cost": Decimal("0"), "vat_mode": "domestic", "vat_rate": Decimal(str(s.vat_rate or 0)),
             "payment_method": "", "signer_name": signer or "", "signer_position": position or "",
-            "sales_order": order}
+            "sales_order": order, "pay_kind": "invoice"}
     kind = "invoice"
     if order is not None:
         from . import payment_info
@@ -301,7 +323,8 @@ def initial_data(order=None, s: InvoiceSettings | None = None) -> dict:
             "service_date": order.shipped_at,
         })
     data["due_date"] = due_for(kind, today, s)
-    data.update(standard_texts(data["language"], data["vat_mode"], kind, s))
+    data["pay_kind"] = kind
+    data.update(standard_texts(data["language"], data["vat_mode"], kind, s, has_order=order is not None))
     return data
 
 
@@ -343,11 +366,15 @@ def _date(d, lang) -> str:
 
 
 def labels(lang: str, currency: str) -> tuple[dict, dict]:
+    from offers.document import _listing
     L = dict(LABELS.get(lang) or LABELS["de"])
     cur = currency or "EUR"
-    H = {"pos": L["h_pos"], "description": L["h_description"], "qty": L["h_qty"],
-         "unit": "\n".join(f"{x}, {cur}" for x in L["h_unit"].split("\n")),
-         "total": "\n".join(f"{x}, {cur}" for x in L["h_total"].split("\n"))}
+
+    def two(key):   # «Einzelpreis,» / «EUR» — двома рядками; «Deutsch + English» — «Einzelpreis, EUR» / «Unit price, EUR»
+        parts = L[key].split(" / ")
+        return _listing("\n".join(f"{x}, {cur}" for x in parts) if len(parts) > 1 else f"{parts[0]},\n{cur}")
+    H = {"pos": L["h_pos"], "description": _listing(L["h_description"].replace(" / ", "\n")),
+         "qty": _listing(L["h_qty"].replace(" / ", "\n")), "unit": two("h_unit"), "total": two("h_total")}
     return L, H
 
 
@@ -378,42 +405,152 @@ def fill(text: str, vals: dict) -> str:
     return _PH_RE.sub(lambda m: str(vals.get(m.group(1), m.group(0))), text or "")
 
 
-def payment_info_text(s: InvoiceSettings, lang: str) -> str:
-    if (s.payment_info or "").strip():
-        return s.payment_info.strip()
+def _company():
     try:
         from accounting.models import CompanySettings
-        c = CompanySettings.get()
+        return CompanySettings.get()
     except Exception:  # noqa: BLE001
-        return ""
+        return None
+
+
+def iban_groups(iban: str) -> str:
+    raw = re.sub(r"\s+", "", iban or "")
+    return " ".join(raw[i:i + 4] for i in range(0, len(raw), 4))
+
+
+def bank_rows(s: InvoiceSettings, lang: str) -> list:
+    """Банківські реквізити рядками {label, value}: «Банківські реквізити» з налаштувань рахунків (рядок
+    «Назва: значення»), інакше — з налаштувань компанії (Kontoinhaber, IBAN групами по 4, BIC, Bank)."""
     L = LABELS.get(lang) or LABELS["de"]
-    rows = [(L["holder"], c.legal_name or c.name), (L["bank"], c.bank_name), ("IBAN", c.iban), ("BIC", c.swift)]
-    if not c.iban:
-        return ""
-    return "\n".join(f"{k}: {v}" for k, v in rows if v)
+    if (s.payment_info or "").strip():
+        out = []
+        for line in s.payment_info.strip().splitlines():
+            label, sep, value = line.partition(":")
+            out.append({"label": f"{label.strip()}:", "value": value.strip()} if sep and value.strip()
+                       else {"label": "", "value": line.strip()})
+        return [r for r in out if r["value"] or r["label"]]
+    c = _company()
+    if c is None or not c.iban:
+        return []
+    rows = [(L["holder"], c.legal_name or c.name), ("IBAN", iban_groups(c.iban)), ("BIC", c.swift),
+            (L["bank"], c.bank_name)]
+    return [{"label": f"{k}:", "value": v} for k, v in rows if v]
 
 
-def company_block() -> str:
-    try:
-        from accounting.models import CompanySettings
-        c = CompanySettings.get()
-    except Exception:  # noqa: BLE001
-        return ""
-    city = " ".join(x for x in (c.addr_zip, c.addr_city) if x)
-    parts = [c.legal_name or c.name, c.addr_street, city, c.vat_id and f"USt-IdNr.: {c.vat_id}", c.email, c.phone]
-    return " · ".join(x for x in parts if x)
+def _ceo(c) -> str:
+    return (c.ceo_name or "").split(",")[0].strip() if c is not None else ""
+
+
+def seller(lang: str) -> dict:
+    """Дані фірми праворуч і рядок відправника над адресою — з «Бухгалтерія → Налаштування компанії»."""
+    c = _company()
+    L = LABELS.get(lang) or LABELS["de"]
+    if c is None:
+        return {"name": "", "return_line": "", "phones": [], "web": [], "tax": []}
+    name = c.legal_name or c.name
+    zip_city = " ".join(x for x in (c.addr_zip, c.addr_city) if x)
+    country = country_name(c.addr_country, "de" if lang == "de_en" else lang)
+
+    def pairs(items):
+        return [{"label": f"{k}:", "value": v} for k, v in items if v]
+    return {
+        "name": name, "street": c.addr_street, "zip_city": zip_city, "country": country,
+        "return_line": ", ".join(x for x in (name, c.addr_street, zip_city, country) if x),
+        "phones": pairs([(L["tel"], c.phone), (L["fax"], c.fax), (L["mob"], c.mobile)]),
+        "web": pairs([(L["email"], c.email), (L["web"], c.website)]),
+        "tax": pairs([(L["tax_no"], c.tax_id), (L["vat_id"], c.vat_id)]),
+    }
+
+
+def footer(lang: str) -> dict:
+    """Нижній колонтитул — три колонки: фірма й реєстрація · офіс · банк."""
+    from offers.document import _listing
+    c = _company()
+    L = LABELS.get(lang) or LABELS["de"]
+    if c is None:
+        return {"c1": "", "c2": "", "c3": ""}
+    name, city = c.legal_name or c.name, c.addr_city
+    ceo = _ceo(c)
+    zip_city = " ".join(x for x in (c.addr_zip, c.addr_city) if x)
+    cols = [
+        [f"{name}, {L['seat']}: {city}" if city else name,
+         f"{L['court']}: {c.registration_court}" if c.registration_court else "",
+         f"{L['ceo']}: {ceo}" if ceo else ""],
+        [f"{L['office']} {city}" if city else "", c.addr_street, zip_city],
+        [f"{L['bank']}: {c.bank_name}" if c.bank_name else "", f"IBAN: {c.iban}" if c.iban else "",
+         f"BIC / SWIFT: {c.swift}" if c.swift else ""],
+    ]
+    return {f"c{i}": _listing("\n".join(x for x in col if x)) for i, col in enumerate(cols, 1)}
+
+
+COMPANY_FIELDS = [("legal_name", "Юридична назва"), ("addr_street", "Адреса"), ("addr_zip", "Поштовий індекс"),
+                  ("addr_city", "Місто"), ("addr_country", "Країна (ISO 2)"), ("phone", "Телефон (Tel)"),
+                  ("email", "Email"), ("vat_id", "VAT ID / ІПН"), ("tax_id", "TAX ID (Steuernummer)"), ("iban", "IBAN"),
+                  ("swift", "SWIFT/BIC"), ("bank_name", "Банк"), ("registration_court", "Реєстраційний суд"),
+                  ("ceo_name", "Підписант (для рахунків)")]
+
+
+def company_missing() -> list:
+    """Поля «Налаштувань компанії», які рахунок показує, але вони порожні (підказка на сторінці рахунків)."""
+    c = _company()
+    if c is None:
+        return [label for _, label in COMPANY_FIELDS]
+    return [label for field, label in COMPANY_FIELDS
+            if not (getattr(c, field, "") or (field == "legal_name" and c.name))]
+
+
+def address_view(bill: dict, lang: str) -> dict:
+    """Адреса покупця для листа: перший рядок (компанія або ім'я), «z. Hd. Herrn …», USt-IdNr."""
+    L = LABELS.get(lang) or LABELS["de"]
+    company, name = (bill.get("company") or "").strip(), (bill.get("name") or "").strip()
+    title = {"mr": L["mr"], "ms": L["ms"]}.get(bill.get("salutation") or "", "")
+    attn = f"{L['attn']} {title + ' ' if title else ''}{name}" if company and name else ""
+    out = {k: (bill.get(k) or "") for k in ("street", "zip_city", "country", "vat_id", "email")}
+    out.update({"company": company, "name": name, "line1": company or name, "attn": attn,
+                "vat_line": f"{L['vat_id']}: {bill['vat_id']}" if bill.get("vat_id") else ""})
+    return out
+
+
+def salutation(bill: dict, lang: str) -> str:
+    """«Sehr geehrter Herr Bartl,» / «Sehr geehrte Frau …,» / «Sehr geehrte Damen und Herren,»; «Deutsch + English» —
+    обидва рядки."""
+    name = (bill.get("name") or "").strip()
+    last = name.split()[-1] if name else ""
+    sal = bill.get("salutation") or ""
+
+    def one(code):
+        L = LABELS[code]
+        if last and sal in ("mr", "ms"):
+            return L[f"dear_{sal}"].format(name=last)
+        return L["dear"]
+    return "\n".join(one(x) for x in (("de", "en") if lang == "de_en" else (lang if lang in LABELS else "de",)))
+
+
+def rich(text: str, vals: dict, bold=("order",)):
+    """Текст з підстановками як RichText: значення {order} — жирним (як «gemäß Ihrer Bestellung **PO-…**»)."""
+    from docxtpl import RichText
+    text = text or ""
+    rt, pos = RichText(), 0
+    for m in _PH_RE.finditer(text):
+        if m.start() > pos:
+            rt.add(text[pos:m.start()])
+        rt.add(str(vals.get(m.group(1), m.group(0))), bold=m.group(1) in bold)
+        pos = m.end()
+    if pos < len(text):
+        rt.add(text[pos:])
+    return rt
 
 
 def rows(inv: SalesInvoice) -> list:
+    """Позиції таблиці: опис і артикул одним рядком («Logarithmisch-periodische Antenne AN220201-04A»)."""
     doc, lang = _fmt(), inv.language
-    L = LABELS.get(lang) or LABELS["de"]
     out = []
     for i, line in enumerate(inv.lines or [], 1):
         qty, unit = _dec(line.get("qty")), _dec(line.get("unit_price"))
         desc = (line.get("description") or "").strip()
         part = (line.get("part_no") or "").strip()
         if part and part not in desc:
-            desc = f"{desc}\n{L['part_no']}: {part}" if desc else part
+            desc = f"{desc} {part}" if desc else part
         u = (line.get("unit") or "").strip()
         q = doc._fmt_qty(qty)
         out.append({"pos": i, "description": doc._listing(desc), "qty": f"{q} {u}" if u else q,
@@ -423,41 +560,37 @@ def rows(inv: SalesInvoice) -> list:
 
 
 def build_context(inv: SalesInvoice, s: InvoiceSettings | None = None) -> dict:
+    from docxtpl import RichText
     s = s or InvoiceSettings.get()
     doc, lang = _fmt(), inv.language if inv.language in LANG_CODES else "de"
     L, H = labels(lang, inv.currency)
     vals = values(inv)
-    bill = {k: (inv.bill_to or {}).get(k, "") for k in ("company", "name", "street", "zip_city", "country",
-                                                         "vat_id", "email")}
-    bill["vat_line"] = f"{L['vat_id']}: {bill['vat_id']}" if bill["vat_id"] else ""
     ship = inv.ship_to or {}
     ship_line = ", ".join(x for x in (ship.get(k, "") for k in ("company", "name", "street", "zip_city", "country")) if x)
+    ship_text = RichText()
+    ship_text.add(f"{L['ship_to']}: ", bold=True)
+    ship_text.add(ship_line or f"{L['same_address']}.")
     items = rows(inv)
     ship_cost = Decimal(inv.shipping_cost or 0)
-    shipping = {"pos": len(items) + 1, "description": L["shipping_row"], "qty": "1",
-                "unit_price": doc._fmt_money(ship_cost, lang), "total": doc._fmt_money(ship_cost, lang)}
-    bill_block = "\n".join(x for x in (bill["company"], bill["name"], bill["street"], bill["zip_city"],
-                                       bill["country"], bill["vat_line"]) if x)
     rate = inv.effective_vat_rate.normalize()
     return {
         "L": L, "H": H, "lang": lang, "currency": inv.currency,
         "number": inv.number, "date": vals["date"], "service_date": _date(inv.service_date, lang),
         "due_date": vals["due_date"], "customer_number": inv.customer_number, "order_ref": inv.order_ref,
         "customer_po": inv.customer_po,
-        "bill": bill, "bill_block": doc._listing(bill_block), "ship_line": ship_line,
-        "rows": items, "all_rows": items + ([shipping] if ship_cost else []),
-        "has_shipping": bool(ship_cost), "shipping_pos": len(items) + 1,
+        "bill": address_view(inv.bill_to or {}, lang), "salutation": doc._listing(salutation(inv.bill_to or {}, lang)),
+        "seller": seller(lang), "F": footer(lang), "ship_line": ship_line, "ship_text": ship_text,
+        "rows": items, "has_shipping": bool(ship_cost), "shipping_pos": len(items) + 1,
         "shipping_cost": doc._fmt_money(ship_cost, lang),
         "goods_total": doc._fmt_money(inv.goods_total, lang), "net_total": doc._fmt_money(inv.net_total, lang),
         "vat_rate": doc._localize(format(rate, "f"), lang) if rate != rate.to_integral_value() else str(int(rate)),
         "vat_total": doc._fmt_money(inv.vat_total, lang), "gross_total": doc._fmt_money(inv.gross_total, lang),
-        "intro": doc._listing(fill(inv.intro_text, vals)),
+        "has_intro": bool((inv.intro_text or "").strip()), "intro": rich(inv.intro_text, vals),
         "payment_text": doc._listing(fill(inv.payment_text, vals)),
         "vat_note": doc._listing(fill(inv.vat_note, vals)),
         "outro": doc._listing(fill(inv.outro_text, vals)),
-        "payment_info": doc._listing(payment_info_text(s, lang)),
-        "signer": inv.signer_name, "signer_position": inv.signer_position,
-        "company_block": company_block(),
+        "bank": bank_rows(s, lang) if inv.pay_kind != "paid" else [], "wide_bank": lang != "de",
+        "signer": inv.signer_name or _ceo(_company()), "signer_position": inv.signer_position,
     }
 
 
@@ -468,16 +601,25 @@ TEMPLATE_VARS = [
     ("{{ number }}", "номер рахунку"), ("{{ date }}", "дата рахунку"), ("{{ service_date }}", "дата поставки"),
     ("{{ due_date }}", "оплатити до"), ("{{ customer_number }}", "Kundennummer"),
     ("{{ order_ref }}", "номер замовлення"), ("{{ customer_po }}", "номер замовлення клієнта"),
-    ("{{ bill.company }} {{ bill.name }} {{ bill.street }} {{ bill.zip_city }} {{ bill.country }}", "адреса рахунку"),
+    ("{{ bill.line1 }} {{ bill.attn }} {{ bill.street }} {{ bill.zip_city }} {{ bill.country }}",
+     "адреса покупця: компанія (або ім'я), «z. Hd. Herrn …», вулиця, індекс і місто, країна"),
     ("{{ bill.vat_line }}", "«USt-IdNr.: …» або порожньо"), ("{{ bill.email }}", "email покупця"),
-    ("{{ ship_line }}", "адреса доставки одним рядком (порожньо — та сама)"),
-    ("{%tr for l in rows %} … {%tr endfor %}", "позиції: l.pos, l.description, l.qty, l.unit_price, l.total"),
-    ("{{ all_rows }}", "позиції разом із рядком доставки (для простого шаблону)"),
+    ("{{ salutation }}", "звертання: «Sehr geehrter Herr …,» або «Sehr geehrte Damen und Herren,»"),
+    ("{{ seller.return_line }}", "рядок відправника над адресою"),
+    ("{{ seller.name }} {{ seller.street }} {{ seller.zip_city }} {{ seller.country }}",
+     "фірма (з «Бухгалтерія → Налаштування компанії»)"),
+    ("{%p for x in seller.phones %} {{ x.label }} {{ x.value }} — так само seller.web, seller.tax",
+     "Tel / Fax / Mob · E-Mail / Internet · St.-Nr. / USt-IdNr."),
+    ("{{ F.c1 }} {{ F.c2 }} {{ F.c3 }}", "нижній колонтитул: фірма й реєстрація · офіс · банк"),
+    ("{{r ship_text }} / {{ ship_line }}", "«Lieferadresse: …» (або «wie Rechnungsadresse») / лише адреса"),
+    ("{%tr for l in rows %} … {%tr endfor %}", "позиції: l.pos, l.description (з артикулом), l.qty, l.unit_price, l.total"),
     ("{{ shipping_cost }} / {{ has_shipping }}", "доставка"),
     ("{{ net_total }} {{ vat_rate }} {{ vat_total }} {{ gross_total }} {{ currency }}", "суми"),
-    ("{{ intro }} {{ payment_text }} {{ vat_note }} {{ outro }}", "тексти (підстановки вже заповнені)"),
-    ("{{ payment_info }}", "банківські реквізити"), ("{{ signer }} / {{ signer_position }}", "підписант"),
-    ("{{ L.title }}, {{ L.number }} … {{ H.description }} …", "підписи мовою документа"),
+    ("{{r intro }} / {{ has_intro }}", "вступ ({order} — жирним)"),
+    ("{{ payment_text }} {{ vat_note }} {{ outro }}", "тексти (підстановки вже заповнені)"),
+    ("{%p for b in bank %} {{ b.label }} {{ b.value }}", "банківські реквізити (немає, коли вже оплачено)"),
+    ("{{ signer }} / {{ signer_position }}", "підписант («Ansprechpartner» і під «Mit freundlichen Grüßen»)"),
+    ("{{ L.title }}, {{ L.number }}, {{ L.regards }} … {{ H.description }} …", "підписи мовою документа"),
 ]
 
 
@@ -549,15 +691,16 @@ def sample_invoice() -> SalesInvoice:
     inv = SalesInvoice(
         number="CI-31728-001", inv_date=timezone.localdate(), service_date=timezone.localdate(),
         due_date=timezone.localdate() + timedelta(days=s.due_days), language="de", currency="EUR",
-        bill_to={"company": "Muster Elektronik GmbH", "name": "Max Mustermann", "street": "Hauptstraße 1",
-                 "zip_city": "10115 Berlin", "country": "Deutschland", "vat_id": "DE123456789",
-                 "email": "einkauf@example.com"},
+        bill_to={"company": "Muster Elektronik GmbH", "name": "Max Mustermann", "salutation": "mr",
+                 "street": "Hauptstraße 1", "zip_city": "10115 Berlin", "country": "Deutschland",
+                 "vat_id": "DE123456789", "email": "einkauf@example.com"},
         ship_to={"company": "Muster Elektronik GmbH", "street": "Lagerweg 5", "zip_city": "12345 Potsdam",
                  "country": "Deutschland"},
         customer_number="31728", order_ref="PO-31728-001", customer_po="4500012345",
         lines=[{"description": "Antenne 2.4 GHz", "part_no": "AN220213-01C", "qty": 10, "unit_price": "12.5"},
                {"description": "Filter 2.7–3.65 GHz", "part_no": "FT220407", "qty": 2, "unit_price": "48.9"}],
         shipping_cost=Decimal("12.90"), vat_mode="domestic", vat_rate=Decimal("19"), payment_method="invoice",
+        pay_kind="invoice",
         signer_name=s.signer_name or "Max Muster", signer_position=s.signer_position or "Geschäftsführer")
     for k, v in standard_texts("de", "domestic", "invoice", s).items():
         setattr(inv, k, v)
@@ -693,7 +836,7 @@ def parse_lines(raw) -> list:
     return out
 
 
-ADDRESS_KEYS = ("company", "name", "street", "zip_city", "country", "vat_id", "email")
+ADDRESS_KEYS = ("company", "name", "salutation", "street", "zip_city", "country", "vat_id", "email")
 
 
 def parse_address(post, prefix: str) -> dict:
@@ -737,6 +880,8 @@ def save_form(inv: SalesInvoice, post) -> SalesInvoice:
         raise InvoiceError("Ставка ПДВ — від 0 до 100 %.")
     inv.vat_rate = rate
     inv.payment_method = (post.get("payment_method") or "").strip()[:20]
+    kind = post.get("pay_kind") or inv.pay_kind
+    inv.pay_kind = kind if kind in PAY_KINDS else "invoice"
     for f in ("intro_text", "payment_text", "vat_note", "outro_text"):
         setattr(inv, f, (post.get(f) or "").strip())
     inv.signer_name = (post.get("signer_name") or "").strip()[:120]

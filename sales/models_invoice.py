@@ -11,6 +11,22 @@ from django.core.validators import MinValueValidator
 from django.db import models
 
 LANGS = [("de", "Deutsch"), ("en", "English"), ("de_en", "Deutsch + English")]
+PAY_KINDS = [("invoice", "Оплата за рахунком (строк)"), ("prepayment", "Передоплата (Vorkasse)"),
+             ("paid", "Уже оплачено")]
+DEFAULT_TEXTS = {
+    "intro_de": "gemäß Ihrer Bestellung {order} berechnen wir Ihnen die folgenden Positionen:",
+    "intro_en": "According to your order {order}, we invoice you for the following items:",
+    "pay_invoice_de": "Bitte überweisen Sie den Rechnungsbetrag ohne Abzug bis zum {due_date} unter Angabe der "
+                      "Rechnungsnummer {number} auf das folgende Konto:",
+    "pay_invoice_en": "Please transfer the invoice amount without deduction by {due_date}, quoting invoice number "
+                      "{number}, to the following account:",
+    "pay_prepayment_de": "Bitte überweisen Sie den Rechnungsbetrag vorab unter Angabe der Rechnungsnummer {number} "
+                         "auf das folgende Konto:",
+    "pay_prepayment_en": "Please transfer the invoice amount in advance, quoting invoice number {number}, to the "
+                         "following account:",
+    "outro_de": "Diese Rechnung wurde elektronisch erstellt und ist ohne Unterschrift gültig.",
+    "outro_en": "This invoice was created electronically and is valid without a signature.",
+}
 VAT_MODES = [
     ("domestic", "З ПДВ (Німеччина / покупець без USt-IdNr)"),
     ("reverse_charge", "Reverse Charge — ЄС, покупець з USt-IdNr (0 %)"),
@@ -40,6 +56,8 @@ class SalesInvoice(models.Model):
     vat_mode = models.CharField("ПДВ", max_length=20, choices=VAT_MODES, default="domestic")
     vat_rate = models.DecimalField("Ставка ПДВ, %", max_digits=5, decimal_places=2, default=Decimal("19"))
     payment_method = models.CharField("Спосіб оплати", max_length=20, blank=True, default="")
+    pay_kind = models.CharField("Текст оплати", max_length=12, choices=PAY_KINDS, default="invoice",
+                                help_text="Уже оплачено — без банківських реквізитів у рахунку.")
     intro_text = models.TextField("Вступ", blank=True, default="")
     payment_text = models.TextField("Оплата (текст у рахунку)", blank=True, default="")
     vat_note = models.TextField("Примітка про ПДВ", blank=True, default="")
@@ -120,24 +138,12 @@ class InvoiceSettings(models.Model):
         "Банківські реквізити", blank=True, default="",
         help_text="Блок «Bankverbindung» у рахунку. Порожньо — з «Бухгалтерія → Налаштування компанії» (банк, IBAN, BIC).")
     # Тексти — {number}, {date}, {due_date}, {amount}, {order}, {customer} підставляються
-    intro_de = models.TextField("Вступ (DE)", blank=True,
-                                default="Vielen Dank für Ihren Auftrag. Wir berechnen Ihnen wie folgt:")
-    intro_en = models.TextField("Вступ (EN)", blank=True,
-                                default="Thank you for your order. We invoice you as follows:")
-    pay_invoice_de = models.TextField(
-        "Оплата за рахунком (DE)", blank=True,
-        default="Zahlbar ohne Abzug bis zum {due_date}. Bitte geben Sie bei der Zahlung die Rechnungsnummer {number} an.")
-    pay_invoice_en = models.TextField(
-        "Оплата за рахунком (EN)", blank=True,
-        default="Payable without deduction by {due_date}. Please quote invoice number {number} with your payment.")
-    pay_prepayment_de = models.TextField(
-        "Передоплата / Vorkasse (DE)", blank=True,
-        default="Zahlung per Vorkasse: Bitte überweisen Sie {amount} bis zum {due_date} unter Angabe der "
-                "Rechnungsnummer {number}. Der Versand erfolgt nach Zahlungseingang.")
-    pay_prepayment_en = models.TextField(
-        "Передоплата / Vorkasse (EN)", blank=True,
-        default="Payment in advance: please transfer {amount} by {due_date} quoting invoice number {number}. "
-                "We ship after receipt of payment.")
+    intro_de = models.TextField("Вступ (DE)", blank=True, default=DEFAULT_TEXTS["intro_de"])
+    intro_en = models.TextField("Вступ (EN)", blank=True, default=DEFAULT_TEXTS["intro_en"])
+    pay_invoice_de = models.TextField("Оплата за рахунком (DE)", blank=True, default=DEFAULT_TEXTS["pay_invoice_de"])
+    pay_invoice_en = models.TextField("Оплата за рахунком (EN)", blank=True, default=DEFAULT_TEXTS["pay_invoice_en"])
+    pay_prepayment_de = models.TextField("Передоплата / Vorkasse (DE)", blank=True, default=DEFAULT_TEXTS["pay_prepayment_de"])
+    pay_prepayment_en = models.TextField("Передоплата / Vorkasse (EN)", blank=True, default=DEFAULT_TEXTS["pay_prepayment_en"])
     pay_paid_de = models.TextField("Уже оплачено (DE)", blank=True,
                                    default="Der Rechnungsbetrag wurde bereits bezahlt ({method}). Vielen Dank!")
     pay_paid_en = models.TextField("Уже оплачено (EN)", blank=True,
@@ -153,10 +159,8 @@ class InvoiceSettings(models.Model):
                                      default="Steuerfreie Ausfuhrlieferung gemäß § 4 Nr. 1a UStG.")
     vat_export_en = models.TextField("Примітка експорт (EN)", blank=True,
                                      default="VAT-exempt export delivery.")
-    outro_de = models.TextField("Завершення (DE)", blank=True,
-                                default="Bei Fragen zu dieser Rechnung stehen wir Ihnen gerne zur Verfügung.")
-    outro_en = models.TextField("Завершення (EN)", blank=True,
-                                default="If you have any questions about this invoice, please do not hesitate to contact us.")
+    outro_de = models.TextField("Завершення (DE)", blank=True, default=DEFAULT_TEXTS["outro_de"])
+    outro_en = models.TextField("Завершення (EN)", blank=True, default=DEFAULT_TEXTS["outro_en"])
     email_subject_de = models.CharField("Тема листа (DE)", max_length=200, blank=True,
                                         default="Rechnung {number}")
     email_subject_en = models.CharField("Тема листа (EN)", max_length=200, blank=True,

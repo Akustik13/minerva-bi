@@ -59,6 +59,10 @@
       <div class="ri-grid">
         <div class="ri-field"><label class="ri-label">Компанія</label><input class="ri-input" name="bill_company" value="{{ inv.bill_to.company }}" translate="no"></div>
         <div class="ri-field"><label class="ri-label">Ім'я (контакт)</label><input class="ri-input" name="bill_name" value="{{ inv.bill_to.name }}" translate="no"></div>
+        <div class="ri-field"><label class="ri-label">Звертання</label>
+          <select class="ri-input" name="bill_salutation" title="«z. Hd. Herrn …» і «Sehr geehrter Herr …,»; без вибору — «Sehr geehrte Damen und Herren,»">
+            {% for code, label in salutations %}<option value="{{ code }}" {% if code == inv.bill_to.salutation %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select></div>
         <div class="ri-field" style="grid-column:1/-1"><label class="ri-label">Вулиця, будинок</label><input class="ri-input" name="bill_street" value="{{ inv.bill_to.street }}" translate="no"></div>
         <div class="ri-field"><label class="ri-label">Індекс, місто</label><input class="ri-input" name="bill_zip_city" value="{{ inv.bill_to.zip_city }}" translate="no"></div>
         <div class="ri-field"><label class="ri-label">Країна</label><input class="ri-input" name="bill_country" value="{{ inv.bill_to.country }}" translate="no"></div>

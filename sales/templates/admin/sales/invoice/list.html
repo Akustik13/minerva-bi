@@ -9,7 +9,7 @@
 {% block content %}
 <div class="ri-wrap">
   <h1 style="margin:0 0 6px;color:var(--text)">🧾 Рахунки (Rechnung)</h1>
-  <p class="ri-muted" style="margin:0 0 18px">Рахунки покупцям на бланку фірми — з логотипом, реквізитами, печаткою й підписом.
+  <p class="ri-muted" style="margin:0 0 18px">Рахунки покупцям — німецький рахунок-лист на бланку фірми: логотип, дані фірми, банк, без печатки й підпису.
     Замовлення з інтернет-магазину отримують номер магазину (CI-&lt;Kundennummer&gt;-NNN), решта — префікс + номер замовлення.
     Для митниці — <a href="/commercial-invoices/">💵 Commercial Invoices</a>.</p>
 
@@ -77,7 +77,12 @@
     <div class="ri-card-title">📄 Шаблон Word
       {% if can.settings %}<a class="ri-btn sm" href="/admin/sales/invoicesettings/" style="margin-left:auto">⚙️ Налаштування рахунків</a>{% endif %}
     </div>
-    <p style="margin:0 0 12px;color:var(--text)">Зараз: <b>{% if template_kind == "custom" %}власний (завантажений){% elif template_kind == "blank" %}на бланку Commercial Invoice — логотип, реквізити, печатка й підпис{% else %}простий (без бланка){% endif %}</b>.</p>
+    {% if company_missing %}
+    <div class="ri-err">⚠️ Дані фірми в рахунку (блок праворуч, банк і нижній колонтитул) беруться з
+      <a href="/admin/accounting/companysettings/">«Бухгалтерія → Налаштування компанії»</a>. Не заповнено:
+      <span translate="no">{{ company_missing|join:", " }}</span>.</div>
+    {% endif %}
+    <p style="margin:0 0 12px;color:var(--text)">Зараз: <b>{% if template_kind == "custom" %}власний (завантажений){% elif template_kind == "blank" %}рахунок-лист на бланку Commercial Invoice — логотип і лінії бланка, дані фірми з налаштувань компанії{% else %}простий (без бланка){% endif %}</b>.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <a class="ri-btn" href="/rechnungen/template/sample/?pdf=1" target="_blank">👁 Приклад рахунку</a>
       <a class="ri-btn" href="/rechnungen/template/download/">⬇️ Завантажити поточний шаблон</a>
@@ -96,8 +101,8 @@
     </div>
     <p class="ri-muted" style="margin:12px 0 8px">Як змінити оформлення: завантажте поточний шаблон, змініть у Word шрифти, тексти, розташування,
       не чіпаючи змінних {% verbatim %}<code>{{ … }}</code> і <code>{%p … %}</code> / <code>{%tr … %}</code>{% endverbatim %}, і завантажте назад —
-      перед збереженням шаблон перевіряється на прикладі. Бланк (логотип, нижній колонтитул, печатка, підпис) береться з шаблону Commercial Invoice:
-      змінили там — шаблон рахунку перебудується сам. Тексти, строки, банк, підписант і лист — у «⚙️ Налаштування рахунків».</p>
+      перед збереженням шаблон перевіряється на прикладі. Логотип і лінії колонтитулів беруться з бланка Commercial Invoice:
+      змінили там — шаблон рахунку перебудується сам. Дані фірми — з «Бухгалтерія → Налаштування компанії», тексти, строки, банк, підписант і лист — у «⚙️ Налаштування рахунків».</p>
     <details>
       <summary style="cursor:pointer;color:var(--link-fg);font-size:13px">📚 Змінні шаблону й підстановки в текстах</summary>
       <div class="ri-scroll" style="margin-top:8px">

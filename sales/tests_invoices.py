@@ -5,7 +5,6 @@ python manage.py test sales.tests_invoices --settings=tabele.settings_test
 """
 import shutil
 import tempfile
-from datetime import timedelta
 from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
@@ -44,6 +43,13 @@ def docx_text(data: bytes) -> str:
         for c in t._cells:
             parts.append(c.text)
     return "\n".join(parts)
+
+
+COMPANY = dict(name="Sevskiy GmbH", legal_name="Sevskiy GmbH", addr_street="Schatzbogen 43", addr_zip="81829",
+               addr_city="München", addr_country="DE", vat_id="DE 293186022", tax_id="143/180/01384",
+               iban="DE35700100800607738803", bank_name="Postbank Ndl Deutsche Bank", swift="PBNKDEFFXXX",
+               email="sergey@sevskiy.de", phone="+49 89 38-90-72-29", website="www.sevskiy.de",
+               registration_court="München, HRB 208657", ceo_name="Dr.-Ing. Sergey Sevskiy, Geschäftsführer")
 
 
 @override_settings(MEDIA_ROOT=MEDIA)
@@ -105,8 +111,9 @@ class RulesTests(_Base):
         self.assertEqual((data["language"], data["vat_mode"], data["vat_rate"]), ("de", "domestic", Decimal("19.00")))
         self.assertEqual(data["lines"], [{"description": "Antenna 2.4 GHz", "part_no": "AN-1", "qty": 10, "unit": "",
                                           "unit_price": "12.5"}])
-        self.assertEqual(data["due_date"], timezone.localdate() + timedelta(days=7))   # Vorkasse
-        self.assertIn("Vorkasse", data["payment_text"])
+        self.assertIsNone(data["due_date"])                 # Vorkasse — «vorab», без дати (як у зразку)
+        self.assertEqual(data["pay_kind"], "prepayment")
+        self.assertIn("vorab", data["payment_text"])
         self.assertEqual(data["shipping_cost"], Decimal("12.90"))
 
     def test_paid_order_has_no_due_date(self):
@@ -120,9 +127,12 @@ class RulesTests(_Base):
         inv = svc.create_from_order(self.order, self.boss)
         ctx = svc.build_context(inv)
         self.assertEqual((ctx["net_total"], ctx["vat_total"], ctx["gross_total"]), ("137,90", "26,20", "164,10"))
-        self.assertIn("164,10 EUR", str(ctx["payment_text"]))
         self.assertIn("CI-31728-001", str(ctx["payment_text"]))
+        self.assertIn("<w:b/>", str(ctx["intro"]))                         # номер замовлення жирним
+        self.assertIn("PO-31728-001", str(ctx["intro"]))
         self.assertEqual(ctx["bill"]["vat_line"], "USt-IdNr.: DE129514004")
+        self.assertEqual(ctx["bill"]["attn"], "z. Hd. Anna Muster")
+        self.assertEqual(str(ctx["salutation"]), "Sehr geehrte Damen und Herren,")
         inv.vat_mode = "reverse_charge"
         ctx = svc.build_context(inv)
         self.assertEqual((ctx["vat_rate"], ctx["vat_total"], ctx["gross_total"]), ("0", "0,00", "137,90"))
@@ -136,9 +146,10 @@ class DocumentTests(_Base):
         inv = svc.create_from_order(self.order, self.boss)
         self.assertEqual(svc.template_kind(), "blank")
         text = docx_text(svc.render_docx(inv))
-        for needle in ("Rechnung", "CI-31728-001", "Fogra e.V.", "Rechnungsempfänger", "USt-IdNr.: DE129514004",
-                       "Antenna 2.4 GHz", "Art.-Nr.: AN-1", "Lieferadresse", "Gesamtbetrag brutto: 164,10 EUR",
-                       "Verpackung und Versand"):
+        for needle in ("Rechnung", "Rechnungsnummer:\tCI-31728-001", "Fogra e.V.", "z. Hd. Anna Muster",
+                       "USt-IdNr.: DE129514004", "Antenna 2.4 GHz AN-1", "Lieferadresse: Lager 1",
+                       "Gesamtsumme brutto", "164,10", "Versandkosten", "Sehr geehrte Damen und Herren,",
+                       "gemäß Ihrer Bestellung PO-31728-001", "Mit freundlichen Grüßen", "ohne Unterschrift gültig"):
             self.assertIn(needle, text)
         self.assertNotIn("{{", text)
         self.assertNotIn("HS Code", text)
@@ -146,8 +157,8 @@ class DocumentTests(_Base):
     def test_simple_template_renders(self):
         inv = svc.create_from_order(self.order, self.boss)
         text = docx_text(svc._render(svc.simple_template(), svc.build_context(inv)))
-        self.assertIn("Rechnung CI-31728-001", text)
-        self.assertIn("Gesamtbetrag brutto: 164,10 EUR", text)
+        self.assertIn("Rechnungsnummer:\tCI-31728-001", text)
+        self.assertIn("Gesamtsumme brutto", text)
 
     @mock.patch("documents.service._convert_to_pdf", return_value=b"%PDF-1.4 test")
     def test_generate_copies_to_order_folder(self, _pdf):
@@ -314,3 +325,76 @@ class QuickFromOrderTests(_Base):
         self.client.force_login(self.boss)
         page = self.client.get(f"/admin/sales/salesorder/{self.order.pk}/change/")
         self.assertContains(page, "🧾 Rechnung")
+
+
+class LetterLayoutTests(_Base):
+    """Рахунок-лист як у зразку: дані фірми, звертання, англійська для інших країн, банк, колонтитул."""
+
+    def setUp(self):
+        super().setUp()
+        from accounting.models import CompanySettings
+        c = CompanySettings.get()
+        for k, v in COMPANY.items():
+            setattr(c, k, v)
+        c.save()
+
+    def test_seller_footer_and_bank_from_company(self):
+        inv = svc.create_from_order(self.order, self.boss)
+        ctx = svc.build_context(inv)
+        self.assertEqual(ctx["seller"]["return_line"], "Sevskiy GmbH, Schatzbogen 43, 81829 München, Deutschland")
+        self.assertEqual(ctx["seller"]["tax"], [{"label": "St.-Nr.:", "value": "143/180/01384"},
+                                                {"label": "USt-IdNr.:", "value": "DE 293186022"}])
+        self.assertEqual(str(ctx["F"]["c1"]).count("Geschäftsführer: Dr.-Ing. Sergey Sevskiy"), 1)
+        self.assertIn("IBAN: DE35700100800607738803", str(ctx["F"]["c3"]))
+        self.assertEqual(ctx["bank"][1], {"label": "IBAN:", "value": "DE35 7001 0080 0607 7388 03"})
+        self.assertEqual(ctx["signer"], inv.signer_name or "Dr.-Ing. Sergey Sevskiy")
+        self.assertEqual(svc.company_missing(), [])
+        inv.pay_kind = "paid"
+        self.assertEqual(svc.build_context(inv)["bank"], [])                 # уже оплачено — без реквізитів
+        text = docx_text(svc.render_docx(svc.create_from_order(self.order, self.boss)))
+        for needle in ("Sevskiy GmbH, Schatzbogen 43, 81829 München, Deutschland", "Ansprechpartner:",
+                       "Kontoinhaber:\tSevskiy GmbH", "IBAN:\tDE35 7001 0080 0607 7388 03", "St.-Nr.:\t143/180/01384"):
+            self.assertIn(needle, text)
+
+    def test_salutation_and_attention(self):
+        bill = {"company": "Fogra", "name": "Johannes Bartl", "salutation": "mr"}
+        self.assertEqual(svc.address_view(bill, "de")["attn"], "z. Hd. Herrn Johannes Bartl")
+        self.assertEqual(svc.salutation(bill, "de"), "Sehr geehrter Herr Bartl,")
+        self.assertEqual(svc.salutation({**bill, "salutation": "ms"}, "en"), "Dear Ms Bartl,")
+        self.assertEqual(svc.salutation(bill, "de_en"), "Sehr geehrter Herr Bartl,\nDear Mr Bartl,")
+        self.assertEqual(svc.address_view({"name": "Anna"}, "de")["line1"], "Anna")      # без компанії — ім'я
+        self.assertEqual(svc.address_view({"name": "Anna"}, "de")["attn"], "")
+
+    def test_english_outside_german_speaking_countries(self):
+        ShopOrder.objects.filter(order=self.order).update(billing={**BILLING, "country": "FR", "vat_id": "FR123"}, vat_rate=0)
+        self.order.refresh_from_db()
+        data = svc.initial_data(self.order)
+        self.assertEqual((data["language"], data["vat_mode"]), ("en", "reverse_charge"))
+        self.assertEqual(data["bill_to"]["country"], "France")
+        self.assertIn("According to your order {order}", data["intro_text"])
+        inv = svc.create_from_order(self.order, self.boss)
+        text = docx_text(svc.render_docx(inv))
+        for needle in ("Invoice", "Invoice No.:", "Dear Sir or Madam,", "Total gross", "Account holder:",
+                       "Sevskiy GmbH, Schatzbogen 43, 81829 München, Germany", "VAT ID: FR123"):
+            self.assertIn(needle, text)
+        ShopOrder.objects.filter(order=self.order).update(billing={**BILLING, "country": "AT"})
+        self.order.refresh_from_db()
+        self.assertEqual(svc.initial_data(self.order)["language"], "de")       # Австрія — німецькою
+
+    def test_old_default_texts_updated_by_migration(self):
+        import importlib
+
+        from django.apps import apps
+        mig = importlib.import_module("sales.migrations.0053_invoice_letter_layout")
+        s = InvoiceSettings.get()
+        s.intro_de, s.outro_en = mig.OLD["intro"][0], "Own closing"
+        s.save()
+        inv = SalesInvoice.objects.create(number="R-9", inv_date=timezone.localdate(),
+                                          intro_text=mig.OLD["intro"][0] + "\n" + mig.OLD["intro"][1],
+                                          payment_text=mig.OLD["pay_prepayment"][0])
+        mig.forwards(apps, None)
+        s.refresh_from_db()
+        inv.refresh_from_db()
+        self.assertEqual((s.intro_de, s.outro_en), (mig.NEW["intro"][0], "Own closing"))   # змінене людиною — як є
+        self.assertEqual(inv.intro_text, mig.NEW["intro"][0] + "\n" + mig.NEW["intro"][1])
+        self.assertEqual((inv.payment_text, inv.pay_kind), (mig.NEW["pay_prepayment"][0], "prepayment"))
