@@ -3158,6 +3158,7 @@
 {"uk": "{0} приймає до {1} документів на посилку — більше додати не можна.", "en": "{0} accepts up to {1} documents per parcel — no more can be added.", "de": "{0} nimmt bis zu {1} Dokumente pro Sendung an — mehr können nicht hinzugefügt werden."}
 {"uk": "{0} прийнято", "en": "{0} received", "de": "{0} eingebucht"}
 {"uk": "{0} проблем", "en": "{0} issues", "de": "{0} Probleme"}
+{"uk": "{0} пропозицій звірки з агендою ще не прийнято — у листі агенда буде така, як зараз відмічено. Спершу «✓ Прийняти всі пропозиції» в агенді, якщо згодні.", "en": "{0} agenda-check suggestions are not accepted yet — the e-mail shows the agenda as it is ticked now. Use “✓ Accept all suggestions” in the agenda first if you agree.", "de": "{0} Vorschläge des Agenda-Abgleichs sind noch nicht übernommen — die E-Mail zeigt die Agenda so, wie sie jetzt abgehakt ist. Wenn Sie einverstanden sind, zuerst „✓ Alle Vorschläge übernehmen“ in der Agenda."}
 {"uk": "{0} пропущено (use --force to recreate)", "en": "{0} skipped (use --force to recreate)", "de": "{0} übersprungen (use --force to recreate)"}
 {"uk": "{0} пропущено/помилок", "en": "{0} skipped/errors", "de": "{0} übersprungen/Fehler"}
 {"uk": "{0} пропущено: {1}", "en": "{0} skipped: {1}", "de": "{0} übersprungen: {1}"}
@@ -3220,6 +3221,7 @@
 {"uk": "{0} — Підтвердіть email", "en": "{0} — Confirm your email", "de": "{0} — E-Mail bestätigen"}
 {"uk": "{0} — або експортуйте без перекладу назв", "en": "{0} — or export without translating the names", "de": "{0} — oder ohne Übersetzung der Namen exportieren"}
 {"uk": "{0} — або надішліть агенду без перекладу", "en": "{0} — or send the agenda without translation", "de": "{0} — oder die Tagesordnung ohne Übersetzung senden"}
+{"uk": "{0} — або надішліть підсумок без перекладу", "en": "{0} — or send the summary without translation", "de": "{0} — oder senden Sie die Zusammenfassung ohne Übersetzung"}
 {"uk": "{0} — адміністратор і бачить усе; щоб обмежити, спершу змініть роль у профілі.", "en": "{0} is an administrator and sees everything; to restrict, first change the role in the profile.", "de": "{0} ist Administrator und sieht alles; um dies einzuschränken, ändern Sie zuerst die Rolle im Profil."}
 {"uk": "{0} — артикул товару (або «Даташит: спільний файл»), напр. https://sevskiy.i234.me/datasheets/download.php?file={1}.pdf", "en": "{0} — the product SKU (or “Datasheet: shared file”), e.g. https://sevskiy.i234.me/datasheets/download.php?file={1}.pdf", "de": "{0} — Artikelnummer des Artikels (oder „Datenblatt: gemeinsame Datei“), z. B. https://sevskiy.i234.me/datasheets/download.php?file={1}.pdf"}
 {"uk": "{0} — артикул товару (або «Даташит: спільний файл»); досить початку адреси — Minerva допише {1}.pdf.", "en": "{0} — the product SKU (or “Datasheet: shared file”); the beginning of the address is enough — Minerva will append {1}.pdf.", "de": "{0} — Artikelnummer des Artikels (oder „Datenblatt: gemeinsame Datei“); der Anfang der Adresse genügt — Minerva ergänzt {1}.pdf."}
@@ -4116,6 +4118,8 @@
 {"uk": "Авторизувати Marketplace", "en": "Authorize Marketplace", "de": "Marketplace autorisieren"}
 {"uk": "Автоімпорт даних (Excel)", "en": "Automatic data import (Excel)", "de": "Automatischer Datenimport (Excel)"}
 {"uk": "Агенда", "en": "Agenda", "de": "Tagesordnung"}
+{"uk": "Агенда й результати", "en": "Agenda and results", "de": "Agenda und Ergebnisse"}
+{"uk": "Агенда й результати ({0})", "en": "Agenda and results ({0})", "de": "Agenda und Ergebnisse ({0})"}
 {"uk": "Агенда наради: скільки пунктів уже обговорили", "en": "Meeting agenda: how many items have been discussed", "de": "Tagesordnung: wie viele Punkte besprochen sind"}
 {"uk": "Агенда порожня — спершу додайте пункти", "en": "The agenda is empty — add items first", "de": "Die Tagesordnung ist leer — zuerst Punkte hinzufügen"}
 {"uk": "Агенда порожня.", "en": "The agenda is empty.", "de": "Die Tagesordnung ist leer."}
@@ -5038,6 +5042,7 @@
 {"uk": "Виберіть хоча б один файл", "en": "Choose at least one file", "de": "Wählen Sie mindestens eine Datei"}
 {"uk": "Виберіть шаблон", "en": "Choose a template", "de": "Wählen Sie eine Vorlage"}
 {"uk": "Виберіть, куди додати пункт", "en": "Choose where to add the item", "de": "Wählen Sie, wohin der Punkt hinzugefügt wird"}
+{"uk": "Виберіть, що буде в листі", "en": "Choose what goes into the e-mail", "de": "Wählen Sie, was in die E-Mail kommt"}
 {"uk": "Виберіть, що покупець бачить у касі: передоплата, рахунок, Stripe.", "en": "Choose what the customer sees at checkout: prepayment, invoice, Stripe.", "de": "Wählen Sie, was der Kunde an der Kasse sieht: Vorauszahlung, Rechnung, Stripe."}
 {"uk": "Виберіть, як відповіли", "en": "Choose how you replied", "de": "Wählen Sie, wie Sie geantwortet haben"}
 {"uk": "Вибирається в таблиці «Що звідки йде»: для «Willkommen» / оплат, команди й сайту — скринька або SMTP сповіщень; не вибрано — як «Відправник листів покупцям».", "en": "Chosen in the «Що звідки йде» table: for «Willkommen» / payments, team and site — a mailbox or the notification SMTP; not chosen — as «Відправник листів покупцям».", "de": "Wird in der Tabelle «Що звідки йде» gewählt: für «Willkommen» / Zahlungen, Team und Website — ein Postfach oder SMTP der Benachrichtigungen; nicht gewählt — wie «Відправник листів покупцям»."}
@@ -6684,6 +6689,7 @@
 {"uk": "До адресної книги", "en": "To address book", "de": "Ins Adressbuch"}
 {"uk": "До закупівлі ще {0} посилок у дорозі", "en": "{0} more parcels of the purchase order are on the way", "de": "Noch {0} Pakete der Bestellung unterwegs"}
 {"uk": "До замовлення", "en": "To order", "de": "Zu bestellen"}
+{"uk": "До коли", "en": "By when", "de": "Bis wann"}
 {"uk": "До надбавки й округлення правил DigiKey · курс — під таблицею", "en": "Before the markup and rounding of the DigiKey rules · rate — below the table", "de": "Vor Aufschlag und Rundung der DigiKey-Regeln · Kurs — unter der Tabelle"}
 {"uk": "До налаштувань DigiKey", "en": "To the DigiKey settings", "de": "Zu den DigiKey-Einstellungen"}
 {"uk": "До нарад", "en": "To meetings", "de": "Zu den Besprechungen"}
@@ -9558,6 +9564,7 @@
 {"uk": "Короткий проєкт: Angebot → замовлення → відправка зі складу.", "en": "Short project: Angebot → order → shipping from stock.", "de": "Kurzes Projekt: Angebot → Auftrag → Versand ab Lager."}
 {"uk": "Коротко", "en": "Brief", "de": "Kurz"}
 {"uk": "Коротко й по ділу: 1–2 речення суті, далі нумеровані кроки «де натиснути → що з'явиться».", "en": "Short and to the point: 1–2 sentences of substance, then numbered steps “where to click → what appears”.", "de": "Kurz und sachlich: 1–2 Sätze zum Kern, danach nummerierte Schritte „wo klicken → was erscheint“."}
+{"uk": "Коротко про нараду", "en": "The meeting in brief", "de": "Die Besprechung in Kürze"}
 {"uk": "Коротко про постачальника праворуч: візитки, контакти, закупівлі, запити", "en": "The supplier in short on the right: business cards, contacts, purchases, requests", "de": "Kurz zum Lieferanten rechts: Visitenkarten, Kontakte, Einkäufe, Anfragen"}
 {"uk": "Коротко, що потрібно", "en": "Briefly, what is needed", "de": "Kurz, was benötigt wird"}
 {"uk": "Коротко: продукція, технології, сильні сторони.", "en": "Briefly: products, technologies, strengths.", "de": "Kurz: Produkte, Technologien, Stärken."}
@@ -9865,6 +9872,7 @@
 {"uk": "Лист з агендою учасникам — за бажанням перекладений AI; відкриється у вашій пошті, надсилаєте ви", "en": "An e-mail with the agenda to the participants — translated by AI if you like; it opens in your mail and you send it", "de": "Eine E-Mail mit der Tagesordnung an die Teilnehmer — auf Wunsch von der AI übersetzt; sie öffnet sich in Ihrer Mail, Sie senden sie"}
 {"uk": "Лист з одноразовим посиланням (60 хв). Новий пароль завершує всі інші входи; покупець отримує лист «пароль змінено».", "en": "An email with a one-time link (60 min). The new password ends all other sessions; the buyer receives a “password changed” email.", "de": "E-Mail mit einem Einmal-Link (60 Min.). Das neue Passwort beendet alle anderen Anmeldungen; der Käufer erhält eine E-Mail „Passwort geändert“."}
 {"uk": "Лист з першим файлом", "en": "E-mail with the first file", "de": "E-Mail mit der ersten Datei"}
+{"uk": "Лист з підсумком відкрито в новій вкладці — перевірте й надішліть", "en": "The e-mail with the summary is open in a new tab — check it and send it", "de": "Die E-Mail mit der Zusammenfassung ist in einem neuen Tab geöffnet — prüfen und senden Sie sie"}
 {"uk": "Лист з рахунком", "en": "Email with the invoice", "de": "E-Mail mit der Rechnung"}
 {"uk": "Лист з файлами відкрито в новій вкладці", "en": "E-mail with the files opened in a new tab", "de": "E-Mail mit den Dateien in neuem Tab geöffnet"}
 {"uk": "Лист з цим файлом не знайдено у ваших скриньках.", "en": "The e-mail with this file was not found in your mailboxes.", "de": "Die E-Mail mit dieser Datei wurde in Ihren Postfächern nicht gefunden."}
@@ -10805,6 +10813,8 @@
 {"uk": "Надіслати посилання", "en": "Send link", "de": "Link senden"}
 {"uk": "Надіслати посилання для нового пароля", "en": "Send a link for a new password", "de": "Link für ein neues Passwort senden"}
 {"uk": "Надіслати поточний статус на Telegram / Email", "en": "Send the current status to Telegram / Email", "de": "Aktuellen Status per Telegram / E-Mail senden"}
+{"uk": "Надіслати підсумок листом", "en": "Send the summary by e-mail", "de": "Zusammenfassung per E-Mail senden"}
+{"uk": "Надіслати підсумок листом…", "en": "Send the summary by e-mail…", "de": "Zusammenfassung per E-Mail senden…"}
 {"uk": "Надіслати ранковий брифінг кожному юзеру в Telegram", "en": "Send the morning briefing to each user in Telegram", "de": "Morgenbriefing an jeden Benutzer in Telegram senden"}
 {"uk": "Надіслати сповіщення", "en": "Send notification", "de": "Benachrichtigung senden"}
 {"uk": "Надіслати сповіщення навіть якщо змін не було", "en": "Send a notification even if there were no changes", "de": "Benachrichtigung auch ohne Änderungen senden"}
@@ -11790,6 +11800,7 @@
 {"uk": "Нижче в «Мої»", "en": "Lower in “My”", "de": "Weiter unten in „Meine“"}
 {"uk": "Нижче точки дозамовлення: {0}", "en": "Below the reorder point: {0}", "de": "Unter dem Meldebestand: {0}"}
 {"uk": "Нижче — агенда нашої наради «{0}»{1}.", "en": "Below is the agenda of our meeting «{0}»{1}.", "de": "Unten die Tagesordnung unserer Besprechung «{0}»{1}."}
+{"uk": "Нижче — підсумок нашої наради «{0}» від {1}.", "en": "Below is the summary of our meeting “{0}” on {1}.", "de": "Nachfolgend die Zusammenfassung unserer Besprechung „{0}“ vom {1}."}
 {"uk": "Нижче: {0}", "en": "Down: {0}", "de": "Nach unten: {0}"}
 {"uk": "Низький", "en": "Low", "de": "Niedrig"}
 {"uk": "Низько", "en": "Low", "de": "Niedrig"}
@@ -13145,6 +13156,7 @@
 {"uk": "Переклад робить Claude (хмарний AI) — туди піде текст агенди; рахується в бюджеті AI. Без перекладу пункти йдуть, як написано.", "en": "Claude (cloud AI) translates — the agenda text is sent there; it counts towards the AI budget. Without translation the items go as written.", "de": "Die Übersetzung macht Claude (Cloud-AI) — dorthin geht der Text der Tagesordnung; zählt zum AI-Budget. Ohne Übersetzung gehen die Punkte wie geschrieben."}
 {"uk": "Переклад робить Claude (хмарний AI) — туди піде текст агенди; рахується в бюджеті AI. Уже перекладене (🌐 під пунктами чи в попередньому листі) не перекладається вдруге. Без перекладу пункти йдуть, як написано.", "en": "Claude (cloud AI) does the translation — the agenda text is sent there; it counts toward the AI budget. Anything already translated (🌐 under the items or in an earlier e-mail) is not translated again. Without translation the items go as written.", "de": "Die Übersetzung macht Claude (Cloud-KI) — dorthin geht der Text der Tagesordnung; zählt zum KI-Budget. Bereits Übersetztes (🌐 unter den Punkten oder in einer früheren E-Mail) wird nicht erneut übersetzt. Ohne Übersetzung gehen die Punkte wie geschrieben."}
 {"uk": "Переклад уже йде.", "en": "A translation is already running.", "de": "Eine Übersetzung läuft bereits."}
+{"uk": "Переклад — Claude (хмарний AI), рахується в бюджеті AI; перекладене запам'ятовується. Без перекладу тексти йдуть мовою, якою їх написано.", "en": "Translation is done by Claude (cloud AI) and counts towards the AI budget; translations are remembered. Without translation the texts go in the language they were written in.", "de": "Die Übersetzung macht Claude (Cloud-AI), sie zählt zum AI-Budget; Übersetzungen werden gespeichert. Ohne Übersetzung gehen die Texte in der Sprache, in der sie geschrieben sind."}
 {"uk": "Перекладаю назви кроків і фаз (AI)…", "en": "Translating the step and phase names (AI)…", "de": "Übersetze die Namen der Schritte und Phasen (AI)…"}
 {"uk": "Перекладаю…", "en": "Translating…", "de": "Übersetze…"}
 {"uk": "Перекладається…", "en": "Translating…", "de": "Wird übersetzt…"}
@@ -14854,6 +14866,7 @@
 {"uk": "Пульт проєкту", "en": "Project cockpit", "de": "Projekt-Cockpit"}
 {"uk": "Пульт проєкту зараз не вдалося показати — поля нижче працюють як звичайно.", "en": "The project cockpit could not be shown right now — the fields below work as usual.", "de": "Das Projekt-Cockpit kann gerade nicht angezeigt werden — die Felder unten funktionieren wie gewohnt."}
 {"uk": "Пункт #{0}", "en": "Item #{0}", "de": "Punkt #{0}"}
+{"uk": "Пункт агенди", "en": "Agenda item", "de": "Agendapunkt"}
 {"uk": "Пункт агенди наради", "en": "Meeting agenda item", "de": "Tagesordnungspunkt"}
 {"uk": "Пункт агенди не знайдено — оновіть сторінку", "en": "Agenda item not found — reload the page", "de": "Tagesordnungspunkt nicht gefunden — Seite neu laden"}
 {"uk": "Пункт не знайдено", "en": "Item not found", "de": "Punkt nicht gefunden"}
@@ -14980,8 +14993,10 @@
 {"uk": "Підсумки (subtotal/VAT/total) розраховуються автоматично.", "en": "Totals (subtotal/VAT/total) are calculated automatically.", "de": "Summen (subtotal/VAT/total) werden automatisch berechnet."}
 {"uk": "Підсумки та дії", "en": "Totals and actions", "de": "Summen und Aktionen"}
 {"uk": "Підсумку не вийшло — у розшифровці замало змісту.", "en": "No summary — the transcript has too little content.", "de": "Keine Zusammenfassung — das Transkript enthält zu wenig Inhalt."}
+{"uk": "Підсумку ще немає — спершу «📝 Скласти підсумок і звірити з агендою»", "en": "There is no summary yet — first “📝 Write the summary and check the agenda”", "de": "Noch keine Zusammenfassung — zuerst „📝 Zusammenfassung erstellen und mit der Agenda abgleichen“"}
 {"uk": "Підсумок", "en": "Summary", "de": "Zusammenfassung"}
 {"uk": "Підсумок наради", "en": "Meeting summary", "de": "Zusammenfassung der Besprechung"}
+{"uk": "Підсумок наради: {0} ({1})", "en": "Meeting summary: {0} ({1})", "de": "Zusammenfassung der Besprechung: {0} ({1})"}
 {"uk": "Підсумок не склався (сервер перезапустили) — спробуйте ще раз.", "en": "The summary was not finished (the server was restarted) — please try again.", "de": "Die Zusammenfassung wurde nicht fertig (der Server wurde neu gestartet) — bitte erneut versuchen."}
 {"uk": "Підсумок останньої перевірки", "en": "Last check summary", "de": "Ergebnis der letzten Prüfung"}
 {"uk": "Підсумок розкладу", "en": "Schedule summary", "de": "Zusammenfassung des Zeitplans"}
@@ -14989,6 +15004,8 @@
 {"uk": "Підсумок текстом — у лист, чат чи нотатки", "en": "The summary as text — for an e-mail, a chat or notes", "de": "Die Zusammenfassung als Text — für E-Mail, Chat oder Notizen"}
 {"uk": "Підсумок тенденцій", "en": "Trends summary", "de": "Zusammenfassung der Trends"}
 {"uk": "Підсумок уже складається — зачекайте", "en": "The summary is already being written — please wait", "de": "Die Zusammenfassung wird bereits erstellt — bitte warten"}
+{"uk": "Підсумок і агенда вже є цією мовою", "en": "The summary and the agenda already exist in this language", "de": "Zusammenfassung und Agenda gibt es bereits in dieser Sprache"}
+{"uk": "Підсумок і агенда з результатами одним листом — мовою, яку виберете; відкриється у вашій пошті, надсилаєте ви", "en": "The summary and the agenda with results in one e-mail — in the language you choose; it opens in your mail, you send it", "de": "Zusammenfassung und Agenda mit Ergebnissen in einer E-Mail — in der gewählten Sprache; sie öffnet sich in Ihrer Mail, senden tun Sie"}
 {"uk": "Підсумок — що {0} бачить, а що сховано", "en": "Summary — what {0} can see and what is hidden", "de": "Zusammenfassung — was {0} sieht und was ausgeblendet ist"}
 {"uk": "Підтвер­дження", "en": "Confirmation", "de": "Bestätigung"}
 {"uk": "Підтвердження", "en": "Confirmation", "de": "Bestätigung"}
@@ -17404,6 +17421,7 @@
 {"uk": "У Minerva зони не задані — сайт рахує доставку за своїми правилами з shop-config.php.", "en": "No zones are set in Minerva — the site calculates shipping by its own rules from shop-config.php.", "de": "In Minerva sind keine Zonen festgelegt – die Website berechnet den Versand nach eigenen Regeln aus shop-config.php."}
 {"uk": "У Minerva немає", "en": "Not in Minerva", "de": "Nicht in Minerva"}
 {"uk": "У Minerva немає вашої поштової скриньки — скопіюйте агенду текстом («📋 Копіювати текстом»)", "en": "You have no mailbox in Minerva — copy the agenda as text («📋 Copy as text»)", "de": "Sie haben kein Postfach in Minerva — Tagesordnung als Text kopieren («📋 Als Text kopieren»)"}
+{"uk": "У Minerva немає вашої поштової скриньки — скопіюйте підсумок текстом («📋 Копіювати текстом»)", "en": "You have no mailbox in Minerva — copy the summary as text (“📋 Copy as text”)", "de": "Sie haben kein Postfach in Minerva — kopieren Sie die Zusammenfassung als Text („📋 Als Text kopieren“)"}
 {"uk": "У Minerva немає вашої поштової скриньки — файли можна завантажити й надіслати самому", "en": "You have no mailbox in Minerva — download the files and send them yourself", "de": "Sie haben in Minerva kein Postfach — laden Sie die Dateien herunter und senden Sie sie selbst"}
 {"uk": "У Minerva немає ключа Anthropic — адміністратор додає його в «⚙️ Налаштування AI».", "en": "Minerva has no Anthropic key — the administrator adds it in “⚙️ AI settings”.", "de": "Minerva hat keinen Anthropic-Schlüssel — der Administrator trägt ihn in „⚙️ KI-Einstellungen“ ein."}
 {"uk": "У Minerva створено проєкт {0} «{1}», зв'язаний з askDANTE.", "en": "Project {0} “{1}” created in Minerva, linked to askDANTE.", "de": "In Minerva wurde das Projekt {0} „{1}“ erstellt, verknüpft mit askDANTE."}
@@ -18679,6 +18697,7 @@
 {"uk": "Ще {0} у пошті — забираю…", "en": "{0} more in mail — fetching…", "de": "Noch {0} in der Post — wird abgerufen…"}
 {"uk": "Ще адреси", "en": "More addresses", "de": "Weitere Adressen"}
 {"uk": "Ще адреси — колеги, через кому", "en": "More addresses — colleagues, comma-separated", "de": "Weitere Adressen — Kollegen, durch Komma getrennt"}
+{"uk": "Ще адреси — через кому", "en": "More addresses — separated by commas", "de": "Weitere Adressen — durch Komma getrennt"}
 {"uk": "Ще в картці", "en": "Also in the card", "de": "Weitere in der Karte"}
 {"uk": "Ще відправити", "en": "Still to ship", "de": "Noch zu versenden"}
 {"uk": "Ще відправити: {0} — замовлення «{1}».", "en": "Still to ship: {0} — order “{1}”.", "de": "Noch zu versenden: {0} — Auftrag „{1}“."}
@@ -18771,6 +18790,7 @@
 {"uk": "Що буде після цих налаштувань: опис, листи скриньки, що підходять, і «🧪 Що зробив би агент» на будь-якому з них.", "en": "What these settings will do: a description, the mailbox's matching emails and «🧪 What the agent would do» on any of them.", "de": "Was diese Einstellungen bewirken: Beschreibung, passende E-Mails des Postfachs und «🧪 Was der Agent tun würde» an jeder davon."}
 {"uk": "Що буде після цих налаштувань: опис, листи скриньки, що підходять, і «🧪 Що зробив би агент» на будь-якому з них. Нові листи доручення бере саме; лист, що прийшов раніше за доручення, — кнопкою «▶ Обробити зараз».", "en": "What these settings will do: a description, the mailbox e-mails that match, and “🧪 What the agent would do” on any of them. The rule picks up new e-mails by itself; an e-mail that arrived before the rule — with the “▶ Process now” button.", "de": "Was diese Einstellungen bewirken: Beschreibung, passende E-Mails des Postfachs und „🧪 Was der Agent tun würde“ bei jeder davon. Neue E-Mails übernimmt die Regel selbst; eine E-Mail, die vor der Regel kam, — mit der Schaltfläche „▶ Jetzt bearbeiten“."}
 {"uk": "Що в замовленні — позицій: {0}", "en": "Order contents — items: {0}", "de": "Bestellinhalt — Positionen: {0}"}
+{"uk": "Що в листі", "en": "What goes into the e-mail", "de": "Was in die E-Mail kommt"}
 {"uk": "Що в мене на цьому тижні?", "en": "What do I have this week?", "de": "Was steht diese Woche an?"}
 {"uk": "Що в них купували ({0} позицій)", "en": "What we bought from them ({0} items)", "de": "Was wir bei ihnen gekauft haben ({0} Positionen)"}
 {"uk": "Що в ньому важливого (необов'язково, теж шукається)", "en": "What is important in it (optional, also searchable)", "de": "Was darin wichtig ist (optional, wird ebenfalls durchsucht)"}
@@ -19117,6 +19137,7 @@
 {"uk": "Якщо увімкнено — лист надсилається одразу при натисканні кнопки без попереднього перегляду.", "en": "If enabled, the e-mail is sent immediately when the button is clicked, without a preview.", "de": "Wenn aktiviert, wird die E-Mail beim Klick auf die Schaltfläche sofort ohne Vorschau gesendet."}
 {"uk": "Якщо увімкнено — при підтвердженні відправки до ЄС система автоматично генерує інвойс (якщо ще не згенеровано). Якщо вимкнено — лише ручний режим.", "en": "If enabled, when confirming a shipment to the EU the system automatically generates an invoice (if not yet generated). If disabled, manual mode only.", "de": "Wenn aktiviert, erzeugt das System bei der Bestätigung einer Sendung in die EU automatisch eine Rechnung (sofern noch nicht erstellt). Wenn deaktiviert, nur manueller Modus."}
 {"uk": "Якщо увімкнено — статус замовлення оновлюється зі статусу DigiKey (тільки якщо новий статус вищий за поточний). Вимкніть якщо статус керується трекінгом перевізника (UPS/DHL) або виставляється вручну.", "en": "If enabled, the order status is updated from the DigiKey status (only if the new status is higher than the current one). Turn it off if the status is driven by carrier tracking (UPS/DHL) or set manually.", "de": "Wenn aktiviert, wird der Auftragsstatus aus dem DigiKey-Status aktualisiert (nur wenn der neue Status höher ist als der aktuelle). Deaktivieren Sie dies, wenn der Status durch die Sendungsverfolgung des Versanddienstleisters (UPS/DHL) gesteuert oder manuell gesetzt wird."}
+{"uk": "Якщо щось записано неточно чи пропущено — напишіть, будь ласка, у відповіді.", "en": "If anything is inaccurate or missing, please reply to this e-mail.", "de": "Falls etwas ungenau festgehalten ist oder fehlt, antworten Sie bitte auf diese E-Mail."}
 {"uk": "Якщо є на складі — підтверджувати тільки якщо всі товари є", "en": "If in stock — confirm only if all products are available", "de": "Wenn auf Lager — nur bestätigen, wenn alle Artikel vorhanden sind"}
 {"uk": "Якщо є трекінг-номер — спочатку запитати пряму API перевізника (DHL Tracking Unified, UPS), лише потім Jumingo. Допомагає коли Jumingo показує «Етикетка готова», а посилка вже в дорозі.", "en": "If there is a tracking number — first query the carrier's direct API (DHL Tracking Unified, UPS), only then Jumingo. Helps when Jumingo shows “Label ready” while the parcel is already in transit.", "de": "Wenn eine Sendungsnummer vorhanden ist — zuerst die direkte API des Versanddienstleisters (DHL Tracking Unified, UPS) abfragen, erst danach Jumingo. Hilfreich, wenn Jumingo „Etikett bereit“ anzeigt, das Paket aber bereits unterwegs ist."}
 {"uk": "Якщо є і завантажений PDF, і URL — що показувати в таблиці/картках?", "en": "If both an uploaded PDF and a URL exist — which to show in the table/cards?", "de": "Wenn sowohl ein hochgeladenes PDF als auch eine URL vorhanden sind — was soll in der Tabelle/den Karten angezeigt werden?"}
@@ -19164,6 +19185,7 @@
 {"uk": "або додайте свій — «＋ Ризик»", "en": "or add your own — “＋ Risk”", "de": "oder fügen Sie ein eigenes hinzu — „＋ Risiko“"}
 {"uk": "або кнопка «💾 Зберегти» — збережено.", "en": "or the “💾 Save” button — saved.", "de": "oder die Schaltfläche „💾 Speichern“ — gespeichert."}
 {"uk": "або надішліть агенду без перекладу", "en": "or send the agenda without translation", "de": "oder senden Sie die Tagesordnung ohne Übersetzung"}
+{"uk": "або надішліть лист без перекладу", "en": "or send the e-mail without translation", "de": "oder senden Sie die E-Mail ohne Übersetzung"}
 {"uk": "або напишіть AI, що скласти", "en": "or tell the AI what to draw up", "de": "oder schreiben Sie der AI, was sie erstellen soll"}
 {"uk": "або немає курсу: у 🥇 не бере участі.", "en": "or no exchange rate: not part of 🥇.", "de": "oder kein Wechselkurs: nimmt an 🥇 nicht teil."}
 {"uk": "або обидва канали вимкнені", "en": "or both channels are disabled", "de": "oder beide Kanäle sind deaktiviert"}
@@ -21396,6 +21418,7 @@
 {"uk": "не нижче закупівельної + {0} %", "en": "not below purchase price + {0} %", "de": "nicht unter Einkaufspreis + {0} %"}
 {"uk": "не обговорили", "en": "not discussed", "de": "nicht besprochen"}
 {"uk": "не обговорили на нараді {0}", "en": "not discussed at the meeting of {0}", "de": "in der Besprechung am {0} nicht besprochen"}
+{"uk": "не обговорили — на наступну нараду", "en": "not discussed — next meeting", "de": "nicht besprochen — nächste Besprechung"}
 {"uk": "не оголошено", "en": "not announced", "de": "nicht angekündigt"}
 {"uk": "не перевірено", "en": "not checked", "de": "nicht geprüft"}
 {"uk": "не перевіряється: {0}", "en": "not checked: {0}", "de": "nicht geprüft: {0}"}
@@ -21955,6 +21978,7 @@
 {"uk": "перезапише поточні документи/зображення.", "en": "will overwrite the current documents/images.", "de": "überschreibt die aktuellen Dokumente/Bilder."}
 {"uk": "перейдіть далі або завершіть", "en": "go on or finish", "de": "fahren Sie fort oder beenden Sie"}
 {"uk": "переклад: {0}", "en": "translation: {0}", "de": "Übersetzung: {0}"}
+{"uk": "перекладено (підсумок для листа)", "en": "translated (summary for the e-mail)", "de": "übersetzt (Zusammenfassung für die E-Mail)"}
 {"uk": "перекладів з комплекту: {0}", "en": "bundled translations: {0}", "de": "mitgelieferte Übersetzungen: {0}"}
 {"uk": "перекривається з записом askDANTE {0}", "en": "overlaps with askDANTE entry {0}", "de": "überschneidet sich mit askDANTE-Eintrag {0}"}
 {"uk": "переможець", "en": "winner", "de": "Gewinner"}
@@ -23597,6 +23621,7 @@
 {"uk": "ще {0} з інших скриньок", "en": "{0} more from other mailboxes", "de": "{0} weitere aus anderen Postfächern"}
 {"uk": "ще {0} записів не збережено (ліміт {1})", "en": "{0} more records not saved (limit {1})", "de": "weitere {0} Datensätze nicht gespeichert (Limit {1})"}
 {"uk": "ще {0} старіших не показано", "en": "{0} more older ones not shown", "de": "weitere {0} ältere nicht angezeigt"}
+{"uk": "ще відкрито", "en": "still open", "de": "noch offen"}
 {"uk": "ще відправити", "en": "still to ship", "de": "noch zu versenden"}
 {"uk": "ще відправити {0}", "en": "still to ship {0}", "de": "noch zu versenden {0}"}
 {"uk": "ще не було", "en": "none yet", "de": "noch keiner"}

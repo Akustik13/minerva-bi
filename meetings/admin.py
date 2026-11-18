@@ -15,6 +15,7 @@
   <pk>/moments/              POST JSON «🔄 Знайти ключові моменти ще раз» — Claude у Minerva (meetings/ai_moments.py)
   <pk>/fix/                  POST JSON «✏️ Виправити помилки розпізнавання» — Claude пропонує правки (meetings/ai_fix.py)
   <pk>/brief/                POST JSON «📝 Скласти підсумок і звірити з агендою» — Claude (meetings/ai_brief.py)
+  <pk>/brief/send/           POST JSON «✉️ Надіслати підсумок листом» — чернетка у власній скриньці (meetings/minutes.py)
   <pk>/fix/decide/           POST JSON ✓ / ✕ / ↶ правок розшифровки → свіжа панель і рядки
   <pk>/continue/             GET підготовка продовження («… (продовження)»)
   <pk>/remove/               POST «🗑 Видалити нараду»
@@ -169,6 +170,7 @@ class MeetingAdmin(admin.ModelAdmin):
             path("<int:pk>/moments/", w(self.moments_view), name="meetings_meeting_moments"),
             path("<int:pk>/fix/", w(self.fix_view), name="meetings_meeting_fix"),
             path("<int:pk>/brief/", w(self.brief_view), name="meetings_meeting_brief"),
+            path("<int:pk>/brief/send/", w(self.brief_send_view), name="meetings_meeting_brief_send"),
             path("<int:pk>/fix/decide/", w(self.fix_decide_view), name="meetings_meeting_fix_decide"),
             path("<int:pk>/continue/", w(self.continue_view), name="meetings_meeting_continue"),
             path("<int:pk>/remove/", w(self.remove_view), name="meetings_meeting_remove"),
@@ -554,6 +556,27 @@ class MeetingAdmin(admin.ModelAdmin):
         except MeetingError as e:
             return JsonResponse({"ok": False, "error": str(e)}, status=400)
         return JsonResponse({"ok": True, "state": st})
+
+    def brief_send_view(self, request, pk):
+        """POST JSON {to: [...], extra, lang, ai, parts: [...]} → {ok, compose} — чернетка листа з підсумком наради
+        й агендою з результатами у власній скриньці (meetings/minutes.py); надсилає людина."""
+        from . import minutes
+        refused = _post_only(request)
+        if refused:
+            return refused
+        m = services.get_own(request.user, pk)
+        refused = self._change_refused(request, m, as_json=True)
+        if refused:
+            return refused
+        data = _json_body(request)
+        to = list(data.get("to") or []) if isinstance(data.get("to"), list) else [data.get("to")]
+        parts = data.get("parts") if isinstance(data.get("parts"), list) else []
+        try:
+            compose = minutes.send(request.user, m, to + [data.get("extra") or ""], str(data.get("lang") or ""),
+                                   [str(p) for p in parts], ai=bool(data.get("ai")))
+        except MeetingError as e:
+            return JsonResponse({"ok": False, "error": str(e)}, status=400)
+        return JsonResponse({"ok": True, "compose": compose})
 
     def fix_decide_view(self, request, pk):
         """POST JSON {action accept | reject | reset, ids: [...] | "all"} → {panel, rows {n: html тексту}, counts}."""

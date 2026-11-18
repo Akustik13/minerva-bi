@@ -411,6 +411,52 @@
     });
   }
 
+  // ── ✉️ Підсумок наради листом (meetings/minutes.py): форма в картці підсумку, вкладка листа — одразу ──
+  var briefMail = document.getElementById('mt-brief-send');
+  if (briefMail) {
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest && e.target.closest('[data-mt-brief-mail]');
+      if (!b) return;
+      briefMail.hidden = b.getAttribute('data-mt-brief-mail') === 'close' ? true : !briefMail.hidden;
+      if (!briefMail.hidden) briefMail.scrollIntoView({block: 'nearest'});
+    });
+    briefMail.addEventListener('change', function (e) {
+      var t = e.target;
+      if (t.name !== 'lang') return;
+      var missing = +t.getAttribute('data-missing') || 0, lab = briefMail.querySelector('[data-mt-brief-ai]');
+      if (briefMail.elements.ai) briefMail.elements.ai.checked = missing > 0;
+      if (lab) lab.hidden = !missing;
+    });
+    briefMail.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var f = briefMail;
+      var pick = function (name) {
+        return Array.prototype.map.call(f.querySelectorAll('input[name=' + name + ']:checked'), function (c) { return c.value; });
+      };
+      var parts = pick('part');
+      if (!parts.length) { toast('⚠️ Виберіть, що буде в листі'); return; }
+      var lang = (f.querySelector('input[name=lang]:checked') || {}).value || 'uk';
+      var ai = f.elements.ai && f.elements.ai.checked && !f.querySelector('[data-mt-brief-ai]').hidden;
+      var tab = window.open('about:blank', '_blank');
+      var btn = f.querySelector('button[type=submit]'), label = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = ai ? '⏳ Перекладаю…' : '⏳ Готую лист…';
+      post(f.getAttribute('data-url'), {to: pick('to'), extra: f.elements.extra.value, lang: lang, ai: ai ? 1 : 0,
+                                        parts: parts}).then(function (j) {
+        btn.disabled = false;
+        btn.textContent = label;
+        if (!j || !j.ok || !j.compose) {
+          if (tab) tab.close();
+          toast('⚠️ ' + ((j && j.error) || 'Не вдалося'));
+          return;
+        }
+        if (tab) { tab.opener = null; tab.location.href = j.compose; } else { location.href = j.compose; }
+        f.hidden = true;
+        toast('✉️ Лист з підсумком відкрито в новій вкладці — перевірте й надішліть');
+      });
+    });
+  }
+
   // ── ✏️ Помилки розпізнавання — Claude у Minerva (meetings/ai_fix.py): запуск, хід (status/ → ai_fix), ✓ / ✕ / ↶ ──
   var fixBox = document.getElementById('mt-fix');
   if (fixBox) {

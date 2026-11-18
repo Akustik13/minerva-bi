@@ -8,6 +8,7 @@
  *
  * Вимкнути для себе — «Мої налаштування» → «♿ Доступність» (html[data-mv-fix-contrast="0"]).
  * Частину сторінки не чіпати — атрибут data-mv-contrast="off" (зразки кольорів, прев'ю теми).
+ * Вміст редакторів (contenteditable — текст листа) не чіпається ніколи: inline-колір пішов би в лист.
  * Перевірка сторінки в консолі: MVContrast.report() — що не читається (без виправлень), MVContrast.summary() —
  * ті самі місця, згруповані за парою «колір тексту / фон», MVContrast.show() — обвести виправлене.
  */
@@ -154,6 +155,7 @@
     return hasHc() ? (large ? 4.5 : 7) : (large ? 3 : 4.5);
   }
   function skipped(el) {
+    if (el.isContentEditable) return true;  // текст листа чи нотатки в редакторі: що там є — те й піде одержувачу
     for (var n = el; n && n.nodeType === 1; n = n.parentElement) {
       if (SKIP[n.tagName] || n.namespaceURI === 'http://www.w3.org/2000/svg') return true;
       if (n.getAttribute('data-mv-contrast') === 'off') return true;

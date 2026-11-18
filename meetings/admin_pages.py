@@ -529,8 +529,8 @@ def log_lines(m) -> list:
             from . import ai_moments
             where = "у Minerva" if e.get("where") == "minerva" else "на RAG-ПК"
             model = ai_moments.SHORT.get(e.get("model"), e.get("model") or "Claude")
-            what = {"fix": "перевірено на помилки розпізнавання",
-                    "brief": "підсумовано й звірено з агендою"}.get(e.get("task"), "оброблено")
+            what = {"fix": "перевірено на помилки розпізнавання", "brief": "підсумовано й звірено з агендою",
+                    "translate": "перекладено (підсумок для листа)"}.get(e.get("task"), "оброблено")
             text = (f"☁️ Текст розшифровки {what} в {model} (Anthropic, США) {where} — учасники погодились "
                     f"(підтвердив той, хто записав)")
         else:
@@ -650,7 +650,10 @@ def brief_box(user, m) -> dict | None:
     can = bool(m.transcript_at) and can_change(user)
     if view is None and not can:
         return None
+    from . import minutes
     return {"view": view, "can": can, "models": list(ai_brief.MODELS.items()), "default": ai_brief.DEFAULT,
+            "mail": minutes.form(user, m) if can and view else None,
+            "send_url": url("admin:meetings_meeting_brief_send", m.pk),
             "langs": list(ai_brief.LANGS.items()), "lang": (view or {}).get("lang") or "uk",
             "available": ai_brief.available(), "consent_text": ai_brief.CONSENT_TEXT, "state": ai_brief.state(m),
             "url": url("admin:meetings_meeting_brief", m.pk), "open": view is None}

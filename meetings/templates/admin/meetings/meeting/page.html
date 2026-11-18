@@ -3,7 +3,7 @@
 {# Назва, розшифровка, цитати, імена й адреси — лише в translate="no". JS — meetings/static/meetings/meetings.js. #}
 {% load static %}
 {% block title %}{{ title }} | Minerva{% endblock %}
-{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=13">{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=14">{% endblock %}
 {% block breadcrumbs %}
 <div class="breadcrumbs">
   <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
@@ -125,8 +125,41 @@
       <textarea id="mt-brief-text" class="mt-hidden-copy" readonly hidden translate="no">{{ brief.view.text }}</textarea>
       <div class="mt-actions">
         <button type="button" class="button" data-mt-copy="mt-brief-text" title="Підсумок текстом — у лист, чат чи нотатки">📋 Копіювати текстом</button>
+        {% if brief.mail %}<button type="button" class="button mt-primary" data-mt-brief-mail title="Підсумок і агенда з результатами одним листом — мовою, яку виберете; відкриється у вашій пошті, надсилаєте ви">✉️ Надіслати підсумок листом…</button>{% endif %}
         <span class="mt-muted">Склав <span translate="no">{{ brief.view.label }}</span>{% if brief.view.at %} · {{ brief.view.at|date:"d.m.Y H:i" }}{% endif %}{% if brief.view.cost %} · ${{ brief.view.cost|floatformat:4 }}{% endif %}{% if brief.view.lang_label %} · {{ brief.view.lang_label }}{% endif %}. Звірка з агендою — під пунктами агенди нижче (🤖).</span>
       </div>
+      {% if brief.mail %}
+      <form class="mt-ag-send mt-brief-send" id="mt-brief-send" data-url="{{ brief.send_url }}" hidden>
+        <h3>✉️ Надіслати підсумок листом</h3>
+        {% if brief.mail.waiting %}<div class="mt-line-warn">🤖 {{ brief.mail.waiting }} пропозицій звірки з агендою ще не прийнято — у листі агенда буде така, як зараз відмічено. Спершу «✓ Прийняти всі пропозиції» в агенді, якщо згодні.</div>{% endif %}
+        <fieldset class="mt-ag-to">
+          <legend>Кому</legend>
+          {% for p in brief.mail.people %}
+            <label><input type="checkbox" name="to" value="{{ p.email }}" checked> <span translate="no">{{ p.name|default:p.email }}{% if p.name %} &lt;{{ p.email }}&gt;{% endif %}</span></label>
+          {% empty %}
+            <p class="mt-muted">У нараді немає учасників з адресою — впишіть адреси нижче (або додасте в листі).</p>
+          {% endfor %}
+          <input name="extra" placeholder="Ще адреси — через кому" aria-label="Ще адреси" autocomplete="off" translate="no">
+        </fieldset>
+        <fieldset class="mt-ag-to">
+          <legend>Що в листі</legend>
+          {% for part in brief.mail.parts %}<label><input type="checkbox" name="part" value="{{ part.key }}"{% if part.on %} checked{% endif %}> {{ part.label }}</label>{% endfor %}
+        </fieldset>
+        <fieldset class="mt-ag-lang">
+          <legend>Мова листа</legend>
+          {% for s in brief.mail.langs %}<label><input type="radio" name="lang" value="{{ s.code }}" data-missing="{{ s.missing }}"{% if s.code == brief.mail.lang %} checked{% endif %}> {{ s.label }}{% if s.ready %} <span class="mt-ag-ok" title="Підсумок і агенда вже є цією мовою">✓</span>{% endif %}</label>{% endfor %}
+          {% for s in brief.mail.langs %}{% if s.code == brief.mail.lang %}
+          <label class="mt-ag-ai" data-mt-brief-ai{% if not s.missing %} hidden{% endif %}><input type="checkbox" name="ai" value="1"{% if s.missing %} checked{% endif %}> 🌐 Перекласти AI те, чого ще немає цією мовою</label>
+          {% endif %}{% endfor %}
+          <p class="mt-muted">Переклад — Claude (хмарний AI), рахується в бюджеті AI; перекладене запам'ятовується. Без перекладу тексти йдуть мовою, якою їх написано.</p>
+        </fieldset>
+        <div class="mt-actions">
+          <button type="submit" class="button mt-primary">✉️ Відкрити лист</button>
+          <button type="button" class="button" data-mt-brief-mail="close">Скасувати</button>
+          <span class="mt-muted">Лист відкриється у вашій пошті Minerva в новій вкладці — перевірте й надішліть самі.</span>
+        </div>
+      </form>
+      {% endif %}
     {% else %}
       <p class="mt-muted">Тези: що обговорили, про що домовились, завдання (хто — що — до коли), терміни, цифри, ризики й відкрите — з посиланнями на місце в розшифровці. І звірка з агендою: що обговорили й що вирішили по кожному пункту.</p>
     {% endif %}
@@ -444,5 +477,5 @@
   </dialog>
 </div>
 {{ config|json_script:"mt-config" }}
-<script src="{% static 'meetings/meetings.js' %}?v=11" defer></script>
+<script src="{% static 'meetings/meetings.js' %}?v=12" defer></script>
 {% endblock %}
