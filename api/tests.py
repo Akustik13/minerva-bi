@@ -400,6 +400,17 @@ class ShopTests(APITestBase):
             self.p2.name = "Cable v2"
             self.p2.save()   # товар не в магазині
         self.assertEqual(len(sent), 2)
+        for field, value in (("tech_attributes", {"Frequency": "38.4 MHz"}), ("manufacturer", "KEMET"),
+                             ("shop_min_qty", 1000), ("shop_qty_choices", [1000, 5000])):
+            with mock.patch("requests.post", side_effect=lambda *a, **k: sent.append(1) or _Resp(200)), \
+                    self.captureOnCommitCallbacks(execute=True):
+                setattr(self.p1, field, value)
+                self.p1.save()   # параметри / виробник / лот — сайт бере свіжі дані одразу
+        self.assertEqual(len(sent), 6)
+        with mock.patch("requests.post", side_effect=lambda *a, **k: sent.append(1) or _Resp(200)), \
+                self.captureOnCommitCallbacks(execute=True):
+            self.p1.save()   # нічого не змінилось — сайт не будимо
+        self.assertEqual(len(sent), 6)
 
 
 class AttrFilterTests(TestCase):

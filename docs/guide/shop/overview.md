@@ -39,7 +39,7 @@ related: shop/catalog-prices, shop/site-admin, shop/shipping-zones, shop/payment
 | [👤 Акаунти покупців](/admin/shop/shopcustomer/) | особистий кабінет на сайті — [детальніше](guide:shop/customer-accounts) |
 | [💳 Онлайн-оплати](/admin/shop/shoppayment/) | оплати Stripe — [детальніше](guide:shop/payments) |
 | [✉️ Шаблони листів](/admin/shop/shopmailtemplate/) | тексти листів покупцям — [детальніше](guide:shop/mail) |
-| [🧾 Замовлення з сайту](/admin/sales/salesorder/?source=webshop) | замовлення магазину з кодом `webshop` |
+| [🧾 Замовлення з сайту](/admin/sales/salesorder/?from_shop=1) | замовлення всіх інтернет-магазинів (фільтр «Інтернет-магазини»); одного магазину — кнопка його джерела над списком |
 | [📡 Вебхуки сайту](/admin/api/webhook/) | миттєве оновлення сайту після змін у Minerva |
 | [📘 Довідка: як це працює](/dashboard/shop/help/) | огляд розділу з цифрами по ваших магазинах |
 

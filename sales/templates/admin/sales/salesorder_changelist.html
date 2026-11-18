@@ -186,6 +186,12 @@ document.addEventListener('DOMContentLoaded', function () {
 #sv-pdf-tip embed{display:block;width:320px;height:420px;border:none}
 .sv-pdf-icon{cursor:pointer;display:inline-block;transition:transform .1s}
 .sv-pdf-icon:hover{transform:scale(1.2)}
+/* 💳 оплата замовлення (sales/payment_info.py): спосіб · стан */
+.sv-pay{font-size:11px;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;cursor:default;
+  color:#9e9e9e;border:1px solid rgba(158,158,158,.5);background:rgba(158,158,158,.10)}
+.sv-pay-paid{color:#4caf50;border-color:rgba(76,175,80,.5);background:rgba(76,175,80,.10)}
+.sv-pay-unpaid,.sv-pay-pending{color:#ff9800;border-color:rgba(255,152,0,.5);background:rgba(255,152,0,.10)}
+.sv-pay-failed{color:#ef5350;border-color:rgba(239,83,80,.5);background:rgba(239,83,80,.10)}
 </style>
 {% endblock %}
 
@@ -311,6 +317,11 @@ document.addEventListener('DOMContentLoaded', function () {
               style="font-size:10px;color:var(--text-dim);padding:2px 7px;border-radius:6px;
                      border:1px solid var(--border-strong);background:var(--bg-input);
                      white-space:nowrap;cursor:default">🔌 {{ order.status_source }}</span>
+        {% endif %}
+        {# 💳 Оплата: спосіб · стан (sales/payment_info.py — ті самі назви, що в листі й картці) #}
+        {% if order.payment_method or order.payment_status %}
+        <span class="sv-pay sv-pay-{{ order.payment_status|default:'none' }}"
+              title="{% trans "Оплата" %}{% if order.payment_reference %} · {{ order.payment_reference }}{% endif %}">💳 {% if order.payment_method %}{{ order.get_payment_method_display }}{% endif %}{% if order.payment_method and order.payment_status %} · {% endif %}{% if order.payment_status %}{{ order.get_payment_status_display }}{% endif %}</span>
         {% endif %}
         {# DigiKey shipment confirmation badge #}
         {% if order.source == "digikey" and order.tracking_number %}

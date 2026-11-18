@@ -4491,6 +4491,7 @@
 {"uk": "Без відповіді", "en": "No response", "de": "Keine Antwort"}
 {"uk": "Без відповіді або ⏭ Пропущено", "en": "No response or ⏭ Skipped", "de": "Keine Antwort oder ⏭ Übersprungen"}
 {"uk": "Без гарнітури", "en": "No headset", "de": "Ohne Headset"}
+{"uk": "Без даних про оплату", "en": "No payment data", "de": "Ohne Zahlungsangaben"}
 {"uk": "Без даташита", "en": "Without datasheet", "de": "Ohne Datenblatt"}
 {"uk": "Без документів", "en": "Without documents", "de": "Ohne Dokumente"}
 {"uk": "Без доступу до пошти Minerva лист з картки клієнта можна надіслати лише на адреси цього клієнта, а не на", "en": "Without access to Minerva mail, an email from the customer card can only be sent to this customer's addresses, not to", "de": "Ohne Zugriff auf die Minerva-E-Mail kann eine E-Mail aus der Kundenkarte nur an die Adressen dieses Kunden gesendet werden, nicht an"}
@@ -5661,6 +5662,7 @@
 {"uk": "Від нас — наше відправлення", "en": "Outgoing — our shipment", "de": "Ausgehend — unsere Sendung"}
 {"uk": "Від них", "en": "From them", "de": "Von ihnen"}
 {"uk": "Від року", "en": "From year", "de": "Ab Jahr"}
+{"uk": "Від сайту", "en": "From the website", "de": "Von der Website"}
 {"uk": "Від спаму в календар нічого не потрапляє. Події з листів відправника, від якого терміни", "en": "No spam gets into the calendar. Events from e-mails of a sender from whom deadlines", "de": "Von Spam gelangt nichts in den Kalender. Termine aus E-Mails eines Absenders, von dem Fristen"}
 {"uk": "Від спаму в календар нічого не потрапляє. Події з листів відправника, від якого терміни не потрібні, — у календарі: подія → «🚫 Більше не заносити від нього» (адреса або весь домен). Список фільтрів і чистка того, що вже внесено, з переглядом перед видаленням", "en": "No spam gets into the calendar. Events from e-mails of a sender from whom deadlines are not needed — in the calendar: event → “🚫 Stop adding from this sender” (address or whole domain). A list of filters and cleanup of what has already been added, with a preview before deletion", "de": "Von Spam gelangt nichts in den Kalender. Termine aus E-Mails eines Absenders, von dem Fristen nicht benötigt werden – im Kalender: Termin → „🚫 Von diesem Absender nicht mehr übernehmen“ (Adresse oder ganze Domain). Liste der Filter und Bereinigung des bereits Eingetragenen mit Vorschau vor dem Löschen"}
 {"uk": "Від того самого відправника, але не підійшли", "en": "From the same sender, but did not match", "de": "Vom selben Absender, aber nicht passend"}
@@ -6925,6 +6927,7 @@
 {"uk": "Доставка від, роб. днів", "en": "Delivery from, business days", "de": "Lieferung ab, Werktage"}
 {"uk": "Доставка до, роб. днів", "en": "Delivery up to, business days", "de": "Lieferung bis, Werktage"}
 {"uk": "Доставка закупівлі (API)", "en": "Purchase delivery (API)", "de": "Bestelllieferung (API)"}
+{"uk": "Доставка на іншу адресу", "en": "Delivery to another address", "de": "Lieferung an eine andere Adresse"}
 {"uk": "Доставка та оплата", "en": "Shipping and payment", "de": "Versand und Zahlung"}
 {"uk": "Доставка — відправлення і трекінг (читання)", "en": "Delivery — shipments and tracking (read)", "de": "Lieferung — Sendungen und Tracking (Lesen)"}
 {"uk": "Доставка — статус або трекінг-номер", "en": "Delivery — status or tracking number", "de": "Lieferung — Status oder Sendungsnummer"}
@@ -7239,6 +7242,7 @@
 {"uk": "З якої скриньки Minerva", "en": "From which Minerva mailbox", "de": "Aus welchem Minerva-Postfach"}
 {"uk": "З якої скриньки Minerva пише покупцям цього магазину (кабінет, «Ласкаво просимо», «Оплату отримано»), куди приходять відповіді і кому з команди — сповіщення. Скриньку магазину додайте в Minerva як акаунт пошти (Email → Акаунти): тоді відповіді покупців потрапляють у пошту Minerva й прив'язуються до клієнта в CRM. Тексти — «Шаблони листів». Підтвердження замовлення й контактну форму надсилає сайт: з «Сайт надсилає листи з цієї ж скриньки» — з цієї самої скриньки, інакше — з власних налаштувань сайту (/admin/ → «Пошта»).", "en": "The mailbox from which Minerva writes to this shop’s customers (account, “Welcome”, “Payment received”), where replies arrive, and which team members receive notifications. Add the shop’s mailbox to Minerva as a mail account (Email → Accounts): then customer replies land in Minerva mail and are linked to the customer in CRM. Texts — “Email templates”. The order confirmation and the contact form are sent by the site: with “The site sends emails from this same mailbox” — from this same mailbox, otherwise — from the site’s own settings (/admin/ → “Mail”).", "de": "Das Postfach, von dem Minerva an die Kunden dieses Shops schreibt (Kundenkonto, „Willkommen“, „Zahlung erhalten“), wohin die Antworten gelangen und welche Teammitglieder Benachrichtigungen erhalten. Fügen Sie das Postfach des Shops in Minerva als E-Mail-Konto hinzu (E-Mail → Konten): Dann landen die Antworten der Kunden in der Minerva-E-Mail und werden dem Kunden im CRM zugeordnet. Texte — „E-Mail-Vorlagen“. Die Auftragsbestätigung und das Kontaktformular sendet die Website: mit „Die Website sendet E-Mails aus diesem Postfach“ — aus diesem Postfach, andernfalls — aus den eigenen Einstellungen der Website (/admin/ → „E-Mail“)."}
 {"uk": "З якої скриньки — для інших листів", "en": "Which mailbox — for the other e-mails", "de": "Aus welchem Postfach — für die übrigen E-Mails"}
+{"uk": "З інтернет-магазинів", "en": "From online shops", "de": "Aus Onlineshops"}
 {"uk": "З інтернету", "en": "From the internet", "de": "Aus dem Internet"}
 {"uk": "З інтернету · {0}", "en": "From the internet · {0}", "de": "Aus dem Internet · {0}"}
 {"uk": "З'явиться після завершення попереднього.", "en": "Will appear after the previous one is completed.", "de": "Erscheint nach Abschluss des vorherigen."}
@@ -11218,6 +11222,7 @@
 {"uk": "Не додавати (пропозиція AI)", "en": "Don't add (AI suggestion)", "de": "Nicht hinzufügen (AI-Vorschlag)"}
 {"uk": "Не дозволяти автоматичному трекінгу знижувати статус замовлення з «Доставлено» назад до «Відправлено». Рекомендовано: увімкнено.", "en": "Do not allow automatic tracking to lower the order status from “Delivered” back to “Shipped”. Recommended: enabled.", "de": "Automatischem Tracking nicht erlauben, den Auftragsstatus von „Zugestellt“ zurück auf „Versendet“ zu senken. Empfohlen: aktiviert."}
 {"uk": "Не доставлено", "en": "Not delivered", "de": "Nicht zugestellt"}
+{"uk": "Не з магазинів", "en": "Not from shops", "de": "Nicht aus Shops"}
 {"uk": "Не задано SMTP: оберіть «Відправник листів покупцям» у магазині або заповніть SMTP у Налаштування → Сповіщення.", "en": "SMTP is not set: select “Sender of customer e-mails” in the shop or fill in SMTP under Settings → Notifications.", "de": "SMTP ist nicht festgelegt: Wählen Sie im Shop „Absender der Kunden-E-Mails“ oder tragen Sie SMTP unter Einstellungen → Benachrichtigungen ein."}
 {"uk": "Не задано назву сервера для RAG — стрічка для RAG вимкнена.", "en": "No server name is set for RAG — the feed for RAG is disabled.", "de": "Kein Servername für RAG festgelegt – der Feed für RAG ist deaktiviert."}
 {"uk": "Не задано наступну дію", "en": "No next action set", "de": "Keine nächste Aktion festgelegt"}
@@ -11277,6 +11282,7 @@
 {"uk": "Не оновити", "en": "Do not update", "de": "Nicht aktualisieren"}
 {"uk": "Не оновлювати зміни, менші за, %", "en": "Do not update changes smaller than, %", "de": "Änderungen kleiner als nicht aktualisieren, %"}
 {"uk": "Не оплачено", "en": "Unpaid", "de": "Nicht bezahlt"}
+{"uk": "Не оплачено / очікує", "en": "Not paid / pending", "de": "Nicht bezahlt / ausstehend"}
 {"uk": "Не оприбутковано: {0}", "en": "Not received: {0}", "de": "Nicht eingebucht: {0}"}
 {"uk": "Не отримали? Перевірте папку «Спам» або зачекайте 5 хвилин.", "en": "Didn't receive it? Check the “Spam” folder or wait 5 minutes.", "de": "Nichts erhalten? Prüfen Sie den Ordner „Spam“ oder warten Sie 5 Minuten."}
 {"uk": "Не перевіряється: {0}.", "en": "Not checked: {0}.", "de": "Nicht geprüft: {0}."}
@@ -12267,6 +12273,7 @@
 {"uk": "Опишіть проблему або пропозицію...", "en": "Describe the problem or suggestion...", "de": "Beschreiben Sie das Problem oder den Vorschlag..."}
 {"uk": "Оплата", "en": "Payment", "de": "Zahlung"}
 {"uk": "Оплата Stripe", "en": "Stripe payment", "de": "Stripe-Zahlung"}
+{"uk": "Оплата й рахунок", "en": "Payment and invoice", "de": "Zahlung und Rechnung"}
 {"uk": "Оплата на сайті", "en": "Payment on the site", "de": "Zahlung auf der Website"}
 {"uk": "Оплата на сторінці сайту", "en": "Payment on the site page", "de": "Zahlung auf der Website"}
 {"uk": "Оплата на сторінці сайту не діє: {0}.", "en": "Payment on the site page is not active: {0}.", "de": "Zahlung auf der Website nicht aktiv: {0}."}
@@ -14962,10 +14969,12 @@
 {"uk": "Рахунок (Invoice, Proforma)", "en": "Invoice (Invoice, Proforma)", "de": "Rechnung (Invoice, Proforma)"}
 {"uk": "Рахунок (Kauf auf Rechnung)", "en": "Invoice (Kauf auf Rechnung)", "de": "Rechnung (Kauf auf Rechnung)"}
 {"uk": "Рахунок (Rechnung)", "en": "Invoice (Rechnung)", "de": "Rechnung"}
+{"uk": "Рахунок (дані клієнта)", "en": "Invoice (customer data)", "de": "Rechnung (Kundendaten)"}
 {"uk": "Рахунок / Proforma з вартістю, HS-кодами й країною походження. Митниця країни отримувача рахує за ним мито й податки.", "en": "Invoice / proforma with value, HS codes and country of origin. Destination customs calculate duties and taxes from it.", "de": "Rechnung / Proforma mit Wert, HS-Codes und Ursprungsland. Der Zoll des Empfängerlandes berechnet danach Zoll und Steuern."}
 {"uk": "Рахунок «{0}» прикріплено до замовлення {1} на DigiKey — на сайті нічого робити не треба.", "en": "Invoice \"{0}\" is attached to order {1} on DigiKey — nothing to do on the website.", "de": "Rechnung „{0}“ ist dem Auftrag {1} bei DigiKey angehängt — auf der Website ist nichts zu tun."}
 {"uk": "Рахунок до замовлення на DigiKey", "en": "Invoice for the order on DigiKey", "de": "Rechnung zum Auftrag bei DigiKey"}
 {"uk": "Рахунок клієнта", "en": "Customer account", "de": "Kundenkonto"}
+{"uk": "Рахунок на", "en": "Invoice to", "de": "Rechnung an"}
 {"uk": "Рахунок надіслано клієнту", "en": "Invoice sent to the customer", "de": "Rechnung an den Kunden gesendet"}
 {"uk": "Рахунок скасовано", "en": "Invoice cancelled", "de": "Rechnung storniert"}
 {"uk": "Рахунок створено, не надіслано", "en": "Invoice created, not sent", "de": "Rechnung erstellt, nicht gesendet"}
@@ -15980,6 +15989,7 @@
 {"uk": "Спосіб оплати", "en": "Payment method", "de": "Zahlungsart"}
 {"uk": "Спосіб оплати «{0}» у магазині вимкнено.", "en": "The payment method “{0}” is disabled in the shop.", "de": "Die Zahlungsart „{0}“ ist im Shop deaktiviert."}
 {"uk": "Спосіб оплати за замовчуванням", "en": "Default payment method", "de": "Standard-Zahlungsart"}
+{"uk": "Спосіб оплати не вказано", "en": "No payment method given", "de": "Keine Zahlungsart angegeben"}
 {"uk": "Спочатку оберіть тариф.", "en": "Select a rate first.", "de": "Wählen Sie zuerst einen Tarif."}
 {"uk": "Спочатку прив'яжіть товар до замовлення.", "en": "First link a product to the order.", "de": "Verknüpfen Sie zuerst einen Artikel mit der Bestellung."}
 {"uk": "Спочатку прив'яжіть товар до цієї позиції.", "en": "First link a product to this line.", "de": "Verknüpfen Sie zuerst einen Artikel mit dieser Position."}

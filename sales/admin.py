@@ -2,7 +2,7 @@ from django.contrib import admin
 from core.mixins import AuditableMixin
 from projects.panels import ProjectsBlockMixin
 from crm.utils import sync_customer_from_order
-from django.utils.html import escape, format_html
+from django.utils.html import escape, format_html, format_html_join
 from django.utils.safestring import mark_safe
 from django.db.models import Sum
 from django.db import transaction
@@ -741,6 +741,46 @@ class FlaggedFilter(admin.SimpleListFilter):
         return queryset
 
 
+class ShopOrdersFilter(admin.SimpleListFilter):
+    """Замовлення з інтернет-магазинів (джерело = код будь-якого магазину) — пункт меню «🧾 Замовлення з сайту»;
+    код джерела магазину може змінитись (sevskiy_de), тож не одне зашите джерело."""
+    title = "Інтернет-магазини"
+    parameter_name = "from_shop"
+
+    def lookups(self, request, model_admin):
+        return [("1", "🛒 З інтернет-магазинів"), ("0", "Не з магазинів")]
+
+    def queryset(self, request, queryset):
+        if self.value() not in ("0", "1"):
+            return queryset
+        try:
+            from shop.models import Shop
+            slugs = list(Shop.objects.values_list("slug", flat=True))
+        except Exception:  # noqa: BLE001 — без застосунку shop
+            slugs = []
+        return queryset.filter(source__in=slugs) if self.value() == "1" else queryset.exclude(source__in=slugs)
+
+
+class PaymentStatusFilter(admin.SimpleListFilter):
+    """Стан оплати: «Не оплачено» разом з «Очікує оплати» — що ще треба отримати."""
+    title = "Оплата"
+    parameter_name = "pay"
+
+    def lookups(self, request, model_admin):
+        return [("open", "💳 Не оплачено / очікує"), ("paid", "Оплачено"), ("failed", "Помилка оплати"),
+                ("refunded", "Повернено"), ("none", "Без даних про оплату")]
+
+    def queryset(self, request, queryset):
+        v = self.value()
+        if v == "open":
+            return queryset.filter(payment_status__in=("unpaid", "pending"))
+        if v == "none":
+            return queryset.filter(payment_status="")
+        if v in ("paid", "failed", "refunded"):
+            return queryset.filter(payment_status=v)
+        return queryset
+
+
 def export_sales_excel(modeladmin, request, queryset):
     try:
         from exports import export_sales
@@ -811,7 +851,9 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
     )
     search_fields = ("order_number", "tracking_number", "client", "email", "phone",
                      "addr_city", "addr_street")
-    list_filter   = (StatusFilter, SourceFilter, CountryFilter, UnshippedFilter, OverdueFilter, ShippedThisMonthFilter, DelayedShipmentFilter, InTransitFilter, FlaggedFilter)
+    list_filter   = (StatusFilter, SourceFilter, ShopOrdersFilter, PaymentStatusFilter, "payment_method", CountryFilter,
+                     UnshippedFilter, OverdueFilter, ShippedThisMonthFilter, DelayedShipmentFilter, InTransitFilter,
+                     FlaggedFilter)
     ordering       = ("-order_date",)
 
     def changelist_view(self, request, extra_context=None):
@@ -1208,7 +1250,7 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
                        ("payment_method", "payment_status", "payment_reference"))
         }),
         ("👤 Клієнт (білінг)", {
-            "fields": ("crm_link", "client", "contact_name", "email", "phone"),
+            "fields": ("crm_link", "payment_invoice_panel", "client", "contact_name", "email", "phone", "buyer_vat_id"),
             "description": "Дані особи, яка зробила замовлення (білінговий контакт).",
         }),
         ("🚚 Доставка", {
@@ -1266,7 +1308,7 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
     readonly_fields = ['stock_summary', 'label_buttons_detail',
                        'documents_list', 'upload_widget', 'doc_buttons', 'doc_templates_panel',
                        'packaging_panel', 'status_source', 'crm_link', 'bom_assembly_status',
-                       'documents_view', 'doc_buttons_view', 'parcel_tracking']
+                       'documents_view', 'doc_buttons_view', 'parcel_tracking', 'payment_invoice_panel']
 
     # Хто замовлення лише переглядає — документи без «🗑️», «📤 Завантажити» й «💾» (ті самі дії сервер і так
     # відхиляє: _list_edit_refused)
@@ -2537,6 +2579,36 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
         )
     customer_link_display.short_description = "Клієнт"
 
+    @admin.display(description="💳 Оплата й рахунок")
+    def payment_invoice_panel(self, obj):
+        """Як оплачує покупець і куди виставити рахунок (sales/payment_info.py — ті самі дані, що в листі
+        «Нове замовлення»): спосіб · стан оплати, платіжна адреса з сайту, USt-IdNr, ПДВ, підсумок від сайту."""
+        if not obj or not obj.pk:
+            return "—"
+        from .payment_info import COLORS, delivery_lines, invoice, payment, site_note
+        pay, inv, note = payment(obj), invoice(obj), site_note(obj)
+        if not pay and not inv["from_site"] and not note:
+            return "—"            # DigiKey, ручні замовлення — без шуму
+        parts = []
+        if pay:
+            parts.append(format_html('<div><b style="color:{}">💳 {}</b>{}</div>', COLORS[pay["tone"]], pay["text"],
+                                     format_html(" · {}", pay["reference"]) if pay["reference"] else ""))
+        else:
+            parts.append(format_html('<div style="opacity:.7">{}</div>', "💳 Спосіб оплати не вказано"))
+        rate = inv["vat_rate"]
+        details = " · ".join(x for x in (f'USt-IdNr: {inv["vat_id"]}' if inv["vat_id"] else "", inv["email"],
+                                          inv["phone"], f"ПДВ {rate.normalize():f} %" if rate is not None else "") if x)
+        parts.append(format_html(
+            '<div style="margin-top:4px">🧾 <b>{}</b> {}{}</div>',
+            "Рахунок на:" if inv["from_site"] else "Рахунок (дані клієнта):", ", ".join(inv["lines"]) or "—",
+            format_html('<div style="opacity:.8;font-size:12px">{}</div>', details) if details else ""))
+        if inv["separate"]:
+            parts.append(format_html('<div style="margin-top:4px">🚚 <b>{}</b> {}</div>', "Доставка на іншу адресу:",
+                                     ", ".join(delivery_lines(obj))))
+        if note:
+            parts.append(format_html('<div style="margin-top:4px;opacity:.8;font-size:12px">📝 {}</div>', note))
+        return format_html_join("", "{}", ((x,) for x in parts))
+
     def crm_link(self, obj):
         """Посилання на картку клієнта в CRM (для форми редагування)."""
         if not obj.pk:
@@ -2590,10 +2662,16 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
         colors = {"received": "#1565c0", "processing": "#e65100",
                   "shipped": "#2e7d32", "delivered": "#00695c", "cancelled": "#c62828"}
         color = colors.get(obj.status, "#757575")
-        return format_html(
+        badge = format_html(
             '<span style="background:{};color:#fff;padding:3px 10px;border-radius:12px;'
             'font-size:11px;font-weight:bold;white-space:nowrap">{}</span>',
             color, obj.get_status_display())
+        from .payment_info import COLORS, payment
+        pay = payment(obj)
+        if not pay:
+            return badge
+        return format_html('{}<div style="margin-top:4px;font-size:11px;font-weight:600;color:{};white-space:nowrap" '
+                           'title="{}">💳 {}</div>', badge, COLORS[pay["tone"]], pay["reference"] or "Оплата", pay["text"])
     status_badge.short_description = "Статус"
     status_badge.admin_order_field = "status"
 

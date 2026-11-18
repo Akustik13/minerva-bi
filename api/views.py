@@ -520,9 +520,22 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
             # спершу — товари поза каталогом (нотатка обрізається до 500 символів)
             d["internal_note"] = ("Поза каталогом Minerva: " + ", ".join(unknown) + (" | " + note if note else ""))[:500]
 
+        extra = {}
         try:
-            order = self._create_order(request, d, resolved, listings, shop if is_shop else None, site_ref,
-                                       is_shop, is_quote, currency)
+            # Одна транзакція: лист «🆕 Нове замовлення» (on_commit, crm/signals.py) уже бачить платіжну адресу,
+            # ПДВ і акаунт з сайту (shop.ShopOrder), а не лише саме замовлення
+            with transaction.atomic():
+                order = self._create_order(request, d, resolved, listings, shop if is_shop else None, site_ref,
+                                           is_shop, is_quote, currency)
+                if shop is not None:
+                    from shop.accounts import record_order
+                    try:  # замовлення вже створено — кабінет не повинен його зламати (savepoint)
+                        with transaction.atomic():
+                            extra["account_linked"] = record_order(order, shop, **account).customer_id is not None
+                    except Exception:
+                        import logging
+                        logging.getLogger("shop").exception("record_order failed for %s", order)
+                        extra["account_linked"] = False
         except IntegrityError:
             dup = None
             if is_shop:   # той самий номер сайту паралельним запитом — те саме замовлення
@@ -531,16 +544,6 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
             if dup is None:
                 raise
             return Response(self._detail(dup, created=False), status=status.HTTP_200_OK)
-
-        extra = {}
-        if shop is not None:
-            from shop.accounts import record_order
-            try:  # замовлення вже створено — кабінет не повинен його зламати
-                extra["account_linked"] = record_order(order, shop, **account).customer_id is not None
-            except Exception:
-                import logging
-                logging.getLogger("shop").exception("record_order failed for %s", order)
-                extra["account_linked"] = False
         return Response(self._detail(order, created=True, **extra), status=status.HTTP_201_CREATED)
 
     def _create_order(self, request, d, resolved, listings, shop, site_ref, is_shop, is_quote, currency):

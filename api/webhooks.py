@@ -339,7 +339,9 @@ def _on_tx_change(sender, instance, **kwargs):
 # Поля товару, зміна яких має оновити каталог інтернет-магазину
 _SHOP_FIELDS = ("sale_price", "is_active", "name", "name_export",
                 "category", "unit_type", "lead_time_days", "image_url", "image", "datasheet_url",
-                "lifecycle_status", "successor_id")
+                "lifecycle_status", "successor_id",
+                # сторінка товару на сайті: виробник і технічні параметри; лот за замовчуванням (shop/lots.py)
+                "manufacturer", "tech_attributes", "shop_min_qty", "shop_qty_step", "shop_qty_choices")
 
 
 def _product_pre_save(sender, instance, **kwargs):

@@ -1144,6 +1144,38 @@ def _order_email_html(order, title, color, body_extra='', show_total: bool = Tru
 
 
 @for_event('new_order')
+def _payment_block(order) -> tuple[str, list[str]]:
+    """Лист / Telegram «Нове замовлення»: 💳 оплата (спосіб · стан), 🧾 куди виставити рахунок (замовлення з сайту
+    або з VAT ID), 📝 підсумок від сайту — sales/payment_info.py. → (HTML, рядки Telegram)."""
+    try:
+        from sales import payment_info as pi
+        pay, inv, note = pi.payment(order), pi.invoice(order), pi.site_note(order)
+    except Exception as e:  # noqa: BLE001 — лист про замовлення важливіший
+        logger.warning('Нове замовлення %s: оплата / рахунок не прочитано: %s', order.order_number, e)
+        return '', []
+    html, tg = '', []
+    if pay:
+        html += (f'<br><b>💳 Оплата:</b> <b style="color:{pi.COLORS[pay["tone"]]}">{esc(pay["text"])}</b>'
+                 + (f' · {esc(pay["reference"])}' if pay['reference'] else ''))
+        tg.append(f'💳 <b>{esc(pay["text"])}</b>')
+    if inv['from_site'] or inv['vat_id']:
+        rate = inv['vat_rate']
+        details = ' · '.join(x for x in (
+            f'USt-IdNr: {inv["vat_id"]}' if inv['vat_id'] else '', inv['email'], inv['phone'],
+            f'ПДВ {rate.normalize():f} %' if rate is not None else '') if x)
+        html += ('<div style="margin-top:10px;padding:8px 10px;border:1px solid #e0e6ef;border-radius:6px;'
+                 'background:#f7f9fc"><b>🧾 Рахунок на:</b><br>' + '<br>'.join(esc(x) for x in inv['lines'])
+                 + (f'<br><span style="color:#555">{esc(details)}</span>' if details else '')
+                 + (f'<br><b>🚚 Доставка на іншу адресу:</b> {esc(", ".join(pi.delivery_lines(order)))}'
+                    if inv['separate'] else '')
+                 + '</div>')
+        tg.append('🧾 ' + esc(', '.join(inv['lines']))
+                  + (f' · USt-IdNr {esc(inv["vat_id"])}' if inv['vat_id'] else ''))
+    if note:
+        html += f'<br><b>📝 Від сайту:</b> <span style="color:#555">{esc(note)}</span>'
+    return html, tg
+
+
 def notify_new_order(order, is_test: bool = False):
     """Send new-order notification via email and/or Telegram."""
     ns = _get_ns()
@@ -1256,9 +1288,11 @@ def notify_new_order(order, is_test: bool = False):
         t = order.lines.aggregate(s=_Sum('total_price'))['s']
         if t:
             currency  = getattr(order, 'currency', '') or ''
-            total_str = f'{t} {currency}'.strip()
+            total_str = f'{t:.2f} {currency}'.strip()
     except Exception:
         pass
+
+    pay_html, pay_tg = _payment_block(order)
 
     # CRM: total orders from this customer
     crm_orders = None
@@ -1377,6 +1411,7 @@ def notify_new_order(order, is_test: bool = False):
                 meta += f'<br><b>📊 Замовлень від клієнта:</b> <b style="color:#1565c0">{crm_orders}</b>'
             if destination:
                 meta += f'<br><b>📍 Куди:</b> {esc(destination)}'
+            meta += pay_html          # 💳 оплата, 🧾 куди рахунок, 📝 від сайту (sales/payment_info.py)
             if _inc_deadline and deadline_str:
                 dl_color = '#c62828' if days_left is not None and days_left <= 2 else '#2e7d32'
                 meta += (
@@ -1413,6 +1448,7 @@ def notify_new_order(order, is_test: bool = False):
                 tg.append(f'📦 Дедлайн: <b>{deadline_str}</b> ({days_left_str}){dl_warn}')
             if _inc_total and total_str:
                 tg.append(f'💰 <b>{esc(total_str)}</b>')
+            tg.extend(pay_tg)
 
             # ── Products ───────────────────────────────────────────────────
             if lines_data:

@@ -379,6 +379,9 @@ def summary(o, request):
     if info is not None:
         rows.append(("Номер на сайті", info.site_ref))
         rows.append(("Kundennummer", _kundennummer(info)))
+        if info.billing:     # куди виставити рахунок (sales/payment_info.py — як у листі «Нове замовлення»)
+            from .payment_info import invoice
+            rows.append(("Рахунок на", ", ".join(invoice(o)["lines"])))
     crm_line = ""
     if _can_crm(request):
         c = _customer(o)
