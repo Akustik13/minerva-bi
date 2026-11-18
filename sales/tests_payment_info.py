@@ -30,7 +30,7 @@ class _Base(TestCase):
             source="sevskiy_de", order_number="PO-31730-001", client="Fogra e.V.", contact_name="Anna Muster",
             email="einkauf@fogra.example", addr_street="Lager 1", addr_zip="63741", addr_city="Aschaffenburg",
             addr_country="DE", payment_method="prepayment", payment_status="unpaid", internal_note=NOTE,
-            buyer_vat_id="DE129514004")
+            buyer_vat_id="DE129514004", currency="EUR")
         ShopOrder.objects.create(order=self.order, shop=self.shop, billing=BILLING, vat_rate=Decimal("19.00"))
         self.order.refresh_from_db()
 
@@ -112,6 +112,22 @@ class AdminTests(_Base):
         unpaid = self.client.get("/admin/sales/salesorder/?pay=open").content.decode()
         self.assertIn("PO-31730-001", unpaid)
         self.assertNotIn("DK-1", unpaid)
+
+    def test_online_payments_page_lists_shop_orders(self):
+        self.order.total_price, self.order.shipping_cost = Decimal("142.10"), Decimal("6.90")
+        self.order.save()
+        paid = SalesOrder.objects.create(source="sevskiy_de", order_number="PO-31730-002", client="Paid GmbH",
+                                         payment_method="stripe", payment_status="paid")
+        page = self.client.get("/admin/shop/shoppayment/").content.decode()
+        self.assertIn("Замовлення з сайту: оплата", page)
+        self.assertIn("PO-31730-001", page)
+        self.assertIn("Передоплата (Vorkasse) · Не оплачено", page)
+        self.assertIn("177.31 EUR", page)                       # (142,10 + 6,90) × 1,19 — сума до оплати брутто
+        self.assertNotIn("PO-31730-002", page)                  # оплачене — лише в «Усі»
+        self.assertNotIn("DK-1", page)                          # не з магазину
+        r = self.client.get("/admin/shop/shoppayment/?orders=all")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(paid.order_number, r.content.decode())
 
     def test_card_shows_payment_and_invoice(self):
         page = self.client.get(f"/admin/sales/salesorder/{self.order.pk}/change/").content.decode()

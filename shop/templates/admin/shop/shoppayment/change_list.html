@@ -1,5 +1,44 @@
 {% extends "admin/change_list.html" %}
 {% block search %}
+{% if shop_orders %}
+{# 🧾 Замовлення з сайту: оплата — Vorkasse / Rechnung / Stripe (shop/admin_payments.shop_orders_overview) #}
+<div class="module" style="padding:10px 14px;margin:0 0 12px;border-left:4px solid #e65100">
+  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
+    <b>🧾 Замовлення з сайту: оплата</b>
+    <a class="button" href="?" {% if shop_orders.mode == "open" %}style="font-weight:700;outline:2px solid #e65100"{% endif %}>💳 Не оплачено · {{ shop_orders.open_count }}</a>
+    <a class="button" href="?orders=all" {% if shop_orders.mode == "all" %}style="font-weight:700;outline:2px solid #e65100"{% endif %}>Усі · {{ shop_orders.total }}</a>
+    <a href="{% if shop_orders.mode == "open" %}{{ shop_orders.open_url }}{% else %}{{ shop_orders.orders_url }}{% endif %}" style="margin-left:auto">У списку замовлень →</a>
+  </div>
+  {% if shop_orders.rows %}
+  <style>table.sp-orders th,table.sp-orders td{padding:5px 10px !important;vertical-align:top}</style>
+  <table class="sp-orders" style="width:100%">
+    <thead><tr>
+      <th>Замовлення</th><th>Дата</th><th>Клієнт</th><th>Статус</th>
+      <th>Спосіб і стан оплати</th><th style="text-align:right">До оплати (брутто)</th><th>Stripe</th>
+    </tr></thead>
+    <tbody>
+    {% for r in shop_orders.rows %}
+    <tr>
+      <td><a href="{{ r.url }}" translate="no"><b>{{ r.order.order_number }}</b></a></td>
+      <td style="white-space:nowrap">{{ r.order.order_date|date:"d.m.Y" }}</td>
+      <td translate="no">{{ r.order.client|default:r.order.email|default:"—" }}</td>
+      <td>{{ r.order.get_status_display }}</td>
+      <td><b style="color:{{ r.color }}">{% if r.pay %}💳 {{ r.pay.text }}{% else %}Спосіб оплати не вказано{% endif %}</b>{% if r.pay.reference %} <span style="opacity:.7" translate="no">· {{ r.pay.reference }}</span>{% endif %}</td>
+      <td style="text-align:right;white-space:nowrap" translate="no">{{ r.amount }}</td>
+      <td>{{ r.stripe|default:"—" }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if shop_orders.mode == "all" and shop_orders.total > shop_orders.limit or shop_orders.mode == "open" and shop_orders.open_count > shop_orders.limit %}
+  <div style="margin-top:6px;opacity:.75">Показано останні {{ shop_orders.limit }} — решта в списку замовлень.</div>
+  {% endif %}
+  {% else %}
+  <div style="opacity:.75">{% if shop_orders.mode == "open" %}Усі замовлення з сайту оплачені.{% else %}Замовлень з сайту ще немає.{% endif %}</div>
+  {% endif %}
+  <div style="margin-top:6px;font-size:12px;opacity:.75">Передоплата (Vorkasse) і рахунок — без Stripe: коли прийде переказ, поставте в замовленні «Статус оплати» → «Оплачено». Нижче — лише спроби онлайн-оплати Stripe.</div>
+</div>
+{% endif %}
 <div class="module" style="padding:10px 14px;margin:0 0 12px;border-left:4px solid var(--accent, #79aec8)">
   <form method="post" action="{% url 'admin:shop_shoppayment_check_open' %}" style="display:inline">{% csrf_token %}
     <button type="submit" class="button">🔄 Перевірити незавершені оплати в Stripe</button>

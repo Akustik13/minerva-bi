@@ -2909,6 +2909,7 @@
 {"uk": "{0} {1} × курс {2}", "en": "{0} {1} × rate {2}", "de": "{0} {1} × Kurs {2}"}
 {"uk": "{0} {1} без курсу", "en": "{0} {1} without exchange rate", "de": "{0} {1} ohne Wechselkurs"}
 {"uk": "{0} {1} від {2} шт.", "en": "{0} {1} from {2} pcs", "de": "{0} {1} ab {2} Stk."}
+{"uk": "{0} {1} нетто", "en": "{0} {1} net", "de": "{0} {1} netto"}
 {"uk": "{0} {1}/шт", "en": "{0} {1}/pc", "de": "{0} {1}/Stk."}
 {"uk": "{0} {1}: Minerva не відповідає", "en": "{0} {1}: Minerva is not responding", "de": "{0} {1}: Minerva antwortet nicht"}
 {"uk": "{0} {1}: мало бути доставлено {2}", "en": "{0} {1}: was due {2}", "de": "{0} {1}: sollte am {2} zugestellt sein"}
@@ -6628,6 +6629,7 @@
 {"uk": "До нас", "en": "Incoming", "de": "Eingehend"}
 {"uk": "До нас — посилка від постачальника", "en": "Incoming — parcel from a supplier", "de": "Eingehend — Paket vom Lieferanten"}
 {"uk": "До однієї візитки — не більше {0} фото.", "en": "No more than {0} photos per business card.", "de": "Höchstens {0} Fotos pro Visitenkarte."}
+{"uk": "До оплати (брутто)", "en": "To pay (gross)", "de": "Zu zahlen (brutto)"}
 {"uk": "До переведення, {0}", "en": "Before conversion, {0}", "de": "Vor der Umrechnung, {0}"}
 {"uk": "До порівняння", "en": "To the comparison", "de": "Zum Vergleich"}
 {"uk": "До поштомату — ти везеш самостійно", "en": "To a parcel locker — you bring it yourself", "de": "Zum Paketautomaten — Sie bringen es selbst hin"}
@@ -7673,6 +7675,7 @@
 {"uk": "Замовлення з рядками", "en": "Orders with lines", "de": "Aufträge mit Positionen"}
 {"uk": "Замовлення з сайту", "en": "Orders from the website", "de": "Aufträge von der Website"}
 {"uk": "Замовлення з сайту одразу з'являється в Продажах: товар списується зі складу, клієнт потрапляє в CRM. Поля оплати «Спосіб», «Статус» і «Референс» заповнені.", "en": "An order from the website appears in Sales immediately: the product is written off from stock and the customer goes into the CRM. The payment fields “Method”, “Status” and “Reference” are filled in.", "de": "Ein Auftrag von der Website erscheint sofort im Verkauf: Der Artikel wird aus dem Lager ausgebucht, der Kunde gelangt ins CRM. Die Zahlungsfelder „Methode“, „Status“ und „Referenz“ sind ausgefüllt."}
+{"uk": "Замовлення з сайту: оплата", "en": "Website orders: payment", "de": "Bestellungen von der Website: Zahlung"}
 {"uk": "Замовлення зникне зі списку невідправлених у Dashboard.", "en": "The order will disappear from the list of unshipped orders in the Dashboard.", "de": "Der Auftrag verschwindet aus der Liste der nicht versendeten Aufträge im Dashboard."}
 {"uk": "Замовлення зі статусом «Доставлено» за звітний період.", "en": "Orders with the status “Delivered” in the reporting period.", "de": "Aufträge mit dem Status „Zugestellt“ im Berichtszeitraum."}
 {"uk": "Замовлення й відправлення — що не відправлено, склад позицій, адреса", "en": "Orders and shipments — what is not shipped, stock of the lines, address", "de": "Aufträge und Sendungen — was nicht versendet ist, Bestand der Positionen, Adresse"}
@@ -7741,6 +7744,7 @@
 {"uk": "Замовлень в списку: {0}", "en": "Orders in the list: {0}", "de": "Aufträge in der Liste: {0}"}
 {"uk": "Замовлень всього", "en": "Total orders", "de": "Aufträge gesamt"}
 {"uk": "Замовлень від клієнта", "en": "Orders from the customer", "de": "Aufträge des Kunden"}
+{"uk": "Замовлень з сайту ще немає.", "en": "No website orders yet.", "de": "Noch keine Bestellungen von der Website."}
 {"uk": "Замовлень за PO «{0}» не знайдено.", "en": "No orders found for PO “{0}”.", "de": "Keine Aufträge für PO „{0}“ gefunden."}
 {"uk": "Замовлень не знайдено.", "en": "No orders found.", "de": "Keine Aufträge gefunden."}
 {"uk": "Замовлень оновлено: {0}", "en": "Orders updated: {0}", "de": "Aufträge aktualisiert: {0}"}
@@ -11283,6 +11287,7 @@
 {"uk": "Не оновлювати зміни, менші за, %", "en": "Do not update changes smaller than, %", "de": "Änderungen kleiner als nicht aktualisieren, %"}
 {"uk": "Не оплачено", "en": "Unpaid", "de": "Nicht bezahlt"}
 {"uk": "Не оплачено / очікує", "en": "Not paid / pending", "de": "Nicht bezahlt / ausstehend"}
+{"uk": "Не оплачено · {0}", "en": "Not paid · {0}", "de": "Nicht bezahlt · {0}"}
 {"uk": "Не оприбутковано: {0}", "en": "Not received: {0}", "de": "Nicht eingebucht: {0}"}
 {"uk": "Не отримали? Перевірте папку «Спам» або зачекайте 5 хвилин.", "en": "Didn't receive it? Check the “Spam” folder or wait 5 minutes.", "de": "Nichts erhalten? Prüfen Sie den Ordner „Spam“ oder warten Sie 5 Minuten."}
 {"uk": "Не перевіряється: {0}.", "en": "Not checked: {0}.", "de": "Nicht geprüft: {0}."}
@@ -12972,6 +12977,7 @@
 {"uk": "Передати замовлення", "en": "Transfer order", "de": "Auftrag übergeben"}
 {"uk": "Передає замовлення постачальнику із зовнішньої CRM: створює або оновлює закупівлю й позиції (постачальник — за назвою чи email, нового створює).", "en": "Transfers a supplier order from an external CRM: creates or updates the purchase order and lines (supplier — by name or email, creates a new one if needed).", "de": "Übergibt eine Lieferantenbestellung aus einem externen CRM: legt die Bestellung und Positionen an oder aktualisiert sie (Lieferant — nach Name oder E-Mail, bei Bedarf wird ein neuer angelegt)."}
 {"uk": "Передоплата (Vorkasse)", "en": "Prepayment (Vorkasse)", "de": "Vorkasse"}
+{"uk": "Передоплата (Vorkasse) і рахунок — без Stripe: коли прийде переказ, поставте в замовленні «Статус оплати» → «Оплачено». Нижче — лише спроби онлайн-оплати Stripe.", "en": "Prepayment (Vorkasse) and invoice — without Stripe: when the transfer arrives, set “Payment status” → “Paid” in the order. Below — only Stripe online payment attempts.", "de": "Vorkasse und Rechnung — ohne Stripe: Wenn die Überweisung eingeht, im Auftrag „Zahlungsstatus“ → „Bezahlt“ setzen. Unten — nur Online-Zahlungsversuche über Stripe."}
 {"uk": "Передоплата (Vorkasse, переказ)", "en": "Prepayment (Vorkasse, transfer)", "de": "Vorauszahlung (Vorkasse, Überweisung)"}
 {"uk": "Передоплата, рахунок і", "en": "Prepayment, invoice and", "de": "Vorkasse, Rechnung und"}
 {"uk": "Перезавантажити вміст з IMAP", "en": "Reload content from IMAP", "de": "Inhalt von IMAP neu laden"}
@@ -13459,6 +13465,7 @@
 {"uk": "Показано для магазину", "en": "Shown for shop", "de": "Angezeigt für Shop"}
 {"uk": "Показано лише вибрані товари ({0})", "en": "Only the selected products are shown ({0})", "de": "Es werden nur die ausgewählten Artikel angezeigt ({0})"}
 {"uk": "Показано останні {0}", "en": "Showing the last {0}", "de": "Angezeigt werden die letzten {0}"}
+{"uk": "Показано останні {0} — решта в списку замовлень.", "en": "Showing the latest {0} — the rest is in the order list.", "de": "Die letzten {0} werden angezeigt — der Rest steht in der Bestellliste."}
 {"uk": "Показано останні {0} — усі зміни у CSV або в журналі з фільтром «✏️ Зміни».", "en": "Showing the last {0} — all changes in CSV or in the log with the “✏️ Changes” filter.", "de": "Die letzten {0} werden angezeigt — alle Änderungen als CSV oder im Protokoll mit dem Filter „✏️ Änderungen“."}
 {"uk": "Показано перші {0} з {1} (найчастіші).", "en": "Showing the first {0} of {1} (most frequent).", "de": "Die ersten {0} von {1} werden angezeigt (die häufigsten)."}
 {"uk": "Показано перші {0} — найтерміновіші.", "en": "Showing the first {0} — the most urgent.", "de": "Die ersten {0} werden angezeigt — die dringendsten."}
@@ -15990,6 +15997,7 @@
 {"uk": "Спосіб оплати «{0}» у магазині вимкнено.", "en": "The payment method “{0}” is disabled in the shop.", "de": "Die Zahlungsart „{0}“ ist im Shop deaktiviert."}
 {"uk": "Спосіб оплати за замовчуванням", "en": "Default payment method", "de": "Standard-Zahlungsart"}
 {"uk": "Спосіб оплати не вказано", "en": "No payment method given", "de": "Keine Zahlungsart angegeben"}
+{"uk": "Спосіб і стан оплати", "en": "Payment method and status", "de": "Zahlungsart und -status"}
 {"uk": "Спочатку оберіть тариф.", "en": "Select a rate first.", "de": "Wählen Sie zuerst einen Tarif."}
 {"uk": "Спочатку прив'яжіть товар до замовлення.", "en": "First link a product to the order.", "de": "Verknüpfen Sie zuerst einen Artikel mit der Bestellung."}
 {"uk": "Спочатку прив'яжіть товар до цієї позиції.", "en": "First link a product to this line.", "de": "Verknüpfen Sie zuerst einen Artikel mit dieser Position."}
@@ -17280,6 +17288,7 @@
 {"uk": "У розшифровці немає тексту", "en": "The transcript has no text", "de": "Das Transkript enthält keinen Text"}
 {"uk": "У розшифровці немає тексту.", "en": "The transcript has no text.", "de": "Das Transkript enthält keinen Text."}
 {"uk": "У системі", "en": "In the system", "de": "Im System"}
+{"uk": "У списку замовлень", "en": "In the order list", "de": "In der Bestellliste"}
 {"uk": "У списку замовлень при наведенні на Артикул показує фото товару зі складу. Вимкніть якщо це сповільнює роботу.", "en": "In the order list, hovering over the SKU shows the product photo from stock. Turn off if it slows things down.", "de": "In der Auftragsliste zeigt das Darüberfahren über die Artikelnummer das Artikelfoto aus dem Lager. Deaktivieren, wenn es die Arbeit verlangsamt."}
 {"uk": "У списку замовлень при наведенні на значок 📄 показує маленький попередній перегляд PDF.", "en": "In the order list, hovering over the 📄 icon shows a small PDF preview.", "de": "In der Auftragsliste zeigt das Darüberfahren über das 📄-Symbol eine kleine PDF-Vorschau."}
 {"uk": "У старому файлі Digi-Key P/N {0} — на новій етикетці {1}.", "en": "In the old file the Digi-Key P/N is {0} — on the new label {1}.", "de": "In der alten Datei lautet die Digi-Key P/N {0} — auf dem neuen Etikett {1}."}
@@ -17439,11 +17448,13 @@
 {"uk": "Усі Angebote", "en": "All Angebote", "de": "Alle Angebote"}
 {"uk": "Усі Angebote клієнта ({0})", "en": "All Angebote of the customer ({0})", "de": "Alle Angebote des Kunden ({0})"}
 {"uk": "Усі {0}", "en": "All {0}", "de": "Alle {0}"}
+{"uk": "Усі · {0}", "en": "All · {0}", "de": "Alle · {0}"}
 {"uk": "Усі адреси", "en": "All addresses", "de": "Alle Adressen"}
 {"uk": "Усі версії", "en": "All versions", "de": "Alle Versionen"}
 {"uk": "Усі вибрані контакти одним файлом .vcf — для телефону / Outlook", "en": "All selected contacts in one .vcf file — for phone / Outlook", "de": "Alle ausgewählten Kontakte in einer .vcf-Datei — für Telefon / Outlook"}
 {"uk": "Усі візитки", "en": "All business cards", "de": "Alle Visitenkarten"}
 {"uk": "Усі доріжки", "en": "All lanes", "de": "Alle Spuren"}
+{"uk": "Усі замовлення з сайту оплачені.", "en": "All website orders are paid.", "de": "Alle Bestellungen von der Website sind bezahlt."}
 {"uk": "Усі записи відповіді", "en": "All records of the response", "de": "Alle Datensätze der Antwort"}
 {"uk": "Усі запити", "en": "All requests", "de": "Alle Anfragen"}
 {"uk": "Усі запити на сайті", "en": "All queries on the site", "de": "Alle Anfragen auf der Website"}

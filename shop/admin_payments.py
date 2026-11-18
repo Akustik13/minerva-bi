@@ -171,6 +171,42 @@ def stripe_tools(shop: Shop) -> str:
         reverse("admin:shop_shoppayment_check_open") + f"?shop={shop.pk}")
 
 
+ORDERS_LIMIT = 50
+OPEN_PAYMENT = ("unpaid", "pending", "failed")
+
+
+def shop_orders_overview(request) -> dict | None:
+    """Блок «🧾 Замовлення з сайту: оплата» над онлайн-оплатами: кожне замовлення магазину — спосіб і стан оплати
+    (Vorkasse / Rechnung теж, а не лише Stripe), сума до оплати брутто, остання спроба Stripe. `?orders=all` — усі,
+    інакше не оплачені (крім скасованих). Лише з правом бачити замовлення."""
+    if not request.user.has_perm("sales.view_salesorder"):
+        return None
+    from sales.models import SalesOrder
+    from sales.payment_info import COLORS, payment
+    from .models import ShopOrder
+    mode = "all" if request.GET.get("orders") == "all" else "open"
+    slugs = list(Shop.objects.values_list("slug", flat=True))
+    qs = (SalesOrder.objects.filter(source__in=slugs).exclude(document_type="QUOTE")
+          .prefetch_related("shop_payments").order_by("-order_date", "-pk"))
+    open_qs = qs.filter(payment_status__in=OPEN_PAYMENT).exclude(status="cancelled")
+    orders = list((qs if mode == "all" else open_qs)[:ORDERS_LIMIT])
+    rates = dict(ShopOrder.objects.filter(order__in=orders).values_list("order_id", "vat_rate"))
+    rows = []
+    for o in orders:
+        pay, rate = payment(o), rates.get(o.pk)
+        net = payments._money(o.total_price) + payments._money(o.shipping_cost)
+        gross = net + payments._money(net * rate / 100) if rate is not None else None
+        attempt = max(o.shop_payments.all(), key=lambda p: p.pk, default=None)
+        rows.append({"order": o, "url": reverse("admin:sales_salesorder_change", args=[o.pk]), "pay": pay,
+                     "color": COLORS[pay["tone"]] if pay else COLORS["muted"],
+                     "amount": f"{gross:.2f} {(o.currency or 'EUR').upper()}" if gross is not None
+                     else f"{payments._money(o.total_price):.2f} {o.currency or ''} нетто",
+                     "stripe": attempt.get_status_display() if attempt else ""})
+    base = reverse("admin:sales_salesorder_changelist")
+    return {"rows": rows, "mode": mode, "open_count": open_qs.count(), "total": qs.count(), "limit": ORDERS_LIMIT,
+            "orders_url": f"{base}?from_shop=1", "open_url": f"{base}?from_shop=1&pay=open"}
+
+
 @admin.register(ShopPayment)
 class ShopPaymentAdmin(admin.ModelAdmin):
     list_display = ["created_at", "order_link", "shop", "amount_col", "status_col", "livemode", "paid_at", "stripe_link"]
@@ -248,6 +284,12 @@ class ShopPaymentAdmin(admin.ModelAdmin):
         extra_context = extra_context or {}
         extra_context["poll_states"] = [(s, payments.poll_state(s)) for s in Shop.objects.exclude(stripe_secret_key="")]
         extra_context["open_count"] = payments.unfinished().count()
+        extra_context["shop_orders"] = shop_orders_overview(request)
+        if "orders" in request.GET:    # перемикач блоку замовлень — не фільтр списку оплат (Django відкинув би його)
+            query = request.GET.copy()
+            query.pop("orders")
+            request.GET = query
+            request.META["QUERY_STRING"] = query.urlencode()
         return super().changelist_view(request, extra_context)
 
     @admin.action(description="🔄 Оновити стан зі Stripe")
