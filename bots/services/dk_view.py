@@ -120,9 +120,7 @@ def offer_rows(listing, offer) -> list:
              tiers=price_table(m_tiers, d_tiers if have else []), currency=_currency()),
         _row("quantityAvailable", "Залишок, шт", m_qty, _num(o.get("quantityAvailable")) if have else None,
              _num(o.get("quantityAvailable")) == m_qty),
-        _row("minOrderQuantity", "MOQ", max(1, listing.dk_min_order_qty or 1),
-             _num(o.get("minOrderQuantity")) if have else None,
-             _num(o.get("minOrderQuantity")) == max(1, listing.dk_min_order_qty or 1)),
+        _moq_row(listing, o, have),
         _row("leadTimeToShip", "Строк відвантаження, дн", listing.dk_lead_time_days,
              _num(o.get("leadTimeToShip")) if have else None,
              _num(o.get("leadTimeToShip")) == listing.dk_lead_time_days),
@@ -131,6 +129,39 @@ def offer_rows(listing, offer) -> list:
              bool(o.get("isActive")) == bool(listing.dk_is_active)),
     ]
     return rows
+
+
+def _moq_row(listing, o, have) -> dict:
+    """MOQ, який Minerva надсилає (dk_marketplace.listing_moq: не менший за перший ступінь ціни), і примітка,
+    якщо в картці менше — інакше DigiKey 1000 проти «1» з картки виглядало як розбіжність."""
+    from bots.services.dk_marketplace import listing_moq
+    moq, card = listing_moq(listing), max(1, listing.dk_min_order_qty or 1)
+    row = _row("minOrderQuantity", "MOQ", moq, _num(o.get("minOrderQuantity")) if have else None,
+               _num(o.get("minOrderQuantity")) == moq)
+    if moq > card:
+        row["note"] = (f"у картці {card}, але ціни лише від {moq} шт. — Minerva надсилає MOQ {moq}; "
+                       f"поставте {moq} і в картці лістингу")
+    return row
+
+
+def _photo_note(listing, mine: str, theirs: str | None) -> str:
+    """Фото з каталогу DigiKey (mm.digikey.com) у «Фото (URL)», а в товарі DigiKey фото немає: схоже, DigiKey не
+    бере адреси свого ж сервера для товару продавця — підказати своє фото (посилання товару / правило складу)."""
+    from bots.services.dk_media import IMAGE, candidates, dk_hosted
+    if theirs or not dk_hosted(mine):
+        return ""
+    suggest, how = "", ""
+    if listing.product_id:
+        try:
+            found, how = candidates(listing.product, IMAGE, listing.get_supplier_sku(), stock_only=True)
+            suggest = next((u for u in found if not dk_hosted(u)), "")
+        except Exception:  # noqa: BLE001 — лише підказка
+            suggest = ""
+    text = ("Це фото з каталогу DigiKey (mm.digikey.com), а в товарі DigiKey фото немає — схоже, DigiKey не бере "
+            "посилання на свій сервер для товару продавця. Вкажіть своє фото")
+    if suggest:
+        text += f" (є {how}: {suggest})"
+    return text + " у картці лістингу, поставте «🖼 Оновити фото на DigiKey» і надішліть зміни товару на перевірку."
 
 
 def _currency() -> str:
@@ -154,6 +185,8 @@ def product_rows(listing, product) -> list:
             row = _row(key, label, m, d, have and m == d, group="product")
         if key == "imageUrl":
             row.update(img_m=_http(m), img_d=_http(d) if have else "")
+            if have:
+                row["note"] = _photo_note(listing, m, d)
         rows.append(row)
     names = attr_names(listing)
     mine = {str(a["code"]): _txt(a.get("value")) for a in listing.get_all_attributes_api()}
