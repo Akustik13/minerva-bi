@@ -29,7 +29,7 @@ class SalesInvoiceAdmin(admin.ModelAdmin):
 class InvoiceSettingsAdmin(admin.ModelAdmin):
     fieldsets = (
         ("🔢 Номер і мова", {
-            "fields": ("number_prefix", "default_language", "file_name"),
+            "fields": ("number_prefix", "default_language", "file_name", "order_button"),
             "description": "Замовлення з інтернет-магазину — номер магазину CI-&lt;Kundennummer&gt;-NNN (той самий, що в "
                            "Commercial Invoice й у кабінеті покупця). Інші — префікс + номер замовлення.",
         }),
@@ -77,3 +77,33 @@ class InvoiceSettingsAdmin(admin.ModelAdmin):
     def changelist_view(self, request, extra_context=None):
         obj = InvoiceSettings.get()
         return redirect(reverse("admin:sales_invoicesettings_change", args=[obj.pk]))
+
+
+ORDER_BUTTON_JS = '<script src="/static/admin/js/ri_order_button.js?v=1" defer></script>'
+
+
+def order_button(order, last, style: str) -> str:
+    """Кнопка «🧾 Rechnung» у картці замовлення (SalesOrderAdmin.doc_templates_panel): рахунку ще немає — клік за
+    `InvoiceSettings.order_button` (⚡ одразу — POST /rechnungen/from-order/<pk>/, або форма), є — відкрити його;
+    правий клік — інші варіанти (MVMenu)."""
+    from django.utils.html import escape
+    if last is not None:
+        attrs = {"data-ri-menu": "1", "data-ri-open": f"/rechnungen/{last.pk}/",
+                 "data-ri-again": f"/rechnungen/new/?order={order.pk}&again=1"}
+        if last.pdf_file:
+            attrs["data-ri-pdf"] = f"/rechnungen/{last.pk}/file/pdf/"
+        if last.pdf_file or last.docx_file:
+            attrs["data-ri-mail"] = f"/email/compose/?invoice={last.pk}"
+        data = " ".join(f'{k}="{escape(v)}"' for k, v in attrs.items())
+        html = (f'<a href="/rechnungen/{last.pk}/" style="{style}" {data} '
+                f'title="Відкрити рахунок · правий клік — PDF, лист, ще один рахунок">'
+                f'🧾 Rechnung <span translate="no">{escape(last.number)}</span></a>')
+    else:
+        mode = InvoiceSettings.get().order_button
+        form = f"/rechnungen/new/?order={order.pk}"
+        title = ("Клік — одразу сформувати рахунок із даних замовлення · правий клік — форма"
+                 if mode == "quick" else "Клік — форма рахунку · правий клік — сформувати одразу")
+        html = (f'<a href="{form}" style="{style}" data-ri-menu="1" data-ri-mode="{escape(mode)}" '
+                f'data-ri-quick="/rechnungen/from-order/{order.pk}/" data-ri-form="{form}" title="{title}">'
+                f'🧾 Rechnung (рахунок)</a>')
+    return html + ORDER_BUTTON_JS

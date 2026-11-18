@@ -320,6 +320,17 @@ def create_from_order(order, user=None) -> SalesInvoice:
     return SalesInvoice.objects.create(number=number, created_by=user, **data)
 
 
+def quick_from_order(order, user=None) -> tuple[SalesInvoice, bool]:
+    """«⚡ Одразу сформувати» з картки замовлення: рахунок замовлення вже є — він (нічого нового), інакше новий із
+    даних замовлення + DOCX / PDF. (рахунок, створено). Збій документа — рахунок лишається, виняток іде далі."""
+    existing = order.sales_invoices.order_by("-pk").first()
+    if existing is not None:
+        return existing, False
+    inv = create_from_order(order, user)
+    generate(inv)
+    return inv, True
+
+
 # ── Документ ─────────────────────────────────────────────────────────────────
 
 def _fmt():

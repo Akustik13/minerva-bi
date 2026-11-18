@@ -101,6 +101,11 @@ class InvoiceSettings(models.Model):
     default_language = models.CharField(
         "Мова за замовчуванням", max_length=5, default=LANG_AUTO,
         choices=[(LANG_AUTO, "Автоматично: Німеччина / Австрія / Швейцарія — Deutsch, інші — English")] + LANGS)
+    ORDER_BUTTON = [("quick", "⚡ Одразу сформувати рахунок із даних замовлення"),
+                    ("form", "✏️ Відкрити форму рахунку")]
+    order_button = models.CharField(
+        "Клік «🧾 Rechnung» у картці замовлення", max_length=10, choices=ORDER_BUTTON, default="quick",
+        help_text="Правий клік на кнопці — інший варіант.")
     due_days = models.PositiveSmallIntegerField("Оплатити протягом, днів (рахунок)", default=14)
     prepayment_due_days = models.PositiveSmallIntegerField("Оплатити протягом, днів (передоплата)", default=7)
     vat_rate = models.DecimalField("Ставка ПДВ за замовчуванням, %", max_digits=5, decimal_places=2,

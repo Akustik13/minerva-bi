@@ -1950,6 +1950,7 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
         pl_last = obj.packing_lists.order_by('-created_at').first()
         ci_last = obj.commercial_invoices.order_by('-created_at').first()
         inv_last = obj.sales_invoices.order_by('-pk').first()
+        from .admin_invoices import order_button as invoice_order_button
         pl_btn_style = ('display:inline-block;font-size:12px;padding:5px 12px;border-radius:6px;'
                         'background:var(--bg-hover);border:1px solid var(--border-strong);'
                         'color:var(--text);text-decoration:none;margin-right:6px')
@@ -1961,8 +1962,7 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
             + f'<a href="/commercial-invoices/new/?order={obj.pk}" style="{pl_btn_style}">💵 Commercial Invoice (свій шаблон)</a>'
             + (f'<a href="/commercial-invoices/{ci_last.pk}/edit/" style="{pl_btn_style}">✏️ Invoice #{escape(ci_last.number)}</a>'
                if ci_last else '')
-            + (f'<a href="/rechnungen/{inv_last.pk}/" style="{pl_btn_style}">🧾 Rechnung {escape(inv_last.number)}</a>'
-               if inv_last else f'<a href="/rechnungen/new/?order={obj.pk}" style="{pl_btn_style}">🧾 Rechnung (рахунок)</a>')
+            + invoice_order_button(obj, inv_last, pl_btn_style)
             + '<div style="font-size:11px;color:var(--text-dim);margin-top:6px">форма з даними замовлення → DOCX/PDF у документи замовлення</div>'
             f'</div>'
         )

@@ -8,6 +8,7 @@ import tempfile
 from datetime import timedelta
 from decimal import Decimal
 from io import BytesIO
+from pathlib import Path
 from unittest import mock
 
 from django.contrib.auth.models import User
@@ -24,7 +25,7 @@ from shop.models import Shop, ShopOrder
 
 BILLING = {"company": "Fogra e.V.", "name": "Anna Muster", "street": "Streitfeldstr. 19", "zip": "81673",
            "city": "München", "country": "DE", "vat_id": "DE129514004", "email": "rechnung@fogra.example"}
-MEDIA = tempfile.mkdtemp(prefix="minerva-invoices-")
+MEDIA = Path(tempfile.mkdtemp(prefix="minerva-invoices-"))   # Path, як у settings (documents_list ділить шляхи)
 
 
 def person(username, modules=("sales",), role="readonly"):
@@ -152,7 +153,6 @@ class DocumentTests(_Base):
     def test_generate_copies_to_order_folder(self, _pdf):
         inv = svc.generate(svc.create_from_order(self.order, self.boss))
         self.assertTrue(inv.docx_file and inv.pdf_file)
-        from pathlib import Path
         folder = Path(MEDIA) / "orders" / "sevskiy_de" / "PO-31728-001"
         self.assertTrue((folder / "Rechnung_CI-31728-001.pdf").exists())
         from shop.accounts import order_documents
@@ -276,3 +276,41 @@ class MailTests(_Base):
         stranger = person("ola", modules=("crm",))
         self.assertFalse(_allowed(stranger, "sales_invoices/Rechnung_X.pdf"))
         self.assertTrue(_allowed(person("vika"), "sales_invoices/Rechnung_X.pdf"))
+
+
+@mock.patch("documents.service._convert_to_pdf", return_value=b"%PDF-1.4 test")
+class QuickFromOrderTests(_Base):
+    def test_one_click_creates_and_returns_to_order(self, _pdf):
+        self.client.force_login(self.boss)
+        url = f"/rechnungen/from-order/{self.order.pk}/"
+        self.assertEqual(self.client.get(url).status_code, 405)                 # лише POST
+        resp = self.client.post(url)
+        self.assertRedirects(resp, f"/admin/sales/salesorder/{self.order.pk}/change/", fetch_redirect_response=False)
+        inv = SalesInvoice.objects.get()
+        self.assertEqual((inv.number, inv.customer_number, inv.created_by), ("CI-31728-001", "31728", self.boss))
+        self.assertTrue(inv.pdf_file and inv.docx_file)
+        again = self.client.post(url)                                           # другий клік — той самий рахунок
+        self.assertRedirects(again, f"/rechnungen/{inv.pk}/", fetch_redirect_response=False)
+        self.assertEqual(SalesInvoice.objects.count(), 1)
+
+    def test_without_right_nothing_created(self, _pdf):
+        self.client.force_login(person("vika"))
+        resp = self.client.post(f"/rechnungen/from-order/{self.order.pk}/")
+        self.assertRedirects(resp, f"/admin/sales/salesorder/{self.order.pk}/change/", fetch_redirect_response=False)
+        self.assertFalse(SalesInvoice.objects.exists())
+
+    def test_order_card_button_follows_setting(self, _pdf):
+        from sales.admin_invoices import order_button
+        html = order_button(self.order, None, "")
+        self.assertIn('data-ri-mode="quick"', html)
+        self.assertIn(f'data-ri-quick="/rechnungen/from-order/{self.order.pk}/"', html)
+        InvoiceSettings.objects.filter(pk=1).update(order_button="form")
+        self.assertIn('data-ri-mode="form"', order_button(self.order, None, ""))
+        inv = svc.generate(svc.create_from_order(self.order, self.boss))
+        html = order_button(self.order, inv, "")
+        self.assertIn(f'href="/rechnungen/{inv.pk}/"', html)
+        self.assertIn(f'data-ri-pdf="/rechnungen/{inv.pk}/file/pdf/"', html)
+        self.assertNotIn("data-ri-quick=", html.split("<script>")[0])     # є рахунок — лише відкрити
+        self.client.force_login(self.boss)
+        page = self.client.get(f"/admin/sales/salesorder/{self.order.pk}/change/")
+        self.assertContains(page, "🧾 Rechnung")

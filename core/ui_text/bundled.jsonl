@@ -339,6 +339,7 @@
 {"uk": "(кроків", "en": "(steps", "de": "(Schritte"}
 {"uk": "(кроків немає)", "en": "(no steps)", "de": "(keine Schritte)"}
 {"uk": "(листування клієнта поза проєктом); перевіряйте за посиланнями ↗.", "en": "(the customer's correspondence outside the project); verify using the links ↗.", "de": "(Korrespondenz des Kunden außerhalb des Projekts); prüfen Sie anhand der Links ↗."}
+{"uk": "(лише DOCX — на сервері немає LibreOffice для PDF)", "en": "(DOCX only — no LibreOffice on the server for PDF)", "de": "(nur DOCX — auf dem Server fehlt LibreOffice für PDF)"}
 {"uk": "(лише DOCX — на сервері немає LibreOffice для PDF).", "en": "(DOCX only — no LibreOffice on the server for PDF).", "de": "(nur DOCX — auf dem Server fehlt LibreOffice für PDF)."}
 {"uk": "(лише DOCX — на сервері немає LibreOffice)", "en": "(DOCX only — LibreOffice is not installed on the server)", "de": "(nur DOCX — auf dem Server ist kein LibreOffice installiert)"}
 {"uk": "(лише DigiKey — форма підтвердження)", "en": "(DigiKey only — confirmation form)", "de": "(nur DigiKey — Bestätigungsformular)"}
@@ -5753,6 +5754,7 @@
 {"uk": "Відкрити Datasheet", "en": "Open Datasheet", "de": "Datenblatt öffnen"}
 {"uk": "Відкрити Jumingo", "en": "Open Jumingo", "de": "Jumingo öffnen"}
 {"uk": "Відкрити Messages Hub", "en": "Open Messages Hub", "de": "Messages Hub öffnen"}
+{"uk": "Відкрити PDF", "en": "Open PDF", "de": "PDF öffnen"}
 {"uk": "Відкрити PO", "en": "Open PO", "de": "Bestellung öffnen"}
 {"uk": "Відкрити RAG-ПК (прийняти сертифікат)", "en": "Open the RAG PC (accept the certificate)", "de": "RAG-PC öffnen (Zertifikat akzeptieren)"}
 {"uk": "Відкрити askDANTE", "en": "Open askDANTE", "de": "askDANTE öffnen"}
@@ -5797,6 +5799,8 @@
 {"uk": "Відкрити посилку", "en": "Open parcel", "de": "Paket öffnen"}
 {"uk": "Відкрити пошту", "en": "Open mail", "de": "Postfach öffnen"}
 {"uk": "Відкрити проєкт", "en": "Open project", "de": "Projekt öffnen"}
+{"uk": "Відкрити рахунок", "en": "Open invoice", "de": "Rechnung öffnen"}
+{"uk": "Відкрити рахунок · правий клік — PDF, лист, ще один рахунок", "en": "Open invoice · right-click — PDF, email, one more invoice", "de": "Rechnung öffnen · Rechtsklick — PDF, E-Mail, noch eine Rechnung"}
 {"uk": "Відкрити службу DYMO", "en": "Open the DYMO service", "de": "DYMO-Dienst öffnen"}
 {"uk": "Відкрити список відправлень на Jumingo — знайдіть за скопійованим ID", "en": "Open the shipment list on Jumingo — find it by the copied ID", "de": "Sendungsliste bei Jumingo öffnen — mit der kopierten ID suchen"}
 {"uk": "Відкрити сторінку й підсвітити «", "en": "Open the page and highlight “", "de": "Seite öffnen und hervorheben: „"}
@@ -5804,6 +5808,7 @@
 {"uk": "Відкрити товар у Minerva", "en": "Open the product in Minerva", "de": "Artikel in Minerva öffnen"}
 {"uk": "Відкрити форму", "en": "Open form", "de": "Formular öffnen"}
 {"uk": "Відкрити форму підтвердження відвантаження", "en": "Open the shipment confirmation form", "de": "Formular zur Versandbestätigung öffnen"}
+{"uk": "Відкрити форму рахунку", "en": "Open the invoice form", "de": "Rechnungsformular öffnen"}
 {"uk": "Відкрити фото", "en": "Open photo", "de": "Foto öffnen"}
 {"uk": "Відкрити це місце в розшифровці наради (бачите лише ви — нараду записали ви)", "en": "Open this spot in the meeting transcript (only you can see it — you recorded the meeting)", "de": "Diese Stelle im Besprechungstranskript öffnen (nur Sie sehen sie — Sie haben die Besprechung aufgenommen)"}
 {"uk": "Відкрити як чернетку", "en": "Open as draft", "de": "Als Entwurf öffnen"}
@@ -9114,6 +9119,7 @@
 {"uk": "Ключів кілька: кожен сайт — свій ключ; який сайт яким користується — у кроці «Сайт підключено». Той, що більше не потрібен, вимкніть.", "en": "There are several keys: one key per site; which site uses which — see the step «Сайт підключено». Deactivate the one you no longer need.", "de": "Es gibt mehrere Schlüssel: je Website ein eigener; welche Website welchen nutzt — im Schritt «Сайт підключено». Den nicht mehr benötigten deaktivieren."}
 {"uk": "Ключів немає — API недоступний", "en": "No keys — API unavailable", "de": "Keine Schlüssel — API nicht verfügbar"}
 {"uk": "Клік", "en": "Click", "de": "Klick"}
+{"uk": "Клік «🧾 Rechnung» у картці замовлення", "en": "Click on “🧾 Rechnung” in the order card", "de": "Klick auf „🧾 Rechnung“ in der Auftragskarte"}
 {"uk": "Клік на вузол — зв’язки й деталі (що замовляли, які запити), подвійний клік або Enter — відкрити · Ctrl + коліщатко — масштаб, тягніть фон — прокрутка.", "en": "Click a node — links and details (what was ordered, which requests), double-click or Enter — open · Ctrl + wheel — zoom, drag the background — scroll.", "de": "Klick auf einen Knoten — Verbindungen und Details (was bestellt wurde, welche Anfragen), Doppelklick oder Enter — öffnen · Strg + Mausrad — Zoom, Hintergrund ziehen — scrollen."}
 {"uk": "Клік на вузол — показати його зв’язки, подвійний клік або Enter — відкрити.", "en": "Click a node to show its links, double-click or Enter to open it.", "de": "Klick auf einen Knoten zeigt seine Verbindungen, Doppelklick oder Enter öffnet ihn."}
 {"uk": "Клік на крок чи фазу — змінити.", "en": "Click a step or phase to change it.", "de": "Klick auf Schritt oder Phase — ändern."}
@@ -9125,9 +9131,11 @@
 {"uk": "Клік — відкрити лист", "en": "Click — open the e-mail", "de": "Klick — E-Mail öffnen"}
 {"uk": "Клік — згорнути чи розгорнути кроки фази", "en": "Click — collapse or expand the steps of the phase", "de": "Klick — Schritte der Phase ein- oder ausklappen"}
 {"uk": "Клік — лист із запрошенням; ✅ / ❔ / ✕ — у блоці «📨 Запрошення на зустрічі» нижче", "en": "Click — the invitation e-mail; ✅ / ❔ / ✕ — in the «📨 Meeting invitations» block below", "de": "Klick — die Einladungs-E-Mail; ✅ / ❔ / ✕ — im Block «📨 Termineinladungen» unten"}
+{"uk": "Клік — одразу сформувати рахунок із даних замовлення · правий клік — форма", "en": "Click — generate the invoice from the order data right away · right-click — form", "de": "Klick — Rechnung sofort aus den Auftragsdaten erstellen · Rechtsklick — Formular"}
 {"uk": "Клік — показати цю сторінку", "en": "Click — show this page", "de": "Klick — diese Seite anzeigen"}
 {"uk": "Клік — увесь лист праворуч · Ctrl + клік — у пошті", "en": "Click — the whole e-mail on the right · Ctrl + click — in mail", "de": "Klick — die ganze E-Mail rechts · Strg + Klick — in der Post"}
 {"uk": "Клік — усе про цю пропозицію праворуч: ціни, вкладення, листи", "en": "Click — everything about this offer on the right: prices, attachments, e-mails", "de": "Klick — alles zu diesem Angebot rechts: Preise, Anhänge, E-Mails"}
+{"uk": "Клік — форма рахунку · правий клік — сформувати одразу", "en": "Click — invoice form · right-click — generate right away", "de": "Klick — Rechnungsformular · Rechtsklick — sofort erstellen"}
 {"uk": "Клік — ✓ виконано, зустріч чи термін, лист", "en": "Click — ✓ done, meeting or deadline, e-mail", "de": "Klick — ✓ erledigt, Besprechung oder Frist, E-Mail"}
 {"uk": "Клікайте рівні розділів, 🚫 біля сторінок, особливі права; правий клік — те саме меню. Сторінка", "en": "Click the section levels, the 🚫 next to pages, special permissions; right-click opens the same menu. The page", "de": "Klicken Sie auf die Bereichsstufen, das 🚫 neben Seiten, besondere Berechtigungen; ein Rechtsklick öffnet dasselbe Menü. Die Seite"}
 {"uk": "Клікайте рівні розділів, 🚫 біля сторінок, особливі права; правий клік — те саме меню. Сторінка одразу показує, як буде. Нічого не збережено, доки не натиснете «💾 Зберегти».", "en": "Click the section levels, the 🚫 next to pages, special permissions; right-click opens the same menu. The page immediately shows the result. Nothing is saved until you click “💾 Save”.", "de": "Klicken Sie auf die Bereichsstufen, das 🚫 neben Seiten, besondere Berechtigungen; ein Rechtsklick öffnet dasselbe Menü. Die Seite zeigt sofort das Ergebnis. Es wird nichts gespeichert, bis Sie auf „💾 Speichern“ klicken."}
@@ -11648,6 +11656,7 @@
 {"uk": "Немає права створювати категорії", "en": "No permission to create categories", "de": "Keine Berechtigung zum Erstellen von Kategorien"}
 {"uk": "Немає права створювати ключі API", "en": "No permission to create API keys", "de": "Keine Berechtigung, API-Schlüssel zu erstellen"}
 {"uk": "Немає права створювати клієнтів CRM", "en": "No permission to create CRM customers", "de": "Keine Berechtigung zum Anlegen von CRM-Kunden"}
+{"uk": "Немає права створювати рахунки.", "en": "No permission to create invoices.", "de": "Keine Berechtigung, Rechnungen zu erstellen."}
 {"uk": "Немає права читати візитки AI.", "en": "No permission to read business cards with AI.", "de": "Keine Berechtigung, Visitenkarten mit KI zu lesen."}
 {"uk": "Немає продажів", "en": "No sales", "de": "Keine Verkäufe"}
 {"uk": "Немає продукту", "en": "No product", "de": "Kein Artikel"}
@@ -12189,6 +12198,7 @@
 {"uk": "Одразу повідомити мене", "en": "Notify me right away", "de": "Mich sofort benachrichtigen"}
 {"uk": "Одразу показувати", "en": "Show immediately", "de": "Sofort anzeigen"}
 {"uk": "Одразу при збереженні", "en": "Immediately on save", "de": "Sofort beim Speichern"}
+{"uk": "Одразу сформувати рахунок із даних замовлення", "en": "Generate the invoice from the order data right away", "de": "Rechnung sofort aus den Auftragsdaten erstellen"}
 {"uk": "Ознака", "en": "Criterion", "de": "Merkmal"}
 {"uk": "Окрема нумерація: замовлення TEST-PO-0001, документи TEST-OC / CI / PI / PL-0001, акаунти TEST-1 — справжні номери й Kundennummern не витрачаються (shop/numbering.py).", "en": "Separate numbering: orders TEST-PO-0001, documents TEST-OC / CI / PI / PL-0001, accounts TEST-1 — real numbers and Kundennummern are not used up (shop/numbering.py).", "de": "Separate Nummerierung: Aufträge TEST-PO-0001, Dokumente TEST-OC / CI / PI / PL-0001, Konten TEST-1 – echte Nummern und Kundennummern werden nicht verbraucht (shop/numbering.py)."}
 {"uk": "Окремий Bearer-ключ RAG для /v2/* (не ключ магазину). Лише на сервері Minerva.", "en": "A separate RAG Bearer key for /v2/* (not the shop key). Only on the Minerva server.", "de": "Separater RAG-Bearer-Schlüssel für /v2/* (nicht der Shop-Schlüssel). Nur auf dem Minerva-Server."}
@@ -14237,6 +14247,7 @@
 {"uk": "Права й обмеження ключа", "en": "Key permissions and restrictions", "de": "Berechtigungen und Einschränkungen des Schlüssels"}
 {"uk": "Права моделі «{0}»", "en": "Permissions for model “{0}”", "de": "Berechtigungen für das Modell „{0}“"}
 {"uk": "Права іншого керівника користувачів змінює лише адміністратор.", "en": "Only an administrator can change the permissions of another user manager.", "de": "Die Berechtigungen eines anderen Benutzerverwalters kann nur ein Administrator ändern."}
+{"uk": "Правий клік на кнопці — інший варіант.", "en": "Right-click on the button — the other option.", "de": "Rechtsklick auf die Schaltfläche — die andere Variante."}
 {"uk": "Правий клік на пункті меню → «⭐ У Мої».", "en": "Right-click a menu item → “⭐ To My”.", "de": "Rechtsklick auf einen Menüpunkt → „⭐ In Meine“."}
 {"uk": "Правий клік на 🖨️ Друкувати → «🔍 Перевірити дані етикетки…» відкриває вікно завжди.", "en": "Right-click on 🖨️ Print → “🔍 Check label data…” always opens the window.", "de": "Rechtsklick auf 🖨️ Drucken → „🔍 Etikettendaten prüfen…“ öffnet das Fenster immer."}
 {"uk": "Правил немає — лише листи, віднесені вручну", "en": "There are no rules — only emails assigned manually", "de": "Keine Regeln vorhanden — nur manuell zugeordnete E-Mails"}
@@ -15091,6 +15102,7 @@
 {"uk": "Рахунок на", "en": "Invoice to", "de": "Rechnung an"}
 {"uk": "Рахунок на (Rechnungsempfänger)", "en": "Invoice to (Rechnungsempfänger)", "de": "Rechnungsempfänger"}
 {"uk": "Рахунок надіслано клієнту", "en": "Invoice sent to the customer", "de": "Rechnung an den Kunden gesendet"}
+{"uk": "Рахунок не сформовано: {0}", "en": "Invoice not generated: {0}", "de": "Rechnung nicht erstellt: {0}"}
 {"uk": "Рахунок скасовано", "en": "Invoice cancelled", "de": "Rechnung storniert"}
 {"uk": "Рахунок створено, не надіслано", "en": "Invoice created, not sent", "de": "Rechnung erstellt, nicht gesendet"}
 {"uk": "Рахунок є — документа про оплату ще немає", "en": "Invoice present — no payment document yet", "de": "Rechnung vorhanden — noch kein Zahlungsbeleg"}
@@ -16567,6 +16579,7 @@
 {"uk": "Сформувати з шаблону з актуальними даними (антени AN…, фільтри FT…, кабелі CA-…)", "en": "Generate from the template with current data (antennas AN…, filters FT…, cables CA-…)", "de": "Aus der Vorlage mit aktuellen Daten erzeugen (Antennen AN…, Filter FT…, Kabel CA-…)"}
 {"uk": "Сформувати й перевірити", "en": "Generate and check", "de": "Erzeugen und prüfen"}
 {"uk": "Сформувати й перевірити посилання", "en": "Generate and check links", "de": "Links erzeugen und prüfen"}
+{"uk": "Сформувати рахунок одразу", "en": "Generate invoice right away", "de": "Rechnung sofort erstellen"}
 {"uk": "Сфотографуйте візитку, флаєр чи стенд на виставці — камерою (телефон, ноутбук) або виберіть файл. Minerva збереже фото з вашими примітками й позначками", "en": "Photograph a business card, flyer or trade fair booth — with the camera (phone, laptop) or choose a file. Minerva saves the photo with your notes and marks", "de": "Fotografieren Sie Visitenkarte, Flyer oder Messestand — mit der Kamera (Handy, Laptop) oder wählen Sie eine Datei. Minerva speichert das Foto mit Ihren Notizen und Markierungen"}
 {"uk": "Сфотографуйте візитку, флаєр чи стенд — камерою або виберіть файл. Minerva збереже фото з вашими примітками", "en": "Photograph a business card, flyer or booth — with the camera or choose a file. Minerva saves the photo with your notes", "de": "Fotografieren Sie Visitenkarte, Flyer oder Stand — mit der Kamera oder wählen Sie eine Datei. Minerva speichert das Foto mit Ihren Notizen"}
 {"uk": "Схема", "en": "Diagram", "de": "Schema"}
@@ -17815,6 +17828,7 @@
 {"uk": "Формат: хвилина година день місяць день_тижня. Приклад: 0 */6 * * * (кожні 6 год)", "en": "Format: minute hour day month weekday. Example: 0 */6 * * * (every 6 h)", "de": "Format: Minute Stunde Tag Monat Wochentag. Beispiel: 0 */6 * * * (alle 6 Std.)"}
 {"uk": "Формати етикеток", "en": "Label formats", "de": "Etikettenformate"}
 {"uk": "Формати: .xlsx, .xls, .csv", "en": "Formats: .xlsx, .xls, .csv", "de": "Formate: .xlsx, .xls, .csv"}
+{"uk": "Формую рахунок…", "en": "Generating invoice…", "de": "Rechnung wird erstellt…"}
 {"uk": "Фото", "en": "Photo", "de": "Foto"}
 {"uk": "Фото (URL)", "en": "Photo (URL)", "de": "Foto (URL)"}
 {"uk": "Фото (адреса)", "en": "Photo (URL)", "de": "Foto (Adresse)"}
@@ -18777,6 +18791,7 @@
 {"uk": "Що робити — інструкція агенту", "en": "What to do — instruction for the agent", "de": "Was zu tun ist – Anweisung an den Agenten"}
 {"uk": "Що робитиме доручення з кожним таким листом", "en": "What the instruction will do with each such email", "de": "Was der Auftrag mit jeder solchen E-Mail tut"}
 {"uk": "Що робить", "en": "What it does", "de": "Was es tut"}
+{"uk": "Що робить клік…", "en": "What a click does…", "de": "Was ein Klick tut…"}
 {"uk": "Що роблять", "en": "What they do", "de": "Was sie machen"}
 {"uk": "Що роблять / продають", "en": "What they make / sell", "de": "Was sie herstellen / verkaufen"}
 {"uk": "Що розробляємо чи постачаємо: за ними Minerva пропонує закупівлі й JLC-замовлення проєкту", "en": "What we develop or supply: Minerva uses them to suggest purchase orders and JLC orders for the project", "de": "Was wir entwickeln oder liefern: danach schlägt Minerva Bestellungen und JLC-Bestellungen des Projekts vor"}
@@ -23602,6 +23617,7 @@
 {"uk": "і відмітити відхід або виправити день.", "en": "and mark the clock-out or correct the day.", "de": "und das Gehen markieren oder den Tag korrigieren."}
 {"uk": "і дає сигнали коли потрібно діяти.", "en": "and gives signals when it is time to act.", "de": "und gibt Signale, wann gehandelt werden muss."}
 {"uk": "і до затвердження діє теперішня версія (на supplier.digikey.com: Products → Pending).", "en": "and until approval the current version stays in effect (on supplier.digikey.com: Products → Pending).", "de": "und bis zur Freigabe gilt die aktuelle Version (auf supplier.digikey.com: Products → Pending)."}
+{"uk": "і додано в документи замовлення. Змінити — «🧾 Rechnung …» → форма.", "en": "and added to the order documents. To change — “🧾 Rechnung …” → form.", "de": "und zu den Auftragsdokumenten hinzugefügt. Ändern — „🧾 Rechnung …“ → Formular."}
 {"uk": "і з Manufacturer Part Number на DigiKey Marketplace.", "en": "and the Manufacturer Part Number on the DigiKey Marketplace.", "de": "und mit der Manufacturer Part Number auf dem DigiKey Marketplace."}
 {"uk": "і завантажте назад", "en": "and upload it back", "de": "und wieder hochladen"}
 {"uk": "і завантажте назад — перед збереженням шаблон перевіряється на тестових даних.", "en": "and upload it back — before saving, the template is checked against test data.", "de": "und laden Sie sie wieder hoch — vor dem Speichern wird die Vorlage mit Testdaten geprüft."}
@@ -23716,6 +23732,7 @@
 {"uk": "ℹ️ Всі поля вже актуальні.", "en": "ℹ️ All fields are already up to date.", "de": "ℹ️ Alle Felder sind bereits aktuell."}
 {"uk": "ℹ️ Відправлення #{0} вже скасовано.", "en": "ℹ️ Shipment #{0} is already cancelled.", "de": "ℹ️ Sendung #{0} ist bereits storniert."}
 {"uk": "ℹ️ Відправлення доставлено. Замовлення не прив'язано.", "en": "ℹ️ The shipment is delivered. The order is not linked.", "de": "ℹ️ Die Sendung ist zugestellt. Der Auftrag ist nicht verknüpft."}
+{"uk": "ℹ️ Для замовлення {0} уже є рахунок {1} — відкрито його.", "en": "ℹ️ Order {0} already has invoice {1} — it has been opened.", "de": "ℹ️ Für den Auftrag {0} gibt es bereits die Rechnung {1} — sie wurde geöffnet."}
 {"uk": "ℹ️ Для прийому прив'яжіть товар.", "en": "ℹ️ Link a product to receive it into stock.", "de": "ℹ️ Verknüpfen Sie für den Wareneingang einen Artikel."}
 {"uk": "ℹ️ Для цього замовлення вже є Invoice #{0} — його можна редагувати у списку. Тут створюється новий.", "en": "ℹ️ This order already has Invoice #{0} — you can edit it in the list. A new one is created here.", "de": "ℹ️ Für diesen Auftrag gibt es bereits Invoice #{0} — Sie können sie in der Liste bearbeiten. Hier wird eine neue erstellt."}
 {"uk": "ℹ️ Для цього замовлення вже є Packing List #{0} — можна редагувати його у списку. Тут створюється новий.", "en": "ℹ️ This order already has Packing List #{0} — you can edit it in the list. A new one is created here.", "de": "ℹ️ Für diesen Auftrag gibt es bereits Packing List #{0} — Sie können sie in der Liste bearbeiten. Hier wird eine neue erstellt."}

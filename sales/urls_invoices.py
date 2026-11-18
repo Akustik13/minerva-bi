@@ -5,6 +5,7 @@ from sales import views_invoices as v
 urlpatterns = [
     path("",                      v.invoice_list,      name="sales_invoice_list"),
     path("new/",                  v.invoice_new,       name="sales_invoice_new"),
+    path("from-order/<int:order_pk>/", v.invoice_from_order, name="sales_invoice_from_order"),
     path("<int:pk>/",             v.invoice_edit,      name="sales_invoice_edit"),
     path("<int:pk>/file/<str:kind>/", v.invoice_file,  name="sales_invoice_file"),
     path("<int:pk>/delete/",      v.invoice_delete,    name="sales_invoice_delete"),

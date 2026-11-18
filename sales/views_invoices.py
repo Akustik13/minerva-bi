@@ -12,6 +12,7 @@ from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from . import invoice_service as svc
@@ -146,6 +147,32 @@ def _save(request, inv, order, kind):
         msg += " Копія — у «Документах замовлення»."
     messages.success(request, msg)
     return redirect(f"{BASE}{inv.pk}/")
+
+
+@_staff
+@require_POST
+def invoice_from_order(request, order_pk):
+    """«⚡ Одразу сформувати» (кнопка «🧾 Rechnung» у картці замовлення): рахунок із даних замовлення без форми,
+    назад у картку. Рахунок уже є — відкривається він."""
+    order = get_object_or_404(SalesOrder, pk=order_pk)
+    card = reverse("admin:sales_salesorder_change", args=[order.pk])
+    if not (request.user.has_perm("sales.add_salesinvoice") and request.user.has_perm("sales.change_salesinvoice")):
+        messages.error(request, "❌ Немає права створювати рахунки.")
+        return redirect(card)
+    try:
+        inv, created = svc.quick_from_order(order, request.user)
+    except Exception as e:  # noqa: BLE001 — рахунок збережено, документ — ні: показати причину у формі
+        logger.exception("quick invoice for order %s failed", order.pk)
+        inv = order.sales_invoices.order_by("-pk").first()
+        messages.error(request, f"❌ Рахунок не сформовано: {e}")
+        return redirect(f"{BASE}{inv.pk}/" if inv else card)
+    if not created:
+        messages.info(request, f"ℹ️ Для замовлення {order.order_number} уже є рахунок {inv.number} — відкрито його.")
+        return redirect(f"{BASE}{inv.pk}/")
+    msg = f"✅ Рахунок {inv.number} сформовано"
+    msg += " (DOCX + PDF)" if inv.pdf_file else " (лише DOCX — на сервері немає LibreOffice для PDF)"
+    messages.success(request, msg + " і додано в документи замовлення. Змінити — «🧾 Rechnung …» → форма.")
+    return redirect(card)
 
 
 @_staff
