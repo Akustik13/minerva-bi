@@ -135,7 +135,7 @@ class QuickPageTests(QuickBase):
             self.assertContains(r, "Kickoff Antenne")
             self.assertContains(r, f'name="event" value="{ev.pk}"')
             self.assertContains(r, reverse("admin:meetings_meeting_record", args=[ready.pk]))
-            self.assertContains(r, "meetings/meetings.js?v=10")
+            self.assertContains(r, "meetings/meetings.js?v=11")
             self.assertContains(r, "RAG-ПК ще не підключено до Minerva")    # ще ні разу не був на зв'язку
             self.assertContains(r, "disabled")
 

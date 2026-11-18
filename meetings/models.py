@@ -204,6 +204,9 @@ class MeetingTranscript(models.Model):
     incoming = models.JSONField(default=dict, blank=True)
     summary = models.TextField(blank=True, default="")
     moments_model = models.CharField(max_length=60, blank=True, default="")
+    brief = models.JSONField(default=dict, blank=True,
+                             help_text="📝 Підсумок наради й звірка з агендою (meetings/ai_brief.py): {about, sections, "
+                                       "agenda {pk пункту: {status, result, lines, st}}, model, lang, at, cost}")
     chars = models.PositiveIntegerField(default=0)
     at = models.DateTimeField(null=True, blank=True)
 
