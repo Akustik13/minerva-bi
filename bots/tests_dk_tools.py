@@ -321,3 +321,60 @@ class AttrsHonestTests(ToolsBase):
         text = " ".join(str(m) for m in r.context["messages"])
         self.assertIn("code=2049 | Tolerance | SingleLabelCodeList | ReadWrite", text)
         self.assertIn("±10%=1131", text)
+
+
+LIST_FIELDS = [
+    {"code": "rohsStatus", "name": "ROHS Status", "fieldType": "SingleLabelCodeList", "permissionLevel": "ReadWrite",
+     "fieldLabelCodePairs": [{"label": "RoHS3 Compliant", "code": "ROHS3 COMPLIANT"}, {"label": "RoHS NA", "code": "ROHS NA"}]},
+    {"code": "countryOfOrigin", "name": "Country of Origin", "fieldType": "SingleLabelCodeList", "permissionLevel": "ReadWrite",
+     "fieldLabelCodePairs": [{"label": "Germany", "code": "DE"}, {"label": "United States of America", "code": "US"}]},
+    {"code": "packaging", "name": "Packaging", "fieldType": "SingleLabelCodeList", "permissionLevel": "ReadWrite",
+     "required": True, "fieldLabelCodePairs": [{"label": "Tape & Reel (TR)", "code": "TAPE & REEL (TR)"},
+                                               {"label": "Bulk", "code": "BULK"}]},
+    {"code": "hts", "name": "Harmonized Tariff Schedule", "fieldType": "Text", "permissionLevel": "ReadWrite"},
+]
+
+
+class ListCodeTests(ToolsBase):
+    """Поля-списки DigiKey (SingleLabelCodeList) зберігають код, а не назву: «RoHS3 Compliant» → «ROHS3 COMPLIANT»."""
+
+    def setUp(self):
+        super().setUp()
+        from bots.services.dk_from_stock import remember_fields
+        remember_fields(LIST_FIELDS)
+
+    def test_label_or_code_to_code(self):
+        from bots.services.dk_from_stock import list_code
+        self.assertEqual(list_code("rohsStatus", "RoHS3 Compliant"), "ROHS3 COMPLIANT")
+        self.assertEqual(list_code("rohsStatus", "rohs3 compliant"), "ROHS3 COMPLIANT")
+        self.assertEqual(list_code("countryOfOrigin", "Germany"), "DE")
+        self.assertEqual(list_code("countryOfOrigin", "DE"), "DE")
+        self.assertEqual(list_code("packaging", "Tape & Reel (TR)"), "TAPE & REEL (TR)")
+        self.assertEqual(list_code("hts", "8529"), "8529")                         # не список — як є
+        self.assertEqual(list_code("countryOfOrigin", "Atlantis"), "Atlantis")     # не зі списку — як є
+        self.assertEqual(list_code("139", "2.4 GHz"), "2.4 GHz")                   # технічний параметр — як є
+
+    def test_sent_as_codes(self):
+        self.listing.dk_packaging = "Bulk"
+        self.listing.dk_attributes = {"139": "2.4 GHz", "rohsStatus": "RoHS3 Compliant", "countryOfOrigin": "Germany"}
+        sent = {a["code"]: a["value"] for a in self.listing.get_all_attributes_api()}
+        self.assertEqual((sent["packaging"], sent["rohsStatus"], sent["countryOfOrigin"], sent["139"]),
+                         ("BULK", "ROHS3 COMPLIANT", "DE", "2.4 GHz"))
+
+    def test_custom_fields_button_refreshes_the_list(self):
+        from core.shared_cache import cache
+        from bots.services import dk_from_stock
+        cache.delete(dk_from_stock.FIELDS_CACHE_KEY)
+        self.admin()
+        with mock.patch("bots.services.dk_marketplace.fetch_custom_fields", return_value=LIST_FIELDS):
+            self.client.get("/admin/bots/digikeyconfig/custom-fields/", follow=True)
+        self.assertEqual(dk_from_stock.list_code("countryOfOrigin", "Germany"), "DE")
+
+    def test_from_stock_marks_technical_params(self):
+        from django.template.loader import render_to_string
+        html = render_to_string("admin/bots/digikeylisting/_from_stock_field.html",
+                                {"m": {"code": "139", "name": "Frequency", "values": []}, "pk": 1, "req": False})
+        self.assertIn("DigiKey через API його не приймає", html)
+        html = render_to_string("admin/bots/digikeylisting/_from_stock_field.html",
+                                {"m": {"code": "rohsStatus", "name": "ROHS", "values": ["RoHS3 Compliant"]}, "pk": 1})
+        self.assertNotIn("через API його не приймає", html)

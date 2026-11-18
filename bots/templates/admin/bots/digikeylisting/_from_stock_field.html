@@ -12,5 +12,5 @@
            {% if m.examples %}list="dl-{{ pk }}-{{ m.code }}" placeholder="напр. {{ m.examples.0 }}"{% endif %}>
     {% if m.examples %}<datalist id="dl-{{ pk }}-{{ m.code }}">{% for v in m.examples %}<option value="{{ v }}">{% endfor %}</datalist>{% endif %}
   {% endif %}
-  <small>{% if m.hint %}{{ m.hint }}{% elif req %}обов'язкове поле DigiKey{% else %}код {{ m.code }}{% endif %}</small>
+  <small>{% if m.hint %}{{ m.hint }}{% elif req %}обов'язкове поле DigiKey{% else %}код {{ m.code }}{% endif %}{% if m.code|slice:":1" in "0123456789" %} · технічний параметр: DigiKey через API його не приймає — лише на порталі (Technical Attributes) або шаблоном DigiKey; у Minerva лишиться в параметрах товару{% endif %}</small>
 </div>

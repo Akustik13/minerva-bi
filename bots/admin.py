@@ -1030,6 +1030,8 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         config = DigiKeyConfig.get()
         try:
             fields = fetch_custom_fields(config)
+            from bots.services.dk_from_stock import remember_fields
+            remember_fields(fields)            # той самий список — Minerva надсилає поля-списки кодами з нього
             if not fields:
                 self.message_user(request, '⚠️ Поля не знайдено (порожня відповідь)', level='warning')
             else:

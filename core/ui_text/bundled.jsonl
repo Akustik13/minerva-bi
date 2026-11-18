@@ -22668,6 +22668,7 @@
 {"uk": "тестовий (sk_test_)", "en": "test (sk_test_)", "de": "Test (sk_test_)"}
 {"uk": "тестовий режим", "en": "test mode", "de": "Testmodus"}
 {"uk": "технологія що перетворює веб-сайт на нативний додаток: власна іконка, повноекранний режим без адресного рядка, кешування статики, офлайн-заглушка.", "en": "a technology that turns a website into a native app: its own icon, full-screen mode without an address bar, static file caching, an offline placeholder.", "de": "eine Technologie, die eine Website in eine native App verwandelt: eigenes Symbol, Vollbildmodus ohne Adressleiste, Caching statischer Dateien, Offline-Platzhalter."}
+{"uk": "технічний параметр: DigiKey через API його не приймає — лише на порталі (Technical Attributes) або шаблоном DigiKey; у Minerva лишиться в параметрах товару", "en": "technical parameter: DigiKey does not accept it through the API — only in the portal (Technical Attributes) or via DigiKey's template; in Minerva it stays in the product parameters", "de": "technischer Parameter: DigiKey nimmt ihn über die API nicht an — nur im Portal (Technical Attributes) oder per DigiKey-Vorlage; in Minerva bleibt er in den Artikelparametern"}
 {"uk": "тиж.", "en": "wk.", "de": "KW"}
 {"uk": "тиждень з {0}: {1} год", "en": "week of {0}: {1} h", "de": "Woche ab {0}: {1} Std."}
 {"uk": "тиждень у Minerva поруч із оригіналом", "en": "a week in Minerva next to the original", "de": "eine Woche in Minerva neben dem Original"}
