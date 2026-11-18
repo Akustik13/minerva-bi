@@ -197,7 +197,7 @@ def product_rows(listing, product) -> list:
         m, d = mine.get(code, ""), theirs.get(code) if have else None
         if have and code.isdigit() and not numeric_back:
             row = _row(f"attr:{code}", _attr_label(code, names), m, "", True, group="attrs")
-            row.update(state="unknown", dk="API не віддає — дивіться сторінку товару на digikey.com")
+            row.update(state="unknown", dk="DigiKey не повернув — перевірте на supplier.digikey.com")
             rows.append(row)
             continue
         if have and code not in theirs:
