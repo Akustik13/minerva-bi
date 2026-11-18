@@ -128,7 +128,13 @@ def apply_shop_choices(request, product) -> None:
         result = apply_base_to_shop(product, shop, factor, add=True,
                                     visible=bool(request.POST.get(f"shop_visible_{shop.pk}")))
         level = messages.SUCCESS if result in ("ok", "added") else messages.WARNING
-        messages.add_message(request, level, f"«{shop.name}»: {APPLY_TEXT[result]}.")
+        text = f"«{shop.name}»: {APPLY_TEXT[result]}."
+        if result == "added":   # новий товар у магазині — фото й даташит одразу на сайт (shop/publish.py)
+            from shop.publish import push
+            user = getattr(request, "user", None)
+            note = push(shop, [product.pk], by=user.get_username() if user is not None else "")
+            text += f" Фото: {note}." if note else ""
+        messages.add_message(request, level, text)
 
 
 # ── Масовий редактор базових цін ──────────────────────────────────────────────

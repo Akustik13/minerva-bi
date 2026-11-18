@@ -3174,6 +3174,7 @@
 {"uk": "{0} шт.", "en": "{0} pcs.", "de": "{0} Stk."}
 {"uk": "{0} шт. {1} додано на склад.", "en": "{0} pcs {1} added to stock.", "de": "{0} Stk. {1} ins Lager gebucht."}
 {"uk": "{0} шт. · позицій: {1}", "en": "{0} pcs · items: {1}", "de": "{0} Stk. · Positionen: {1}"}
+{"uk": "{0} шт. або більше", "en": "{0} pcs or more", "de": "{0} Stk. oder mehr"}
 {"uk": "{0} шт. — {1}", "en": "{0} pcs — {1}", "de": "{0} Stk. — {1}"}
 {"uk": "{0} шт: {1}", "en": "{0} pcs: {1}", "de": "{0} Stk.: {1}"}
 {"uk": "{0} шт: {1} {2}", "en": "{0} pcs: {1} {2}", "de": "{0} Stk.: {1} {2}"}
@@ -3514,6 +3515,7 @@
 {"uk": "«{0}» → {1}, надіслано {2}", "en": "«{0}» → {1}, надіслано {2}", "de": "«{0}» → {1}, надіслано {2}"}
 {"uk": "«{0}»: {1} дн. · {2}", "en": "“{0}”: {1} d. · {2}", "de": "„{0}“: {1} Tg. · {2}"}
 {"uk": "«{0}»: {1} — не застосовано.", "en": "“{0}”: {1} — not applied.", "de": "„{0}“: {1} — nicht übernommen."}
+{"uk": "«{0}»: додано {1}", "en": "“{0}”: added {1}", "de": "„{0}“: hinzugefügt {1}"}
 {"uk": "«{0}»: зон з DigiKey створено {1}, оновлено {2}. Перевірте ціни — DigiKey дає лише мінімальну ціну доставки регіону.", "en": "“{0}”: zones from DigiKey: {1} created, {2} updated. Check the prices — DigiKey gives only the minimum shipping price for a region.", "de": "„{0}“: Zonen von DigiKey: {1} erstellt, {2} aktualisiert. Prüfen Sie die Preise — DigiKey liefert nur den Mindestversandpreis einer Region."}
 {"uk": "«{0}»: код валюти з 3 латинських літер, напр. USD.", "en": "“{0}”: a currency code of 3 Latin letters, e.g. USD.", "de": "„{0}“: Währungscode aus 3 lateinischen Buchstaben, z. B. USD."}
 {"uk": "«{0}»: кількість ≥ 2, знижка 0–99 %", "en": "“{0}”: quantity ≥ 2, discount 0–99 %", "de": "„{0}“: Menge ≥ 2, Rabatt 0–99 %"}
@@ -4480,6 +4482,7 @@
 {"uk": "Без базових цін", "en": "No base prices", "de": "Ohne Basispreise"}
 {"uk": "Без базових цін (не змінено)", "en": "No base prices (unchanged)", "de": "Keine Basispreise (nicht geändert)"}
 {"uk": "Без базових цін (пропущено)", "en": "Without base prices (skipped)", "de": "Ohne Basispreise (übersprungen)"}
+{"uk": "Без базових цін (ціна — «Ціна продажу»)", "en": "No base prices (price = “Sale price”)", "de": "Ohne Basispreise (Preis = „Verkaufspreis“)"}
 {"uk": "Без вебхука зміни складу й цін з'являються на сайті лише після його кешу (1–2 хв). Підключення кодом налаштовує вебхук саме; вручну — REST API → Вебхуки, URL", "en": "Without a webhook, stock and price changes appear on the site only after its cache expires (1–2 min). Connecting by code sets up the webhook by itself; manually — REST API → Webhooks, URL", "de": "Ohne Webhook erscheinen Änderungen bei Bestand und Preisen auf der Website erst nach Ablauf ihres Caches (1–2 Min.). Die Verbindung per Code richtet den Webhook selbst ein; manuell – REST API → Webhooks, URL"}
 {"uk": "Без відповідального", "en": "No owner", "de": "Ohne Verantwortlichen"}
 {"uk": "Без відповіді", "en": "No response", "de": "Keine Antwort"}
@@ -9903,6 +9906,7 @@
 {"uk": "Лише для кабелів. Без галочки етикетка складається з шаблону й лише завантажується. Файл цього артикула", "en": "Cables only. Without the checkbox the label is built from the template and only downloaded. The file of this SKU", "de": "Nur für Kabel. Ohne Häkchen wird das Etikett aus der Vorlage erstellt und nur heruntergeladen. Die Datei dieser Artikelnummer"}
 {"uk": "Лише для кабелів. Без галочки етикетка складається з шаблону й лише завантажується. Файл цього артикула, що вже є в базі (можливо, виправлений вручну), замінюється тільки після підтвердження.", "en": "Cables only. Without the checkbox the label is built from the template and only downloaded. The file of this SKU that is already in the database (possibly corrected manually) is replaced only after confirmation.", "de": "Nur für Kabel. Ohne Häkchen wird das Etikett aus der Vorlage erstellt und nur heruntergeladen. Die Datei dieser Artikelnummer, die bereits in der Datenbank vorhanden ist (möglicherweise manuell korrigiert), wird erst nach Bestätigung ersetzt."}
 {"uk": "Лише для ключа API сайту.", "en": "Only for a website API key.", "de": "Nur für den API-Schlüssel einer Website."}
+{"uk": "Лише для нових позицій — ціни товарів, що вже є в магазині, не змінюються.", "en": "Only for new listings — prices of products already in the shop are not changed.", "de": "Nur für neue Positionen — Preise von Artikeln, die schon im Shop sind, bleiben unverändert."}
 {"uk": "Лише для одного магазину", "en": "For one shop only", "de": "Nur für einen Shop"}
 {"uk": "Лише для цього товару, у валюті DigiKey (може бути від'ємною). Порожньо — як у налаштуваннях.", "en": "For this product only, in DigiKey currency (can be negative). Empty — as in the settings.", "de": "Nur für diesen Artikel, in DigiKey-Währung (kann negativ sein). Leer — wie in den Einstellungen."}
 {"uk": "Лише для цього товару: +10 — дорожче на 10 %, −5 — знижка 5 %. Порожньо — як у налаштуваннях.", "en": "For this product only: +10 — 10 % more expensive, −5 — 5 % discount. Empty — as in the settings.", "de": "Nur für diesen Artikel: +10 — 10 % teurer, −5 — 5 % Rabatt. Leer — wie in den Einstellungen."}
@@ -10038,6 +10042,7 @@
 {"uk": "Лот для вибраних позицій", "en": "Lot for the selected listings", "de": "Los für die ausgewählten Positionen"}
 {"uk": "Лот з картки товару", "en": "Lot from the product card", "de": "Los aus der Artikelkarte"}
 {"uk": "Лот змінено: {0} позицій", "en": "Lot changed: {0} listings", "de": "Los geändert: {0} Positionen"}
+{"uk": "Лот і кількості", "en": "Lot and quantities", "de": "Los und Mengen"}
 {"uk": "Людей", "en": "People", "de": "Personen"}
 {"uk": "Людей — за email чи іменем контактної особи, фірм — за назвою без форми (Ltd, GmbH…). Клік на подію — лише її візитки.", "en": "People — by the contact's e-mail or name, companies — by name without legal form (Ltd, GmbH…). Click an event — only its business cards.", "de": "Personen — nach E-Mail oder Name des Kontakts, Firmen — nach Namen ohne Rechtsform (Ltd, GmbH…). Klick auf ein Ereignis — nur dessen Visitenkarten."}
 {"uk": "Люди з сайту фірми", "en": "People from the company website", "de": "Personen von der Firmenwebsite"}
@@ -12283,6 +12288,8 @@
 {"uk": "Опубліковано / оновлено {0} лістингів на DigiKey.", "en": "{0} listings published / updated on DigiKey.", "de": "{0} Listings auf DigiKey veröffentlicht / aktualisiert."}
 {"uk": "Опублікувати", "en": "Publish", "de": "Veröffentlichen"}
 {"uk": "Опублікувати / Оновити на DigiKey", "en": "Publish / Update on DigiKey", "de": "Auf DigiKey veröffentlichen / aktualisieren"}
+{"uk": "Опублікувати в інтернет-магазині", "en": "Publish in the online shop", "de": "Im Onlineshop veröffentlichen"}
+{"uk": "Опублікувати в інтернет-магазині…", "en": "Publish in the online shop…", "de": "Im Onlineshop veröffentlichen…"}
 {"uk": "Опублікувати на DigiKey", "en": "Publish on DigiKey", "de": "Auf DigiKey veröffentlichen"}
 {"uk": "Опублікувати на DigiKey (картка зі складу)…", "en": "Publish on DigiKey (card from stock)…", "de": "Auf DigiKey veröffentlichen (Karte aus dem Lager)…"}
 {"uk": "Опублікувати на DigiKey одразу (тільки з Offer ID)", "en": "Publish on DigiKey immediately (only with an Offer ID)", "de": "Sofort auf DigiKey veröffentlichen (nur mit Offer-ID)"}
@@ -16437,6 +16444,7 @@
 {"uk": "Сховано колонок: {0} — вони є в панелі", "en": "Hidden columns: {0} — they are in the panel", "de": "Ausgeblendete Spalten: {0} — sie sind im Panel"}
 {"uk": "Сховано: {0}", "en": "Hidden: {0}", "de": "Ausgeblendet: {0}"}
 {"uk": "Сховано: {0} розділів · {1} окремих сторінок", "en": "Hidden: {0} sections · {1} individual pages", "de": "Ausgeblendet: {0} Bereiche · {1} einzelne Seiten"}
+{"uk": "Сховані в цьому магазині товари теж знову стануть видимими.", "en": "Products hidden in this shop become visible again too.", "de": "In diesem Shop ausgeblendete Artikel werden ebenfalls wieder sichtbar."}
 {"uk": "Сховані свої категорії", "en": "Hidden own categories", "de": "Ausgeblendete eigene Kategorien"}
 {"uk": "Сховати", "en": "Hide", "de": "Ausblenden"}
 {"uk": "Сховати в магазині", "en": "Hide in shop", "de": "Im Shop ausblenden"}
@@ -17700,6 +17708,7 @@
 {"uk": "Фото, яке DigiKey показував, коли Minerva востаннє читала товар", "en": "The photo DigiKey showed when Minerva last read the product", "de": "Das Foto, das DigiKey anzeigte, als Minerva den Artikel zuletzt gelesen hat"}
 {"uk": "Фото, яке показує DigiKey (їхня копія)", "en": "The photo DigiKey shows (its own copy)", "de": "Das Foto, das DigiKey anzeigt (dessen eigene Kopie)"}
 {"uk": "Фото: {0}", "en": "Photo: {0}", "de": "Foto: {0}"}
+{"uk": "Фото: {0}.", "en": "Photos: {0}.", "de": "Fotos: {0}."}
 {"uk": "Фото: спільний файл", "en": "Photo: shared file", "de": "Foto: gemeinsame Datei"}
 {"uk": "Фото: якщо файлу з розширенням правила немає, перевіряються .png, .jpeg, .webp; спільний файл з розширенням (X.png) — як є.", "en": "Photo: if there is no file with the rule’s extension, .png, .jpeg and .webp are checked; a shared file with an extension (X.png) is used as is.", "de": "Foto: Gibt es keine Datei mit der Endung der Regel, werden .png, .jpeg und .webp geprüft; eine gemeinsame Datei mit Endung (X.png) wird unverändert verwendet."}
 {"uk": "Фотографувати візитки телефоном — навіть без інтернету, надішле само", "en": "Photograph business cards with the phone — even without internet, it sends them by itself", "de": "Visitenkarten mit dem Handy fotografieren — auch ohne Internet, wird selbst gesendet"}
@@ -20254,6 +20263,7 @@
 {"uk": "знижка на найбільшу", "en": "discount on the largest", "de": "Rabatt auf die größte"}
 {"uk": "зникає, якщо сума доставки 0.", "en": "disappears if the shipping amount is 0.", "de": "entfällt, wenn der Versandbetrag 0 ist."}
 {"uk": "зникає, якщо сума доставки 0. Суми з крапкою і 2 знаками (149.99), валюта", "en": "disappears if the shipping amount is 0. Amounts with a decimal point and 2 digits (149.99), currency", "de": "entfällt, wenn der Versandbetrag 0 ist. Beträge mit Dezimalpunkt und 2 Nachkommastellen (149.99), Währung"}
+{"uk": "знову показано {0}", "en": "shown again {0}", "de": "wieder angezeigt {0}"}
 {"uk": "зняти блокування · 🚪 завершити всі входи · ⛔ вимкнути", "en": "remove the lock · 🚪 end all sessions · ⛔ disable", "de": "Sperre aufheben · 🚪 alle Anmeldungen beenden · ⛔ deaktivieren"}
 {"uk": "зняти всі", "en": "clear all", "de": "alle abwählen"}
 {"uk": "знято з виробництва; плюс «Рекомендована заміна».", "en": "discontinued; plus “Recommended replacement”.", "de": "abgekündigt; zusätzlich „Empfohlener Ersatz“."}
@@ -22827,6 +22837,7 @@
 {"uk": "у картці", "en": "in the card", "de": "in der Karte"}
 {"uk": "у картці або колонці таблиці. Клік — стає", "en": "in the card or the table column. Click — it becomes", "de": "in der Karte oder in der Tabellenspalte. Klick — wird"}
 {"uk": "у картці кожного товару (📦 Склад → Товари)", "en": "in each product card (📦 Stock → Products)", "de": "in der Karte jedes Artikels (📦 Lager → Artikel)"}
+{"uk": "у картці магазину «{0}» немає адреси сайту — фото сайт забере під час наступної синхронізації", "en": "the shop card “{0}” has no website address — the website will fetch photos at the next sync", "de": "in der Shop-Karte „{0}“ fehlt die Website-Adresse — die Website holt die Fotos bei der nächsten Synchronisierung"}
 {"uk": "у картці магазину не задано адресу сайту", "en": "the site address is not set on the shop card", "de": "in der Shop-Karte ist keine Website-Adresse festgelegt"}
 {"uk": "у конфігу сайту, зазвичай 1–5 хв).", "en": "in the website config, usually 1–5 min).", "de": "in der Website-Konfiguration, normalerweise 1–5 Min.)."}
 {"uk": "у коробці було кілька товарів, вага — на всю коробку", "en": "the box held several products, the weight is for the whole box", "de": "im Karton waren mehrere Artikel, das Gewicht gilt für den ganzen Karton"}
@@ -22914,6 +22925,7 @@
 {"uk": "увімкнути в картці магазину", "en": "enable on the shop card", "de": "in der Shop-Karte aktivieren"}
 {"uk": "увімкнути галочку", "en": "tick the checkbox", "de": "das Kontrollkästchen aktivieren"}
 {"uk": "увімкніть перемикач", "en": "turn on the switch", "de": "aktivieren Sie den Schalter"}
+{"uk": "уже були {0}", "en": "already there {0}", "de": "schon vorhanden {0}"}
 {"uk": "уже в закупівлі", "en": "already in the purchase order", "de": "bereits in der Bestellung"}
 {"uk": "уже в проєкті {0}", "en": "already in project {0}", "de": "bereits im Projekt {0}"}
 {"uk": "уже внесено", "en": "already entered", "de": "bereits eingetragen"}
@@ -22921,6 +22933,7 @@
 {"uk": "уже відповів {0}{1}: «{2}»", "en": "{0}{1} has already replied: “{2}”", "de": "{0}{1} hat bereits geantwortet: „{2}“"}
 {"uk": "уже записано з Minerva", "en": "already recorded from Minerva", "de": "bereits aus Minerva eingetragen"}
 {"uk": "уже зроблено", "en": "already done", "de": "bereits erledigt"}
+{"uk": "уже йде перевірка фото — сайту надіслано запит забрати готові файли", "en": "a photo check is already running — the website was asked to fetch the files that are ready", "de": "eine Fotoprüfung läuft bereits — die Website wurde gebeten, fertige Dateien abzuholen"}
 {"uk": "уже можна написати покупцю в чаті DigiKey.", "en": "can already be sent to the buyer in the DigiKey chat.", "de": "kann dem Käufer schon im DigiKey-Chat geschickt werden."}
 {"uk": "уже не заноситься (", "en": "is no longer added (", "de": "wird nicht mehr eingetragen ("}
 {"uk": "уже не працює", "en": "no longer works there", "de": "arbeitet nicht mehr dort"}
@@ -23029,6 +23042,9 @@
 {"uk": "фото видно мініатюрою (клік — відкрити повністю), даташит — «📄 відкрити» («{0}»", "en": "the photo is shown as a thumbnail (click to open in full), the datasheet — “📄 open” (“{0}”", "de": "das Foto wird als Miniaturansicht angezeigt (Klick — vollständig öffnen), das Datenblatt — „📄 öffnen“ („{0}“"}
 {"uk": "фото збережено з кадру", "en": "photo saved from the frame", "de": "Foto aus dem Kamerabild gespeichert"}
 {"uk": "фото й даташит є", "en": "photo and datasheet present", "de": "Foto und Datenblatt vorhanden"}
+{"uk": "фото й даташити для сайту «{0}» вимкнено на сторінці «🖼 Фото й даташити»", "en": "photos and datasheets for the website “{0}” are switched off on the “🖼 Photos and datasheets” page", "de": "Fotos und Datenblätter für die Website „{0}“ sind auf der Seite „🖼 Fotos und Datenblätter“ ausgeschaltet"}
+{"uk": "фото й даташити для сайту вимкнено («🖼 Фото й даташити» → «Увімкнено») — сайт показує свої файли", "en": "photos and datasheets for the website are switched off (“🖼 Photos and datasheets” → “Enabled”) — the website shows its own files", "de": "Fotos und Datenblätter für die Website sind ausgeschaltet („🖼 Fotos und Datenblätter“ → „Aktiviert“) — die Website zeigt eigene Dateien"}
+{"uk": "фото й даташити перевіряються, потім сайт забере їх (кілька хвилин)", "en": "photos and datasheets are being checked, then the website will fetch them (a few minutes)", "de": "Fotos und Datenblätter werden geprüft, danach holt die Website sie ab (einige Minuten)"}
 {"uk": "фото не відкрилось", "en": "the photo did not open", "de": "das Foto ließ sich nicht öffnen"}
 {"uk": "фото не відкрилось у браузері", "en": "the photo did not open in the browser", "de": "Foto ließ sich im Browser nicht öffnen"}
 {"uk": "фото немає", "en": "no photo", "de": "kein Foto"}
