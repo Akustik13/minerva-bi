@@ -217,7 +217,9 @@ def describe(ch) -> str:
     name = ch.title or "—"
     if ch.action == "add":
         parts = []
-        if ch.after.get("start") or ch.after.get("end"):
+        if ch.after.get("kind") == "milestone" and (ch.after.get("end") or ch.after.get("start")):
+            parts.append(f"◆ {_show('end', ch.after.get('end') or ch.after.get('start'))}")
+        elif ch.after.get("start") or ch.after.get("end"):
             parts.append(f"{_show('start', ch.after.get('start'))} – {_show('end', ch.after.get('end'))}")
         if ch.after.get("phase"):
             parts.append(f"фаза {ch.after['phase']}")
@@ -236,7 +238,8 @@ def describe(ch) -> str:
 
 
 def entries(project, viewer=None, limit=SHOWN) -> list:
-    """Останні дії з планом: [{at, who, source, source_label, meeting (лише власнику наради), lines, more}]."""
+    """Останні дії з планом: [{at, who, source, source_label, meetings [{title, day, url, tag}] (назва й посилання — лише
+    власнику наради; кілька нарад однієї дії — M1, M2… і в рядках), lines, more, count}]."""
     from .models import PlanChange
     rows = list(PlanChange.objects.filter(project=project).select_related("user", "meeting")
                 .order_by("-at", "-pk")[:limit * 20])
@@ -256,15 +259,22 @@ def entries(project, viewer=None, limit=SHOWN) -> list:
     for key in order:
         g = groups[key]
         items = list(reversed(g["items"]))          # усередині дії — у тому порядку, як робили
-        m = g["meeting"]
-        meeting = None
-        if m is not None:
+        seen = {}
+        for c in items:
+            if c.meeting is not None:
+                seen.setdefault(c.meeting.pk, c.meeting)
+        ms = sorted(seen.values(), key=lambda m: (m.start, m.pk))
+        tags = {m.pk: f"M{i}" for i, m in enumerate(ms, 1)} if len(ms) > 1 else {}
+        meetings = []
+        for m in ms:
             mine = uid and m.owner_id == uid
-            meeting = {"title": m.title if mine else "", "day": m.day,
-                       "url": f"/admin/meetings/meeting/{m.pk}/page/" if mine else ""}
+            meetings.append({"title": m.title if mine else "", "day": m.day, "tag": tags.get(m.pk, ""),
+                             "url": f"/admin/meetings/meeting/{m.pk}/page/" if mine else ""})
         who = g["user"]
         out.append({"at": g["at"], "who": (who.get_full_name() or who.username) if who else "",
-                    "source": g["source"], "source_label": g["source_label"], "meeting": meeting,
-                    "lines": [describe(c) for c in items[:LINES]], "more": max(len(items) - LINES, 0),
-                    "count": len(items)})
+                    "source": g["source"], "source_label": g["source_label"], "meetings": meetings,
+                    "meeting": meetings[-1] if meetings else None,
+                    "lines": [(f"{tags[c.meeting_id]} · " if c.meeting_id in tags else "") + describe(c)
+                              for c in items[:LINES]],
+                    "more": max(len(items) - LINES, 0), "count": len(items)})
     return out

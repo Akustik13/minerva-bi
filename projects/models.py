@@ -725,16 +725,19 @@ class ProjectParty(models.Model):
 
 
 class PlanReview(models.Model):
-    """📅 Звірка плану з нарадою (projects/plan_review.py): Claude читає план і підсумок наради (meetings ai_brief) і
-    пропонує зміни (PlanReviewChange). План не змінюється, доки людина не натисне ✓. Нарада — того, хто звіряв (наради
-    особисті); refs — тези підсумку на момент звірки ({B1: {text, section, who, due, second, time}})."""
+    """📅 Звірка плану з нарадою (projects/plan_review.py): Claude читає план і підсумки однієї чи кількох нарад
+    (meetings ai_brief) і пропонує зміни (PlanReviewChange). План не змінюється, доки людина не натисне ✓. Наради — того,
+    хто звіряв (наради особисті); refs — тези підсумків на момент звірки ({B1: {text, section, who, due, second, time,
+    meeting, tag}}, нумерація B… наскрізна для всіх нарад)."""
     RUNNING, READY, ERROR, DONE = "running", "ready", "error", "done"
     STATUS_CHOICES = [(RUNNING, "🧠 Звіряє"), (READY, "✋ Чекає рішень"), (ERROR, "⚠️ Помилка"),
                       (DONE, "✓ Розглянуто")]
 
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="plan_reviews")
     meeting = models.ForeignKey("meetings.Meeting", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
-                                verbose_name="Нарада")
+                                verbose_name="Нарада", help_text="Остання за датою з вибраних нарад")
+    meetings = models.ManyToManyField("meetings.Meeting", blank=True, related_name="+", verbose_name="Наради",
+                                      help_text="Усі наради звірки (кілька — у порядку дат, пізніше рішення важливіше)")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
                                    related_name="+")
     status = models.CharField("Стан", max_length=10, choices=STATUS_CHOICES, default=RUNNING, db_index=True)

@@ -20,25 +20,34 @@
     root.innerHTML = html; applyTab(curTab); renderFound(); applyGantt(); applyTimeline(); applyPartyView(); replanInit();
   }
   // ── 📅 Звірити план з нарадою (_replan.html → api/project/<pk>/plan/review/…): запуск, опитування, ✓ / ✕ ──
+  // Вибрані наради (галочки) переживають оновлення пульта; уперше — з ?plan_meeting=12[,15] (review_url сторінки наради)
   var replanTimer = 0, replanFocused = false;
+  var replanChosen = (new URLSearchParams(location.search).get('plan_meeting') || '').split(',')
+    .map(function (x) { return x.replace(/\D/g, ''); }).filter(Boolean);
+  var replanFromUrl = replanChosen.length > 0;
   function replanBox() { return root.querySelector('#pj-replan'); }
-  function replanConsent() {
+  function replanBoxes() {
     var b = replanBox();
-    var sel = b && b.querySelector('[data-pjr2-meeting]'), box = b && b.querySelector('[data-pjr2-consent]');
-    if (!sel || !box) return;
-    var opt = sel.options[sel.selectedIndex];
-    box.checked = !!(opt && opt.getAttribute('data-consent'));
+    return b ? Array.prototype.slice.call(b.querySelectorAll('input[data-pjr2-meeting]')) : [];
+  }
+  function replanConsent() {             // галочка згоди стоїть сама, коли всі вибрані наради вже мають згоду на хмару
+    var b = replanBox(), box = b && b.querySelector('[data-pjr2-consent]');
+    var on = replanBoxes().filter(function (x) { return x.checked; });
+    if (box) box.checked = on.length > 0 && on.every(function (x) { return !!x.getAttribute('data-consent'); });
+  }
+  function replanPick(ids) {
+    var all = replanBoxes(), hit = all.filter(function (x) { return ids.indexOf(x.value) >= 0; });
+    if (!hit.length) return false;
+    all.forEach(function (x) { x.checked = ids.indexOf(x.value) >= 0; });
+    replanConsent();
+    return true;
   }
   function replanInit() {
     var b = replanBox();
     clearTimeout(replanTimer);
     if (!b) return;
-    var want = new URLSearchParams(location.search).get('plan_meeting');   // зі сторінки наради: review_url
-    var sel = b.querySelector('[data-pjr2-meeting]');
-    if (want && sel && !sel.dataset.picked) {
-      sel.dataset.picked = '1';
-      if (sel.querySelector('option[value="' + want.replace(/\D/g, '') + '"]')) sel.value = want.replace(/\D/g, '');
-      replanConsent();
+    var picked = replanChosen.length && replanPick(replanChosen);
+    if (picked && replanFromUrl) {
       if (!replanFocused) {
         replanFocused = true;
         var det = b.querySelector('.pjr2-start');
@@ -61,14 +70,24 @@
   }
   function replanStart(btn) {
     var b = replanBox();
-    var meeting = b.querySelector('[data-pjr2-meeting]').value, model = b.querySelector('[data-pjr2-model]').value;
-    var consent = b.querySelector('[data-pjr2-consent]').checked;
+    var meetings = replanBoxes().filter(function (x) { return x.checked; }).map(function (x) { return x.value; });
+    if (!meetings.length) { toast('Виберіть нараду'); return; }
+    var model = b.querySelector('[data-pjr2-model]').value, consent = b.querySelector('[data-pjr2-consent]').checked;
     btn.disabled = true;
-    toast('🧠 Звіряю план з нарадою…');
-    send(box().dataset.planReview, {meeting: meeting, model: model, consent: consent ? 1 : 0}).then(function (j) {
+    toast(meetings.length > 1 ? '🧠 Звіряю план з нарадами…' : '🧠 Звіряю план з нарадою…');
+    send(box().dataset.planReview, {meetings: meetings, model: model, consent: consent ? 1 : 0}).then(function (j) {
       if (!done(j)) btn.disabled = false;
     });
   }
+  root.addEventListener('change', function (e) {
+    var t = e.target;
+    if (!t || !t.matches || !t.matches('input[data-pjr2-meeting]')) return;
+    var list = t.closest('.pjr2-mlist'), max = parseInt(list && list.getAttribute('data-max'), 10) || 5;
+    var on = replanBoxes().filter(function (x) { return x.checked; });
+    if (on.length > max) { t.checked = false; toast('В одній звірці — до ' + max + ' нарад'); }
+    replanChosen = replanBoxes().filter(function (x) { return x.checked; }).map(function (x) { return x.value; });
+    replanConsent();
+  });
   function replanAct(btn) {
     var b = replanBox(), ids = btn.getAttribute('data-ids');
     if (btn.getAttribute('data-confirm') && !window.confirm(btn.getAttribute('data-confirm'))) return;

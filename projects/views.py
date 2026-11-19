@@ -574,15 +574,15 @@ def invite_view(request, pk):
 @staff_member_required
 @require_POST
 def plan_review_view(request, pk):
-    """📅 Звірити план з нарадою: {meeting, model, consent} → Claude у фоні (projects/plan_review.py) → свіжий пульт;
-    стан — plan_review_state_view."""
+    """📅 Звірити план з нарадою: {meetings: [pk, …] (або meeting), model, consent} → Claude у фоні
+    (projects/plan_review.py) → свіжий пульт; стан — plan_review_state_view."""
     from . import plan_review
     from .models import PlanReview
     project = _project_for_change(request, pk)
     body = _body(request)
     try:
-        review = plan_review.start(project, request.user, body.get("meeting"), str(body.get("model") or ""),
-                                   bool(body.get("consent")))
+        review = plan_review.start(project, request.user, body.get("meetings") or body.get("meeting"),
+                                   str(body.get("model") or ""), bool(body.get("consent")))
     except ValueError as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=400)
     notice = ("🧠 Звіряю план з нарадою — зазвичай хвилина-дві, сторінку можна не оновлювати"

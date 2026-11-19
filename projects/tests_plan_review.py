@@ -1,5 +1,9 @@
 """📅 Звірити план з нарадою (projects/plan_review.py) і 🕘 Історія змін плану (projects/plan_history.py).
 
+Кілька нарад в одній звірці: у порядку дат [M1], [M2], тези з наскрізними номерами, пізніше рішення важливіше; згода —
+для кожної наради окремо (без згоди в протоколі — лише з галочкою), запис у протокол кожної; зміна — з наради своєї тези
+(у списку й в історії видно, з якої).
+
 Історія: хто, коли, було → стало, звідки (вручну / редактор / з наради), кеш прогнозу й видалення проєкту — без записів.
 Звірка: лише свої наради проєкту з «📝 Підсумком наради», без галочки згоди / з чужою нарадою / іншою моделлю — відмова,
 кожна передача — у протокол згоди наради; зміна без тези наради відкидається; план змінюється лише після ✓ (нові фаза
@@ -39,18 +43,21 @@ class ReviewBase(PlanBase):
         self.b = self.step("Muster senden", 2, after=[self.a], phase=self.phase)
         PlanChange.objects.all().delete()                  # підготовка тесту — не історія
 
-    def meeting(self, owner=None, linked=False, brief=True, consent=False):
-        m = Meeting.objects.create(owner=owner or self.user, title="Kickoff Muster", status=Meeting.REVIEW,
-                                   project=None if linked else self.project, started_at=self.ago(1, hour=10),
+    def meeting(self, owner=None, linked=False, brief=True, consent=False, title="Kickoff Muster", days=1,
+                points=None):
+        m = Meeting.objects.create(owner=owner or self.user, title=title, status=Meeting.REVIEW,
+                                   project=None if linked else self.project, started_at=self.ago(days, hour=10),
                                    duration_s=1800, transcript_at=timezone.now(),
                                    consent_log=[{"at": timezone.now().isoformat(), "kind": "cloud"}] if consent else [])
         if linked:
             MeetingProject.objects.create(meeting=m, project=self.project)
+        sections = ({"agreements": [{"text": t, "lines": [1]} for t in points]} if points else
+                    {"agreements": [{"text": "Muster kommt eine Woche später", "lines": [1]}],
+                     "tasks": [{"text": "Kunde gibt das Muster frei", "who": "Client GmbH", "due": "Ende Monat",
+                                "lines": [2]}]})
         MeetingTranscript.objects.create(meeting=m, segments=[{"n": 1, "start": 125}, {"n": 2, "start": 300}], brief={
             "v": 1, "about": "Muster und Freigabe", "label": "Sonnet", "at": timezone.now().isoformat(),
-            "sections": {"agreements": [{"text": "Muster kommt eine Woche später", "lines": [1]}],
-                         "tasks": [{"text": "Kunde gibt das Muster frei", "who": "Client GmbH", "due": "Ende Monat",
-                                    "lines": [2]}]}} if brief else {})
+            "sections": sections} if brief else {})
         return m
 
     def answer(self, changes=None, summary="Muster eine Woche später, Freigabe durch den Kunden neu."):
@@ -221,6 +228,7 @@ class ApplyTests(ReviewBase):
         r.refresh_from_db()
         self.assertEqual(r.status, PlanReview.DONE)
         self.assertEqual(set(PlanChange.objects.values_list("action", flat=True)), {PlanChange.ADD, PlanChange.PHASE_ADD})
+        self.assertIn(f"◆ {self.d(20):%d.%m.%Y}", plan_history.describe(PlanChange.objects.get(action=PlanChange.ADD)))
 
     def test_failed_change_stays_open_others_apply(self):
         _m, r = self.reviewed()
@@ -328,3 +336,88 @@ class ViewTests(ReviewBase):
         self.a.refresh_from_db()
         self.assertEqual(self.a.end, self.d(5))
         self.assertEqual(review.changes.filter(status=PlanReviewChange.PENDING).count(), 2)
+
+
+class SeveralMeetingsTests(ReviewBase):
+    def two(self, consent=(False, False)):
+        client = self.meeting(title="Mit dem Kunden", days=3, consent=consent[0],
+                              points=["Muster eine Woche später", "Freigabe in 5 Tagen"])
+        internal = self.meeting(title="Intern", days=1, consent=consent[1],
+                                points=["Freigabe doch erst nach 10 Tagen"])
+        return client, internal
+
+    def test_meetings_in_date_order_one_numbering_later_decides(self):
+        client, internal = self.two()
+        b = f"s{self.b.pk}"
+        data = self.answer(changes=[
+            {"op": "update", "id": f"s{self.a.pk}", "end": self.d(12).isoformat(), "from": ["B1"]},
+            {"op": "add", "ref": "a1", "place_after": b, "title": "Freigabe Kunde", "kind": "milestone",
+             "end": self.d(25).isoformat(), "after": [b], "from": ["B2", "B3"]}])
+        with self.claude(data):
+            r = plan_review.start(self.project, self.user, f"{internal.pk},{client.pk}", MODEL, consent=True)
+        self.assertEqual(r.status, PlanReview.READY, r.error)
+        self.assertEqual(r.meeting, internal)                                  # остання за датою
+        self.assertEqual(set(r.meetings.all()), {client, internal})
+        prompt = self.calls[0]
+        self.assertLess(prompt.index("[M1] нарада"), prompt.index("[M2] нарада"))
+        self.assertLess(prompt.index("Mit dem Kunden"), prompt.index("«Intern»"))
+        self.assertIn("[B3] ", prompt)                                         # тези другої — далі за номером
+        self.assertIn("діє пізніша", prompt)
+        self.assertEqual((r.refs["B1"]["meeting"], r.refs["B3"]["meeting"], r.refs["B3"]["tag"]),
+                         (client.pk, internal.pk, "M2"))
+        for m in (client, internal):                                          # згода — у протоколі кожної наради
+            m.refresh_from_db()
+            e = [x for x in m.consent_log if x.get("task") == "plan"]
+            self.assertEqual((len(e), e[0]["meetings"]), (1, 2))
+        v = plan_review.view(r, self.user)
+        self.assertEqual([x["tag"] for x in v["meetings"]], ["M1", "M2"])
+        add = next(x for x in v["rows"] if x["op"] == "add")
+        self.assertEqual([s["tag"] for s in add["sources"]], ["M1", "M2"])
+        self.assertIn(f"/meeting/{internal.pk}/page/", add["sources"][1]["url"])
+        html = cockpit.render(self.project, self.user)
+        self.assertIn("📅 Пропозиції з нарад", html)
+        plan_review.apply(self.project, self.user, r)
+        self.assertEqual(PlanChange.objects.get(step=self.a).meeting, client)
+        self.assertEqual(PlanChange.objects.get(title="Freigabe Kunde").meeting, internal)   # пізніша теза
+        e = plan_history.entries(self.project, self.user)[0]
+        self.assertEqual([(x["tag"], x["title"]) for x in e["meetings"]], [("M1", "Mit dem Kunden"), ("M2", "Intern")])
+        self.assertTrue(any(line.startswith("M2 · ") for line in e["lines"]))
+
+    def test_consent_per_meeting(self):
+        client, internal = self.two(consent=(True, False))
+        with self.assertRaisesMessage(plan_review.ReviewError, "«Intern»"):     # у «Intern» згоди ще немає
+            plan_review.start(self.project, self.user, [client.pk, internal.pk], MODEL, consent=False)
+        with self.claude(self.answer()):                                      # у протоколі вже є згода — досить
+            r = plan_review.start(self.project, self.user, [client.pk], MODEL, consent=False)
+        self.assertEqual(r.status, PlanReview.READY, r.error)
+        internal.refresh_from_db()
+        self.assertFalse(internal.consent_log)                                # не вибрана — не передавалась
+
+    def test_limits_and_foreign_meetings(self):
+        self.assertEqual(plan_review.parse_pks("3, 2,3,x"), [3, 2])
+        self.assertEqual(plan_review.parse_pks([5, "6"]), [5, 6])
+        ms = [self.meeting(title=f"N{i}", days=i + 1) for i in range(plan_review.REVIEW_MEETINGS_MAX + 1)]
+        with self.assertRaisesMessage(plan_review.ReviewError, "до 5 нарад"):
+            plan_review.start(self.project, self.user, [m.pk for m in ms], MODEL, consent=True)
+        bob = User.objects.create_user("bob", "bob@x.y", "p", is_staff=True)
+        other = self.meeting(owner=bob)
+        with self.assertRaises(plan_review.ReviewError):
+            plan_review.start(self.project, self.user, [ms[0].pk, other.pk], MODEL, consent=True)
+        with self.assertRaisesMessage(plan_review.ReviewError, "Виберіть нараду"):
+            plan_review.start(self.project, self.user, "", MODEL, consent=True)
+        self.assertFalse(PlanReview.objects.exists())
+
+    def test_block_checkboxes_url_and_endpoint(self):
+        client, internal = self.two(consent=(True, True))
+        html = cockpit.render(self.project, self.user)
+        self.assertEqual(html.count('data-pjr2-meeting value="'), 2)
+        self.assertIn("☁️ згода є", html)
+        self.assertEqual(plan_review.review_url(self.project, [client, internal.pk]),
+                         f"/admin/projects/project/{self.project.pk}/change/?plan_meeting={client.pk},{internal.pk}#pj-plan")
+        base = f"/projects/api/project/{self.project.pk}/plan/review/"
+        with self.claude(self.answer(changes=[
+                {"op": "update", "id": f"s{self.a.pk}", "end": self.d(12).isoformat(), "from": ["B3"]}])):
+            j = self.post(base, {"meetings": [client.pk, internal.pk], "model": MODEL}).json()
+        self.assertTrue(j["ok"], j)
+        self.assertIn("Пропозиції з нарад", j["html"])
+        self.assertEqual(PlanReview.objects.get(pk=j["review"]).meetings.count(), 2)

@@ -1199,6 +1199,7 @@
 {"uk": "Claude аналізує…", "en": "Claude is analyzing…", "de": "Claude analysiert…"}
 {"uk": "Claude звіряє розшифровку з назвами з Minerva — клієнт, проєкти, артикули, учасники, порядок денний — і пропонує правки «було → стало» для слів, які RAG-ПК розпізнав неправильно. Текст змінюється лише після ✓. Надсилається лише текст, без аудіо; ключ Minerva, витрати — у бюджеті AI.", "en": "Claude checks the transcript against names from Minerva — customer, projects, articles, participants, agenda — and suggests “before → after” corrections for words the RAG PC misrecognized. The text changes only after ✓. Only the text is sent, no audio; Minerva’s key, costs count towards the AI budget.", "de": "Claude gleicht das Transkript mit Namen aus Minerva ab — Kunde, Projekte, Artikel, Teilnehmende, Tagesordnung — und schlägt Korrekturen „vorher → nachher“ für Wörter vor, die der RAG-PC falsch erkannt hat. Der Text ändert sich erst nach ✓. Gesendet wird nur Text, kein Audio; Minerva-Schlüssel, Kosten im KI-Budget."}
 {"uk": "Claude порівняє план проєкту з підсумком цієї наради й запропонує зміни — на діаграмі іншим кольором; застосовуєте ви", "en": "Claude compares the project plan with the summary of this meeting and proposes changes — shown on the chart in another colour; you apply them", "de": "Claude vergleicht den Projektplan mit der Zusammenfassung dieser Besprechung und schlägt Änderungen vor — im Diagramm in anderer Farbe; übernehmen tun Sie"}
+{"uk": "Claude читає план (кроки, дати, стан) і «📝 Підсумок наради» вибраних нарад та пропонує, що змінити: строки, виконане, нові кроки чи віхи — кожну зміну з тезою наради. Кілька нарад (наприклад, з клієнтом, потім внутрішня) — у порядку дат, рішення пізнішої наради важливіше. Галочка стоїть сама, якщо учасники всіх вибраних нарад уже погодились на хмару. Плату — з бюджету AI.", "en": "Claude reads the plan (steps, dates, status) and the «📝 Meeting summary» of the selected meetings and suggests what to change: dates, what is done, new steps or milestones — each change with a point from a meeting. Several meetings (for example, with the customer, then internal) are read in date order; a later meeting's decision counts more. The box is ticked already if the participants of all selected meetings agreed to the cloud. Paid from the AI budget.", "de": "Claude liest den Plan (Schritte, Termine, Status) und die «📝 Besprechungszusammenfassung» der ausgewählten Besprechungen und schlägt Änderungen vor: Termine, Erledigtes, neue Schritte oder Meilensteine — jede Änderung mit einem Punkt aus einer Besprechung. Mehrere Besprechungen (z. B. mit dem Kunden, dann intern) werden nach Datum gelesen; die Entscheidung der späteren Besprechung zählt mehr. Das Häkchen ist schon gesetzt, wenn die Teilnehmer aller ausgewählten Besprechungen der Cloud zugestimmt haben. Bezahlt aus dem KI-Budget."}
 {"uk": "Claude читає план (кроки, дати, стан) і «📝 Підсумок наради» та пропонує, що змінити: строки, виконане, нові кроки чи віхи — кожну зміну з тезою наради. Галочка стоїть сама, якщо учасники цієї наради вже погодились на хмару. Плату — з бюджету AI.", "en": "Claude reads the plan (steps, dates, status) and the «📝 Meeting summary» and suggests what to change: dates, what is done, new steps or milestones — each change with a point from the meeting. The box is ticked already if the participants of this meeting agreed to the cloud. Paid from the AI budget.", "de": "Claude liest den Plan (Schritte, Termine, Status) und die «📝 Besprechungszusammenfassung» und schlägt Änderungen vor: Termine, Erledigtes, neue Schritte oder Meilensteine — jede Änderung mit einem Punkt aus der Besprechung. Das Häkchen ist schon gesetzt, wenn die Teilnehmer dieser Besprechung der Cloud zugestimmt haben. Bezahlt aus dem KI-Budget."}
 {"uk": "Claude і RAG разом", "en": "Claude and RAG together", "de": "Claude und RAG zusammen"}
 {"uk": "Client ID не вказано", "en": "Client ID not specified", "de": "Client ID nicht angegeben"}
@@ -4775,6 +4776,7 @@
 {"uk": "В обидва боки", "en": "Both directions", "de": "In beide Richtungen"}
 {"uk": "В обробці", "en": "Processing", "de": "In Bearbeitung"}
 {"uk": "В обробці / Відправлено / Доставлено / Скасовано — окремо", "en": "Processing / Shipped / Delivered / Cancelled — separately", "de": "In Bearbeitung / Versendet / Zugestellt / Storniert — getrennt"}
+{"uk": "В одній звірці — до {0} нарад", "en": "Up to {0} meetings in one review", "de": "Bis zu {0} Besprechungen in einem Abgleich"}
 {"uk": "В рахунку → інлайн «Платежі» → додати суму і метод. Статус зміниться на", "en": "In the invoice → inline “Payments” → add the amount and method. The status will change to", "de": "In der Rechnung → Inline „Zahlungen“ → Betrag und Methode hinzufügen. Der Status ändert sich zu"}
 {"uk": "В роботі", "en": "In progress", "de": "In Bearbeitung"}
 {"uk": "В роботі: {0} задач.", "en": "In progress: {0} tasks.", "de": "In Bearbeitung: {0} Aufgaben."}
@@ -5034,6 +5036,7 @@
 {"uk": "Виберіть мову перекладу", "en": "Choose the translation language", "de": "Wählen Sie die Übersetzungssprache"}
 {"uk": "Виберіть мову підсумку", "en": "Choose the summary language", "de": "Wählen Sie die Sprache der Zusammenfassung"}
 {"uk": "Виберіть модель", "en": "Choose a model", "de": "Modell wählen"}
+{"uk": "Виберіть нараду", "en": "Choose a meeting", "de": "Wählen Sie eine Besprechung"}
 {"uk": "Виберіть один або кілька днів тижня.", "en": "Select one or more days of the week.", "de": "Wählen Sie einen oder mehrere Wochentage."}
 {"uk": "Виберіть один запит — на його основі відкриється форма нового.", "en": "Select one request — a new request form based on it will open.", "de": "Wählen Sie eine Anfrage — das Formular einer neuen Anfrage auf ihrer Grundlage öffnet sich."}
 {"uk": "Виберіть один магазин для копіювання.", "en": "Select one shop to copy.", "de": "Wählen Sie einen Shop zum Kopieren aus."}
@@ -8488,6 +8491,7 @@
 {"uk": "Звідси — про проєкт", "en": "From here — about project", "de": "Ab hier — zum Projekt"}
 {"uk": "Звідси — про проєкт…", "en": "From here — about project…", "de": "Ab hier — zum Projekt…"}
 {"uk": "Звільнити відеопам'ять; наступний запит завантажить потрібну модель сам (перший запит буде повільніший)", "en": "Free video memory; the next request will load the needed model by itself (the first request will be slower)", "de": "Videospeicher freigeben; die nächste Anfrage lädt das benötigte Modell selbst (die erste Anfrage ist langsamer)"}
+{"uk": "Звірено з нарадами", "en": "Checked against the meetings", "de": "Mit den Besprechungen abgeglichen"}
 {"uk": "Звірено з нарадою", "en": "Checked against the meeting", "de": "Mit der Besprechung abgeglichen"}
 {"uk": "Звірити", "en": "Check", "de": "Abgleichen"}
 {"uk": "Звірити всі лістинги з офером", "en": "Reconcile all listings with the offer", "de": "Alle Listings mit dem Offer abgleichen"}
@@ -8519,6 +8523,8 @@
 {"uk": "Звірку не знайдено — оновіть сторінку", "en": "Review not found — refresh the page", "de": "Abgleich nicht gefunden — Seite neu laden"}
 {"uk": "Звірку стрічки запущено у фоні — оновіть сторінку за хвилину.", "en": "Feed reconciliation started in the background — refresh the page in a minute.", "de": "Der Feed-Abgleich wurde im Hintergrund gestartet — aktualisieren Sie die Seite in einer Minute."}
 {"uk": "Звірте кількість і оприбуткуйте на сторінці закупівлі.", "en": "Check the quantity and receive it on the purchase order page.", "de": "Menge prüfen und auf der Bestellseite einbuchen."}
+{"uk": "Звіряю план з нарадами", "en": "Checking the plan against the meetings", "de": "Gleiche den Plan mit den Besprechungen ab"}
+{"uk": "Звіряю план з нарадами…", "en": "Checking the plan against the meetings…", "de": "Gleiche den Plan mit den Besprechungen ab…"}
 {"uk": "Звіряю план з нарадою", "en": "Checking the plan against the meeting", "de": "Gleiche den Plan mit der Besprechung ab"}
 {"uk": "Звіряю план з нарадою — зазвичай хвилина-дві, сторінку можна не оновлювати", "en": "Checking the plan against the meeting — usually a minute or two, no need to refresh the page", "de": "Gleiche den Plan mit der Besprechung ab — meist ein bis zwei Minuten, die Seite muss nicht neu geladen werden"}
 {"uk": "Звіряю план з нарадою…", "en": "Checking the plan against the meeting…", "de": "Gleiche den Plan mit der Besprechung ab…"}
@@ -11182,6 +11188,7 @@
 {"uk": "Наради (/api/v1/meetings/) — лише для вікна запису на RAG-ПК: у консолі не відкривається", "en": "Meetings (/api/v1/meetings/) — only for the recording window on the RAG PC: not available in the console", "de": "Besprechungen (/api/v1/meetings/) — nur für das Aufnahmefenster auf dem RAG-PC: in der Konsole nicht verfügbar"}
 {"uk": "Наради (RAG-ПК)", "en": "Meetings (RAG PC)", "de": "Besprechungen (RAG-PC)"}
 {"uk": "Наради (запис і розшифровка)", "en": "Meetings (recording and transcription)", "de": "Besprechungen (Aufnahme und Transkription)"}
+{"uk": "Наради для звірки", "en": "Meetings to check against", "de": "Besprechungen für den Abgleich"}
 {"uk": "Наради — лише службовий ключ RAG-ПК (вікно запису: квиток, стан, розшифровка)", "en": "Meetings — RAG PC service key only (recording window: ticket, status, transcript)", "de": "Besprechungen — nur Dienstschlüssel des RAG-PCs (Aufnahmefenster: Ticket, Status, Transkript)"}
 {"uk": "Наради: завислі записи й прибирання за строками зберігання", "en": "Meetings: stuck recordings and clean-up by retention periods", "de": "Besprechungen: hängende Aufnahmen und Bereinigung nach Aufbewahrungsfristen"}
 {"uk": "Наради: прибирання за строками зберігання", "en": "Meetings: clean-up by retention periods", "de": "Besprechungen: Bereinigung nach Aufbewahrungsfristen"}
@@ -12561,6 +12568,7 @@
 {"uk": "Остання адреса сторінки кабінету від сайту, яку Minerva не прийняла (інший домен, ніж «Адреса сайту»).", "en": "The last customer account page address from the site that Minerva did not accept (a domain other than the “Site address”).", "de": "Die letzte Adresse einer Kundenkonto-Seite von der Website, die Minerva nicht akzeptiert hat (eine andere Domain als die „Website-Adresse“)."}
 {"uk": "Остання активність", "en": "Last activity", "de": "Letzte Aktivität"}
 {"uk": "Остання доставка", "en": "Last delivery", "de": "Letzte Zustellung"}
+{"uk": "Остання за датою з вибраних нарад", "en": "The latest of the selected meetings", "de": "Die neueste der ausgewählten Besprechungen"}
 {"uk": "Остання звірка стрічки", "en": "Last feed reconciliation", "de": "Letzter Feed-Abgleich"}
 {"uk": "Остання зміна цін (%)", "en": "Last price change (%)", "de": "Letzte Preisänderung (%)"}
 {"uk": "Остання маска пошуку термінів", "en": "Last deadline search filter", "de": "Letzter Filter der Fristensuche"}
@@ -14179,6 +14187,7 @@
 {"uk": "Поставка після дедлайну! Очікується", "en": "Delivery after the deadline! Expected", "de": "Lieferung nach der Frist! Erwartet"}
 {"uk": "Поставте галочку «Так, перевести» — нічого не змінено.", "en": "Tick “Yes, convert” — nothing was changed.", "de": "Setzen Sie das Häkchen „Ja, umrechnen“ — es wurde nichts geändert."}
 {"uk": "Поставте галочку згоди учасників на обробку в хмарі.", "en": "Tick the participants’ consent to processing in the cloud.", "de": "Einwilligung der Teilnehmenden zur Verarbeitung in der Cloud ankreuzen."}
+{"uk": "Поставте галочку згоди: учасники нарад", "en": "Tick the consent box: the participants of the meetings", "de": "Setzen Sie das Häkchen zur Zustimmung: die Teilnehmer der Besprechungen"}
 {"uk": "Поставте галочку: учасники погодились на обробку тексту в хмарі. Вголос їм обіцяли обробку на наших серверах — без їхньої згоди текст у Claude не надсилається.", "en": "Tick the box: the participants agreed to the text being processed in the cloud. They were told aloud it stays on our servers — without their consent the text is not sent to Claude.", "de": "Bitte ankreuzen: Die Teilnehmenden haben der Verarbeitung des Textes in der Cloud zugestimmt. Mündlich wurde ihnen die Verarbeitung auf unseren Servern zugesagt — ohne ihre Zustimmung wird der Text nicht an Claude gesendet."}
 {"uk": "Поставте ✅ біля \"Надсилати email-сповіщення\" та збережіть", "en": "Tick ✅ next to \"Send email notifications\" and save", "de": "Setzen Sie ✅ bei \"E-Mail-Benachrichtigungen senden\" und speichern Sie"}
 {"uk": "Постачальник", "en": "Supplier", "de": "Lieferant"}
@@ -14745,6 +14754,7 @@
 {"uk": "Пропозиції", "en": "Suggestions", "de": "Vorschläge"}
 {"uk": "Пропозиції AI", "en": "AI suggestions", "de": "KI-Vorschläge"}
 {"uk": "Пропозиції агента", "en": "Agent proposals", "de": "Vorschläge des Agenten"}
+{"uk": "Пропозиції з нарад", "en": "Suggestions from the meetings", "de": "Vorschläge aus den Besprechungen"}
 {"uk": "Пропозиції з наради", "en": "Suggestions from the meeting", "de": "Vorschläge aus der Besprechung"}
 {"uk": "Пропозиції зовнішнього агента (Claude Code, Claude Desktop…) стають завданням цієї людини в «🧩 Завдання агенту» — вона перевіряє й застосовує ✓; її права діють і для читання. Порожньо — MCP для ключа вимкнено.", "en": "Proposals from an external agent (Claude Code, Claude Desktop…) become a task for this person in “🧩 Agent tasks” — they review and apply them with ✓; their permissions also apply to reading. Empty — MCP is disabled for the key.", "de": "Vorschläge eines externen Agenten (Claude Code, Claude Desktop…) werden zu einer Aufgabe dieser Person unter „🧩 Agentenaufgaben“ — sie prüft und übernimmt sie mit ✓; ihre Berechtigungen gelten auch für das Lesen. Leer — MCP ist für den Schlüssel deaktiviert."}
 {"uk": "Пропозиції зовнішнього агента (MCP) Minerva не виконує — повторити нічого.", "en": "Minerva does not run proposals of an external agent (MCP) — there is nothing to repeat.", "de": "Vorschläge eines externen Agenten (MCP) führt Minerva nicht aus — nichts zu wiederholen."}
@@ -17773,6 +17783,7 @@
 {"uk": "Усі моменти — у розділі «📌 Важливі моменти» нижче.", "en": "All moments are in the \"📌 Key moments\" section below.", "de": "Alle Momente stehen unten im Abschnitt „📌 Wichtige Momente“."}
 {"uk": "Усі мої наради", "en": "All my meetings", "de": "Alle meine Besprechungen"}
 {"uk": "Усі налаштування панелі…", "en": "All panel settings…", "de": "Alle Panel-Einstellungen…"}
+{"uk": "Усі наради звірки (кілька — у порядку дат, пізніше рішення важливіше)", "en": "All meetings of the review (several — in date order, the later decision counts more)", "de": "Alle Besprechungen des Abgleichs (mehrere — nach Datum, die spätere Entscheidung zählt mehr)"}
 {"uk": "Усі події", "en": "All events", "de": "Alle Termine"}
 {"uk": "Усі поля", "en": "All fields", "de": "Alle Felder"}
 {"uk": "Усі поля й службові", "en": "All fields and internal", "de": "Alle und interne Felder"}
@@ -17815,7 +17826,9 @@
 {"uk": "Учасники (email)", "en": "Participants (e-mail)", "de": "Teilnehmer (E-Mail)"}
 {"uk": "Учасники (з листування — автоматично; роль можна виправити)", "en": "Participants (from correspondence — automatic; the role can be corrected)", "de": "Teilnehmer (aus der Korrespondenz — automatisch; die Rolle kann korrigiert werden)"}
 {"uk": "Учасники в описі (календар команди)", "en": "Participants in the description (team calendar)", "de": "Teilnehmer in der Beschreibung (Teamkalender)"}
+{"uk": "Учасники вже погодились на обробку в хмарі: {0}", "en": "The participants already agreed to cloud processing: {0}", "de": "Die Teilnehmer haben der Verarbeitung in der Cloud bereits zugestimmt: {0}"}
 {"uk": "Учасники вже погодились на хмару — у протоколі згоди з {0}.", "en": "Participants have already agreed to the cloud — in the consent log since {0}.", "de": "Die Teilnehmenden haben der Cloud bereits zugestimmt — im Einwilligungsprotokoll seit {0}."}
+{"uk": "Учасники вибраних нарад погодились, щоб текст підсумку обробився в хмарі (Anthropic, США)", "en": "The participants of the selected meetings agreed that the summary text is processed in the cloud (Anthropic, USA)", "de": "Die Teilnehmer der ausgewählten Besprechungen sind einverstanden, dass der Text der Zusammenfassung in der Cloud verarbeitet wird (Anthropic, USA)"}
 {"uk": "Учасники зустрічі", "en": "Meeting attendees", "de": "Besprechungsteilnehmer"}
 {"uk": "Учасники й відповіді", "en": "Attendees and replies", "de": "Teilnehmer und Antworten"}
 {"uk": "Учасники й запрошення", "en": "Attendees and invitations", "de": "Teilnehmer und Einladungen"}
@@ -20564,6 +20577,7 @@
 {"uk": "звітував, які фото й даташити має сайт", "en": "reported which photos and datasheets the website has", "de": "hat gemeldet, welche Fotos und Datenblätter die Website hat"}
 {"uk": "звітів від RAG", "en": "reports from RAG", "de": "Berichte von RAG"}
 {"uk": "згадано {0}", "en": "mentioned {0}", "de": "erwähnt {0}"}
+{"uk": "згода є", "en": "consent given", "de": "Zustimmung liegt vor"}
 {"uk": "зголошуюсь", "en": "I volunteer", "de": "ich melde mich"}
 {"uk": "згорнутий", "en": "collapsed", "de": "eingeklappt"}
 {"uk": "згорнуто — розгорнути кліком", "en": "collapsed — click to expand", "de": "eingeklappt — per Klick ausklappen"}
@@ -23748,6 +23762,7 @@
 {"uk": "ще не перевірялось", "en": "not checked yet", "de": "noch nicht geprüft"}
 {"uk": "ще не передано (звірка стрічки ще не дійшла)", "en": "not sent yet (feed reconciliation has not reached it yet)", "de": "noch nicht übertragen (der Feed-Abgleich hat es noch nicht erreicht)"}
 {"uk": "ще не перекладено", "en": "not translated yet", "de": "noch nicht übersetzt"}
+{"uk": "ще не погоджувались на обробку тексту в хмарі", "en": "have not yet agreed to the text being processed in the cloud", "de": "haben der Verarbeitung des Textes in der Cloud noch nicht zugestimmt"}
 {"uk": "ще не позначене як відправлене", "en": "is not yet marked as shipped", "de": "ist noch nicht als versendet markiert"}
 {"uk": "ще не показується", "en": "is not shown yet", "de": "wird noch nicht angezeigt"}
 {"uk": "ще не прочитано: {0}", "en": "not read yet: {0}", "de": "noch nicht gelesen: {0}"}
