@@ -45,6 +45,7 @@ SOURCES_MAX = 5
 MAX_TOKENS = 16_000
 ORDER = {"add_phase": 0, "update_phase": 1, "add": 2, "update": 3, "remove": 4, "remove_phase": 5}
 OPEN_STATES = (PlanReviewChange.PENDING, PlanReviewChange.FAILED)
+COLOURS = 5                        # кольорів нарад у pj.css (pjm-1 … pjm-5): кожна нарада звірки — свій колір
 SHOW_DONE = timedelta(minutes=30)  # завершену звірку ще видно в пульті («план узгоджений» / що застосовано)
 SHOW_ERROR = timedelta(days=1)
 
@@ -568,6 +569,22 @@ def review_for(project, user, pk) -> PlanReview:
     return r
 
 
+def meeting_marks(review) -> tuple[dict, dict]:
+    """({pk: Meeting}, {pk наради: (колір 1…COLOURS, тег «M2» — лише коли нарад кілька)}) — у порядку дат."""
+    ms = sorted(review.meetings.all(), key=lambda m: (m.start, m.pk))
+    if not ms and review.meeting is not None:
+        ms = [review.meeting]
+    several = len(ms) > 1
+    return ({m.pk: m for m in ms},
+            {m.pk: ((i - 1) % COLOURS + 1, f"M{i}" if several else "") for i, m in enumerate(ms, 1)})
+
+
+def change_mark(ch, review, by_pk, marks) -> tuple[int, str]:
+    """Колір і тег наради зміни (як в історії — найпізніша з нарад її тез)."""
+    m = change_meeting(ch, review, by_pk)
+    return marks.get(getattr(m, "pk", None), (1, ""))
+
+
 def change_meeting(ch, review, by_pk=None):
     """Нарада, з якої зміна (у 🕘 історію): теза пізнішої наради важливіша; старі звірки — нарада звірки."""
     if by_pk is None:
@@ -734,15 +751,15 @@ def view(review, viewer) -> dict | None:
     steps = {s.pk: s for s in ProjectStep.objects.filter(project=review.project)}
     m = review.meeting
     refs = review.refs or {}
-    ms = sorted(review.meetings.all(), key=lambda x: (x.start, x.pk)) or ([m] if m is not None else [])
-    tags = {r.get("meeting"): r.get("tag") for r in refs.values() if r.get("meeting") and r.get("tag")}
-    several = len(ms) > 1
+    objs, marks = meeting_marks(review)
+    several = len(objs) > 1
     meetings = [{"pk": x.pk, "title": x.title, "day": x.day, "url": timeline.meeting_url(x.pk),
-                 "tag": tags.get(x.pk, f"M{i}") if several else ""} for i, x in enumerate(ms, 1)]
+                 "m": marks[x.pk][0], "tag": marks[x.pk][1]} for x in objs.values()]
     by_pk = {x["pk"]: x for x in meetings}
     rows = []
     for ch in review.changes.all():
         d = describe(ch, names)
+        colour, tag = change_mark(ch, review, objs, marks)
         src = []
         for key in ch.sources or []:
             r = refs.get(key)
@@ -751,9 +768,10 @@ def view(review, viewer) -> dict | None:
             mt = by_pk.get(r.get("meeting")) or (by_pk.get(m.pk) if m is not None else None)
             url = timeline.meeting_url(mt["pk"], r.get("second")) if mt else ""
             src.append({"key": key, "text": r["text"], "time": r.get("time") or "", "url": url,
-                        "tag": mt["tag"] if mt else "", "day": mt["day"] if mt else None,
+                        "tag": mt["tag"] if mt else "", "m": mt["m"] if mt else 1, "day": mt["day"] if mt else None,
                         "meeting": mt["title"] if mt and several else ""})
-        rows.append({"id": ch.pk, "op": ch.op, "icon": OP_ICON.get(ch.op, "•"), "title": d["title"],
+        rows.append({"id": ch.pk, "op": ch.op, "icon": OP_ICON.get(ch.op, "•"), "title": d["title"], "m": colour,
+                     "tag": tag,
                      "parts": d["parts"], "why": ch.why, "sources": src, "status": ch.status,
                      "status_label": dict(PlanReviewChange.STATUS_CHOICES).get(ch.status, ch.status), "note": ch.note,
                      "open": ch.status in OPEN_STATES,
@@ -784,22 +802,29 @@ def active(project, user):
 
 
 def ghosts(review) -> dict:
-    """«Привиди» на діаграмах: {steps: {pk: {start, end, kind, remove, status, label, change}}, added: [{after, phase,
-    new_phase, title, kind, start, end, label, change}], phases: {pk: {name, remove}}, new_phases: [{key, name, after}]}
-    — лише зміни, що чекають рішення."""
-    out = {"steps": {}, "added": [], "phases": {}, "new_phases": []}
+    """«Привиди» на діаграмах: {steps: {pk: {start, end, kind, remove, status, label, change, m, tag}}, added: [{after,
+    phase, new_phase, title, kind, start, end, label, change, m, tag}], phases: {pk: {name, remove, m, tag}},
+    new_phases: [{key, name, m, tag}], legend: [{m, tag, title, day}]} — лише зміни, що чекають рішення; m — колір
+    наради зміни (pjm-1…), tag — «M2 » на початку підпису, коли нарад кілька."""
+    out = {"steps": {}, "added": [], "phases": {}, "new_phases": [], "legend": []}
     if review is None or review.status != PlanReview.READY:
         return out
+    objs, marks = meeting_marks(review)
+    if len(objs) > 1:
+        out["legend"] = [{"m": marks[x.pk][0], "tag": marks[x.pk][1], "title": x.title, "day": x.day.isoformat()}
+                         for x in objs.values()]
     steps = {s.pk: s for s in ProjectStep.objects.filter(project=review.project)}
     for ch in review.changes.filter(status__in=OPEN_STATES):
         f = (ch.data or {}).get("set") or {}
+        colour, tag = change_mark(ch, review, objs, marks)
+        pre = f"{tag} " if tag else ""
         if ch.op == "update" and _num(ch.target, "s") in steps:
             s = steps[_num(ch.target, "s")]
             kind = f.get("kind", s.kind)
             start, end = s.start or s.f_start, s.end or s.f_end
             ns, ne, _days = _dates({k: v for k, v in f.items() if k in ("start", "end", "duration")}, start, end,
                                    s.duration_days, kind)
-            g = {"change": ch.pk, "kind": kind, "remove": False}
+            g = {"change": ch.pk, "kind": kind, "remove": False, "m": colour, "tag": tag}
             if any(k in f for k in ("start", "end", "duration")) and ne:
                 g.update(start=_iso(ns) if kind != ProjectStep.MILESTONE else "", end=_iso(ne),
                          label=f"→ {_span(_iso(ns), _iso(ne), kind).replace('.20', '.')}")
@@ -807,9 +832,11 @@ def ghosts(review) -> dict:
                 g["status"] = f["status"]
                 g["label"] = (g.get("label", "") + f" · {STATUS_WORDS.get(f['status'], f['status'])}").strip(" ·")
             if g.get("label"):
+                g["label"] = pre + g["label"]
                 out["steps"][s.pk] = g
         elif ch.op == "remove" and _num(ch.target, "s") in steps:
-            out["steps"][_num(ch.target, "s")] = {"change": ch.pk, "remove": True, "label": "− прибрати"}
+            out["steps"][_num(ch.target, "s")] = {"change": ch.pk, "remove": True, "label": pre + "− прибрати",
+                                                  "m": colour, "tag": tag}
         elif ch.op == "add":
             kind = f.get("kind", ProjectStep.TASK)
             s, e, _days = _dates(f, None, None, f.get("duration") or 1, kind)
@@ -818,12 +845,13 @@ def ghosts(review) -> dict:
                                  "start": _iso(s) if kind != ProjectStep.MILESTONE else "", "end": _iso(e),
                                  "after": _num(place, "s"), "phase": _num(f.get("phase"), "p"),
                                  "new_phase": f.get("phase") if str(f.get("phase") or "").startswith("ap") else "",
-                                 "label": "＋ " + _span(_iso(s), _iso(e), kind).replace(".20", ".")})
+                                 "label": pre + "＋ " + _span(_iso(s), _iso(e), kind).replace(".20", "."),
+                                 "m": colour, "tag": tag})
         elif ch.op in ("update_phase", "remove_phase") and _num(ch.target, "p"):
             out["phases"][_num(ch.target, "p")] = {"change": ch.pk, "remove": ch.op == "remove_phase",
-                                                   "name": f.get("name", "")}
+                                                   "name": f.get("name", ""), "m": colour, "tag": tag}
         elif ch.op == "add_phase":
-            out["new_phases"].append({"key": ch.target, "change": ch.pk,
+            out["new_phases"].append({"key": ch.target, "change": ch.pk, "m": colour, "tag": tag,
                                       "name": f"{f.get('icon', '')} {f.get('name', '')}".strip()})
     return out
 

@@ -235,8 +235,9 @@
   }
   // Пропозиція звірки з нарадою до кроку класичної діаграми: нові дати — пунктиром іншим кольором, «прибрати» —
   // перекреслено (gantt.classic_data → prop)
-  function propOn(g, r, y, X, ppd) {
-    var p = r.prop, gx, el;
+  function propOn(row, r, y, X, ppd) {
+    var p = r.prop, gx, el, g = sv('g', {'class': 'pjg2-propg pjm-' + (p.m || 1)});   // колір наради пропозиції
+    row.appendChild(g);
     var tip = 'Запропоновано з наради: ' + (p.label || '') + ' — ✓ / ✕ у звірці плану';
     if (p.remove) {
       var a = X(dnum(r.start)), b = X(dnum(r.end) + 1);
@@ -303,7 +304,8 @@
     });
     grid.appendChild(sv('line', {x1: 0, y1: GHEAD - 0.5, x2: leftW, y2: GHEAD - 0.5, 'class': 'pjg2-hl'}));
     rows.forEach(function (r, i) {
-      var y = GHEAD + i * ROW, g = sv('g', {'class': 'pjg2-row pjg2-' + r.type + (r.ghost ? ' pjg2-proprow' : '')});
+      var y = GHEAD + i * ROW, g = sv('g', {'class': 'pjg2-row pjg2-' + r.type
+                                            + (r.ghost ? ' pjg2-proprow pjm-' + (r.m || 1) : '')});
       if (r.ghost) {
         // пропозиція звірки з нарадою — без вікна кроку й перетягування (✓ / ✕ — у звірці)
       } else if (r.type === 'step') {
@@ -386,7 +388,7 @@
       var x1 = X(s), x2 = X(e + 1), g;
       if (r.ghost) {
         if (!r.end) return;                       // нова фаза — лише рядок у таблиці, смуги — її нові кроки
-        g = sv('g', {'class': 'pjg2-propbar'});
+        g = sv('g', {'class': 'pjg2-propbar pjm-' + (r.m || 1)});
         if (r.kind === 'milestone') {
           var gmx = X(e) + ppd / 2;
           g.appendChild(sv('path', {d: 'M' + gmx + ',' + (y + 5) + ' l8,8 l-8,8 l-8,-8 z', 'class': 'pjg2-prop'}));
@@ -414,8 +416,9 @@
         g.appendChild(sv('title', {}, r.title + ' · ' + dshort(r.start) + ' – ' + dshort(r.end)
           + (canChange && r.id ? '\nПодвійний клік — виділити фазу й тягнути її разом з кроками' : '')));
         if (r.prop) {
-          g.appendChild(sv('text', {x: x2 + 8, y: y + 15, 'class': 'pjg2-proplab'},
-                           r.prop.remove ? '− прибрати фазу' : (r.prop.name ? '→ «' + r.prop.name + '»' : '✎ зміна фази')));
+          g.appendChild(sv('text', {x: x2 + 8, y: y + 15, 'class': 'pjg2-proplab pjm-' + (r.prop.m || 1)},
+                           (r.prop.tag ? r.prop.tag + ' ' : '')
+                           + (r.prop.remove ? '− прибрати фазу' : (r.prop.name ? '→ «' + r.prop.name + '»' : '✎ зміна фази'))));
         }
         svg.appendChild(g);
         return;

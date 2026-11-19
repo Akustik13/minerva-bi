@@ -606,8 +606,16 @@ svg.pjz-grab { cursor: grabbing; }
 
 /* 📅 Звірка плану з нарадою (projects/plan_review.py, _replan.html): пропозиції — пунктиром фіолетовим на обох
    діаграмах, ✓ / ✕ — у блоці; 🕘 Історія змін плану (plan_history.py) */
-.pjc { --pjr-prop: #a371f7; }
-html[data-theme="light"] .pjc, html[data-theme="hc-light"] .pjc { --pjr-prop: #8250df; }
+.pjc { --pjr-m1: #a371f7; --pjr-m2: #39c5cf; --pjr-m3: #f0883e; --pjr-m4: #f778ba; --pjr-m5: #c9a26b;
+  --pjr-prop: var(--pjr-m1); }
+html[data-theme="light"] .pjc, html[data-theme="hc-light"] .pjc {
+  --pjr-m1: #8250df; --pjr-m2: #0b8c96; --pjr-m3: #bc4c00; --pjr-m4: #bf3989; --pjr-m5: #8a6a2e; }
+/* кожна нарада звірки — свій колір (plan_review.meeting_marks: M1, M2 … у порядку дат) */
+.pjm-1 { --pjr-prop: var(--pjr-m1); }
+.pjm-2 { --pjr-prop: var(--pjr-m2); }
+.pjm-3 { --pjr-prop: var(--pjr-m3); }
+.pjm-4 { --pjr-prop: var(--pjr-m4); }
+.pjm-5 { --pjr-prop: var(--pjr-m5); }
 .pjg .pjg-ghost { fill: color-mix(in srgb, var(--pjr-prop) 18%, transparent); stroke: var(--pjr-prop); stroke-width: 1.6; stroke-dasharray: 4 2; }
 .pjg .pjg-ghost-del { stroke: var(--pjr-prop); stroke-width: 2.4; stroke-dasharray: 5 3; }
 .pjg .pjg-ghost-lab { fill: var(--pjr-prop); font-size: 10.5px; font-weight: 700; }
@@ -655,5 +663,6 @@ html[data-theme="light"] .pjc, html[data-theme="hc-light"] .pjc { --pjr-prop: #8
 .pjr2-m { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: baseline; font-size: 13px; cursor: pointer; }
 .pjr2-m input { margin: 0 2px 0 0; align-self: center; }
 .pjr2-tag { display: inline-block; padding: 0 5px; border-radius: 6px; font-size: 11px; line-height: 16px;
-  background: color-mix(in srgb, var(--pjr-prop) 22%, transparent); }
+  background: color-mix(in srgb, var(--pjr-prop) 22%, transparent); border: 1px solid var(--pjr-prop); }
+.pjr2-several .pjr2-row { border-left: 3px solid var(--pjr-prop); padding-left: 8px; }
 .pjr2-then { opacity: .7; margin: 0 2px; }

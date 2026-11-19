@@ -407,6 +407,39 @@ class SeveralMeetingsTests(ReviewBase):
             plan_review.start(self.project, self.user, "", MODEL, consent=True)
         self.assertFalse(PlanReview.objects.exists())
 
+    def test_each_meeting_its_own_colour_on_both_gantts_and_in_the_list(self):
+        client, internal = self.two()
+        b = f"s{self.b.pk}"
+        data = self.answer(changes=[
+            {"op": "update", "id": f"s{self.a.pk}", "end": self.d(12).isoformat(), "from": ["B1"]},
+            {"op": "add", "ref": "a1", "place_after": b, "title": "Freigabe Kunde", "kind": "milestone",
+             "end": self.d(25).isoformat(), "after": [b], "from": ["B2", "B3"]}])
+        with self.claude(data):
+            r = plan_review.start(self.project, self.user, [client.pk, internal.pk], MODEL, consent=True)
+        gh = plan_review.ghosts(r)
+        step = gh["steps"][self.a.pk]
+        self.assertEqual((step["m"], step["tag"]), (1, "M1"))
+        self.assertTrue(step["label"].startswith("M1 → "))
+        added = gh["added"][0]
+        self.assertEqual((added["m"], added["tag"]), (2, "M2"))                # обидві тези — колір пізнішої
+        self.assertEqual([(x["m"], x["tag"]) for x in gh["legend"]], [(1, "M1"), (2, "M2")])
+        p = schedule.compute(self.project, today=self.today)
+        svg = gantt.render(self.project, p, self.today, ghosts=gh)
+        self.assertIn('class="pjg-prop pjm-1"', svg)
+        self.assertIn('pjg-ghost-row pjm-2"', svg)
+        rows = gantt.classic_data(self.project, p, self.today, ghosts=gh)["rows"]
+        self.assertEqual(next(x for x in rows if x.get("ghost"))["m"], 2)
+        self.assertEqual(next(x for x in rows if x["type"] == "step" and x["id"] == self.a.pk)["prop"]["m"], 1)
+        v = plan_review.view(r, self.user)
+        self.assertEqual([(x["op"], x["m"]) for x in v["rows"]], [("update", 1), ("add", 2)])
+        html = cockpit.render(self.project, self.user)
+        self.assertIn('class="pjr2-tag pjm-2"', html)
+        self.assertIn("pjr2-several", html)
+        self.assertIn("Кожна нарада — своїм кольором", html)
+        _m, one = self.reviewed()                                             # одна нарада — як було, без міток
+        self.assertEqual({(g["m"], g["tag"]) for g in plan_review.ghosts(one)["steps"].values()}, {(1, "")})
+        self.assertEqual(plan_review.ghosts(one)["legend"], [])
+
     def test_block_checkboxes_url_and_endpoint(self):
         client, internal = self.two(consent=(True, True))
         html = cockpit.render(self.project, self.user)

@@ -269,6 +269,7 @@ def entries(project, viewer=None, limit=SHOWN) -> list:
         for m in ms:
             mine = uid and m.owner_id == uid
             meetings.append({"title": m.title if mine else "", "day": m.day, "tag": tags.get(m.pk, ""),
+                             "m": (int(tags[m.pk][1:]) - 1) % 5 + 1 if m.pk in tags else 1,
                              "url": f"/admin/meetings/meeting/{m.pk}/page/" if mine else ""})
         who = g["user"]
         out.append({"at": g["at"], "who": (who.get_full_name() or who.username) if who else "",

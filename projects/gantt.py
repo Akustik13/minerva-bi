@@ -54,6 +54,12 @@ def _gd(v):
         return None
 
 
+def _mcls(g) -> str:
+    """Клас кольору наради пропозиції (pj.css .pjm-1 … .pjm-5)."""
+    m = (g or {}).get("m")
+    return f" pjm-{int(m)}" if isinstance(m, int) and 1 <= m <= 9 else ""
+
+
 def _ghost_rows(plan, ghosts, brief=False) -> list:
     """Рядки діаграми з пропозиціями звірки (projects/plan_review.ghosts): новий крок — одразу після кроку, за яким
     його поставили (інакше — у кінці своєї фази), нова фаза — в кінці з її кроками. ("phase" | "step" | "ghost" |
@@ -150,16 +156,17 @@ def render(project, plan, today=None, editable=False, brief=False, ghosts=None) 
         top = HEAD + i * RH
         cy = top + RH / 2
         if kind == "ghost_phase":
-            out.append(f'<g class="pjg-row pjg-ghost-row" data-change="{item["change"]}"><title>'
+            pre = f"{item['tag']} " if item.get("tag") else ""
+            out.append(f'<g class="pjg-row pjg-ghost-row{_mcls(item)}" data-change="{item["change"]}"><title>'
                        f'{escape("Запропоновано з наради: нова фаза «" + item["name"] + "» — ✓ / ✕ у звірці плану")}</title>'
                        f'<rect x="0" y="{top}" width="{W}" height="{RH}" class="pjg-rowbg pjg-phbg pjg-ghost-bg"/>'
-                       f'<text x="10" y="{_n(cy + 4)}" class="pjg-pname pjg-ghost-t">＋ {_name(item["name"], 36)}</text></g>')
+                       f'<text x="10" y="{_n(cy + 4)}" class="pjg-pname pjg-ghost-t">{escape(pre)}＋ {_name(item["name"], 36)}</text></g>')
             continue
         if kind == "ghost":
             a = item
             gs, ge = _gd(a.get("start")), _gd(a.get("end"))
             tip = f"Запропоновано з наради: «{a['title']}» {a.get('label', '')} — ✓ / ✕ у звірці плану"
-            g = [f'<g class="pjg-row pjg-ghost-row" data-change="{a["change"]}"><title>{escape(tip)}</title>',
+            g = [f'<g class="pjg-row pjg-ghost-row{_mcls(a)}" data-change="{a["change"]}"><title>{escape(tip)}</title>',
                  f'<rect x="0" y="{top}" width="{W}" height="{RH}" class="pjg-rowbg pjg-ghost-bg"/>',
                  f'<text x="22" y="{_n(cy + 4)}" class="pjg-t pjg-ghost-t">＋ {_name(a["title"], 29)}</text>',
                  f'<text x="268" y="{_n(cy + 4)}" class="pjg-dates pjg-ghost-t">'
@@ -194,8 +201,9 @@ def render(project, plan, today=None, editable=False, brief=False, ghosts=None) 
                          f'height="2.5" class="pjg-base"/>')
             gp = (gh.get("phases") or {}).get(ph.pk) if ph else None
             if gp:
-                text = "− прибрати фазу" if gp.get("remove") else f"→ «{gp.get('name')}»"
-                g.append(f'<text x="{_n(W - RIGHT - 4)}" y="{_n(cy + 4)}" text-anchor="end" class="pjg-ghost-lab">'
+                text = (f"{gp['tag']} " if gp.get("tag") else "") + (
+                    "− прибрати фазу" if gp.get("remove") else f"→ «{gp.get('name')}»" if gp.get("name") else "✎ зміна фази")
+                g.append(f'<text x="{_n(W - RIGHT - 4)}" y="{_n(cy + 4)}" text-anchor="end" class="pjg-ghost-lab{_mcls(gp)}">'
                          f'{escape(text)}<title>Запропоновано з наради — ✓ / ✕ у звірці плану</title></text>')
             g.append("</g>")
             out.append("".join(g))
@@ -328,7 +336,7 @@ def _ghost_on_step(g, c, x, ppd, cy) -> list:
             anchor = x(c.end + timedelta(days=1)) + 6 if c.end else 300
     out.append(f'<text x="{_n(min(anchor, W - RIGHT - 60))}" y="{_n(cy + 4)}" class="pjg-ghost-lab">'
                f'{escape(g.get("label", ""))}</text>')
-    return out
+    return [f'<g class="pjg-prop{_mcls(g)}">'] + out + ["</g>"]
 
 
 # ── 📋 Класична діаграма Ганта (малює браузер — admin/projects/project/change_form.html) ──────────────────────────
@@ -402,7 +410,7 @@ def _classic_ghosts(rows, gh) -> tuple:
         placed.add(a["change"])
         dates.extend(d for d in (_gd(a.get("start")), _gd(a.get("end"))) if d)
         days = ((_gd(a["end"]) - _gd(a["start"])).days + 1) if a.get("start") and a.get("end") else 0
-        return {"type": "step", "ghost": True, "id": f"g{a['change']}", "phase": phase, "n": "＋",
+        return {"type": "step", "ghost": True, "id": f"g{a['change']}", "phase": phase, "n": "＋", "m": a.get("m", 1),
                 "title": a["title"], "kind": a.get("kind") or ProjectStep.TASK, "side": "", "who": "",
                 "start": a.get("start") or a.get("end") or "", "end": a.get("end") or "", "status": "todo",
                 "crit": False, "slip": 0, "preds": [], "days": days, "note": note, "label": a.get("label", "")}
@@ -425,7 +433,8 @@ def _classic_ghosts(rows, gh) -> tuple:
             out += [ghost_row(a, phase_id or "") for a in added if a["change"] not in placed and not a.get("new_phase")
                     and a.get("after") not in step_ids and (a.get("phase") or "") == (phase_id or "")]
     for np in gh.get("new_phases") or []:
-        out.append({"type": "phase", "ghost": True, "id": f"g{np['change']}", "n": "＋", "title": np["name"],
+        out.append({"type": "phase", "ghost": True, "id": f"g{np['change']}", "n": "＋", "m": np.get("m", 1),
+                    "title": (f"{np['tag']} " if np.get("tag") else "") + np["name"],
                     "start": "", "end": "", "status": "todo", "done": 0, "total": 0, "note": note})
         out += [ghost_row(a, f"g{np['change']}") for a in added if a.get("new_phase") == np["key"]
                 and a["change"] not in placed]
