@@ -58,6 +58,12 @@
   /* 💶 порівняння: кількості колонками, 🥇 по кожній, ⚠️ неповні — services/rfq_compare.py */
   /* сторінка запиту — на всю ширину (інші сторінки постачальників — 1180 px, _styles.html) */
   .spp { max-width: none; }
+.rw-more { border-collapse: collapse; width: 100%; margin: 4px 0; font-size: 13px; }
+.rw-more th, .rw-more td { border-bottom: 1px solid var(--border-strong, #ddd); padding: 4px 8px; text-align: left; vertical-align: middle; }
+.rw-more th { font-size: 12px; color: var(--text-muted, #888); font-weight: 600; }
+.rw-more tr.rw-noemail { opacity: .65; }
+.rw-more label { cursor: pointer; }
+.rw-more-open { text-decoration: none; margin-left: 4px; }
   .rw-legend { font-size: 12px; margin: 4px 0 8px; display: grid; gap: 4px; }
   .rw-counts { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
   .rw-scroll { overflow-x: auto; }
@@ -237,11 +243,40 @@
 
   {% if can_change and more %}
   <div class="spf-card">
-    <details><summary class="spf-h">➕ Додати отримувачів{% if req.category %} ({{ req.category.name }}){% endif %}</summary>
+    <details id="rw-more"><summary class="spf-h">➕ Додати отримувачів{% if req.category %} ({{ req.category.name }}){% endif %} <span class="spf-muted">· {{ more|length }}</span></summary>
       <form method="post" action="{{ act }}">{% csrf_token %}<input type="hidden" name="do" value="add">
-        <div class="spf-cats" style="max-height:220px;overflow:auto">{% for s in more %}<label class="spf-cat"><input type="checkbox" name="rcp" value="{{ s.pk }}"> <span translate="no">{{ s.name }}</span></label>{% endfor %}</div>
-        <div class="spf-row"><button type="submit" class="button">➕ Додати (ще не надсилати)</button></div>
+        {% if more|length > 6 %}<input type="search" id="rw-more-q" placeholder="Пошук: назва, людина, email, країна…" style="min-width:260px;margin:4px 0">{% endif %}
+        <table class="rw-more"><thead><tr><th></th><th>Постачальник</th><th>Кому піде лист</th><th>Країна</th></tr></thead><tbody>
+        {% for s in more %}<tr data-q="{{ s.name|lower }} {{ s.f_email|lower }} {% for c in s.f_mails %}{{ c.name|lower }} {% endfor %}{{ s.f_country_name|lower }}"{% if not s.f_email %} class="rw-noemail"{% endif %}>
+          <td><input type="checkbox" name="rcp" value="{{ s.pk }}" id="rw-more-{{ s.pk }}"{% if not s.f_email %} disabled{% endif %}></td>
+          <td><label for="rw-more-{{ s.pk }}"><b translate="no">{{ s.name }}</b>{% for c in s.categories.all %} <span title="{{ c.name }}">{{ c.icon_html }}</span>{% endfor %}{% if s.status == "potential" %} <span title="Потенційний">🌱</span>{% elif s.status == "paused" %} <span title="Пауза">⏸</span>{% endif %}</label>
+            <a href="{% url 'admin:inventory_supplier_change' s.pk %}" target="_blank" class="rw-more-open" title="Картка постачальника — у новій вкладці">↗</a></td>
+          <td>{% if s.f_mails|length > 1 %}<select name="contact_{{ s.pk }}" title="Кому з фірми піде лист">{% for c in s.f_mails %}<option value="{{ c.pk }}">{{ c.name }}{% if c.position %} ({{ c.position }}){% endif %} · {{ c.email }}</option>{% endfor %}</select>
+            {% elif s.f_contact %}<span translate="no">👤 {{ s.f_contact.name }}{% if s.f_contact.position %} ({{ s.f_contact.position }}){% endif %} · ✉️ {{ s.f_contact.email }}</span>
+            {% elif s.f_email %}<span translate="no">✉️ {{ s.f_email }}</span> <span class="spf-muted">(email фірми)</span>
+            {% else %}<span class="spf-bad">⚠️ немає email — допишіть у <a href="{% url 'admin:inventory_supplier_change' s.pk %}" target="_blank">картці ↗</a></span>{% endif %}</td>
+          <td>{% if s.f_country %}<span translate="no">{{ s.f_country_name|default:s.f_country }}</span>{% else %}<span class="spf-muted">—</span>{% endif %}</td>
+        </tr>{% endfor %}</tbody></table>
+        <div class="spf-row"><button type="submit" class="button">➕ Додати (ще не надсилати)</button>
+          <span class="spf-muted">Потім угорі «📤 Надіслати» — лист піде лише доданим; хто вже отримав, удруге не отримає.</span></div>
+        <div class="spf-muted">Тут — постачальники {% if req.category %}категорії «{{ req.category.name }}», {% endif %}яких ще немає в запиті. Іншого — «✏️ Змінити запит» → «🏭 Кому» (усі постачальники).</div>
       </form></details>
+    <script>
+    (function(){
+      var q = document.getElementById('rw-more-q');
+      if (!q) return;
+      q.addEventListener('input', function(){
+        var words = q.value.toLowerCase().split(/\s+/).filter(Boolean);
+        document.querySelectorAll('.rw-more tbody tr').forEach(function(tr){
+          var t = tr.getAttribute('data-q') || '';
+          var ok = words.every(function(w){ return t.indexOf(w) >= 0; });
+          var box = tr.querySelector('input[type=checkbox]');
+          tr.style.display = ok || (box && box.checked) ? '' : 'none';     // позначені не ховаються
+        });
+      });
+      q.addEventListener('keydown', function(e){ if (e.key === 'Enter') e.preventDefault(); });   // Enter не надсилає форму
+    })();
+    </script>
   </div>
   {% endif %}
 

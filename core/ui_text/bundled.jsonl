@@ -231,6 +231,7 @@
 {"uk": "(cols: Frequency/Bandwidth/Filter Type…) і", "en": "(cols: Frequency/Bandwidth/Filter Type…) and", "de": "(cols: Frequency/Bandwidth/Filter Type…) und"}
 {"uk": "(cols: Style/Connector/Length/Cable Type…). Колонки з форматом «Name (код)» парсяться автоматично.", "en": "(cols: Style/Connector/Length/Cable Type…). Columns in the “Name (code)” format are parsed automatically.", "de": "(cols: Style/Connector/Length/Cable Type…). Spalten im Format „Name (Code)“ werden automatisch ausgewertet."}
 {"uk": "(d.syntax_error ? '⚠️ Синтаксична помилка' : '✗ Помилка') + '", "en": "(d.syntax_error ? '⚠️ Syntax error' : '✗ Error') + '", "de": "(d.syntax_error ? '⚠️ Syntaxfehler' : '✗ Fehler') + '"}
+{"uk": "(email фірми)", "en": "(company email)", "de": "(Firmen-E-Mail)"}
 {"uk": "(function(f){ var fd=new FormData(); fd.append('labels',f); fetch('/labels/upload/',{method:'POST',body:fd, headers:{'X-CSRFToken':document.cookie.match(/csrftoken=([^;]+)/)[1]}}) .then(r=>r.json()).then(d=>{ if(d.results&&d.results[0]&&d.results[0].status!='error') location.reload(); else alert('Помилка: '+(d.results?d.results[0].msg:d.error)); }); })(this.files[0])", "en": "(function(f){ var fd=new FormData(); fd.append('labels',f); fetch('/labels/upload/',{method:'POST',body:fd, headers:{'X-CSRFToken':document.cookie.match(/csrftoken=([^;]+)/)[1]}}) .then(r=>r.json()).then(d=>{ if(d.results&&d.results[0]&&d.results[0].status!='error') location.reload(); else alert('Error: '+(d.results?d.results[0].msg:d.error)); }); })(this.files[0])", "de": "(function(f){ var fd=new FormData(); fd.append('labels',f); fetch('/labels/upload/',{method:'POST',body:fd, headers:{'X-CSRFToken':document.cookie.match(/csrftoken=([^;]+)/)[1]}}) .then(r=>r.json()).then(d=>{ if(d.results&&d.results[0]&&d.results[0].status!='error') location.reload(); else alert('Fehler: '+(d.results?d.results[0].msg:d.error)); }); })(this.files[0])"}
 {"uk": "(qwen2.5:7b) — локально й безкоштовно", "en": "(qwen2.5:7b) — local and free", "de": "(qwen2.5:7b) — lokal und kostenlos"}
 {"uk": "(s.datasheets.fixed ? ', виправлено розширень: ' + s.datasheets.fixed : '')", "en": "(s.datasheets.fixed ? ', extensions fixed: ' + s.datasheets.fixed : '')", "de": "(s.datasheets.fixed ? ', korrigierte Erweiterungen: ' + s.datasheets.fixed : '')"}
@@ -9029,6 +9030,7 @@
 {"uk": "Картка магазину: редактор країн зон доставки (як на DigiKey) — регіони з галочками, пошук", "en": "Shop card: shipping zone country editor (as on DigiKey) — regions with checkboxes, search", "de": "Shop-Karte: Länder-Editor der Versandzonen (wie bei DigiKey) – Regionen mit Kontrollkästchen, Suche"}
 {"uk": "Картка магазину: редактор країн зон доставки (як на DigiKey) — регіони з галочками, пошук, країни інших зон (перенести сюди), «усі інші країни», винятки країни (своя ціна / термін). Дані: прихований JSON у полі «Країни» і «Винятки» кожної зони (shop/admin.py → CountryPickerWidget).", "en": "Shop card: shipping zone country editor (as on DigiKey) — regions with checkboxes, search, countries of other zones (move here), “all other countries”, country exceptions (own price / lead time). Data: hidden JSON in the “Countries” and “Exceptions” fields of each zone (shop/admin.py → CountryPickerWidget).", "de": "Shop-Karte: Länder-Editor der Versandzonen (wie bei DigiKey) – Regionen mit Kontrollkästchen, Suche, Länder anderer Zonen (hierher verschieben), „alle übrigen Länder“, Länderausnahmen (eigener Preis / eigene Lieferzeit). Daten: verstecktes JSON in den Feldern „Länder“ und „Ausnahmen“ jeder Zone (shop/admin.py → CountryPickerWidget)."}
 {"uk": "Картка постачальника", "en": "Supplier card", "de": "Lieferantenkarte"}
+{"uk": "Картка постачальника — у новій вкладці", "en": "Supplier card — in a new tab", "de": "Lieferantenkarte — in neuem Tab"}
 {"uk": "Картка проєкту", "en": "Project card", "de": "Projektkarte"}
 {"uk": "Картка товару", "en": "Product card", "de": "Artikelkarte"}
 {"uk": "Картка товару → «🏪 Інтернет-магазини»: усі магазини (нові з'являються самі), ціна й звідки вона; галочка «застосувати базові» з %", "en": "Product card → “🏪 Web shops”: all shops (new ones appear on their own), the price and where it comes from; the “apply base” checkbox with %", "de": "Artikelkarte → „🏪 Webshops“: alle Shops (neue erscheinen von selbst), der Preis und seine Herkunft; Häkchen „Basispreise anwenden“ mit %"}
@@ -9483,6 +9485,7 @@
 {"uk": "Кому в Telegram", "en": "Telegram recipient", "de": "Telegram-Empfänger"}
 {"uk": "Кому віддає", "en": "Delivers to", "de": "Liefert an"}
 {"uk": "Кому віддає — ＋ сторона…", "en": "Delivers to — ＋ party…", "de": "Liefert an — ＋ Beteiligter…"}
+{"uk": "Кому з фірми піде лист", "en": "Who at the company gets the e-mail", "de": "Wer in der Firma die E-Mail bekommt"}
 {"uk": "Кому звіт (пошта)", "en": "Report to (e-mail)", "de": "Bericht an (E-Mail)"}
 {"uk": "Кому й звідки", "en": "To whom and from where", "de": "An wen und von wo"}
 {"uk": "Кому на пошту й у які чати", "en": "Who gets the e-mail and which chats", "de": "An wen per E-Mail und in welche Chats"}
@@ -14284,6 +14287,7 @@
 {"uk": "Потягніть, щоб змінити ширину · подвійний клік — авто · ← → з клавіатури", "en": "Drag to change the width · double-click — auto · ← → from the keyboard", "de": "Ziehen, um die Breite zu ändern · Doppelklick — automatisch · ← → per Tastatur"}
 {"uk": "Потік даних", "en": "Data flow", "de": "Datenfluss"}
 {"uk": "Потік даних та Django Signals", "en": "Data flow and Django Signals", "de": "Datenfluss und Django Signals"}
+{"uk": "Потім угорі «📤 Надіслати» — лист піде лише доданим; хто вже отримав, удруге не отримає.", "en": "Then «📤 Надіслати» at the top — the e-mail goes only to those added; whoever already got it will not get it again.", "de": "Dann oben «📤 Надіслати» — die E-Mail geht nur an die Hinzugefügten; wer sie schon bekommen hat, bekommt sie nicht noch einmal."}
 {"uk": "Походження", "en": "Origin", "de": "Ursprung"}
 {"uk": "Почали", "en": "Started", "de": "Begonnen"}
 {"uk": "Почати з", "en": "Start with", "de": "Beginnen mit"}
@@ -14372,6 +14376,7 @@
 {"uk": "Пошук усюди", "en": "Search everywhere", "de": "Überall suchen"}
 {"uk": "Пошук ще не запускали", "en": "The search has not been started yet", "de": "Die Suche wurde noch nicht gestartet"}
 {"uk": "Пошук: назва або код — напр. Schweiz, Швейцарія, CH", "en": "Search: name or code — e.g. Schweiz, Switzerland, CH", "de": "Suche: Name oder Code – z. B. Schweiz, Switzerland, CH"}
+{"uk": "Пошук: назва, людина, email, країна…", "en": "Search: name, person, email, country…", "de": "Suche: Name, Person, E-Mail, Land…"}
 {"uk": "Пошуки в RAG", "en": "RAG searches", "de": "RAG-Suchen"}
 {"uk": "Пошуків", "en": "Searches", "de": "Suchanfragen"}
 {"uk": "Права", "en": "Permissions", "de": "Berechtigungen"}
@@ -17446,6 +17451,7 @@
 {"uk": "Тут нічого немає — виберіть іншу плитку вгорі.", "en": "There is nothing here — choose another tile at the top.", "de": "Hier ist nichts — wählen Sie oben eine andere Kachel."}
 {"uk": "Тут нічого немає — виберіть іншу плитку.", "en": "There is nothing here — choose another tile.", "de": "Hier ist nichts — wählen Sie eine andere Kachel."}
 {"uk": "Тут цього змінити не можна — відкрийте картку.", "en": "This cannot be changed here — open the card.", "de": "Das lässt sich hier nicht ändern — öffnen Sie die Karte."}
+{"uk": "Тут — постачальники", "en": "Here — suppliers", "de": "Hier — Lieferanten"}
 {"uk": "Тягніть рамку — інший період · краї рамки — довший чи коротший · подвійний клік — увесь проєкт", "en": "Drag the frame — another period · its edges — longer or shorter · double-click — the whole project", "de": "Rahmen ziehen — anderer Zeitraum · Ränder — länger oder kürzer · Doppelklick — ganzes Projekt"}
 {"uk": "Тягніть смугу чи ◆ — нові дати, край смуги — тривалість · клік — вікно кроку · правий клік — меню", "en": "Drag a bar or ◆ — new dates, the bar edge — duration · click — step window · right-click — menu", "de": "Balken oder ◆ ziehen — neue Daten, Balkenrand — Dauer · Klick — Schrittfenster · Rechtsklick — Menü"}
 {"uk": "Тягніть — нові дати · подвійний клік — тягнути початок і кінець · правий клік — меню", "en": "Drag — new dates · double-click — drag start and end · right-click — menu", "de": "Ziehen — neue Termine · Doppelklick — Anfang und Ende ziehen · Rechtsklick — Menü"}
@@ -20755,6 +20761,7 @@
 {"uk": "категорія: {0}", "en": "category: {0}", "de": "Kategorie: {0}"}
 {"uk": "категорією товарів. Дані оновлюються в реальному часі.", "en": "product category. Data is updated in real time.", "de": "Artikelkategorie. Die Daten werden in Echtzeit aktualisiert."}
 {"uk": "категорії {0} немає в каталозі DigiKey — знайди через dk_find_category", "en": "category {0} is not in the DigiKey catalog — find it with dk_find_category", "de": "Kategorie {0} ist nicht im DigiKey-Katalog — mit dk_find_category suchen"}
+{"uk": "категорії «{0}»", "en": "of category «{0}»", "de": "der Kategorie «{0}»"}
 {"uk": "категорії «{0}» немає в довіднику складу", "en": "category «{0}» is not in the stock category list", "de": "Kategorie «{0}» ist nicht in der Lagerkategorienliste"}
 {"uk": "категорії.", "en": "categories.", "de": "Kategorien."}
 {"uk": "квиток вікна запису застарів", "en": "recording window ticket expired", "de": "Ticket des Aufnahmefensters abgelaufen"}
@@ -21600,6 +21607,7 @@
 {"uk": "немає PDF (на сервері немає LibreOffice)", "en": "no PDF (no LibreOffice on the server)", "de": "kein PDF (auf dem Server fehlt LibreOffice)"}
 {"uk": "немає email", "en": "no e-mail address", "de": "keine E-Mail-Adresse"}
 {"uk": "немає email покупця", "en": "no buyer email", "de": "keine E-Mail des Käufers"}
+{"uk": "немає email — допишіть у", "en": "no email — add it in the", "de": "keine E-Mail — ergänzen in der"}
 {"uk": "немає адрес", "en": "no addresses", "de": "keine Adressen"}
 {"uk": "немає адреси", "en": "no address", "de": "keine Adresse"}
 {"uk": "немає адреси доставки", "en": "no delivery address", "de": "keine Lieferadresse"}
@@ -23868,6 +23876,7 @@
 {"uk": "яке посилання", "en": "which link", "de": "welcher Link"}
 {"uk": "яке посилання за правилом", "en": "which link by the rule", "de": "welcher Link nach Regel"}
 {"uk": "яким ключем — ще невідомо: сайт звітував до оновлення Minerva; з'явиться після його наступного звіту (до {0} днів, зазвичай за кілька хвилин)", "en": "which key — not known yet: the site reported before the Minerva update; it will show after its next report (up to {0} days, usually within minutes)", "de": "welcher Schlüssel — noch unbekannt: die Website hat vor dem Minerva-Update berichtet; erscheint nach ihrem nächsten Bericht (bis {0} Tage, meist in wenigen Minuten)"}
+{"uk": "яких ще немає в запиті. Іншого — «✏️ Змінити запит» → «🏭 Кому» (усі постачальники).", "en": "not yet in the request. Anyone else — «✏️ Змінити запит» → «🏭 Кому» (all suppliers).", "de": "die noch nicht in der Anfrage sind. Andere — «✏️ Змінити запит» → «🏭 Кому» (alle Lieferanten)."}
 {"uk": "якщо API недоступний, система використає останній збережений статус.", "en": "if the API is unavailable, the system uses the last saved status.", "de": "ist die API nicht verfügbar, verwendet das System den zuletzt gespeicherten Status."}
 {"uk": "якщо в джерелах відповіді немає або її частини — так і скажи і напиши, де ще пошукати; нічого не вигадуй", "en": "if the sources do not contain the answer or part of it — say so and write where else to look; invent nothing", "de": "wenn die Quellen die Antwort oder einen Teil davon nicht enthalten — sagen Sie das und schreiben Sie, wo man sonst suchen kann; erfinden Sie nichts"}
 {"uk": "якщо вибрано пакет", "en": "if a bundle is selected", "de": "wenn ein Paket gewählt ist"}

@@ -92,6 +92,22 @@ class GroupFilter(admin.SimpleListFilter):
         return queryset.filter(group=self.value()) if self.value() else queryset
 
 
+def _recipient_rows(suppliers) -> list:
+    """Постачальники для «➕ Додати отримувачів» з тим, кому піде лист (rfq.pick_email без запиту на кожного):
+    f_email, f_contact (контакт або None), f_mails (контакти з email — вибір), f_country, f_country_name."""
+    from shop.countries import name as country_name
+    out = []
+    for s in suppliers:
+        mails = sorted((c for c in s.contacts.all() if c.email and c.is_active), key=lambda c: (not c.is_primary, c.pk))
+        s.f_mails = mails
+        s.f_contact = mails[0] if mails else None
+        s.f_email = mails[0].email if mails else (s.email or "")
+        s.f_country = (s.addr_country or "").upper()
+        s.f_country_name = country_name(s.f_country) if s.f_country else ""
+        out.append(s)
+    return out
+
+
 @admin.register(SupplierRequest)
 class SupplierRequestAdmin(admin.ModelAdmin):
     list_display = ("code_col", "title", "status", "group", "project", "category", "answers_col", "reply_by",
@@ -576,6 +592,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         more = Supplier.objects.exclude(pk__in=in_req).exclude(status=Supplier.STATUS_BLOCKED)
         if req.category_id:
             more = more.filter(categories=req.category_id)
+        more = _recipient_rows(more.prefetch_related("contacts", "categories").order_by("name")[:200])
         events = SupplierEvent.objects.filter(request=req).select_related("supplier", "user")[:40]
         return TemplateResponse(request, "admin/suppliers/request_work.html", self._ctx(
             request, f"📨 {req.code} · {req.title}", req=req, rows=rows, files=list(req.files.all()),
@@ -584,7 +601,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             review_must=", ".join(x["label"] for x in rfq_copy.pending(req) if x["level"] == rfq_copy.MUST),
             copies=list(req.copies.order_by("-created_at").values("pk", "code", "status")[:10]),
             states=[s for s in SupplierRequestRecipient.STATES if s[0] != SupplierRequestRecipient.PLANNED],
-            more=more.order_by("name")[:200], events=events, quantities=rfq.parse_quantities(req.quantities),
+            more=more, more_mail=sum(1 for s in more if s.f_email), events=events, quantities=rfq.parse_quantities(req.quantities),
             cmp=cmp, qtys=cmp["qtys"], ncols=max(len(cmp["qtys"]), 1) + 6, stale=rfq_compare.stale(req),
             analysis_at=analysis_at,
             reparse=len(self._to_parse(req, False)), scope_choices=rfq_compare.SCOPE,
@@ -708,7 +725,15 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             elif do == "add":
                 from inventory.models import Supplier
                 ids = [int(x) for x in request.POST.getlist("rcp") if str(x).isdigit()]
-                out = rfq.add_recipients(req, Supplier.objects.filter(pk__in=ids).prefetch_related("contacts"))
+                sups = list(Supplier.objects.filter(pk__in=ids).prefetch_related("contacts"))
+                contacts = {}                 # кому саме з контактів фірми (вибір у рядку)
+                for s in sups:
+                    cid = request.POST.get(f"contact_{s.pk}")
+                    if str(cid or "").isdigit():
+                        c = next((c for c in s.contacts.all() if c.pk == int(cid) and c.email), None)
+                        if c is not None:
+                            contacts[s.pk] = c
+                out = rfq.add_recipients(req, sups, contacts)
                 msg = f"➕ Додано: {out['added']}"
                 if out["skipped"]:
                     msg += " · без email: " + ", ".join(out["skipped"])
