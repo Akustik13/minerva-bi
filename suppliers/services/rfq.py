@@ -209,10 +209,49 @@ _GREETED_RE = re.compile(r"\{(greeting|name|first_name)\}")
 
 TEAM = {"en": "team", "de": "Team", "uk": "колеги"}
 
+# слова посади, що потрапили в ім'я контакту («Anduin Chen Sales Representative») — у привітанні їх не треба
+_TITLE_WORDS = {
+    "sales", "representative", "rep", "manager", "mgr", "engineer", "director", "ceo", "cto", "coo", "cfo", "cmo",
+    "president", "vice", "vp", "purchasing", "purchase", "procurement", "buyer", "account", "accounts", "marketing",
+    "business", "development", "bd", "support", "technical", "tech", "specialist", "assistant", "officer", "owner",
+    "founder", "co-founder", "head", "lead", "leader", "consultant", "executive", "coordinator", "supervisor",
+    "general", "senior", "sr", "junior", "jr", "chief", "customer", "service", "services", "export", "import",
+    "international", "overseas", "trade", "foreign", "team", "department", "dept", "project", "product", "quality",
+    "qa", "qc", "admin", "administrator", "secretary", "agent", "partner", "operations", "logistics", "fae", "pm",
+    "vertrieb", "verkauf", "einkauf", "geschäftsführer", "geschaeftsfuehrer", "geschäftsführerin", "leiter", "leiterin",
+    "mitarbeiter", "mitarbeiterin", "inhaber", "inhaberin", "innendienst", "außendienst", "aussendienst", "technik",
+    "менеджер", "директор", "інженер", "керівник", "відділ", "продажів", "закупівель",
+}
+_NAME_CUT_RE = re.compile(r"\s+[-–—|/]\s+|[,;|(\[]")
+
+
+def person_name(name, position="") -> str:
+    """Ім'я контакту для привітання без посади: «Anduin Chen Sales Representative» → «Anduin Chen», «Wendy Wu -
+    Sales» → «Wendy Wu», ім'я, що закінчується посадою з картки, — без неї. Лише посада — порожньо."""
+    n = " ".join(str(name or "").split())
+    pos = " ".join(str(position or "").split())
+    if pos and len(n) > len(pos) and n.lower().endswith(pos.lower()):
+        n = n[:-len(pos)].strip(" -–—,|/")
+    n = _NAME_CUT_RE.split(n)[0].strip()
+    words = n.split()
+    out = []
+    for i, w in enumerate(words):
+        if w.lower().strip(".:") in _TITLE_WORDS and out and (
+                len(out) >= 2 or all(x.lower().strip(".:") in _TITLE_WORDS for x in words[i:])):
+            break
+        out.append(w)
+    if out and all(w.lower().strip(".:") in _TITLE_WORDS for w in out):
+        return ""
+    return " ".join(out)
+
+
+def contact_name(recipient) -> str:
+    c = getattr(recipient, "contact", None)
+    return person_name(c.name, c.position) if c is not None and c.name else ""
+
 
 def values_for(req, recipient) -> dict:
-    person = (recipient.contact.name if getattr(recipient, "contact", None) is not None and recipient.contact.name
-              else "").strip()
+    person = contact_name(recipient)
     name = person or recipient.supplier.name
     return {"greeting": greeting(req, recipient), "name": name,
             "first_name": person.split()[0] if person else TEAM.get(req.language, "team"),
@@ -262,8 +301,46 @@ def cc_for(req, recipient) -> list:
 
 def greeting(req, recipient) -> str:
     t = TEXTS.get(req.language, TEXTS["en"])
-    name = recipient.contact.name if recipient.contact_id and recipient.contact.name else ""
+    name = contact_name(recipient) if recipient.contact_id else ""
     return t["hello"].format(name=name) if name else t["hello_all"]
+
+
+# ── ✍️ Підпис скриньки ──
+
+def signature(account) -> dict:
+    """Підпис скриньки, як у «Написати» (підпис скриньки → профілю, {name}) → {text, html}; html — лише якщо підпис
+    з розміткою (лого, кольори); немає підпису — обидва порожні."""
+    if account is None:
+        return {"text": "", "html": ""}
+    try:
+        from email_assistant.mail_app import _signature
+        return _signature(account)
+    except Exception:  # noqa: BLE001 — лист піде й без підпису
+        logger.warning("rfq: signature failed", exc_info=True)
+        return {"text": "", "html": ""}
+
+
+def letter(account, body, quote="") -> tuple:
+    """(текст, html) листа з підписом скриньки — те саме, що піде, що видно в перегляді й що лягає в «Надіслані».
+    Підпис — після тексту (перед цитатою; «в кінці» в налаштуваннях скриньки — після неї). html — лише коли підпис
+    з розміткою, інакше '' (лист простим текстом, як раніше)."""
+    from django.utils.html import escape
+    sig = signature(account)
+    end = getattr(account, "signature_position", "after_reply") == "end"
+    sig_text = f"-- \n{sig['text']}" if sig["text"] else ""
+    parts = [body] + ([quote, sig_text] if end else [sig_text, quote])
+    text = "\n\n".join(x for x in parts if x)
+    html = ""
+    if sig["html"]:
+        def para(t):
+            return escape(t).replace("\n", "<br>")
+        quote_html = (f'<blockquote style="margin:0 0 0 6px;padding-left:8px;border-left:2px solid #ccc;color:#555">'
+                      f'{para(quote)}</blockquote>') if quote else ""
+        sig_html = f'<div>-- <br>{sig["html"]}</div>'
+        blocks = [f"<div>{para(body)}</div>"] + ([quote_html, sig_html] if end else [sig_html, quote_html])
+        html = ('<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px">' +
+                "<br>".join(b for b in blocks if b) + "</div>")
+    return text, html
 
 
 def pick_email(supplier, contact=None):
@@ -343,8 +420,10 @@ def send_test(req, recipient, user, to, attachments=()) -> dict:
     subject, body = render(req, recipient)
     subject = (TEST_PREFIX + subject)[:250]
     attachments = list(attachments)
+    text, html = letter(account, body)
     try:
-        result = SMTPClient(account).send(to_emails=to, subject=subject, body_text=body, attachments=attachments)
+        result = SMTPClient(account).send(to_emails=to, subject=subject, body_text=text, body_html=html,
+                                          attachments=attachments, signature=False)
     except Exception as e:  # noqa: BLE001
         result = {"ok": False, "error": str(e)}
     if not result.get("ok"):
@@ -355,7 +434,7 @@ def send_test(req, recipient, user, to, attachments=()) -> dict:
             "cc": cc_for(req, recipient) if real else addresses(req.cc), "files": [a["name"] for a in attachments]}
 
 
-def store_sent(account, result, to, cc, subject, body, attachments, reply_to=None):
+def store_sent(account, result, to, cc, subject, body, attachments, reply_to=None, body_html=""):
     """Копія надісланого листа в Minerva й гілка (так само, як лист з «Написати»), щоб відповідь лягла поруч."""
     from email_assistant.models import EmailMessage
     from email_assistant.sync import get_or_create_thread
@@ -368,7 +447,7 @@ def store_sent(account, result, to, cc, subject, body, attachments, reply_to=Non
         imap_folder_name=("minerva:" + result.get("message_id", ""))[:200],
         in_reply_to=(reply_to.message_id if reply_to else "")[:500], message_id=result.get("message_id", ""),
         subject=subject, from_email=account.email_address, from_name=account.display_name, to_emails=to,
-        cc_emails=cc, body_text=body, is_read=True, sent_at=now,
+        cc_emails=cc, body_text=body, body_html=body_html or "", is_read=True, sent_at=now,
         attachments=[{"name": a["name"], "content_type": a["content_type"], "size": len(a["content"])}
                      for a in attachments])
     thread.message_count = thread.messages.count()
@@ -411,9 +490,10 @@ def send(req, user, only=None) -> dict:
             continue
         cc = cc_for(req, r)
         subject, body = render(req, r)
+        text, html = letter(account, body)
         try:
-            result = SMTPClient(account).send(to_emails=[r.email], subject=subject, body_text=body, cc_emails=cc,
-                                              attachments=attachments)
+            result = SMTPClient(account).send(to_emails=[r.email], subject=subject, body_text=text, body_html=html,
+                                              cc_emails=cc, attachments=attachments, signature=False)
         except Exception as e:  # noqa: BLE001 — не впустити бронь
             result = {"ok": False, "error": str(e)}
         if not result.get("ok"):
@@ -423,7 +503,7 @@ def send(req, user, only=None) -> dict:
             continue
         sent = None
         try:
-            sent = store_sent(account, result, [r.email], cc, subject, body, attachments)
+            sent = store_sent(account, result, [r.email], cc, subject, text, attachments, body_html=html)
         except Exception:  # noqa: BLE001 — лист уже пішов
             logger.warning("rfq: store sent copy failed", exc_info=True)
         R.objects.filter(pk=r.pk).update(message_id=result.get("message_id", "")[:500], sent_message=sent,
@@ -511,13 +591,14 @@ def remind(recipient, user) -> dict:
     subject = prev.subject if prev is not None and prev.subject else render(req, recipient)[0]
     subject = subject if subject.lower().startswith(("re:", "aw:")) else f"Re: {subject}"
     quote = "\n".join("> " + ln for ln in ((prev.body_text if prev else req.body) or "").splitlines()[:60])
-    body = f"{greeting(req, recipient)}\n\n{t['remind'].format(code=req.code)}\n\n{t['bye']}\n\n{quote}"
-    result = SMTPClient(account).send(to_emails=[recipient.email], subject=subject, body_text=body,
-                                      reply_to_message=prev)
+    body, html = letter(account, f"{greeting(req, recipient)}\n\n{t['remind'].format(code=req.code)}\n\n{t['bye']}",
+                        quote)
+    result = SMTPClient(account).send(to_emails=[recipient.email], subject=subject, body_text=body, body_html=html,
+                                      reply_to_message=prev, signature=False)
     if not result.get("ok"):
         raise RFQError(str(result.get("error") or "помилка SMTP"))
     try:
-        store_sent(account, result, [recipient.email], [], subject, body, [], reply_to=prev)
+        store_sent(account, result, [recipient.email], [], subject, body, [], reply_to=prev, body_html=html)
     except Exception:  # noqa: BLE001
         logger.warning("rfq: store reminder failed", exc_info=True)
     R.objects.filter(pk=recipient.pk).update(reminded_at=timezone.now(), state=R.SENT)

@@ -42,6 +42,8 @@
   @media (max-width: 700px) { #rq-panel { left: 8px; right: 8px; width: auto; top: auto; height: 70vh; } }
   .rq-pv { border: 1px solid var(--border-strong, #ccc); border-radius: 6px; padding: 8px 12px; margin-top: 6px; background: var(--body-bg, #fff); }
   .rq-pv pre { white-space: pre-wrap; font-family: inherit; margin: 6px 0 0; }
+  .rq-pv-sig { margin-top: 4px; padding: 8px 12px; border: 1px dashed var(--border-strong, #ccc); border-radius: 6px; background: #fff; color: #222; }
+  .rq-pv-sig pre { margin: 0; }
   .rq-sup .rq-sent { opacity: .7; }
   .rq-filters { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: 4px 0 6px; }
   .rq-ms { position: relative; }
@@ -551,11 +553,26 @@
         pvMsg.textContent = '';
         if (j.error) { pvMsg.textContent = '⚠️ ' + j.error; return; }
         pvBox.innerHTML = ''; pvBox.hidden = false;
+        if (j.from) pvBox.appendChild(line('Від', j.from));
         pvBox.appendChild(line('Кому', j.to)); pvBox.appendChild(line('Копія', (j.cc || []).join(', ') || '—'));
         pvBox.appendChild(line('Тема', j.subject));
         if (j.files && j.files.length) pvBox.appendChild(line('Вкладення', j.files.join(', ')));
         var pre = document.createElement('pre'); pre.setAttribute('translate', 'no');
         pre.textContent = j.body || '(текст порожній — «🔄 Скласти текст з параметрів» або напишіть свій)'; pvBox.appendChild(pre);
+        // ✍️ підпис скриньки — додасться в кінці (той самий, що в «Написати»)
+        var sig = j.signature || {};
+        var sk = document.createElement('div'); sk.className = 'spf-muted'; sk.style.marginTop = '6px';
+        if (sig.html || sig.text) {
+          sk.textContent = '✍️ Підпис скриньки — додасться в кінці:'; pvBox.appendChild(sk);
+          var sb = document.createElement('div'); sb.className = 'rq-pv-sig'; sb.setAttribute('translate', 'no');
+          if (sig.html) sb.innerHTML = sig.html;                     // очищено на сервері (html_clean)
+          else { var sp = document.createElement('pre'); sp.textContent = sig.text; sb.appendChild(sp); }
+          pvBox.appendChild(sb);
+        } else {
+          sk.textContent = '⚠️ У скриньці немає підпису — лист піде без нього. ';
+          if (j.signature_url) { var sa = document.createElement('a'); sa.href = j.signature_url; sa.target = '_blank'; sa.textContent = '✍️ Додати підпис ↗'; sk.appendChild(sa); }
+          pvBox.appendChild(sk);
+        }
       }).catch(function(){ pvMsg.textContent = '⚠️ Немає зв’язку з сервером'; });
   });
   // ✉️ тестовий лист — лише на вказані адреси, як отримає вибраний у «👁» постачальник

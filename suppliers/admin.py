@@ -92,6 +92,23 @@ class GroupFilter(admin.SimpleListFilter):
         return queryset.filter(group=self.value()) if self.value() else queryset
 
 
+def _js(value) -> str:
+    """Значення для <script> (JSON без «<», «>», «&» — не закриє тег)."""
+    import json
+    return (json.dumps(value).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026"))
+
+
+def _letter_extras(account) -> dict:
+    """Звідки й з яким підписом піде лист (для 👁): from, signature {text, html — очищений}, як налаштувати підпис."""
+    from django.urls import NoReverseMatch
+    sig = rfq.signature(account)
+    try:
+        sig_url = reverse("admin:email_assistant_emailaccount_change", args=[account.pk]) if account else ""
+    except NoReverseMatch:
+        sig_url = ""
+    return {"from": account.email_address if account else "", "signature": sig, "signature_url": sig_url}
+
+
 def _recipient_rows(suppliers) -> list:
     """Постачальники для «➕ Додати отримувачів» з тим, кому піде лист (rfq.pick_email без запиту на кожного):
     f_email, f_contact (контакт або None), f_mails (контакти з email — вибір), f_country, f_country_name."""
@@ -171,6 +188,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             path("<int:pk>/edit/", view(self.form_view), name="suppliers_supplierrequest_edit"),
             path("<int:pk>/work/", view(self.work_view), name="suppliers_supplierrequest_work"),
             path("<int:pk>/action/", view(self.action_view), name="suppliers_supplierrequest_action"),
+            path("<int:pk>/letters/", view(self.letters_view), name="suppliers_supplierrequest_letters"),
             path("<int:pk>/recipient/<int:rid>/panel/", view(self.panel_view), name="suppliers_supplierrequest_panel"),
             path("preview/", view(self.preview_view), name="suppliers_supplierrequest_preview"),
             path("ai-letter/", view(self.ai_letter_view), name="suppliers_supplierrequest_ai_letter"),
@@ -245,8 +263,28 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         subject, body = rfq.render(draft, r)
         if not draft.body.strip():
             body = ""
+        account = rfq.account_for(request.user, draft)
         return JsonResponse({"to": r.email or "⚠️ немає email", "cc": rfq.cc_for(draft, r), "subject": subject,
-                             "body": body, "files": [f.name for f in self._form_files(request, req)]})
+                             "body": body, "files": [f.name for f in self._form_files(request, req)],
+                             **_letter_extras(account)})
+
+    def letters_view(self, request, pk):
+        """👁 Перед «📤 Надіслати» на сторінці запиту: лист кожному, кому ще не надіслано (?rid= — лише йому), —
+        тема, текст з привітанням, підпис скриньки, кому, копія, файли. Нічого не надсилає."""
+        req = self._request(request, pk, "change")
+        qs = req.recipients.filter(state__in=[SupplierRequestRecipient.PLANNED, SupplierRequestRecipient.FAILED]) \
+            .select_related("supplier", "contact")
+        if str(request.GET.get("rid") or "").isdigit():
+            qs = qs.filter(pk=int(request.GET["rid"]))
+        letters = []
+        for r in qs:
+            subject, body = rfq.render(req, r)
+            letters.append({"rid": r.pk, "supplier": r.supplier.name, "to": r.email or "⚠️ немає email",
+                            "contact": (r.contact.name if r.contact_id else ""), "cc": rfq.cc_for(req, r),
+                            "subject": subject, "body": body, "failed": r.state == SupplierRequestRecipient.FAILED})
+        account = rfq.account_for(request.user, req)
+        return JsonResponse({"letters": letters, "files": [f.name for f in req.files.all()],
+                             "empty_body": not (req.body or "").strip(), **_letter_extras(account)})
 
     def test_mail_view(self, request):
         """✉️ Тестовий лист собі / колезі: як отримає вибраний у «👁» постачальник (не вибрано — зразок
@@ -599,6 +637,8 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             overdue=rfq.waiting_overdue(req), can_change=self.has_change_permission(request, req),
             can_add=self.has_add_permission(request), review_left=rfq_copy.pending(req),
             review_must=", ".join(x["label"] for x in rfq_copy.pending(req) if x["level"] == rfq_copy.MUST),
+            review_must_json=_js(", ".join(x["label"] for x in rfq_copy.pending(req) if x["level"] == rfq_copy.MUST)),
+            letters_url_json=_js(reverse("admin:suppliers_supplierrequest_letters", args=[req.pk])),
             copies=list(req.copies.order_by("-created_at").values("pk", "code", "status")[:10]),
             states=[s for s in SupplierRequestRecipient.STATES if s[0] != SupplierRequestRecipient.PLANNED],
             more=more, more_mail=sum(1 for s in more if s.f_email), events=events, quantities=rfq.parse_quantities(req.quantities),

@@ -110,7 +110,7 @@
       {% if can_change or can_add %}<div class="spf-row">
         {% if can_change %}<a class="button" href="{% url 'admin:suppliers_supplierrequest_edit' req.pk %}">✏️ Змінити запит</a>{% endif %}
         {% if can_add %}<a class="button" href="{% url 'admin:suppliers_supplierrequest_new' %}?copy={{ req.pk }}" title="Новий запит на основі цього: що, параметри, кількості, файли, кому, лист — що зазвичай треба змінити, буде підсвічено. Нічого не створюється, поки не збережете.">📋 Копіювати як новий</a>{% endif %}
-        {% if can_change and planned %}<form method="post" action="{{ act }}" onsubmit="return {% if review_must %}confirm('Після копіювання ще не змінено й не перевірено: {{ review_must|escapejs }}. Надіслати так?') && {% endif %}confirm('Надіслати запит отримувачам, яким ще не надіслано ({{ planned }})?')">{% csrf_token %}<input type="hidden" name="do" value="send"><button type="submit" class="default">📤 Надіслати ({{ planned }})</button></form>{% endif %}
+        {% if can_change and planned %}<form method="post" action="{{ act }}" class="rw-send">{% csrf_token %}<input type="hidden" name="do" value="send"><button type="submit" class="default" title="Спершу покаже лист кожному — надішле після «📤 Надіслати» у вікні">📤 Надіслати ({{ planned }})</button></form>{% endif %}
       </div>{% endif %}
     </div>
     {% if req.copied_from or copies %}<div class="spf-muted" style="margin-top:4px">{% if req.copied_from %}📋 Копія запиту <a href="{% url 'admin:suppliers_supplierrequest_work' req.copied_from.pk %}" translate="no">{{ req.copied_from.code }}</a>{% endif %}{% if req.copied_from and copies %} · {% endif %}{% if copies %}📋 На його основі: {% for c in copies %}<a href="{% url 'admin:suppliers_supplierrequest_work' c.pk %}" translate="no">{{ c.code }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}</div>{% endif %}
@@ -188,7 +188,7 @@
         <td>{% if row.shipping_text %}{{ row.shipping_text }} {{ r.currency }}{% elif row.priced %}<span class="spf-muted">не вказано</span>{% else %}—{% endif %}</td>
         <td style="white-space:nowrap">{% if can_change %}
           {% if r.state == "planned" or r.state == "failed" %}
-            <form method="post" action="{{ act }}" style="display:inline">{% csrf_token %}<input type="hidden" name="rid" value="{{ r.pk }}"><button type="submit" name="do" value="send_one" class="button" title="Надіслати лише йому">📤</button><button type="submit" name="do" value="remove" class="button" title="Прибрати з запиту">✕</button></form>
+            <form method="post" action="{{ act }}" style="display:inline">{% csrf_token %}<input type="hidden" name="rid" value="{{ r.pk }}"><button type="submit" name="do" value="send_one" class="button rw-send-one" data-rid="{{ r.pk }}" title="Показати лист і надіслати лише йому">📤</button><button type="submit" name="do" value="remove" class="button" title="Прибрати з запиту">✕</button></form>
           {% else %}
             <button type="button" class="button" onclick="document.getElementById('rq-{{ r.pk }}').classList.toggle('on')" title="Внести або виправити пропозицію вручну">✏️</button>
             {% if r.thread_id or r.reply_message_id %}<button type="button" class="button" data-rw-ai="{{ r.pk }}" title="AI прочитає відповідь (лист і файли) й заповнить ціни за кількістю, разові витрати, що входить, строк, умови">🧠</button>{% endif %}
@@ -435,4 +435,108 @@
   }
 })();
 </script>
+{% if can_change %}
+<dialog id="rw-pv" class="rw-pv" aria-labelledby="rw-pv-h">
+  <div class="rw-pv-head"><b id="rw-pv-h">👁 Перевірте лист перед надсиланням</b><button type="button" class="button" data-pv-close aria-label="Закрити">✕</button></div>
+  <div id="rw-pv-warn"></div>
+  <div class="rw-pv-who" id="rw-pv-who"></div>
+  <div class="rw-pv-mail" id="rw-pv-mail"></div>
+  <div class="rw-pv-foot">
+    <span class="spf-muted" id="rw-pv-note"></span>
+    <button type="button" class="button" data-pv-close>Скасувати</button>
+    <button type="button" class="default" id="rw-pv-send">📤 Надіслати</button>
+  </div>
+</dialog>
+<style>
+  .rw-pv { width: min(860px, 96vw); max-height: 90vh; border: 1px solid var(--border-strong, #ccc); border-radius: 10px; padding: 0; background: var(--body-bg, #fff); color: var(--body-fg, #222); }
+  .rw-pv::backdrop { background: rgba(0, 0, 0, .45); }
+  .rw-pv-head, .rw-pv-foot { display: flex; align-items: center; gap: 8px; padding: 10px 14px; }
+  .rw-pv-head { justify-content: space-between; border-bottom: 1px solid var(--border-strong, #ddd); }
+  .rw-pv-foot { justify-content: flex-end; border-top: 1px solid var(--border-strong, #ddd); position: sticky; bottom: 0; background: var(--body-bg, #fff); }
+  .rw-pv-foot .spf-muted { margin-right: auto; }
+  #rw-pv-warn > div { margin: 8px 14px 0; }
+  .rw-pv-who { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 14px 0; }
+  .rw-pv-who button.on { outline: 2px solid var(--primary, #5b8def); }
+  .rw-pv-mail { padding: 8px 14px 12px; overflow: auto; max-height: calc(90vh - 190px); }
+  .rw-pv-mail .rw-pv-k { color: var(--text-muted, #888); display: inline-block; min-width: 70px; }
+  .rw-pv-mail pre { white-space: pre-wrap; font-family: inherit; margin: 8px 0 0; padding: 10px 12px; border: 1px solid var(--border-strong, #ddd); border-radius: 6px; background: var(--darkened-bg, rgba(127,127,127,.05)); }
+  .rw-pv-sig { margin-top: 0; padding: 8px 12px; border: 1px dashed var(--border-strong, #ccc); border-radius: 6px; background: #fff; color: #222; }
+  .rw-pv-sig-k { font-size: 12px; color: var(--text-muted, #888); margin-top: 8px; }
+</style>
+<script>
+(function(){
+  var dlg = document.getElementById('rw-pv');
+  if (!dlg || typeof dlg.showModal !== 'function') return;          // старий браузер — як раніше, без вікна
+  var url = {{ letters_url_json|safe }};
+  var reviewMust = {{ review_must_json|safe }};
+  var who = document.getElementById('rw-pv-who'), mail = document.getElementById('rw-pv-mail'),
+      warn = document.getElementById('rw-pv-warn'), note = document.getElementById('rw-pv-note'),
+      sendBtn = document.getElementById('rw-pv-send');
+  var pending = null;                                               // яку форму надіслати після «📤 Надіслати»
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function line(k, v) { var d = el('div'); d.appendChild(el('span', 'rw-pv-k', k)); var s = el('span', null, v); s.setAttribute('translate', 'no'); d.appendChild(s); return d; }
+  function show(data, i) {
+    var L = data.letters[i];
+    who.querySelectorAll('button').forEach(function(b, j){ b.classList.toggle('on', j === i); });
+    mail.innerHTML = '';
+    mail.appendChild(line('Від', data.from || '—'));
+    mail.appendChild(line('Кому', L.to + (L.contact ? ' (' + L.contact + ')' : '')));
+    mail.appendChild(line('Копія', (L.cc || []).join(', ') || '—'));
+    mail.appendChild(line('Тема', L.subject));
+    mail.appendChild(line('Файли', (data.files || []).join(', ') || '—'));
+    var body = el('pre', null, L.body || '(порожній текст)'); body.setAttribute('translate', 'no'); mail.appendChild(body);
+    var sig = data.signature || {};
+    if (sig.html || sig.text) {
+      mail.appendChild(el('div', 'rw-pv-sig-k', '✍️ Підпис скриньки — додасться в кінці:'));
+      var box = el('div', 'rw-pv-sig'); box.setAttribute('translate', 'no');
+      if (sig.html) box.innerHTML = sig.html;                       // очищено на сервері (html_clean)
+      else { box.appendChild(el('pre', null, sig.text)); box.firstChild.style.cssText = 'margin:0;border:0;padding:0;background:none'; }
+      mail.appendChild(box);
+    }
+  }
+  function open(form, rid) {
+    pending = form;
+    who.innerHTML = ''; mail.innerHTML = ''; warn.innerHTML = ''; note.textContent = '⏳ Складаю лист…';
+    sendBtn.disabled = true;
+    dlg.showModal();
+    fetch(url + (rid ? '?rid=' + encodeURIComponent(rid) : ''), {credentials: 'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        var n = (data.letters || []).length;
+        if (!n) { note.textContent = 'Немає кому надсилати — оновіть сторінку.'; return; }
+        if (data.empty_body) warn.appendChild(el('div', 'spf-bad', '⚠️ Порожній текст листа — спершу «✏️ Змінити запит».'));
+        if (reviewMust) warn.appendChild(el('div', 'spf-warn', '📋 Після копіювання ще не змінено й не перевірено: ' + reviewMust + '.'));
+        var sig = data.signature || {};
+        if (!sig.html && !sig.text) {
+          var w = el('div', 'spf-warn', '⚠️ У скриньці ' + (data.from || '') + ' немає підпису — лист піде без нього. ');
+          if (data.signature_url) { var a = el('a', null, '✍️ Додати підпис ↗'); a.href = data.signature_url; a.target = '_blank'; w.appendChild(a); }
+          warn.appendChild(w);
+        }
+        if (n > 1) data.letters.forEach(function(L, i){
+          var b = el('button', 'button', L.supplier + (L.failed ? ' ⚠️' : '')); b.type = 'button'; b.setAttribute('translate', 'no');
+          b.addEventListener('click', function(){ show(data, i); });
+          who.appendChild(b);
+        });
+        show(data, 0);
+        note.textContent = n > 1 ? 'Кожен отримає свій лист (своє привітання) — перегляньте будь-кого вгорі.' : '';
+        sendBtn.textContent = '📤 Надіслати' + (n > 1 ? ' (' + n + ')' : '');
+        sendBtn.disabled = !!data.empty_body;
+      })
+      .catch(function(){ note.textContent = '⚠️ Не вдалося скласти лист — спробуйте ще раз.'; });
+  }
+  dlg.querySelectorAll('[data-pv-close]').forEach(function(b){ b.addEventListener('click', function(){ dlg.close(); pending = null; }); });
+  sendBtn.addEventListener('click', function(){
+    var p = pending; if (!p) return;
+    sendBtn.disabled = true; note.textContent = '⏳ Надсилаю…';
+    if (p.extra) { var h = el('input'); h.type = 'hidden'; h.name = p.extra[0]; h.value = p.extra[1]; p.form.appendChild(h); }
+    p.form.submit();
+  });
+  var top = document.querySelector('form.rw-send');
+  if (top) top.addEventListener('submit', function(e){ e.preventDefault(); open({form: top}); });
+  document.querySelectorAll('.rw-send-one').forEach(function(b){
+    b.addEventListener('click', function(e){ e.preventDefault(); open({form: b.form, extra: ['do', 'send_one']}, b.getAttribute('data-rid')); });
+  });
+})();
+</script>
+{% endif %}
 {% endblock %}

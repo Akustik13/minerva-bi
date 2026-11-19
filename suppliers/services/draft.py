@@ -80,9 +80,16 @@ def _contact_exists(supplier, email, name) -> bool:
 def add_contact(supplier, data: dict, source="mail", user=None, media=None, message=None):
     """Контактна особа з чернетки (якщо ще немає такої) → (контакт | None, створено?)."""
     from suppliers.models import SupplierContact, SupplierEvent
+    from suppliers.services.rfq import person_name
     name, email = (data.get("contact_name") or "").strip(), match.addr(data.get("contact_email"))
     if not (name or email):
         return None, False
+    # посада в імені («Anduin Chen Sales Representative», з підпису / візитки) → ім'я й посада окремо
+    clean = person_name(name, data.get("contact_position"))
+    if clean and clean != " ".join(name.split()):
+        if not (data.get("contact_position") or "").strip():
+            data = dict(data, contact_position=" ".join(name.split())[len(clean):].strip(" -–—,;|/()[]"))
+        name = clean
     if _contact_exists(supplier, email, name):
         c = (supplier.contacts.filter(email__iexact=email).first() if email else None) or \
             (supplier.contacts.filter(name__iexact=name).first() if name else None)
