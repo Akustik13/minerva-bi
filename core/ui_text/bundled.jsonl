@@ -7133,6 +7133,7 @@
 {"uk": "Діагностика", "en": "Diagnostics", "de": "Diagnose"}
 {"uk": "Діагностика AI Tools", "en": "AI Tools diagnostics", "de": "Diagnose der AI Tools"}
 {"uk": "Діаграма Minerva", "en": "Minerva chart", "de": "Minerva-Diagramm"}
+{"uk": "Діаграма на весь екран — Esc повертає", "en": "Chart full screen — Esc returns", "de": "Diagramm im Vollbild — Esc kehrt zurück"}
 {"uk": "Діаграма потоку даних", "en": "Data flow diagram", "de": "Datenflussdiagramm"}
 {"uk": "Діаграма спрямованості в безлунній камері", "en": "Radiation pattern in the anechoic chamber", "de": "Richtdiagramm in der Absorberkammer"}
 {"uk": "Діаграма — як зараз на екрані (масштаб, «Коротко / Детально»), на білому тлі. «✉️ Надіслати", "en": "The chart — as on screen now (zoom, «Brief / Detailed»), on a white background. «✉️ Send", "de": "Das Diagramm — wie jetzt auf dem Bildschirm (Zoom, «Kurz / Detailliert»), auf weißem Hintergrund. «✉️ Per"}
@@ -8588,6 +8589,7 @@
 {"uk": "Згоду ще не підтверджено — це роблять у вікні запису перед ▶.", "en": "Consent not confirmed yet — this is done in the recording window before ▶.", "de": "Einwilligung noch nicht bestätigt — das geschieht im Aufnahmefenster vor ▶."}
 {"uk": "Згорнути", "en": "Collapse", "de": "Einklappen"}
 {"uk": "Згорнути / розгорнути параметри", "en": "Collapse / expand parameters", "de": "Parameter ein- / ausklappen"}
+{"uk": "Згорнути / розгорнути пропозиції", "en": "Collapse / expand the proposals", "de": "Vorschläge ein- / ausklappen"}
 {"uk": "Згорнути всі", "en": "Collapse all", "de": "Alle einklappen"}
 {"uk": "Згорнути кроки", "en": "Collapse the steps", "de": "Schritte einklappen"}
 {"uk": "Згорнути меню до значків", "en": "Collapse the menu to icons", "de": "Menü auf Symbole reduzieren"}
@@ -10647,6 +10649,7 @@
 {"uk": "На Telegram ID з «Мої налаштування» (бот — «Налаштування → Сповіщення»).", "en": "To the Telegram ID from «My settings» (bot — «Settings → Notifications»).", "de": "An die Telegram-ID aus «Meine Einstellungen» (Bot — «Einstellungen → Benachrichtigungen»)."}
 {"uk": "На developer.dhl.com перевір статус API у своєму App: має бути Aktiviert, а не Pending.", "en": "On developer.dhl.com check the API status in your App: it must be Aktiviert, not Pending.", "de": "Prüfen Sie auf developer.dhl.com den API-Status in Ihrer App: Er muss Aktiviert lauten, nicht Pending."}
 {"uk": "На supplier.digikey.com не налаштовано жодного способу доставки.", "en": "No shipping method is set up on supplier.digikey.com.", "de": "Auf supplier.digikey.com ist keine Versandart eingerichtet."}
+{"uk": "На весь екран", "en": "Full screen", "de": "Vollbild"}
 {"uk": "На візитці немає ні імені, ні фірми, ні email — заповніть поля вище.", "en": "The business card has no name, company or e-mail — fill in the fields above.", "de": "Auf der Visitenkarte gibt es weder Name, Firma noch E-Mail — füllen Sie die Felder oben aus."}
 {"uk": "На головну", "en": "Go to home page", "de": "Zur Startseite"}
 {"uk": "На екранах вужче 768px з'являється кнопка", "en": "On screens narrower than 768px a button appears", "de": "Auf Bildschirmen schmaler als 768px erscheint die Schaltfläche"}
@@ -17437,6 +17440,7 @@
 {"uk": "Тягніть смугу чи ◆ — нові дати, край смуги — тривалість · клік — вікно кроку · правий клік — меню", "en": "Drag a bar or ◆ — new dates, the bar edge — duration · click — step window · right-click — menu", "de": "Balken oder ◆ ziehen — neue Daten, Balkenrand — Dauer · Klick — Schrittfenster · Rechtsklick — Menü"}
 {"uk": "Тягніть — нові дати · подвійний клік — тягнути початок і кінець · правий клік — меню", "en": "Drag — new dates · double-click — drag start and end · right-click — menu", "de": "Ziehen — neue Termine · Doppelklick — Anfang und Ende ziehen · Rechtsklick — Menü"}
 {"uk": "Тягніть — нові дати · правий клік — меню", "en": "Drag — new dates · right-click — menu", "de": "Ziehen — neue Daten · Rechtsklick — Menü"}
+{"uk": "Тягніть — ширша колонка «Крок» · подвійний клік — під найдовшу назву", "en": "Drag to widen the «Step» column · double-click to fit the longest name", "de": "Ziehen — Spalte «Schritt» breiter · Doppelklick — passend zum längsten Namen"}
 {"uk": "Ті самі посилання, що для магазинів, або свої правила саме для DigiKey.", "en": "The same links as for the web shops, or own rules specifically for DigiKey.", "de": "Dieselben Links wie für die Webshops oder eigene Regeln speziell für DigiKey."}
 {"uk": "Ті, хто відповів на старий запит", "en": "Those who answered the old request", "de": "Diejenigen, die auf die alte Anfrage geantwortet haben"}
 {"uk": "Ті, хто надіслав ціну", "en": "Those who sent a price", "de": "Diejenigen, die einen Preis geschickt haben"}
@@ -18833,6 +18837,7 @@
 {"uk": "Ще рано (остання синхронізація {0} хв тому, інтервал {1} хв). Наступна через ~{2} хв.", "en": "Too early (last sync {0} min ago, interval {1} min). Next in ~{2} min.", "de": "Noch zu früh (letzte Synchronisierung vor {0} Min., Intervall {1} Min.). Nächste in ca. {2} Min."}
 {"uk": "Ще рано — інтервал перевірки не минув.", "en": "Too early — the check interval has not passed.", "de": "Zu früh — das Prüfintervall ist noch nicht abgelaufen."}
 {"uk": "Ще розділи", "en": "More sections", "de": "Weitere Bereiche"}
+{"uk": "Ще тези наради: {0}", "en": "More meeting points: {0}", "de": "Weitere Punkte der Besprechung: {0}"}
 {"uk": "Ще фото до візитки", "en": "Extra photo for a business card", "de": "Zusatzfoto zur Visitenkarte"}
 {"uk": "Ще фото до візиток", "en": "Extra photos for business cards", "de": "Zusatzfotos zu Visitenkarten"}
 {"uk": "Ще фото цієї групи ({0})", "en": "More photos in this group ({0})", "de": "Weitere Fotos dieser Gruppe ({0})"}
@@ -21236,6 +21241,7 @@
 {"uk": "на бланку Commercial Invoice", "en": "on the Commercial Invoice letterhead", "de": "auf dem Briefbogen der Commercial Invoice"}
 {"uk": "на бланку Commercial Invoice (логотип, реквізити й таблиця адрес — з бланка; бланк CI змінили — Angebot теж)", "en": "on the Commercial Invoice letterhead (logo, company details and address table come from the letterhead; if the CI letterhead changes, so does the Angebot)", "de": "auf dem Commercial-Invoice-Briefbogen (Logo, Firmenangaben und Adresstabelle stammen vom Briefbogen; wird der CI-Briefbogen geändert, ändert sich auch das Angebot)"}
 {"uk": "на бланку Commercial Invoice — логотип, реквізити, печатка й підпис", "en": "on the Commercial Invoice letterhead — logo, company details, stamp and signature", "de": "auf dem Briefbogen der Commercial Invoice — Logo, Firmendaten, Stempel und Unterschrift"}
+{"uk": "на діаграмі — пунктиром кольором наради, у PDF — сторінка «що й чому змінюється», в Excel — аркуш змін, у листі — рядок, що це ще пропозиції; зніміть галочку — план без пропозицій", "en": "on the chart — dashed in the meeting's colour, in the PDF — a page «what changes and why», in Excel — a sheet of changes, in the e-mail — a line saying these are still proposals; untick — the plan without proposals", "de": "im Diagramm — gestrichelt in der Farbe der Besprechung, im PDF — eine Seite «was sich ändert und warum», in Excel — ein Blatt mit Änderungen, in der E-Mail — ein Satz, dass es noch Vorschläge sind; Häkchen entfernen — Plan ohne Vorschläge"}
 {"uk": "на запит", "en": "on request", "de": "auf Anfrage"}
 {"uk": "на картці замовлення показуватиме рекомендовану коробку та розраховану вагу посилки автоматично.", "en": "the order card will automatically show the recommended box and the calculated parcel weight.", "de": "die Auftragskarte zeigt automatisch den empfohlenen Karton und das berechnete Paketgewicht an."}
 {"uk": "на кожен новий такий лист", "en": "for every new email of this kind", "de": "bei jeder neuen E-Mail dieser Art"}
@@ -22575,6 +22581,7 @@
 {"uk": "пункт", "en": "item", "de": "Punkt"}
 {"uk": "пункти", "en": "items", "de": "Punkte"}
 {"uk": "пунктир — зв'язок за значенням або через API (не зовнішній ключ)", "en": "dashed — a relation by value or via API (not a foreign key)", "de": "gestrichelt — Beziehung über den Wert oder per API (kein Fremdschlüssel)"}
+{"uk": "пунктиром кольором наради — пропозиції з наради, ✓ / ✕ угорі", "en": "dashed in the meeting's colour — proposals from the meeting, ✓ / ✕ above", "de": "gestrichelt in der Farbe der Besprechung — Vorschläge aus der Besprechung, ✓ / ✕ oben"}
 {"uk": "пунктів", "en": "items", "de": "Punkte"}
 {"uk": "пунктів — спершу приберіть один.", "en": "items — remove one first.", "de": "Einträge — entfernen Sie zuerst einen."}
 {"uk": "під це замовлення вже враховано {0}", "en": "{0} already accounted for this order", "de": "für diesen Auftrag sind bereits {0} berücksichtigt"}
@@ -23081,6 +23088,7 @@
 {"uk": "те, що після копіювання зазвичай треба змінити", "en": "what usually needs changing after copying", "de": "was nach dem Kopieren meist geändert werden muss"}
 {"uk": "теж працюють — ступені рядками в одній комірці). Мова підписів", "en": "also work — price breaks as rows in one cell). The language of the labels", "de": "funktionieren ebenfalls — Staffeln als Zeilen in einer Zelle). Die Sprache der Beschriftungen"}
 {"uk": "теза цієї наради: лишається тільки тут, у проєкт і календар нічого не додається", "en": "a point of this meeting: stays only here, nothing is added to the project or the calendar", "de": "ein Punkt dieser Besprechung: bleibt nur hier, ins Projekt und in den Kalender wird nichts übernommen"}
+{"uk": "тези наради під кожною зміною", "en": "meeting points under each change", "de": "Punkte der Besprechung unter jeder Änderung"}
 {"uk": "текст", "en": "text", "de": "Text"}
 {"uk": "текст збережено в браузері.", "en": "text saved in the browser.", "de": "Text im Browser gespeichert."}
 {"uk": "текст між", "en": "текст між", "de": "текст між"}
@@ -23543,6 +23551,7 @@
 {"uk": "цей ПК", "en": "this PC", "de": "dieser PC"}
 {"uk": "цей курс", "en": "this rate", "de": "dieser Kurs"}
 {"uk": "цим ключем ще ніхто не звертався", "en": "nobody has used this key yet", "de": "dieser Schlüssel wurde noch von niemandem verwendet"}
+{"uk": "цитати з підсумку наради — для своїх; клієнту зазвичай досить «чому»", "en": "quotes from the meeting summary — for your team; for the customer «why» is usually enough", "de": "Zitate aus der Zusammenfassung — fürs Team; dem Kunden genügt meist das «Warum»"}
 {"uk": "цитати прибрано в {0}", "en": "quotes removed in {0}", "de": "Zitate entfernt in {0}"}
 {"uk": "цього конкретного", "en": "this specific", "de": "diesen bestimmten"}
 {"uk": "цього ступеня не буде", "en": "this price break will not exist", "de": "diese Staffel entfällt"}

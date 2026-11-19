@@ -666,3 +666,27 @@ html[data-theme="light"] .pjc, html[data-theme="hc-light"] .pjc {
   background: color-mix(in srgb, var(--pjr-prop) 22%, transparent); border: 1px solid var(--pjr-prop); }
 .pjr2-several .pjr2-row { border-left: 3px solid var(--pjr-prop); padding-left: 8px; }
 .pjr2-then { opacity: .7; margin: 0 2px; }
+/* ▸ / ▾ блок пропозицій звірки з нарадою, ще тези під зміною */
+.pjr2-box > summary { cursor: pointer; list-style: none; }
+.pjr2-box > summary::-webkit-details-marker { display: none; }
+.pjr2-box > summary::before { content: "▾"; display: inline-block; width: 1em; opacity: .7; }
+.pjr2-box:not([open]) > summary::before { content: "▸"; }
+.pjr2-more > summary { cursor: pointer; font-size: 12.5px; margin-top: 2px; opacity: .85; }
+.pjc-legend .lg-prop { display: inline-block; width: 22px; height: 10px; margin-right: 4px; vertical-align: middle;
+  border: 1.6px dashed var(--pjr-m1); border-radius: 3px; background: color-mix(in srgb, var(--pjr-m1) 18%, transparent); }
+/* ⛶ діаграма на весь екран (pj.js toggleFull): панель «📅 План» поверх сторінки, лише діаграма з її кнопками */
+.pjc-pane.pj-full { position: fixed; inset: 0; z-index: 10000; margin: 0; padding: 10px 16px 16px; overflow: auto;
+  background: var(--body-bg, var(--bg-card, #fff)); box-sizing: border-box; }
+.pjc-pane.pj-full > #pj-replan, .pjc-pane.pj-full > #pj-plan-history,
+.pjc-pane.pj-full > .pjc-ptools:not(.pjg-views) { display: none; }
+.pjc-pane.pj-full > .pjg-views { position: sticky; top: -10px; z-index: 2; padding: 6px 0; background: inherit; }
+html.pj-full-on, html.pj-full-on body { overflow: hidden; }
+/* 🔍 повна назва кроку під курсором */
+.pjg-nametip { position: fixed; z-index: 10035; max-width: min(560px, 90vw); padding: 5px 9px; border-radius: 7px;
+  font-size: 13px; line-height: 1.35; pointer-events: none; color: var(--body-fg, #1c2128);
+  background: var(--bg-card, #fff); border: 1px solid var(--border-strong, #d0d7de); box-shadow: 0 3px 12px rgba(0, 0, 0, .22); }
+/* ↔ межа колонки «Крок» класичної діаграми */
+.pjg2-colsz { fill: var(--accent, #0969da); opacity: .25; cursor: col-resize; }
+.pjg2-colsz:hover, html.pjg2-resizing .pjg2-colsz { opacity: .8; }
+.pjg2-colln { stroke: var(--border-strong, #d0d7de); stroke-width: 1; pointer-events: none; }
+html.pjg2-resizing, html.pjg2-resizing * { cursor: col-resize !important; user-select: none; }

@@ -54,6 +54,12 @@ def _gd(v):
         return None
 
 
+def has_ghosts(gh) -> bool:
+    """Є пропозиції звірки з нарадою, які видно на діаграмі."""
+    gh = gh or {}
+    return bool(gh.get("steps") or gh.get("added") or gh.get("phases") or gh.get("new_phases"))
+
+
 def _mcls(g) -> str:
     """Клас кольору наради пропозиції (pj.css .pjm-1 … .pjm-5)."""
     m = (g or {}).get("m")
@@ -394,6 +400,7 @@ def classic_data(project, plan, today=None, ghosts=None) -> dict:
     if ghosts:
         out, extra = _classic_ghosts(out, ghosts)
     return {"rows": out, "today": today.isoformat(), "due": _iso(project.due_date),
+            "props": (ghosts or {}).get("meetings") or [] if has_ghosts(ghosts) else [],
             "start": _iso(min([c.start for c in plan.steps if c.start] + extra or [today])),
             "end": _iso(max([c.end for c in plan.steps if c.end] + ([project.due_date] if project.due_date else [])
                             + extra + [today]))}

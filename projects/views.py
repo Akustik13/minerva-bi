@@ -410,7 +410,8 @@ def export_names_view(request, pk):
 @require_POST
 def export_view(request, pk):
     """📤 Діаграма проєкту: multipart {image (PNG з браузера), what plan|timeline|chain, lang de|en|uk,
-    formats pdf,png,xlsx, table, send} — право перегляду. send — чернетка листа у власній скриньці з файлами
+    formats pdf,png,xlsx, table, send, props (📅 пропозиції з наради — розділ PDF, аркуш Excel, рядок листа; лише
+    своя звірка), quotes (ще й тези наради)} — право перегляду. send — чернетка листа у власній скриньці з файлами
     (→ {compose}); інакше — один файл (pdf або xlsx) на завантаження."""
     from django.http import HttpResponse
 
@@ -432,19 +433,22 @@ def export_view(request, pk):
                                          "Картинка завелика — зменште масштаб діаграми")
             png = export.check_png(upload.read())
         names = export.clean_names(project, request.POST.get("names")) if what == "plan" else {}
+        props = (export.proposals(project, request.user, lang, names, bool(request.POST.get("quotes")))
+                 if what == "plan" and request.POST.get("props") else None)          # 📅 пропозиції з наради
         files = []
         for f in formats:
             if f == "pdf":
                 files.append((export.file_name(project, what, "pdf"),
                               export.pdf(project, what, lang, png, bool(request.POST.get("table")),
-                                         titled=bool(request.POST.get("titled")), names=names), "application/pdf"))
+                                         titled=bool(request.POST.get("titled")), names=names, props=props),
+                              "application/pdf"))
             elif f == "png":
                 files.append((export.file_name(project, what, "png"), png, "image/png"))
             else:
-                files.append((export.file_name(project, what, "xlsx"), export.xlsx(project, lang, names=names),
+                files.append((export.file_name(project, what, "xlsx"), export.xlsx(project, lang, names=names, props=props),
                               "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
         if request.POST.get("send"):
-            return JsonResponse({"ok": True, "compose": export.mail(request.user, project, what, lang, files)})
+            return JsonResponse({"ok": True, "compose": export.mail(request.user, project, what, lang, files, props=props)})
     except export.ExportError as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=400)
     except Exception as e:                                   # причина — у вікні експорту й у журналі сервера

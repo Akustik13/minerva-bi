@@ -46,6 +46,32 @@ L = {
            "subject": "{what} {code} · {name} (станом на {date})",
            "body": "Добрий день!\n\nНадсилаю {what_lc} {code} · {name} (станом на {date}).\n\n"},
 }
+# 📅 Пропозиції звірки плану з нарадою (projects/plan_review.py) — окремим розділом PDF, аркушем Excel і рядком листа
+P = {
+    "de": {"title": "Vorgeschlagene Änderungen aus der Besprechung", "titles": "Vorgeschlagene Änderungen aus den Besprechungen",
+           "meeting": "Besprechung", "step": "Schritt / Phase", "change": "Änderung", "why": "Begründung",
+           "dates": "Termine", "status": "Status", "name": "Name", "who": "wer", "phase": "Phase", "after": "nach",
+           "new_step": "neuer Schritt", "new_ms": "neuer Meilenstein", "remove": "entfällt", "new_phase": "neue Phase",
+           "phase_remove": "Phase entfällt", "sheet": "Änderungen",
+           "note": "Gestrichelt im Diagramm: Vorschläge aus der Besprechung vom {days} — noch nicht übernommen.",
+           "mail": "Gestrichelt markierte Termine im Diagramm sind Vorschläge aus unserer Besprechung vom {days} — noch nicht verbindlich.\n\n"},
+    "en": {"title": "Proposed changes from the meeting", "titles": "Proposed changes from the meetings",
+           "meeting": "Meeting", "step": "Step / phase", "change": "Change", "why": "Reason",
+           "dates": "dates", "status": "status", "name": "name", "who": "who", "phase": "phase", "after": "after",
+           "new_step": "new step", "new_ms": "new milestone", "remove": "dropped", "new_phase": "new phase",
+           "phase_remove": "phase dropped", "sheet": "Changes",
+           "note": "Dashed in the chart: proposals from the meeting on {days} — not applied yet.",
+           "mail": "Dates shown dashed in the chart are proposals from our meeting on {days} — not final yet.\n\n"},
+    "uk": {"title": "Запропоновані зміни з наради", "titles": "Запропоновані зміни з нарад",
+           "meeting": "Нарада", "step": "Крок / фаза", "change": "Зміна", "why": "Чому",
+           "dates": "дати", "status": "стан", "name": "назва", "who": "хто робить", "phase": "фаза", "after": "після",
+           "new_step": "новий крок", "new_ms": "нова віха", "remove": "прибрати", "new_phase": "нова фаза",
+           "phase_remove": "прибрати фазу", "sheet": "Зміни",
+           "note": "Пунктиром на діаграмі — пропозиції з наради {days}, ще не застосовані.",
+           "mail": "Пунктиром на діаграмі позначено пропозиції з нашої наради {days} — ще не остаточно.\n\n"},
+}
+MEETING_HEX = {1: "8250DF", 2: "0B8C96", 3: "BC4C00", 4: "BF3989", 5: "8A6A2E"}     # як pj.css --pjr-m1…m5 (світла)
+MEETING_TINT = {1: "EFE7FB", 2: "DFF2F3", 3: "F8E6D9", 4: "F6E1EE", 5: "EFE8DD"}
 IMAGE_MAX = 15 * 1024 * 1024
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 MAX_WEEKS = 104
@@ -221,6 +247,89 @@ def rows(project, lang, names=None) -> list:
     return out
 
 
+def proposals(project, user, lang, names=None, quotes=False) -> dict | None:
+    """Зміни звірки з нарадою, що чекають ✓ (лише звірка цієї людини — наради особисті) мовою документа:
+    {meetings [{tag, m, day}], days — «18.11.2026» / «17.11.2026, 18.11.2026», rows [{tag, m, day, title, change, why,
+    quotes}]}; немає — None. quotes — ще й тези наради (за замовчуванням ні: лише «чому»)."""
+    from . import plan_review
+    from .models import PlanReview
+    review = plan_review.active(project, user)
+    if review is None or review.status != PlanReview.READY:
+        return None
+    pending = [c for c in review.changes.all() if c.status in plan_review.OPEN_STATES]
+    if not pending:
+        return None
+    p, t, name = P[lang], L[lang], names_in(lang, names)
+    objs, marks = plan_review.meeting_marks(review)
+    titles = plan_review._names(review)
+    refs = review.refs or {}
+    rows = []
+    for ch in pending:
+        m, tag = plan_review.change_mark(ch, review, objs, marks)
+        mt = plan_review.change_meeting(ch, review, objs)
+        f, b = (ch.data or {}).get("set") or {}, ch.before or {}
+        title = b.get("title") or b.get("name") or f.get("title") or f.get("name") or titles.get(ch.target, "")
+        rows.append({"tag": tag, "m": m, "day": mt.day if mt else None, "title": name(title),
+                     "change": _change_text(ch, f, b, lang, titles, name), "why": ch.why or "",
+                     "quotes": [refs[k]["text"] for k in ch.sources or [] if k in refs] if quotes else []})
+    meetings = [{"tag": marks[x.pk][1], "m": marks[x.pk][0], "day": x.day} for x in objs.values()]
+    return {"meetings": meetings, "rows": rows, "several": len(meetings) > 1,
+            "days": ", ".join(_date_text(x["day"], lang) for x in meetings)}
+
+
+def _span_text(start, end, kind, lang) -> str:
+    def d(v):
+        try:
+            return _date_text(date.fromisoformat(str(v)), lang)
+        except (TypeError, ValueError):
+            return "—"
+    if kind == ProjectStep.MILESTONE:
+        return "◆ " + d(end or start)
+    return f"{d(start)} – {d(end)}"
+
+
+def _change_text(ch, f, b, lang, titles, name) -> str:
+    from . import plan_review
+    p, t = P[lang], L[lang]
+    parts = []
+    if ch.op == "update":
+        kind = f.get("kind", b.get("kind"))
+        if any(k in f for k in ("start", "end", "duration")):
+            s, e, _days = plan_review._dates(
+                {k: v for k, v in f.items() if k in ("start", "end", "duration")},
+                date.fromisoformat(b["start"]) if b.get("start") else None,
+                date.fromisoformat(b["end"]) if b.get("end") else None, b.get("duration") or 1, kind)
+            parts.append(f"{p['dates']} {_span_text(b.get('start'), b.get('end'), kind, lang)} → "
+                         f"{_span_text(s.isoformat() if s else '', e.isoformat() if e else '', kind, lang)}")
+        if "status" in f:
+            parts.append(f"{p['status']} {t['status_map'].get(b.get('status'), b.get('status') or '—')} → "
+                         f"{t['status_map'].get(f['status'], f['status'])}")
+        if "title" in f and f["title"] != b.get("title"):
+            parts.append(f"{p['name']} → «{f['title']}»")
+        if "side" in f:
+            parts.append(f"{p['who']} → {t['side_map'].get(f['side'], f['side'])}")
+        if "phase" in f:
+            parts.append(f"{p['phase']} → {name(titles.get(f['phase'], '—'))}")
+        if "after" in f and f["after"]:
+            parts.append(f"{p['after']}: " + ", ".join(f"«{name(titles.get(a, a))}»" for a in f["after"]))
+    elif ch.op == "add":
+        kind = f.get("kind", ProjectStep.TASK)
+        s, e, _days = plan_review._dates(f, None, None, f.get("duration") or 1, kind)
+        parts.append((p["new_ms"] if kind == ProjectStep.MILESTONE else p["new_step"]) + " "
+                     + _span_text(s.isoformat() if s else "", e.isoformat() if e else "", kind, lang))
+        if f.get("phase"):
+            parts.append(f"{p['phase']}: {name(titles.get(f['phase'], f['phase']))}")
+    elif ch.op == "remove":
+        parts.append(p["remove"])
+    elif ch.op == "add_phase":
+        parts.append(p["new_phase"])
+    elif ch.op == "update_phase":
+        parts += [f"{p['name']} → «{f['name']}»"] if f.get("name") else []
+    elif ch.op == "remove_phase":
+        parts.append(p["phase_remove"])
+    return " · ".join(parts)
+
+
 # ── PDF ───────────────────────────────────────────────────────────────────────
 
 def _fonts():
@@ -245,7 +354,7 @@ def _keep(font_name):
     return clean
 
 
-def pdf(project, what, lang, png, table=False, today=None, titled=False, names=None) -> bytes:
+def pdf(project, what, lang, png, table=False, today=None, titled=False, names=None, props=None) -> bytes:
     from PIL import Image as PILImage
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A3, A4, landscape
@@ -280,8 +389,9 @@ def pdf(project, what, lang, png, table=False, today=None, titled=False, names=N
     head = [Paragraph(_esc(title), h1), Paragraph(_esc(clean(" · ".join(line))), sub), Spacer(1, 4 * mm)]
     story = [] if (titled and png) else list(head)       # заголовок і легенда вже в картинці
     if png:
-        avail_w = page[0] - 2 * margin
-        avail_h = page[1] - 2 * margin - (4 * mm if titled else 22 * mm)
+        frame_pad = 12 + 1                         # поля рамки сторінки (6 pt з кожного боку) + запас округлення —
+        avail_w = page[0] - 2 * margin - frame_pad  # інакше висока діаграма «too large on page» (LayoutError)
+        avail_h = page[1] - 2 * margin - (4 * mm if titled else 22 * mm) - frame_pad
         ratio = min(avail_w / w, avail_h / h)
         story.append(Image(io.BytesIO(png), width=w * ratio, height=h * ratio))
     if table and what == "plan":
@@ -319,6 +429,29 @@ def pdf(project, what, lang, png, table=False, today=None, titled=False, names=N
             styles += [("FONTNAME", (0, 0), (-1, -1), font), ("FONTSIZE", (0, 0), (-1, -1), 8.5)]
             tbl.setStyle(TableStyle(styles))
             story.append(tbl)
+    if props and what == "plan":                       # 📅 пропозиції з наради — окремою сторінкою
+        pl = P[lang]
+        if story:
+            story.append(PageBreak())
+        story.append(Paragraph(_esc(clean(pl["titles"] if props["several"] else pl["title"])), h1))
+        story.append(Paragraph(_esc(clean(pl["note"].format(days=props["days"]))), sub))
+        story.append(Spacer(1, 3 * mm))
+        small = ParagraphStyle("q", fontName=font, fontSize=7.5, leading=9.5, textColor=colors.HexColor("#57606a"))
+        body = [[Paragraph(_esc(clean(x)), cellb) for x in (pl["meeting"], pl["step"], pl["change"], pl["why"])]]
+        styles = [("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#d0d7de")),
+                  ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eef2f6")), ("VALIGN", (0, 0), (-1, -1), "TOP")]
+        for r in props["rows"]:
+            tagged = ParagraphStyle(f"m{r['m']}", parent=cellb, textColor=colors.HexColor("#" + MEETING_HEX.get(r["m"], "8250DF")))
+            why = [Paragraph(_esc(clean(r["why"])), cell)] if r["why"] else []
+            why += [Paragraph(_esc(clean(f"„{q}“")), small) for q in r["quotes"]]
+            body.append([Paragraph(_esc(clean(" ".join(x for x in (r["tag"], _date_text(r["day"], lang) if r["day"] else "") if x))), tagged),
+                         Paragraph(_esc(clean(r["title"])), cell), Paragraph(_esc(clean(r["change"])), cell), why or ""])
+            styles.append(("BACKGROUND", (0, len(body) - 1), (0, len(body) - 1),
+                           colors.HexColor("#" + MEETING_TINT.get(r["m"], "EFE7FB"))))
+        avail = page[0] - 2 * margin
+        tbl = Table(body, colWidths=[avail * 0.1, avail * 0.26, avail * 0.32, avail * 0.32], repeatRows=1)
+        tbl.setStyle(TableStyle(styles + [("FONTNAME", (0, 0), (-1, -1), font), ("FONTSIZE", (0, 0), (-1, -1), 8.5)]))
+        story.append(tbl)
 
     def footer(canvas, _doc):
         canvas.saveState()
@@ -334,7 +467,7 @@ def pdf(project, what, lang, png, table=False, today=None, titled=False, names=N
 
 # ── Excel ─────────────────────────────────────────────────────────────────────
 
-def xlsx(project, lang, today=None, names=None) -> bytes:
+def xlsx(project, lang, today=None, names=None, props=None) -> bytes:
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
@@ -410,6 +543,28 @@ def xlsx(project, lang, today=None, names=None) -> bytes:
     for i, wdt in enumerate(widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = wdt
     ws.freeze_panes = ws.cell(row=hr + 1, column=base)
+    if props:                                          # 📅 пропозиції з наради — окремий аркуш
+        pl = P[lang]
+        ch = wb.create_sheet(pl["sheet"])
+        ch["A1"] = pl["titles"] if props["several"] else pl["title"]
+        ch["A1"].font = Font(bold=True, size=13)
+        ch["A2"] = pl["note"].format(days=props["days"])
+        ch["A2"].font = Font(color="57606A")
+        for i, label in enumerate((pl["meeting"], pl["step"], pl["change"], pl["why"]), 1):
+            c = ch.cell(row=4, column=i, value=label)
+            c.font = Font(bold=True)
+            c.fill = PatternFill("solid", fgColor="EEF2F6")
+        for n, r in enumerate(props["rows"], 5):
+            tag = ch.cell(row=n, column=1, value=" ".join(x for x in (r["tag"], _date_text(r["day"], lang) if r["day"] else "") if x))
+            tag.font = Font(bold=True, color=MEETING_HEX.get(r["m"], "8250DF"))
+            tag.fill = PatternFill("solid", fgColor=MEETING_TINT.get(r["m"], "EFE7FB"))
+            ch.cell(row=n, column=2, value=r["title"])
+            ch.cell(row=n, column=3, value=r["change"])
+            ch.cell(row=n, column=4, value="\n".join([r["why"]] + [f"„{q}“" for q in r["quotes"]]).strip())
+            for col in range(1, 5):
+                ch.cell(row=n, column=col).alignment = Alignment(vertical="top", wrap_text=True)
+        for col, wdt in zip("ABCD", (14, 40, 50, 60)):
+            ch.column_dimensions[col].width = wdt
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
@@ -425,7 +580,7 @@ def recipients(project) -> list:
     return [e for e in emails if e]
 
 
-def mail(user, project, what, lang, files, today=None) -> str:
+def mail(user, project, what, lang, files, today=None, props=None) -> str:
     """Чернетка у власній скриньці з файлами → адреса форми листа. files: [(name, bytes, content_type)]."""
     from email_assistant import attachments
     from email_assistant.models import EmailAccount, EmailDraft
@@ -438,7 +593,8 @@ def mail(user, project, what, lang, files, today=None) -> str:
     fmt = {"what": label, "what_lc": label if lang == "de" else label[0].lower() + label[1:], "code": project.code,
            "name": project.name, "date": _date_text(today, lang)}
     items = [attachments.store_file(name, data, ctype) for name, data, ctype in files]
+    body = t["body"].format(**fmt) + (P[lang]["mail"].format(days=props["days"]) if props else "")
     draft = EmailDraft.objects.create(account=account, to_emails=recipients(project),
-                                      subject=t["subject"].format(**fmt)[:500], body=t["body"].format(**fmt),
+                                      subject=t["subject"].format(**fmt)[:500], body=body,
                                       attachments=items, source=EmailDraft.SOURCE_MANUAL)
     return f"/email/compose/?draft={draft.pk}"

@@ -454,3 +454,103 @@ class SeveralMeetingsTests(ReviewBase):
         self.assertTrue(j["ok"], j)
         self.assertIn("Пропозиції з нарад", j["html"])
         self.assertEqual(PlanReview.objects.get(pk=j["review"]).meetings.count(), 2)
+
+
+class ExportAndLayoutTests(ReviewBase):
+    """📤 Експорт з пропозиціями з наради (сторінка PDF, аркуш Excel, рядок листа), ▸ блок пропозицій, ⛶ на весь
+    екран, діаграми без пропозицій для експорту."""
+
+    def send(self, **data):
+        import io
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.urls import reverse
+        from PIL import Image
+        buf = io.BytesIO()
+        Image.new("RGB", (400, 160), "white").save(buf, "PNG")
+        body = {"what": "plan", "lang": "de", "formats": "xlsx", "image": SimpleUploadedFile(
+            "d.png", buf.getvalue(), content_type="image/png"), **data}
+        return self.client.post(reverse("projects:export", args=[self.project.pk]), body)
+
+    def test_proposals_in_the_document_language_only_for_the_reviewer(self):
+        from projects import export
+        self.reviewed()
+        de = export.proposals(self.project, self.user, "de")
+        self.assertEqual(len(de["rows"]), 2)
+        upd, add = de["rows"]
+        self.assertEqual(upd["title"], "Muster bauen")
+        self.assertIn(f"Termine {self.d(1):%d.%m.%Y} – {self.d(5):%d.%m.%Y} → {self.d(1):%d.%m.%Y} – {self.d(12):%d.%m.%Y}",
+                      upd["change"])
+        self.assertIn(f"neuer Meilenstein ◆ {self.d(20):%d.%m.%Y}", add["change"])
+        self.assertEqual(upd["quotes"], [])
+        self.assertIn("Muster kommt", export.proposals(self.project, self.user, "en", quotes=True)["rows"][0]["quotes"][0])
+        self.assertIn("нова віха", export.proposals(self.project, self.user, "uk")["rows"][1]["change"])
+        bob = User.objects.create_superuser("bob", "bob@x.y", "p")
+        self.assertIsNone(export.proposals(self.project, bob, "de"))
+
+    def test_excel_sheet_and_mail_line_only_with_the_option(self):
+        import io
+
+        from openpyxl import load_workbook
+
+        from email_assistant.models import EmailDraft
+        self.reviewed()
+        wb = load_workbook(io.BytesIO(self.send(props="1").content))
+        self.assertIn("Änderungen", wb.sheetnames)
+        ch = wb["Änderungen"]
+        self.assertEqual(ch["B5"].value, "Muster bauen")
+        self.assertIn("Termine", ch["C5"].value)
+        self.assertNotIn("Änderungen", load_workbook(io.BytesIO(self.send().content)).sheetnames)
+        url = self.send(props="1", send="1").json()["compose"]
+        draft = EmailDraft.objects.get(pk=int(url.rsplit("=", 1)[1]))
+        self.assertIn("Gestrichelt markierte Termine", draft.body)
+        url = self.send(send="1").json()["compose"]
+        self.assertNotIn("Gestrichelt", EmailDraft.objects.get(pk=int(url.rsplit("=", 1)[1])).body)
+
+    def test_pdf_with_the_proposals_page(self):
+        from importlib.util import find_spec
+        if find_spec("reportlab") is None:
+            self.skipTest("reportlab не встановлено")
+        self.reviewed()
+        r = self.send(formats="pdf", table="1", props="1", quotes="1")
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.content.startswith(b"%PDF"))
+
+    def test_tall_diagram_fits_the_pdf_page(self):
+        """Довгий план (висока картинка) — раніше «LayoutError: … too large on page» (поля рамки не віднімались)."""
+        import io
+        from importlib.util import find_spec
+
+        from PIL import Image
+
+        from projects import export
+        if find_spec("reportlab") is None:
+            self.skipTest("reportlab не встановлено")
+        buf = io.BytesIO()
+        Image.new("RGB", (900, 1400), "white").save(buf, "PNG")
+        for titled in (True, False):
+            self.assertTrue(export.pdf(self.project, "plan", "de", buf.getvalue(), table=True,
+                                       titled=titled).startswith(b"%PDF"))
+
+    def test_page_collapse_full_screen_and_clean_diagrams(self):
+        b = f"s{self.b.pk}"
+        self.reviewed(self.answer(changes=[
+            {"op": "update", "id": f"s{self.a.pk}", "end": self.d(12).isoformat(), "from": ["B1", "B2"]},
+            {"op": "add", "ref": "a1", "place_after": b, "title": "Freigabe Kunde", "kind": "milestone",
+             "end": self.d(25).isoformat(), "after": [b], "from": ["B2"]}]))
+        html = cockpit.render(self.project, self.user)
+        self.assertIn("data-pjr2-box", html)                                   # ▸ / ▾ блок пропозицій
+        self.assertIn("Ще тези наради: 1", html)                              # друга теза — під «ще»
+        self.assertIn("data-pjg-full", html)                                  # ⛶ на весь екран
+        self.assertIn('id="pjg-clean-full"', html)
+        clean = html.split('id="pjg-clean-full">', 1)[1].split("</template>", 1)[0]
+        self.assertIn("<svg", clean)
+        self.assertNotIn("pjg-ghost", clean)                                  # для експорту без пропозицій
+        self.assertIn("lg-prop", html)
+        p = schedule.compute(self.project, today=self.today)
+        data = gantt.classic_data(self.project, p, self.today, ghosts=plan_review.ghosts(plan_review.active(self.project, self.user)))
+        self.assertEqual([(m["m"], m["tag"]) for m in data["props"]], [(1, "")])
+        plan_review.reject(self.project, self.user, plan_review.active(self.project, self.user))
+        html = cockpit.render(self.project, self.user)
+        self.assertNotIn('id="pjg-clean-full"', html)                         # немає пропозицій — немає й копії
+        self.assertIn("data-pjg-full", html)

@@ -806,10 +806,11 @@ def ghosts(review) -> dict:
     phase, new_phase, title, kind, start, end, label, change, m, tag}], phases: {pk: {name, remove, m, tag}},
     new_phases: [{key, name, m, tag}], legend: [{m, tag, title, day}]} — лише зміни, що чекають рішення; m — колір
     наради зміни (pjm-1…), tag — «M2 » на початку підпису, коли нарад кілька."""
-    out = {"steps": {}, "added": [], "phases": {}, "new_phases": [], "legend": []}
+    out = {"steps": {}, "added": [], "phases": {}, "new_phases": [], "legend": [], "meetings": []}
     if review is None or review.status != PlanReview.READY:
         return out
     objs, marks = meeting_marks(review)
+    out["meetings"] = [{"m": marks[x.pk][0], "tag": marks[x.pk][1], "day": x.day.isoformat()} for x in objs.values()]
     if len(objs) > 1:
         out["legend"] = [{"m": marks[x.pk][0], "tag": marks[x.pk][1], "title": x.title, "day": x.day.isoformat()}
                          for x in objs.values()]

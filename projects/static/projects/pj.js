@@ -17,7 +17,8 @@
     if (n) n.textContent = text;
   }
   function put(html) {
-    root.innerHTML = html; applyTab(curTab); renderFound(); applyGantt(); applyTimeline(); applyPartyView(); replanInit();
+    root.innerHTML = html; applyTab(curTab); applyFull(); renderFound(); applyGantt(); applyTimeline(); applyPartyView();
+    replanInit();
   }
   // ── 📅 Звірити план з нарадою (_replan.html → api/project/<pk>/plan/review/…): запуск, опитування, ✓ / ✕ ──
   // Вибрані наради (галочки) переживають оновлення пульта; уперше — з ?plan_meeting=12[,15] (review_url сторінки наради)
@@ -46,6 +47,16 @@
     var b = replanBox();
     clearTimeout(replanTimer);
     if (!b) return;
+    var det = b.querySelector('[data-pjr2-box]');
+    if (det && b.dataset.review) {              // ▸ / ▾ блоку пропозицій — для кожної звірки, як залишили
+      if (pref('pjr2-closed-' + b.dataset.review, '') === '1') det.open = false;
+      det.addEventListener('toggle', function () {
+        try {
+          if (det.open) localStorage.removeItem('pjr2-closed-' + b.dataset.review);
+          else localStorage.setItem('pjr2-closed-' + b.dataset.review, '1');
+        } catch (e) { /* немає сховища */ }
+      });
+    }
     var picked = replanChosen.length && replanPick(replanChosen);
     if (picked && replanFromUrl) {
       if (!replanFocused) {
@@ -168,6 +179,8 @@
   var GCOLS = [['n', '№', 46], ['title', 'Крок', 236], ['start', 'Початок', 56], ['end', 'Кінець', 56],
                ['days', 'Дн.', 34], ['who', 'Хто', 92], ['preds', 'Після', 64]];
   var SVGNS = 'http://www.w3.org/2000/svg';
+  var GT = 'pj-gantt-titlew', TITLE_MIN = 140, TITLE_MAX = 720, classicNoProps = false;
+  function titleW() { return Math.min(Math.max(parseInt(pref(GT, ''), 10) || 236, TITLE_MIN), TITLE_MAX); }
   var zoomAnchor = null, drawRaf = 0, noClickUntil = 0;
   function pref(key, dflt) { try { return localStorage.getItem(key) || dflt; } catch (e) { return dflt; } }
   function setPref(key, v) { try { localStorage.setItem(key, v); } catch (e) { /* лише на цю сторінку */ } }
@@ -229,6 +242,95 @@
     if (view === 'classic') drawClassic();
     else bindOurs();
   }
+  // ⛶ Діаграма на весь екран: панель «📅 План» поверх сторінки (вікна кроку й меню — над нею) + повноекранний
+  // режим браузера; Esc чи «✕ Згорнути» — назад. Переживає оновлення пульта (applyFull у put)
+  var fullOn = false;
+  function applyFull() {
+    var pane = root.querySelector('[data-pjc-pane="plan"]');
+    document.documentElement.classList.toggle('pj-full-on', fullOn && !!pane);
+    if (!pane) return;
+    pane.classList.toggle('pj-full', fullOn);
+    pane.querySelectorAll('[data-pjg-full]').forEach(function (b) {
+      b.textContent = fullOn ? '✕ Згорнути' : '⛶ На весь екран';
+      b.setAttribute('aria-pressed', fullOn ? 'true' : 'false');
+    });
+  }
+  function toggleFull(on) {
+    fullOn = on;
+    applyFull();
+    try {
+      if (on && !document.fullscreenElement && document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(function () { /* браузер не дав — лише панель */ });
+      } else if (!on && document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(function () { /* уже вийшли */ });
+      }
+    } catch (e) { /* без повноекранного режиму — лише панель */ }
+    if (pref(GV, 'ours') === 'classic') scheduleDraw();
+  }
+  document.addEventListener('fullscreenchange', function () {
+    if (!document.fullscreenElement && fullOn) toggleFull(false);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && fullOn && !document.querySelector('dialog[open]')) toggleFull(false);
+  });
+  // 🔍 Скорочена назва кроку чи фази — повністю під курсором одразу (обидві діаграми: [data-mv-cut])
+  var nameTip = null;
+  root.addEventListener('mouseover', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('[data-mv-cut][data-mv-full]');
+    if (!t) { if (nameTip) nameTip.hidden = true; return; }
+    if (!nameTip) {
+      nameTip = document.createElement('div');
+      nameTip.className = 'pjg-nametip';
+      nameTip.setAttribute('role', 'tooltip');
+      nameTip.setAttribute('translate', 'no');
+      document.body.appendChild(nameTip);
+    }
+    nameTip.textContent = t.getAttribute('data-mv-full');
+    nameTip.hidden = false;
+    var r = t.getBoundingClientRect(), w = Math.min(nameTip.offsetWidth, window.innerWidth - 16);
+    nameTip.style.left = Math.max(8, Math.min(r.left - 6, window.innerWidth - w - 8)) + 'px';
+    nameTip.style.top = Math.max(8, r.top - nameTip.offsetHeight - 6) + 'px';
+  });
+  function nameTipHide() { if (nameTip) nameTip.hidden = true; }
+  root.addEventListener('mouseleave', nameTipHide);
+  root.addEventListener('mouseout', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('[data-mv-cut][data-mv-full]');
+    if (t && !(e.relatedTarget && t.contains(e.relatedTarget))) nameTipHide();
+  });
+  window.addEventListener('scroll', nameTipHide, true);       // прокрутили — підказка не висить на чужому рядку
+  // ↔ межа колонки «Крок» класичної діаграми: тягнути — ширше / вужче, подвійний клік — під найдовшу назву
+  root.addEventListener('mousedown', function (e) {
+    var h = e.target.closest && e.target.closest('[data-pjg-colsz]');
+    if (!h || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var x0 = e.clientX, w0 = titleW(), raf = 0;
+    document.documentElement.classList.add('pjg2-resizing');
+    function move(ev) {
+      setPref(GT, String(Math.min(Math.max(w0 + ev.clientX - x0, TITLE_MIN), TITLE_MAX)));
+      if (!raf) raf = requestAnimationFrame(function () { raf = 0; drawClassic(); });
+    }
+    function up() {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+      document.documentElement.classList.remove('pjg2-resizing');
+      noClickUntil = Date.now() + 300;
+    }
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  }, true);
+  root.addEventListener('dblclick', function (e) {
+    if (!(e.target.closest && e.target.closest('[data-pjg-colsz]'))) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var node = root.querySelector('#pjg-data'), d = null, longest = 0;
+    try { d = JSON.parse(node.textContent); } catch (x) { d = null; }
+    ((d && d.rows) || []).forEach(function (r) {
+      longest = Math.max(longest, String(r.title || '').length + (r.kind === 'milestone' ? 2 : 0));
+    });
+    setPref(GT, String(Math.min(Math.max(Math.ceil(longest * 6.6) + 30, TITLE_MIN), TITLE_MAX)));
+    drawClassic();
+  }, true);
   function scheduleDraw() {
     if (drawRaf) return;
     drawRaf = requestAnimationFrame(function () { drawRaf = 0; applyGantt(); });
@@ -263,6 +365,10 @@
   function classicRows(d) {
     var detail = pref(GD, 'full'), f = folds(), out = [], phase = null;
     (d.rows || []).forEach(function (r) {
+      if (classicNoProps) {                     // 📤 експорт без пропозицій з наради
+        if (r.ghost) return;
+        if (r.prop) r = Object.assign({}, r, {prop: null});
+      }
       if (r.type === 'phase') { phase = r; out.push(r); return; }
       if (detail === 'brief' && r.kind !== 'milestone') return;
       if (detail !== 'brief' && phase && f[phase.id || 'none']) return;
@@ -285,6 +391,7 @@
     if (!holder || !node || holder.hidden) return;
     var d;
     try { d = JSON.parse(node.textContent); } catch (e) { return; }
+    GCOLS[1][2] = titleW();                       // колонку «Крок» можна розтягнути (межа в заголовку)
     var rows = classicRows(d), ppd = ganttPpd(), detail = pref(GD, 'full'), f = folds();
     var canChange = canEdit();
     var pad = Math.max(3, Math.ceil(60 / ppd));
@@ -303,6 +410,10 @@
       x += c[2];
     });
     grid.appendChild(sv('line', {x1: 0, y1: GHEAD - 0.5, x2: leftW, y2: GHEAD - 0.5, 'class': 'pjg2-hl'}));
+    var colEdge = GCOLS[0][2] + GCOLS[1][2];
+    var handle = sv('rect', {x: colEdge - 4, y: 4, width: 8, height: GHEAD - 8, rx: 2, 'class': 'pjg2-colsz',
+                             'data-pjg-colsz': '1'});
+    handle.appendChild(sv('title', {}, 'Тягніть — ширша колонка «Крок» · подвійний клік — під найдовшу назву'));
     rows.forEach(function (r, i) {
       var y = GHEAD + i * ROW, g = sv('g', {'class': 'pjg2-row pjg2-' + r.type
                                             + (r.ghost ? ' pjg2-proprow pjm-' + (r.m || 1) : '')});
@@ -479,6 +590,8 @@
       svg.appendChild(dl);
     }
     chart.appendChild(svg);
+    grid.appendChild(sv('line', {x1: colEdge - 0.5, y1: 0, x2: colEdge - 0.5, y2: height, 'class': 'pjg2-colln'}));
+    grid.appendChild(handle);                      // межа колонки «Крок» — поверх рядків
     holder.appendChild(grid);
     holder.appendChild(chart);
     if (zoomAnchor) {
@@ -940,9 +1053,10 @@
     else phaseMenu(g.dataset.phase, ev);
   });
   root.addEventListener('click', function (ev) {
-    var t = ev.target.closest('[data-pjg-view],[data-pjg-scale],[data-pjg-detail-btn],[data-pjg-zoom]');
+    var t = ev.target.closest('[data-pjg-view],[data-pjg-scale],[data-pjg-detail-btn],[data-pjg-zoom],[data-pjg-full]');
     if (!t || !root.contains(t)) return;
     ev.preventDefault();
+    if (t.hasAttribute('data-pjg-full')) { toggleFull(!fullOn); return; }
     if (t.dataset.pjgView) setPref(GV, t.dataset.pjgView);
     if (t.dataset.pjgScale) { setPref(GS, t.dataset.pjgScale); setPref(GP, String(PPD[t.dataset.pjgScale])); }
     if (t.dataset.pjgDetailBtn) setPref(GD, t.dataset.pjgDetailBtn);
@@ -1551,6 +1665,8 @@
     }
     d.querySelector('[data-x-what]').textContent = what;
     d.querySelectorAll('[data-x-only]').forEach(function (el) { el.hidden = el.dataset.xOnly.split(' ').indexOf(kind) < 0; });
+    var pp = d.querySelector('[data-x-props]');       // 📅 пропозиції з наради — коли вони є на діаграмі
+    if (pp) pp.hidden = !(kind === 'plan' && expMeetings().length);
     d.querySelector('[data-pjp-err]').textContent = '';
     if (!d.dataset.bound) {
       d.dataset.bound = '1';
@@ -1580,7 +1696,15 @@
          todo: 'заплановано', crit: 'критичний шлях', mile: 'віха', base: 'базовий план', today: 'сьогодні',
          due: 'строк клієнту', late: 'прострочено', ok: 'готово', slip: 'дн. зсуву від базового плану'}
   };
-  function expHead(lang) {
+  // 📅 Наради звірки, пропозиції яких зараз на діаграмі: [{m, tag, day}] (gantt.classic_data → props)
+  function expMeetings() {
+    var node = root.querySelector('#pjg-data'), d = null;
+    try { d = JSON.parse(node.textContent); } catch (e) { d = null; }
+    return (d && d.props) || [];
+  }
+  var MEETING_HEX = {1: '#8250df', 2: '#0b8c96', 3: '#bc4c00', 4: '#bf3989', 5: '#8a6a2e'};   // pj.css, світла тема
+  var PROP_WORDS = {de: 'Vorschlag Besprechung', en: 'proposal, meeting', uk: 'пропозиція, нарада'};
+  function expHead(lang, props) {
     var w = EXP_WORDS[lang] || EXP_WORDS.de, b = box(), d = new Date();
     var day = lang === 'en' ? d.toISOString().slice(0, 10)
       : ('0' + d.getDate()).slice(-2) + '.' + ('0' + (d.getMonth() + 1)).slice(-2) + '.' + d.getFullYear();
@@ -1602,13 +1726,22 @@
     } else if (expKind === 'chain') {
       legend = [['outline', '#cf222e', w.late], ['outline', '#9a6700', w.waiting], ['outline', '#1a7f37', w.ok]];
     }
+    if (expKind === 'plan' && props) {                                  // 📅 пунктир кольором наради
+      expMeetings().forEach(function (m) {
+        var day = (m.day || '').slice(8, 10) + '.' + (m.day || '').slice(5, 7) + '.';
+        legend.push(['dashbox', MEETING_HEX[m.m] || MEETING_HEX[1],
+                     (PROP_WORDS[lang] || PROP_WORDS.de) + ' ' + (m.tag ? m.tag + ' · ' : '') + day]);
+      });
+    }
     return {title: (b.dataset.code || '') + ' · ' + (b.dataset.title || ''), sub: sub, legend: legend};
   }
   function expWant() {
     var d = dlg.exp, f = function (k) { return q(d, 'data-x', k); };
     return {pdf: f('pdf').checked, png: f('png').checked, xlsx: expKind === 'plan' && f('xlsx').checked,
             table: expKind === 'plan' && f('pdf').checked && f('table').checked, lang: f('lang').value,
-            ai: expKind !== 'chain' && f('ai').checked, model: f('model').value};
+            ai: expKind !== 'chain' && f('ai').checked, model: f('model').value,
+            props: expKind === 'plan' && expMeetings().length > 0 && f('props').checked,
+            quotes: expKind === 'plan' && expMeetings().length > 0 && f('props').checked && f('quotes').checked};
   }
   // 🌐 План написано іншою абеткою, ніж мова документа (кирилиця ↔ латиниця) — «Перекласти назви (AI)» саме
   function expAiDefault() {
@@ -1623,6 +1756,8 @@
     if (w.xlsx) names.push(window.PJExport ? window.PJExport.fileName(title, expKind, 'xlsx') : 'xlsx');
     var tbl = q(d, 'data-x', 'table');
     if (tbl) tbl.disabled = !q(d, 'data-x', 'pdf').checked;
+    var qt = q(d, 'data-x', 'quotes');
+    if (qt) qt.disabled = !q(d, 'data-x', 'props').checked;
     var mdl = d.querySelector('[data-x-model]');
     if (mdl) mdl.hidden = !q(d, 'data-x', 'ai').checked;
     d.querySelector('[data-x-files]').textContent = !names.length ? '⚠️ Виберіть хоча б один файл'
@@ -1644,6 +1779,27 @@
     var ours = Array.prototype.slice.call(root.querySelectorAll('[data-pjg-pane="ours"] [data-pjg-detail]'))
       .filter(function (el) { return !el.hidden; });
     return ours.length ? Array.prototype.slice.call(ours[0].querySelectorAll('svg')).slice(0, 1) : [];
+  }
+  // 📤 «Без пропозицій з наради»: на час знімка — діаграма без пунктиру (Minerva — з <template id="pjg-clean-…">,
+  // класична — перемальовується без них) → функція, що повертає все як було
+  function expClean(on) {
+    if (!on) return function () {};
+    var classic = root.querySelector('[data-pjg-pane="classic"]');
+    if (classic && !classic.hidden) {
+      classicNoProps = true;
+      drawClassic();
+      return function () { classicNoProps = false; drawClassic(); };
+    }
+    var holder = Array.prototype.slice.call(root.querySelectorAll('[data-pjg-pane="ours"] [data-pjg-detail]'))
+      .filter(function (el) { return !el.hidden; })[0];
+    var tpl = holder && root.querySelector(holder.dataset.pjgDetail === 'brief' ? '#pjg-clean-brief' : '#pjg-clean-full');
+    var live = holder && holder.querySelector('svg');
+    var clean = tpl && tpl.content && tpl.content.querySelector('svg');
+    if (!live || !clean) return function () {};
+    clean = document.importNode(clean, true);
+    live.parentNode.insertBefore(clean, live);
+    live.style.display = 'none';
+    return function () { clean.remove(); live.style.display = ''; };
   }
   function runExport(sendMail) {
     var d = dlg.exp, err = d.querySelector('[data-pjp-err]'), want = expWant();
@@ -1674,7 +1830,11 @@
     var pic = named.then(function () {
       if (!svgs.length || !(want.pdf || want.png)) return null;
       return (window.PJExport.translator ? window.PJExport.translator(want.lang) : Promise.resolve(null)).then(function (tr) {
-        return window.PJExport.png(svgs, Object.assign(expHead(want.lang), {lang: want.lang, tr: tr, names: names}));
+        var back = expClean(expKind === 'plan' && expMeetings().length > 0 && !want.props);
+        try {                                     // знімок SVG — синхронно, потім діаграма знову як була
+          return window.PJExport.png(exportSvgs(expKind), Object.assign(expHead(want.lang, want.props),
+                                                                         {lang: want.lang, tr: tr, names: names}));
+        } finally { back(); }
       });
     });
     function ask(blob, formats, mail) {
@@ -1686,6 +1846,8 @@
       fd.append('table', want.table ? '1' : '');
       fd.append('send', mail ? '1' : '');
       fd.append('titled', '1');                 // заголовок і легенда вже в картинці — у PDF не дублювати
+      fd.append('props', want.props ? '1' : '');  // 📅 пропозиції з наради — сторінка PDF, аркуш Excel, рядок листа
+      fd.append('quotes', want.quotes ? '1' : '');
       if (names) fd.append('names', JSON.stringify(names));   // таблиця PDF і Excel — тими самими назвами
       return fetch(box().dataset.export, {method: 'POST', credentials: 'same-origin', headers: {'X-CSRFToken': csrf()},
                                           body: fd})

@@ -430,9 +430,11 @@
           </span>
           <span class="pjc-hint" data-pjg-only="classic" hidden>{% if can_change %}Ctrl + коліщатко — масштаб · тягніть фон — прокрутка · тягніть смугу — нові дати, край — тривалість · правий клік — меню · клік на фазу — згорнути{% else %}Ctrl + коліщатко — масштаб · тягніть фон — прокрутка · клік на фазу — згорнути{% endif %}</span>
           {% if can_change %}<span class="pjc-hint" data-pjg-only="ours">Тягніть смугу чи ◆ — нові дати, край смуги — тривалість · клік — вікно кроку · правий клік — меню</span>{% endif %}
-          <button type="button" class="pjc-b pjc-right" data-pjx="plan" title="PDF з таблицею кроків, картинка чи Excel — завантажити або надіслати листом">📤 Експорт / лист</button>
+          <button type="button" class="pjc-b pjc-right" data-pjg-full aria-pressed="false" title="Діаграма на весь екран — Esc повертає">⛶ На весь екран</button>
+          <button type="button" class="pjc-b" data-pjx="plan" title="PDF з таблицею кроків, картинка чи Excel — завантажити або надіслати листом">📤 Експорт / лист</button>
         </div>
         <div class="pjc-svg" data-pjg-pane="ours"><div data-pjg-detail="full">{{ plan.gantt|safe }}</div><div data-pjg-detail="brief" hidden>{{ plan.gantt_brief|safe }}</div></div>
+        {% if plan.props %}<template id="pjg-clean-full">{{ plan.gantt_clean|safe }}</template><template id="pjg-clean-brief">{{ plan.gantt_brief_clean|safe }}</template>{% endif %}
         <div class="pjg2" data-pjg-pane="classic" hidden></div>
         {{ plan.classic|json_script:"pjg-data" }}
         <div class="pjc-legend">
@@ -440,6 +442,7 @@
           <span><i class="lg-bar warn"></i>чекаємо</span><span><i class="lg-bar plan"></i>заплановано</span>
           <span><i class="lg-bar crit"></i>критичний шлях</span><span><i class="lg-base"></i>базовий план</span>
           <span>◆ віха · +N — зсув від базового · 🔗 стан з прив'язаних об'єктів</span>
+          {% if plan.props %}<span><i class="lg-prop"></i>пунктиром кольором наради — пропозиції з наради, ✓ / ✕ угорі</span>{% endif %}
           <span class="pjc-hint">{% if can_change %}Клік на крок чи фазу — змінити.{% endif %}</span>
         </div>
         {% if plan.data %}{{ plan.data|json_script:"pjp-data" }}{% endif %}

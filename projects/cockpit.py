@@ -250,9 +250,13 @@ def _plan_context(project, facts, today, can_change=False, ghosts=None) -> dict:
         return {"has_plan": False, "templates": [
             {"id": t.pk, "name": t.name, "counts": plan_mod.template_counts(t), "description": t.description}
             for t in plan_mod.templates()] if can_change else []}
-    return {"has_plan": True, "strip": _strip(p),
+    props = gantt.has_ghosts(ghosts)
+    return {"has_plan": True, "strip": _strip(p), "props": props,
             "gantt": gantt.render(project, p, today, editable=can_change, ghosts=ghosts),
             "gantt_brief": gantt.render(project, p, today, editable=can_change, brief=True, ghosts=ghosts),
+            # 📤 експорт «без пропозицій з наради» бере ці діаграми (pj.js exportSvgs) — лише коли пропозиції є
+            "gantt_clean": gantt.render(project, p, today) if props else "",
+            "gantt_brief_clean": gantt.render(project, p, today, brief=True) if props else "",
             "classic": gantt.classic_data(project, p, today, ghosts=ghosts),
             "end": p.end, "base_end": p.base_end,
             "late": bool(project.due_date and p.end and p.end > project.due_date),
