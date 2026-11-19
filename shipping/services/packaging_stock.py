@@ -10,6 +10,9 @@
 - Відправлення, оформлене раніше, ніж почали вести облік коробки («Облік з»), її не списує: воно вже враховане в
   кількості, яку людина вписала.
 - Прихід — `receive`, інвентаризація («фактично є») — `count`.
+- Коробка в архіві («Активна» знято — «🗄 В архів» у списку): нові відправлення її не списують (упаковка бере лише
+  активні), уже списане відправленням за нею лишається (`sync_shipment` бере її в пул — інакше наступна зміна стану
+  посилки «повернула» б коробку), скасоване — повертає; «мало коробок» про неї не надсилається.
 - Мало (`PackagingMaterial.is_low`: залишок ≤ «Мінімальний запас») — `check_low` один раз повідомляє (кому й куди —
   «🗺 Хто що отримує», вид packaging; ✉️ / 💬 — «Налаштування доставки»), знову — `remind_due` (cron) через
   «Нагадувати кожні N днів»; запас знову вище мінімуму — позначка знімається, наступного разу попередимо знову.
@@ -64,6 +67,17 @@ def _move(material_pk, delta, kind, *, shipment=None, note="", user=None):
     return mv
 
 
+def _pool(have) -> list:
+    """Коробки для впізнавання: уже списані цим відправленням (і архівні — першими: однаковий розмір лишається за
+    тією самою коробкою) + активні."""
+    from shipping.models import PackagingMaterial
+    from shipping.services import packaging
+    used = [m for m in PackagingMaterial.objects.filter(pk__in=[pk for pk, q in have.items() if q > 0])
+            .order_by("pk")]
+    seen = {m.pk for m in used}
+    return used + [m for m in packaging.materials() if m.pk not in seen]
+
+
 def sync_shipment(shipment) -> list:
     """Списати / повернути коробки відправлення: лише різниця між потрібним (`needed`) і вже списаним ним.
     → [рухи]."""
@@ -73,9 +87,9 @@ def sync_shipment(shipment) -> list:
         s = Shipment.objects.select_for_update().filter(pk=shipment.pk).first()
         if s is None:
             return done
-        want = needed(s)
         have = {r["material"]: -(r["q"] or 0) for r in PackagingMovement.objects.filter(shipment=s)
                 .values("material").annotate(q=Sum("qty"))}
+        want = needed(s, _pool(have))
         tracked = set(PackagingMaterial.objects.filter(pk__in=set(want) | set(have), track_stock=True)
                       .values_list("pk", flat=True))
         label = s.tracking_number or f"#{s.pk}"
@@ -117,8 +131,8 @@ def count(material, actual: int, *, user=None, note="") -> object | None:
 
 def low_materials():
     from shipping.models import PackagingMaterial
-    return [m for m in PackagingMaterial.objects.filter(track_stock=True, min_stock__isnull=False).order_by("name")
-            if m.is_low]
+    return [m for m in PackagingMaterial.objects.filter(track_stock=True, is_active=True, min_stock__isnull=False)
+            .order_by("name") if m.is_low]
 
 
 def check_low(material_pk) -> bool:
@@ -131,7 +145,7 @@ def check_low(material_pk) -> bool:
         if m.low_notified_at:
             PackagingMaterial.objects.filter(pk=m.pk).update(low_notified_at=None)
         return False
-    if m.low_notified_at or not ShippingSettings.get().packaging_alert_enabled:
+    if m.low_notified_at or not m.is_active or not ShippingSettings.get().packaging_alert_enabled:
         return False
     claimed = PackagingMaterial.objects.filter(pk=m.pk, low_notified_at__isnull=True).update(
         low_notified_at=timezone.now())

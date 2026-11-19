@@ -4765,8 +4765,11 @@
 {"uk": "В askDANTE немає розрахункового періоду «{0}».", "en": "There is no settlement period “{0}” in askDANTE.", "de": "In askDANTE gibt es keine Abrechnungsperiode „{0}“."}
 {"uk": "В askDANTE створено проєкт «{0}» і прив'язано до {1}.", "en": "Project “{0}” created in askDANTE and linked to {1}.", "de": "In askDANTE wurde das Projekt „{0}“ erstellt und mit {1} verknüpft."}
 {"uk": "В агенді вже {0} пунктів — забагато для однієї наради", "en": "The agenda already has {0} items — too many for one meeting", "de": "Die Tagesordnung hat schon {0} Punkte — zu viele für eine Besprechung"}
+{"uk": "В архів — не використовуємо", "en": "Archive — not in use", "de": "Archivieren — nicht mehr verwendet"}
 {"uk": "В архіві", "en": "Archived", "de": "Archiviert"}
 {"uk": "В архіві askDANTE", "en": "Archived in askDANTE", "de": "In askDANTE archiviert"}
+{"uk": "В архіві · {0}", "en": "Archived · {0}", "de": "Im Archiv · {0}"}
+{"uk": "В архіві: {0} — більше не пропонуються в упаковці й не списуються новими відправленнями.", "en": "Archived: {0} — no longer suggested for packaging and not deducted by new shipments.", "de": "Im Archiv: {0} — wird nicht mehr als Verpackung vorgeschlagen und von neuen Sendungen nicht abgebucht."}
 {"uk": "В дорозі", "en": "In transit", "de": "Unterwegs"}
 {"uk": "В дорозі {0}", "en": "In transit {0}", "de": "Unterwegs {0}"}
 {"uk": "В замовленні → блок \"🏷️ Етикетки\" → \"🖨️ Друкувати\".", "en": "In the order → the \"🏷️ Labels\" block → \"🖨️ Print\".", "de": "Im Auftrag → Block \"🏷️ Etiketten\" → \"🖨️ Drucken\"."}
@@ -5074,6 +5077,8 @@
 {"uk": "Вибрано: 0", "en": "Selected: 0", "de": "Ausgewählt: 0"}
 {"uk": "Вибрано: 0 (найбільше {0})", "en": "Selected: 0 (at most {0})", "de": "Ausgewählt: 0 (höchstens {0})"}
 {"uk": "Вибрано: {0}", "en": "Selected: {0}", "de": "Ausgewählt: {0}"}
+{"uk": "Вибрані вже в архіві.", "en": "The selected ones are already archived.", "de": "Die ausgewählten sind bereits im Archiv."}
+{"uk": "Вибрані вже використовуються — в архіві їх немає.", "en": "The selected ones are already in use — none of them is archived.", "de": "Die ausgewählten werden bereits verwendet — keiner davon ist im Archiv."}
 {"uk": "Вибрані візитки", "en": "Selected business cards", "de": "Ausgewählte Visitenkarten"}
 {"uk": "Вибрані листи будуть додані до наступного повідомлення як контекст для AI.", "en": "The selected e-mails will be added to the next message as context for the AI.", "de": "Die ausgewählten E-Mails werden der nächsten Nachricht als Kontext für die KI hinzugefügt."}
 {"uk": "Вибрані листи зі скриньки (повний текст)", "en": "Selected emails from the mailbox (full text)", "de": "Ausgewählte E-Mails aus dem Postfach (Volltext)"}
@@ -5275,6 +5280,7 @@
 {"uk": "Використовуйте", "en": "Use", "de": "Verwenden Sie"}
 {"uk": "Використовуйте Chrome або Edge.", "en": "Use Chrome or Edge.", "de": "Verwenden Sie Chrome oder Edge."}
 {"uk": "Використовуються стандартні значення.", "en": "Default values are used.", "de": "Es werden Standardwerte verwendet."}
+{"uk": "Використовуємо", "en": "In use", "de": "In Verwendung"}
 {"uk": "Використовується в CN23 для всіх товарів категорії. Власні значення товару мають пріоритет над значеннями категорії.", "en": "Used in CN23 for all products in the category. A product’s own values take priority over the category’s values.", "de": "Wird in der CN23 für alle Artikel der Kategorie verwendet. Eigene Werte des Artikels haben Vorrang vor den Werten der Kategorie."}
 {"uk": "Використовується в post_save", "en": "Used in post_save", "de": "Wird in post_save verwendet"}
 {"uk": "Використовується в посиланнях email листів (password reset). Приклади: akustik.synology.me:81 | minerva-bi.com | localhost:8000", "en": "Used in e-mail links (password reset). Examples: akustik.synology.me:81 | minerva-bi.com | localhost:8000", "de": "Wird in den Links der E-Mails verwendet (Passwort zurücksetzen). Beispiele: akustik.synology.me:81 | minerva-bi.com | localhost:8000"}
@@ -8839,6 +8845,7 @@
 {"uk": "Знижки для цих кількостей — у таблицю шаблону нижче; потім «Застосувати до позначених»", "en": "Discounts for these quantities go into the template table below; then «Apply to marked»", "de": "Rabatte für diese Mengen kommen in die Vorlagentabelle unten; dann «Auf markierte anwenden»"}
 {"uk": "Знижки за шаблоном", "en": "Discounts by template", "de": "Rabatte nach Vorlage"}
 {"uk": "Знову в черзі: {0} — агент обробить протягом хвилини за теперішніми налаштуваннями доручень.", "en": "Queued again: {0} — the agent will process them within a minute with the current rule settings.", "de": "Wieder in der Warteschlange: {0} — der Agent verarbeitet sie innerhalb einer Minute mit den aktuellen Einstellungen der Regeln."}
+{"uk": "Знову використовуємо: {0}.", "en": "In use again: {0}.", "de": "Wieder in Verwendung: {0}."}
 {"uk": "Знову на розгляд", "en": "Back for review", "de": "Wieder zur Prüfung"}
 {"uk": "Знову рахуються (знято рішень: {0}).", "en": "Counted again (decisions removed: {0}).", "de": "Werden wieder gezählt (aufgehobene Entscheidungen: {0})."}
 {"uk": "Знову розглянути", "en": "Review again", "de": "Erneut prüfen"}
@@ -8856,6 +8863,7 @@
 {"uk": "Зняти цей параметр", "en": "Remove this parameter", "de": "Diesen Parameter entfernen"}
 {"uk": "Знято з виробництва (EOL)", "en": "Discontinued (EOL)", "de": "Nicht mehr in Produktion (EOL)"}
 {"uk": "Знято з календаря", "en": "Removed from the calendar", "de": "Aus dem Kalender entfernt"}
+{"uk": "Знято — коробка в архіві: не пропонується в упаковці відправлень, нові відправлення її не списують, «мало коробок» про неї не надсилається. Список показує її лише з фільтром «🗄 В архіві».", "en": "Unchecked — the box is archived: not suggested for shipment packaging, new shipments do not deduct it, no «low on boxes» alert is sent for it. The list shows it only with the «🗄 Archived» filter.", "de": "Nicht angehakt — der Karton ist im Archiv: wird nicht als Verpackung für Sendungen vorgeschlagen, neue Sendungen buchen ihn nicht ab, keine Meldung «Kartons knapp». Die Liste zeigt ihn nur mit dem Filter «🗄 Im Archiv»."}
 {"uk": "Знімається само, коли askDANTE відповів «Die Verwendung einer Dauer ist nicht erlaubt»: тоді Minerva пише «з … по …» у вільний відрізок дня.", "en": "Cleared automatically when askDANTE answered “Die Verwendung einer Dauer ist nicht erlaubt”: then Minerva writes “from … to …” into a free slot of the day.", "de": "Wird automatisch entfernt, wenn askDANTE mit „Die Verwendung einer Dauer ist nicht erlaubt“ geantwortet hat: dann schreibt Minerva „von … bis …“ in einen freien Zeitabschnitt des Tages."}
 {"uk": "Знімки бази знань", "en": "Knowledge base snapshots", "de": "Snapshots der Wissensdatenbank"}
 {"uk": "Знімок бази знань", "en": "Knowledge base snapshot", "de": "Snapshot der Wissensdatenbank"}
@@ -13419,6 +13427,7 @@
 {"uk": "Повернути в роботу", "en": "Back to work", "de": "Zurück in Arbeit"}
 {"uk": "Повернути вигляд для телефону", "en": "Back to the phone view", "de": "Zurück zur Handy-Ansicht"}
 {"uk": "Повернути все, що змінив AI", "en": "Undo everything the AI changed", "de": "Alle Änderungen der AI zurücksetzen"}
+{"uk": "Повернути з архіву", "en": "Restore from archive", "de": "Aus dem Archiv zurückholen"}
 {"uk": "Повернути крок", "en": "Restore the step", "de": "Schritt wiederherstellen"}
 {"uk": "Повернути ліворуч", "en": "Rotate left", "de": "Nach links drehen"}
 {"uk": "Повернути можна лише пункт «Не те»", "en": "Only a “Not relevant” item can be restored", "de": "Nur ein Punkt „Nicht relevant“ kann wiederhergestellt werden"}
@@ -17828,6 +17837,7 @@
 {"uk": "Усі проєкти", "en": "All projects", "de": "Alle Projekte"}
 {"uk": "Усі проєкти клієнта", "en": "All customer projects", "de": "Alle Projekte des Kunden"}
 {"uk": "Усі підписи мовою документа (L.date, L.customer, L.qty, L.total, L.net…)", "en": "All labels in the document language (L.date, L.customer, L.qty, L.total, L.net…)", "de": "Alle Beschriftungen in der Dokumentsprache (L.date, L.customer, L.qty, L.total, L.net…)"}
+{"uk": "Усі разом", "en": "All together", "de": "Alle zusammen"}
 {"uk": "Усі розділи вже на панелі.", "en": "All sections are already on the panel.", "de": "Alle Bereiche sind bereits im Panel."}
 {"uk": "Усі розділи — повне меню", "en": "All sections — full menu", "de": "Alle Bereiche — vollständiges Menü"}
 {"uk": "Усі розділи…", "en": "All sections…", "de": "Alle Bereiche…"}

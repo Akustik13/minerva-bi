@@ -82,6 +82,29 @@ class ShipmentStockTests(Base):
         self.set_status(s, Shipment.Status.ERROR)
         self.assertEqual(self.stock(), 5)
 
+    def test_archived_box_keeps_what_was_used_and_is_not_used_again(self):
+        s = self.shipment()
+        self.set_status(s, Shipment.Status.LABEL_READY)
+        self.assertEqual(self.stock(), 4)
+        PackagingMaterial.objects.filter(pk=self.box.pk).update(is_active=False)     # 🗄 в архів
+        self.set_status(s, Shipment.Status.IN_TRANSIT)          # посилка поїхала далі — коробку не «повертаємо»
+        self.assertEqual(self.stock(), 4)
+        self.set_status(self.shipment(), Shipment.Status.LABEL_READY)                 # нова посилка — не списує
+        self.assertEqual(self.stock(), 4)
+        self.set_status(s, Shipment.Status.CANCELLED)           # скасували — повертається, хоч і в архіві
+        self.assertEqual(self.stock(), 5)
+
+    def test_archived_same_size_box_stays_with_its_shipment(self):
+        s = self.shipment()
+        self.set_status(s, Shipment.Status.LABEL_READY)
+        PackagingMaterial.objects.filter(pk=self.box.pk).update(is_active=False)
+        new = PackagingMaterial.objects.create(length_cm=20, width_cm=15, height_cm=5, track_stock=True)
+        PackagingMaterial.objects.filter(pk=new.pk).update(stock_qty=10)
+        self.set_status(s, Shipment.Status.DELIVERED)
+        self.assertEqual((self.stock(), self.stock(new)), (4, 10))
+        self.set_status(self.shipment(), Shipment.Status.LABEL_READY)                 # нова — уже нова коробка
+        self.assertEqual((self.stock(), self.stock(new)), (4, 9))
+
 
 class ManualMovesTests(Base):
     def test_receive_and_count(self):
@@ -126,6 +149,13 @@ class LowStockTests(Base):
             with self.captureOnCommitCallbacks(execute=True):
                 packaging_stock.count(self.box, 0)
             self.assertEqual(notify.call_count, 2)
+
+    def test_archived_box_is_silent(self):
+        PackagingMaterial.objects.filter(pk=self.box.pk).update(is_active=False)
+        with mock.patch(NOTIFY) as notify, self.captureOnCommitCallbacks(execute=True):
+            packaging_stock.count(self.box, 0)
+        notify.assert_not_called()
+        self.assertEqual(packaging_stock.low_materials(), [])
 
     def test_disabled_or_no_minimum_is_silent(self):
         s = ShippingSettings.get()
@@ -216,6 +246,34 @@ class AdminTests(Base):
         PackagingMaterial.objects.filter(pk=self.box.pk).update(stock_qty=8)
         page = self.client.get("/admin/shipping/packagingmaterial/?stock=low")
         self.assertNotContains(page, "8 шт")
+
+    def test_archive_and_restore_actions(self):
+        unused = PackagingMaterial.objects.create(name="castom", length_cm=20, width_cm=11, height_cm=7)
+        url = "/admin/shipping/packagingmaterial/"
+        self.assertContains(self.client.get(url), "castom")
+        r = self.client.post(url, {"action": "archive_selected", "_selected_action": [unused.pk]}, follow=True)
+        self.assertContains(r, "🗄 В архіві: castom")
+        self.assertFalse(PackagingMaterial.objects.get(pk=unused.pk).is_active)
+        page = self.client.get(url)                                       # за замовчуванням — лише ті, що в роботі
+        self.assertNotContains(page, ">castom<")
+        self.assertContains(page, "🗄 В архіві · 1")
+        self.assertContains(self.client.get(url + "?archive=yes"), "castom")
+        self.assertContains(self.client.get(url + "?archive=all"), "castom")
+        with mock.patch(NOTIFY):
+            self.client.post(url + "?archive=yes", {"action": "restore_selected", "_selected_action": [unused.pk]})
+        self.assertTrue(PackagingMaterial.objects.get(pk=unused.pk).is_active)
+
+    def test_viewer_has_no_archive_action(self):
+        viewer = User.objects.create_user("viewer", password="x", is_staff=True)
+        viewer.profile.role = "readonly"                                 # склад / доставка — лише перегляд
+        viewer.profile.allowed_modules = ["shipping"]
+        viewer.profile.save()
+        self.client.force_login(User.objects.get(pk=viewer.pk))
+        self.assertNotContains(self.client.get("/admin/shipping/packagingmaterial/"), "archive_selected")
+        r = self.client.post("/admin/shipping/packagingmaterial/",
+                             {"action": "archive_selected", "_selected_action": [self.box.pk]})
+        self.assertTrue(PackagingMaterial.objects.get(pk=self.box.pk).is_active)
+        self.assertIn(r.status_code, (200, 302, 403))
 
     def test_settings_panel_and_send_now(self):
         ShippingSettings.get()

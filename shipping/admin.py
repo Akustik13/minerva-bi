@@ -103,6 +103,33 @@ class PackagingStockFilter(admin.SimpleListFilter):
         return queryset
 
 
+class PackagingArchiveFilter(admin.SimpleListFilter):
+    """Архів = «Активна» знято. За замовчуванням список показує лише ті, що використовуємо."""
+    title = _('Архів')
+    parameter_name = 'archive'
+    ARCHIVE, ALL = 'yes', 'all'
+
+    def lookups(self, request, model_admin):
+        n = PackagingMaterial.objects.filter(is_active=False).count()
+        return ((self.ARCHIVE, _('🗄 В архіві · {}').format(n)), (self.ALL, _('Усі разом')))
+
+    def choices(self, changelist):
+        yield {'selected': self.value() is None,
+               'query_string': changelist.get_query_string(remove=[self.parameter_name]),
+               'display': _('✓ Використовуємо')}
+        for value, title in self.lookup_choices:
+            yield {'selected': self.value() == value,
+                   'query_string': changelist.get_query_string({self.parameter_name: value}),
+                   'display': title}
+
+    def queryset(self, request, queryset):
+        if self.value() == self.ARCHIVE:
+            return queryset.filter(is_active=False)
+        if self.value() == self.ALL:
+            return queryset
+        return queryset.filter(is_active=True)
+
+
 class PackagingMaterialForm(forms.ModelForm):
     """Прихід і інвентаризація — не поля моделі: кожна зміна запасу йде рухом (shipping/services/packaging_stock)."""
     receive_qty = forms.IntegerField(
@@ -117,6 +144,9 @@ class PackagingMaterialForm(forms.ModelForm):
     class Meta:
         model = PackagingMaterial
         exclude = ('stock_qty', 'stock_since', 'low_notified_at')
+        help_texts = {'is_active': _('Знято — коробка в архіві: не пропонується в упаковці відправлень, нові '
+                                     'відправлення її не списують, «мало коробок» про неї не надсилається. '
+                                     'Список показує її лише з фільтром «🗄 В архіві».')}
 
     def clean(self):
         data = super().clean()
@@ -131,10 +161,11 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
     form = PackagingMaterialForm
     list_display  = ('type_badge', 'name', 'dimensions_col', 'stock_col', 'tare_weight_kg',
                      'max_weight_kg', 'volume_col', 'cost', 'is_active')
-    list_filter   = (PackagingStockFilter, 'box_type', 'is_active')
+    list_filter   = (PackagingArchiveFilter, PackagingStockFilter, 'box_type')
     list_editable = ('is_active',)
     search_fields = ('name',)
     readonly_fields = ('stock_panel', 'movements_panel')
+    actions = ('archive_selected', 'restore_selected')
 
     fieldsets = (
         ('📦 Упаковка', {
@@ -167,8 +198,43 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
             packaging_stock.count(obj, form.cleaned_data['count_qty'], user=request.user, note=note)
         if form.cleaned_data.get('receive_qty'):
             packaging_stock.receive(obj, form.cleaned_data['receive_qty'], user=request.user, note=note)
-        if change and 'min_stock' in form.changed_data:
+        if change and ('min_stock' in form.changed_data or 'is_active' in form.changed_data):
             transaction.on_commit(lambda: packaging_stock.check_low(obj.pk))
+
+    def _set_archived(self, request, queryset, archived):
+        """«Активна» = not archived для вибраних, що ще не в цьому стані; кожна — запис в історії. → [змінені]."""
+        changed = []
+        for obj in queryset.filter(is_active=archived):
+            obj.is_active = not archived
+            obj.save(update_fields=['is_active'])
+            self.log_change(request, obj, [{'changed': {'fields': ['Активна']}}])
+            changed.append(obj)
+        return changed
+
+    @admin.action(description=_('🗄 В архів — не використовуємо'), permissions=['change'])
+    def archive_selected(self, request, queryset):
+        changed = self._set_archived(request, queryset, True)
+        if not changed:
+            self.message_user(request, _('Вибрані вже в архіві.'), messages.INFO)
+            return
+        url = reverse('admin:shipping_packagingmaterial_changelist') + f'?{PackagingArchiveFilter.parameter_name}=' \
+            + PackagingArchiveFilter.ARCHIVE
+        self.message_user(request, format_html(
+            '{} <a href="{}">{} →</a>',
+            _('🗄 В архіві: {} — більше не пропонуються в упаковці й не списуються новими відправленнями.').format(
+                ', '.join(str(o) for o in changed)), url, _('Архів')), messages.SUCCESS)
+
+    @admin.action(description=_('↩ Повернути з архіву'), permissions=['change'])
+    def restore_selected(self, request, queryset):
+        from .services import packaging_stock
+        changed = self._set_archived(request, queryset, False)
+        if not changed:
+            self.message_user(request, _('Вибрані вже використовуються — в архіві їх немає.'), messages.INFO)
+            return
+        pks = [o.pk for o in changed if o.track_stock]
+        transaction.on_commit(lambda: [packaging_stock.check_low(pk) for pk in pks])
+        self.message_user(request, _('↩ Знову використовуємо: {}.').format(', '.join(str(o) for o in changed)),
+                          messages.SUCCESS)
 
     @admin.display(description=_('На складі'), ordering='stock_qty')
     def stock_col(self, obj):
@@ -8705,7 +8771,7 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
 
     @admin.display(description=_("Коробки з обліком"))
     def packaging_stock_panel(self, obj):
-        mats = list(PackagingMaterial.objects.filter(track_stock=True).order_by("name"))
+        mats = list(PackagingMaterial.objects.filter(track_stock=True, is_active=True).order_by("name"))
         changelist = reverse("admin:shipping_packagingmaterial_changelist")
         if not mats:
             return format_html('{} <a href="{}">{} →</a>', _("Жодна коробка ще не має обліку на складі."),
