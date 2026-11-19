@@ -241,7 +241,21 @@ def _replan_context(project, user, can_change) -> dict:
         return {"meetings": [], "review": None, "history": [], "ghosts": None}
 
 
-def _plan_context(project, facts, today, can_change=False, ghosts=None) -> dict:
+def gantt_views(project, p, today, can_change, ghosts, view=None) -> dict:
+    """Діаграма Minerva (детально й коротко) у вигляді людини (view — gantt.clean_view: 🔍 період, ширина «КРОК»);
+    ще й без пропозицій з наради — для експорту «без пропозицій» (pj.js exportSvgs), лише коли пропозиції є.
+    Ним же — /projects/api/project/<pk>/gantt/ (масштаб без оновлення всього пульта)."""
+    from . import gantt
+    props = gantt.has_ghosts(ghosts)
+    full0, full1 = gantt.span(project, p, today, ghosts)
+    return {"props": props, "span0": full0, "span1": full1,
+            "gantt": gantt.render(project, p, today, editable=can_change, ghosts=ghosts, view=view),
+            "gantt_brief": gantt.render(project, p, today, editable=can_change, brief=True, ghosts=ghosts, view=view),
+            "gantt_clean": gantt.render(project, p, today, view=view) if props else "",
+            "gantt_brief_clean": gantt.render(project, p, today, brief=True, view=view) if props else ""}
+
+
+def _plan_context(project, facts, today, can_change=False, ghosts=None, view=None) -> dict:
     """Вкладка «📅 План»: смуга фаз, Гант, дані вікна кроку (лише тому, хто може змінювати проєкт); ghosts — зміни
     звірки з нарадою, що чекають ✓ / ✕ (plan_review.ghosts)."""
     from . import gantt, plan as plan_mod
@@ -250,13 +264,7 @@ def _plan_context(project, facts, today, can_change=False, ghosts=None) -> dict:
         return {"has_plan": False, "templates": [
             {"id": t.pk, "name": t.name, "counts": plan_mod.template_counts(t), "description": t.description}
             for t in plan_mod.templates()] if can_change else []}
-    props = gantt.has_ghosts(ghosts)
-    return {"has_plan": True, "strip": _strip(p), "props": props,
-            "gantt": gantt.render(project, p, today, editable=can_change, ghosts=ghosts),
-            "gantt_brief": gantt.render(project, p, today, editable=can_change, brief=True, ghosts=ghosts),
-            # 📤 експорт «без пропозицій з наради» бере ці діаграми (pj.js exportSvgs) — лише коли пропозиції є
-            "gantt_clean": gantt.render(project, p, today) if props else "",
-            "gantt_brief_clean": gantt.render(project, p, today, brief=True) if props else "",
+    return {"has_plan": True, "strip": _strip(p), **gantt_views(project, p, today, can_change, ghosts, view),
             "classic": gantt.classic_data(project, p, today, ghosts=ghosts),
             "end": p.end, "base_end": p.base_end,
             "late": bool(project.due_date and p.end and p.end > project.due_date),
@@ -349,7 +357,7 @@ def export_names_script(project) -> str:
         return ""
 
 
-def context(project, user, range_key="all", notice="") -> dict:
+def context(project, user, range_key="all", notice="", view=None) -> dict:
     today = timezone.localdate()
     if range_key not in timeline.RANGES:
         range_key = "all"
@@ -362,7 +370,7 @@ def context(project, user, range_key="all", notice="") -> dict:
     can_change = bool(user and user.has_perm("projects.change_project"))
     attention = _acts(attention, can_change)
     replan = _replan_context(project, user, can_change)
-    plan = _plan_context(project, facts, today, can_change, replan.get("ghosts"))
+    plan = _plan_context(project, facts, today, can_change, replan.get("ghosts"), view)
     ai = _ai_context(project, user, can_change)
     if plan.get("data") is not None:
         plan["data"]["agent"] = bool(ai.get("agent"))
@@ -406,6 +414,7 @@ def context(project, user, range_key="all", notice="") -> dict:
                  "export_names": reverse("projects:export_names", args=[pk]),
                  "invite": reverse("projects:invite", args=[pk]),
                  "plan_review": reverse("projects:plan_review", args=[pk]),
+                 "gantt": reverse("projects:gantt", args=[pk]),
                  "plan_review_base": f"/projects/api/project/{pk}/plan/review/",
                  "party_suggest": reverse("projects:party_suggest", args=[pk]),
                  "party_base": f"/projects/api/project/{pk}/party/",
@@ -434,5 +443,5 @@ def context(project, user, range_key="all", notice="") -> dict:
     }
 
 
-def render(project, user, range_key="all", notice="") -> str:
-    return render_to_string("admin/projects/project/_cockpit.html", context(project, user, range_key, notice))
+def render(project, user, range_key="all", notice="", view=None) -> str:
+    return render_to_string("admin/projects/project/_cockpit.html", context(project, user, range_key, notice, view))

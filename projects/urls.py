@@ -15,6 +15,7 @@ urlpatterns = [
     path("api/project/<int:pk>/overview/next-action/", views.overview_next_action_view, name="overview_next_action"),
     # 🧭 Пульт проєкту (projects/cockpit.py)
     path("api/project/<int:pk>/cockpit/", views.cockpit_view, name="cockpit"),
+    path("api/project/<int:pk>/gantt/", views.gantt_view, name="gantt"),
     path("api/project/<int:pk>/highlights/", views.highlight_view, name="highlight"),
     path("api/highlight/<int:hid>/delete/", views.highlight_delete_view, name="highlight_delete"),
     path("api/project/<int:pk>/mail-handled/", views.mail_handled_view, name="mail_handled"),

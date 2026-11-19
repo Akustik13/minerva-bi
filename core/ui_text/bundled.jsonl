@@ -5756,6 +5756,7 @@
 {"uk": "Віддавати сайту фото й даташити з Minerva", "en": "Provide photos and datasheets from Minerva to the site", "de": "Fotos und Datenblätter aus Minerva an die Website liefern"}
 {"uk": "Віддалити", "en": "Zoom out", "de": "Herauszoomen"}
 {"uk": "Віддалити (Ctrl + коліщатко)", "en": "Zoom out (Ctrl + wheel)", "de": "Herauszoomen (Strg + Mausrad)"}
+{"uk": "Віддалити — довший період (Ctrl + коліщатко над діаграмою)", "en": "Zoom out — a longer period (Ctrl + wheel over the chart)", "de": "Herauszoomen — längerer Zeitraum (Strg + Mausrad über dem Diagramm)"}
 {"uk": "Віддає: {0}", "en": "Delivers to: {0}", "de": "Liefert an: {0}"}
 {"uk": "Відеопам'ять", "en": "Video memory", "de": "Videospeicher"}
 {"uk": "Відключено", "en": "Disconnected", "de": "Getrennt"}
@@ -10592,6 +10593,7 @@
 {"uk": "Місце (необов'язково)", "en": "Location (optional)", "de": "Ort (optional)"}
 {"uk": "Місце забору", "en": "Pickup location", "de": "Abholort"}
 {"uk": "Місяць", "en": "Month", "de": "Monat"}
+{"uk": "Місяць від тижня тому", "en": "A month from a week ago", "de": "Ein Monat ab vor einer Woche"}
 {"uk": "Місяць до місяця — останні 12 місяців", "en": "Month over month — last 12 months", "de": "Monat zu Monat — letzte 12 Monate"}
 {"uk": "Місяці", "en": "Months", "de": "Monate"}
 {"uk": "Місяців", "en": "Months", "de": "Monate"}
@@ -10698,6 +10700,7 @@
 {"uk": "Наблизити", "en": "Zoom in", "de": "Heranzoomen"}
 {"uk": "Наблизити (Ctrl + коліщатко)", "en": "Zoom in (Ctrl + wheel)", "de": "Heranzoomen (Strg + Mausrad)"}
 {"uk": "Наблизити (Ctrl + коліщатко, подвійний клік)", "en": "Zoom in (Ctrl + mouse wheel, double-click)", "de": "Vergrößern (Strg + Mausrad, Doppelklick)"}
+{"uk": "Наблизити — коротший період (Ctrl + коліщатко над діаграмою)", "en": "Zoom in — a shorter period (Ctrl + wheel over the chart)", "de": "Hineinzoomen — kürzerer Zeitraum (Strg + Mausrad über dem Diagramm)"}
 {"uk": "Набори", "en": "Sets", "de": "Sortimente"}
 {"uk": "Навантаження", "en": "Workload", "de": "Auslastung"}
 {"uk": "Наведіть на візитку й натисніть «⏺ Зробити фото».", "en": "Point at the business card and press «⏺ Take photo».", "de": "Auf die Visitenkarte richten und «⏺ Foto aufnehmen» drücken."}
@@ -13318,6 +13321,7 @@
 {"uk": "Першим", "en": "First", "de": "Zuerst"}
 {"uk": "Період", "en": "Period", "de": "Zeitraum"}
 {"uk": "Період аналізу продажів", "en": "Sales analysis period", "de": "Zeitraum der Verkaufsanalyse"}
+{"uk": "Період діаграми", "en": "Chart period", "de": "Zeitraum des Diagramms"}
 {"uk": "Період звіту", "en": "Report period", "de": "Berichtszeitraum"}
 {"uk": "Період пошуку нових замовлень (днів)", "en": "Search period for new orders (days)", "de": "Suchzeitraum für neue Bestellungen (Tage)"}
 {"uk": "Період шкали", "en": "Timeline period", "de": "Zeitraum der Zeitleiste"}
@@ -13351,6 +13355,7 @@
 {"uk": "Планові задачі", "en": "Scheduled tasks", "de": "Geplante Aufgaben"}
 {"uk": "Планові сповіщення", "en": "Scheduled alerts", "de": "Geplante Hinweise"}
 {"uk": "Планові сповіщення (cron)", "en": "Scheduled notifications (cron)", "de": "Geplante Benachrichtigungen (Cron)"}
+{"uk": "Плану ще немає", "en": "There is no plan yet", "de": "Noch kein Plan"}
 {"uk": "Плану ще немає — «📅 План» у пульті картки проєкту.", "en": "There is no plan yet — “📅 Plan” in the cockpit of the project card.", "de": "Noch kein Plan — „📅 Plan“ im Cockpit der Projektkarte."}
 {"uk": "Плану ще немає — додайте фазу й кроки або напишіть AI, що скласти.", "en": "No plan yet — add a phase and steps or tell the AI what to draw up.", "de": "Noch kein Plan — fügen Sie eine Phase und Schritte hinzu oder schreiben Sie der AI, was sie erstellen soll."}
 {"uk": "Плану ще немає — спершу складіть його (шаблон, редактор чи 🧠 з листування)", "en": "There is no plan yet — create it first (template, editor or 🧠 from correspondence)", "de": "Noch kein Plan — erstellen Sie ihn zuerst (Vorlage, Editor oder 🧠 aus der Korrespondenz)"}
@@ -13704,7 +13709,10 @@
 {"uk": "Показати лише постачальників звідти", "en": "Show only suppliers from there", "de": "Nur Lieferanten von dort zeigen"}
 {"uk": "Показати лише цей", "en": "Show only this one", "de": "Nur diesen anzeigen"}
 {"uk": "Показати лише цю категорію", "en": "Show only this category", "de": "Nur diese Kategorie anzeigen"}
+{"uk": "Показати лише цю фазу", "en": "Show only this phase", "de": "Nur diese Phase zeigen"}
+{"uk": "Показати лише час однієї фази", "en": "Show only the time of one phase", "de": "Nur den Zeitraum einer Phase zeigen"}
 {"uk": "Показати на екрані (Minerva підсвітить елемент, сама нічого не натискає)", "en": "Show on screen (Minerva highlights the element, does not click anything itself)", "de": "Auf dem Bildschirm zeigen (Minerva hebt das Element hervor, klickt selbst nichts an)"}
+{"uk": "Показати одну фазу", "en": "Show one phase", "de": "Eine Phase zeigen"}
 {"uk": "Показати папки", "en": "Show folders", "de": "Ordner anzeigen"}
 {"uk": "Показати розклад всіх активних сайтів і вийти.", "en": "Show the schedule of all active sites and exit.", "de": "Zeitplan aller aktiven Websites anzeigen und beenden."}
 {"uk": "Показати рядок у списку", "en": "Show the row in the list", "de": "Zeile in der Liste anzeigen"}
@@ -17412,6 +17420,7 @@
 {"uk": "Третя сторона (BillThirdParty)", "en": "Third party (BillThirdParty)", "de": "Dritte Partei (BillThirdParty)"}
 {"uk": "Третя сторона — інший UPS-акаунт", "en": "Third party — another UPS account", "de": "Dritter — anderes UPS-Konto"}
 {"uk": "Три PDF-документи генеруються", "en": "Three PDF documents are generated", "de": "Drei PDF-Dokumente werden erzeugt"}
+{"uk": "Три місяці від тижня тому", "en": "Three months from a week ago", "de": "Drei Monate ab vor einer Woche"}
 {"uk": "Тривалість", "en": "Duration", "de": "Dauer"}
 {"uk": "Тривалість (с)", "en": "Duration (s)", "de": "Dauer (s)"}
 {"uk": "Тривалість (сек)", "en": "Duration (sec)", "de": "Dauer (Sek.)"}
@@ -17437,9 +17446,11 @@
 {"uk": "Тут нічого немає — виберіть іншу плитку вгорі.", "en": "There is nothing here — choose another tile at the top.", "de": "Hier ist nichts — wählen Sie oben eine andere Kachel."}
 {"uk": "Тут нічого немає — виберіть іншу плитку.", "en": "There is nothing here — choose another tile.", "de": "Hier ist nichts — wählen Sie eine andere Kachel."}
 {"uk": "Тут цього змінити не можна — відкрийте картку.", "en": "This cannot be changed here — open the card.", "de": "Das lässt sich hier nicht ändern — öffnen Sie die Karte."}
+{"uk": "Тягніть рамку — інший період · краї рамки — довший чи коротший · подвійний клік — увесь проєкт", "en": "Drag the frame — another period · its edges — longer or shorter · double-click — the whole project", "de": "Rahmen ziehen — anderer Zeitraum · Ränder — länger oder kürzer · Doppelklick — ganzes Projekt"}
 {"uk": "Тягніть смугу чи ◆ — нові дати, край смуги — тривалість · клік — вікно кроку · правий клік — меню", "en": "Drag a bar or ◆ — new dates, the bar edge — duration · click — step window · right-click — menu", "de": "Balken oder ◆ ziehen — neue Daten, Balkenrand — Dauer · Klick — Schrittfenster · Rechtsklick — Menü"}
 {"uk": "Тягніть — нові дати · подвійний клік — тягнути початок і кінець · правий клік — меню", "en": "Drag — new dates · double-click — drag start and end · right-click — menu", "de": "Ziehen — neue Termine · Doppelklick — Anfang und Ende ziehen · Rechtsklick — Menü"}
 {"uk": "Тягніть — нові дати · правий клік — меню", "en": "Drag — new dates · right-click — menu", "de": "Ziehen — neue Daten · Rechtsklick — Menü"}
+{"uk": "Тягніть — ширша колонка «КРОК» · подвійний клік — під найдовшу назву", "en": "Drag to widen the «STEP» column · double-click to fit the longest name", "de": "Ziehen — Spalte «SCHRITT» breiter · Doppelklick — passend zum längsten Namen"}
 {"uk": "Тягніть — ширша колонка «Крок» · подвійний клік — під найдовшу назву", "en": "Drag to widen the «Step» column · double-click to fit the longest name", "de": "Ziehen — Spalte «Schritt» breiter · Doppelklick — passend zum längsten Namen"}
 {"uk": "Ті самі посилання, що для магазинів, або свої правила саме для DigiKey.", "en": "The same links as for the web shops, or own rules specifically for DigiKey.", "de": "Dieselben Links wie für die Webshops oder eigene Regeln speziell für DigiKey."}
 {"uk": "Ті, хто відповів на старий запит", "en": "Those who answered the old request", "de": "Diejenigen, die auf die alte Anfrage geantwortet haben"}
@@ -17630,6 +17641,7 @@
 {"uk": "Увага: розбіжність у вазі", "en": "Warning: weight discrepancy", "de": "Achtung: Gewichtsabweichung"}
 {"uk": "Увага: товари в різних валютах (", "en": "Attention: products in different currencies (", "de": "Achtung: Artikel in unterschiedlichen Währungen ("}
 {"uk": "Увесь гід", "en": "Entire guide", "de": "Gesamter Leitfaden"}
+{"uk": "Увесь проєкт", "en": "Whole project", "de": "Ganzes Projekt"}
 {"uk": "Увесь рух", "en": "All movements", "de": "Alle Bewegungen"}
 {"uk": "Увійдіть в систему і почніть роботу", "en": "Sign in and get started", "de": "Melden Sie sich an und legen Sie los"}
 {"uk": "Увійдіть у Minerva й натисніть «🔑 Авторизувати» на сторінці DigiKey ще раз.", "en": "Log in to Minerva and click “🔑 Authorize” on the DigiKey page again.", "de": "Melden Sie sich bei Minerva an und klicken Sie auf der DigiKey-Seite erneut auf „🔑 Autorisieren“."}
@@ -17871,6 +17883,7 @@
 {"uk": "Фаза: name, icon, gate, steps. Крок: title, days, side (we / customer / supplier / colleague), kind (task / milestone), trigger, after (null — після попереднього, \"parallel\" — разом з попереднім, [0, 2] — після цих кроків шаблону за номером від 0).", "en": "Phase: name, icon, gate, steps. Step: title, days, side (we / customer / supplier / colleague), kind (task / milestone), trigger, after (null — after the previous one, \"parallel\" — together with the previous one, [0, 2] — after these template steps, numbered from 0).", "de": "Phase: name, icon, gate, steps. Schritt: title, days, side (we / customer / supplier / colleague), kind (task / milestone), trigger, after (null — nach dem vorherigen, \"parallel\" — zusammen mit dem vorherigen, [0, 2] — nach diesen Vorlagenschritten, gezählt ab 0)."}
 {"uk": "Фаза: {0}", "en": "Phase: {0}", "de": "Phase: {0}"}
 {"uk": "Фаза: {0}; кроків виконано {1} з {2}.", "en": "Phase: {0}; steps done {1} of {2}.", "de": "Phase: {0}; Schritte erledigt {1} von {2}."}
+{"uk": "Фаза…", "en": "Phase…", "de": "Phase…"}
 {"uk": "Фази", "en": "Phases", "de": "Phasen"}
 {"uk": "Фази й віхи", "en": "Phases and milestones", "de": "Phasen und Meilensteine"}
 {"uk": "Фази й кроки", "en": "Phases and steps", "de": "Phasen und Schritte"}

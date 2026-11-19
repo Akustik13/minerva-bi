@@ -554,3 +554,60 @@ class ExportAndLayoutTests(ReviewBase):
         html = cockpit.render(self.project, self.user)
         self.assertNotIn('id="pjg-clean-full"', html)                         # немає пропозицій — немає й копії
         self.assertIn("data-pjg-full", html)
+
+
+class GanttViewTests(ReviewBase):
+    """🔍 Період діаграми Minerva і ширина колонки «КРОК»: сервер малює лише вибраний період (смуги поза ним
+    обрізано), ширша колонка — повні назви; /gantt/ — без оновлення всього пульта; дії в пульті тримають вигляд."""
+
+    def test_clean_view_takes_only_valid_values(self):
+        cv = gantt.clean_view
+        self.assertEqual(cv({}), {})
+        self.assertEqual(cv({"nw": "9999"}), {"nw": gantt.NW_MAX})
+        self.assertEqual(cv({"nw": "abc", "gw": "x,y"}), {})
+        self.assertEqual(cv({"gw": "2026-11-01,2026-11-03"}), {})                      # коротше тижня — ні
+        self.assertEqual(cv({"gw": "2026-11-01,2026-11-30", "nw": "300"}),
+                         {"from": self.today.replace(2026, 11, 1), "to": self.today.replace(2026, 11, 30), "nw": 300})
+
+    def test_window_and_wide_names(self):
+        self.a.title = "Muster bauen mit einem sehr langen Namen, den man im Diagramm sonst nicht lesen kann"
+        self.a.save()
+        p = schedule.compute(self.project, today=self.today)
+        whole = gantt.render(self.project, p, self.today)
+        self.assertNotIn("data-win", whole)
+        self.assertIn('data-mv-cut', whole)                                     # довга назва обрізана
+        a, b = self.d(3), self.d(20)
+        svg = gantt.render(self.project, p, self.today, view={"from": a, "to": b, "nw": 520})
+        self.assertIn(f'data-day0="{a.isoformat()}"', svg)
+        self.assertIn(f'data-end="{(b + timedelta(days=1)).isoformat()}"', svg)
+        self.assertIn("data-win=1", svg)
+        self.assertIn("clip-path=", svg)                                        # смуги поза періодом — обрізано
+        self.assertIn('data-nw="520"', svg)
+        self.assertIn(f'viewBox="0 0 {gantt.W + 520 - gantt.NW_DEFAULT} ', svg)  # ширша колонка — ширша діаграма
+        self.assertNotIn("data-mv-cut", svg.split("pjg-t", 2)[1].split("</text>", 1)[0])   # назва — повністю
+        self.assertIn("data-pjg-nw", svg)                                       # межа колонки — тягнути
+        self.assertIn(f'data-span0="{gantt.span(self.project, p, self.today)[0].isoformat()}"', svg)
+
+    def test_gantt_endpoint_and_actions_keep_the_view(self):
+        from django.urls import reverse
+        url = reverse("projects:gantt", args=[self.project.pk])
+        j = self.client.get(url, {"gw": f"{self.d(2)},{self.d(15)}", "nw": "300"}).json()
+        self.assertTrue(j["ok"])
+        self.assertIn("data-win=1", j["full"])
+        self.assertIn('data-nw="300"', j["brief"])
+        self.assertEqual(j["clean_full"], "")                                   # без пропозицій з наради
+        self.reviewed()
+        j = self.client.get(url, {"gw": f"{self.d(2)},{self.d(15)}"}).json()
+        self.assertIn("pjg-ghost", j["full"])
+        self.assertIn("<svg", j["clean_full"])
+        self.assertNotIn("pjg-ghost", j["clean_full"])
+        html = self.client.get(reverse("projects:cockpit", args=[self.project.pk]),
+                               {"gw": f"{self.d(2)},{self.d(15)}", "nw": "300"}).json()["html"]
+        self.assertIn("data-win=1", html)
+        self.assertIn("data-pjg-brush", html)
+        r = self.post(self.url("plan_step_dates", self.project.pk, self.a.pk),
+                      {"start": self.d(2).isoformat(), "end": self.d(6).isoformat(), "gw": f"{self.d(2)},{self.d(15)}",
+                       "nw": "300"})
+        self.assertIn('data-nw="300"', r.json()["html"])                        # змінили крок — вигляд той самий
+        self.client.logout()
+        self.assertEqual(self.client.get(url).status_code, 302)                 # без входу — на сторінку входу

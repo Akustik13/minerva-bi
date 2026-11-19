@@ -18,7 +18,7 @@
   }
   function put(html) {
     root.innerHTML = html; applyTab(curTab); applyFull(); renderFound(); applyGantt(); applyTimeline(); applyPartyView();
-    replanInit();
+    replanInit(); zoomInit();
   }
   // ── 📅 Звірити план з нарадою (_replan.html → api/project/<pk>/plan/review/…): запуск, опитування, ✓ / ✕ ──
   // Вибрані наради (галочки) переживають оновлення пульта; уперше — з ?plan_meeting=12[,15] (review_url сторінки наради)
@@ -330,6 +330,243 @@
     });
     setPref(GT, String(Math.min(Math.max(Math.ceil(longest * 6.6) + 30, TITLE_MIN), TITLE_MAX)));
     drawClassic();
+  }, true);
+  // ── 🔍 Період діаграми Minerva і ширина колонки «КРОК»: сервер малює лише вибраний період (gantt.render view;
+  // /projects/api/project/<pk>/gantt/ — без оновлення всього пульта). Смуга над діаграмою — рамка періоду (тягнути,
+  // краї — довше / коротше, подвійний клік — увесь проєкт), Ctrl + коліщатко над діаграмою — масштаб довкола
+  // курсора, Shift + коліщатко — далі / раніше, кнопки «－ Усе 3 міс 1 міс ＋», «🔍 Фаза…»; межа «КРОК» у заголовку —
+  // тягнути, подвійний клік — під найдовшу назву. Період — для кожного проєкту, ширина — для всіх (localStorage). ──
+  var NW_MIN = 150, NW_MAX = 560, WIN_MIN = 7;
+  function gwKey() { return 'pj-gantt-win-' + ((box() && box().dataset.code) || ''); }
+  function gwPref() { return pref(gwKey(), ''); }
+  function nwPref() { return pref('pj-gantt-nw', ''); }
+  function oursSvg() { return root.querySelector('[data-pjg-pane="ours"] [data-pjg-detail="full"] svg.pjg'); }
+  function gwState() {                  // дні від 1970: увесь проєкт [s0, s1) і що показано [w0, w1)
+    var svg = oursSvg();
+    if (!svg || !svg.getAttribute('data-span0')) return null;
+    return {s0: dnum(svg.getAttribute('data-span0')), s1: dnum(svg.getAttribute('data-span1')),
+            w0: dnum(svg.getAttribute('data-day0')), w1: dnum(svg.getAttribute('data-end'))};
+  }
+  var gwCur = null, gwTimer = 0, gwSeq = 0;
+  function gwNow() { var st = gwState(); return gwCur || (st ? {a: st.w0, b: st.w1} : null); }
+  function gwSet(a, b, now) {           // a, b — дні (b — день після останнього)
+    var st = gwState();
+    if (!st) return;
+    var len = Math.max(Math.round(b - a), WIN_MIN), lo = st.s0 - 366, hi = st.s1 + 366;
+    len = Math.min(len, hi - lo);
+    a = Math.round(Math.max(lo, Math.min(a, hi - len)));
+    b = a + len;
+    if (a <= st.s0 && b >= st.s1) { gwAll(now); return; }        // увесь проєкт і так видно
+    setPref(gwKey(), diso(a) + ',' + diso(b - 1));
+    gwCur = {a: a, b: b};
+    drawBrush();
+    if (now) gwFetch(); else gwSoon();
+  }
+  function gwAll(now) {
+    try { localStorage.removeItem(gwKey()); } catch (e) { /* немає сховища */ }
+    var st = gwState();
+    gwCur = st ? {a: st.s0, b: st.s1} : null;
+    drawBrush();
+    if (now) gwFetch(); else gwSoon();
+  }
+  function gwSoon() { clearTimeout(gwTimer); gwTimer = setTimeout(gwFetch, 200); }
+  function gwQuery() { return 'gw=' + encodeURIComponent(gwPref()) + '&nw=' + encodeURIComponent(nwPref()); }
+  function gwFetch() {
+    clearTimeout(gwTimer);
+    var b = box();
+    if (!b || !b.dataset.gantt || !oursSvg()) return;
+    var seq = ++gwSeq;
+    fetch(b.dataset.gantt + '?' + gwQuery(), {credentials: 'same-origin'})
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (seq !== gwSeq || !j || !j.ok) return;
+        var full = root.querySelector('[data-pjg-pane="ours"] [data-pjg-detail="full"]');
+        var brief = root.querySelector('[data-pjg-pane="ours"] [data-pjg-detail="brief"]');
+        if (full) full.innerHTML = j.full;
+        if (brief) brief.innerHTML = j.brief;
+        var cf = root.querySelector('#pjg-clean-full'), cb = root.querySelector('#pjg-clean-brief');
+        if (cf) cf.innerHTML = j.clean_full;
+        if (cb) cb.innerHTML = j.clean_brief;
+        gwCur = null;
+        bindOurs();
+        zoomInit();
+      }).catch(function () { /* лишається як було */ });
+  }
+  function gwToday() {
+    var node = root.querySelector('#pjg-data'), t = '';
+    try { t = JSON.parse(node.textContent).today || ''; } catch (e) { t = ''; }
+    return t ? dnum(t) : Math.floor(Date.now() / DAY);
+  }
+  function gwZoom(f, at) {              // f > 1 — довший період; at — день, довкола якого
+    var w = gwNow();
+    if (!w) return;
+    if (at === undefined || at === null) at = (w.a + w.b) / 2;
+    var len = (w.b - w.a) * f;
+    gwSet(at - (at - w.a) * f, at - (at - w.a) * f + len);
+  }
+  function drawBrush() {
+    var el = root.querySelector('[data-pjg-brush]'), st = gwState(), w = gwNow();
+    if (!el || !st || !w) return;
+    var tot = st.s1 - st.s0, pct = function (d) { return Math.max(0, Math.min(100, (d - st.s0) / tot * 100)); };
+    el.textContent = '';
+    var fm = null;
+    try { fm = new Intl.DateTimeFormat(document.documentElement.lang || 'uk', {month: 'short', timeZone: 'UTC'}); } catch (e) { fm = null; }
+    var d = new Date(st.s0 * DAY);
+    d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+    while (d.getTime() / DAY < st.s1) {
+      var m = document.createElement('span');
+      m.className = 'pjg-br-m';
+      m.style.left = pct(d.getTime() / DAY) + '%';
+      m.textContent = (fm ? fm.format(d) : String(d.getUTCMonth() + 1)) + (d.getUTCMonth() === 0 ? ' ' + d.getUTCFullYear() : '');
+      el.appendChild(m);
+      d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+    }
+    var today = gwToday();
+    if (today >= st.s0 && today < st.s1) {
+      var t = document.createElement('span');
+      t.className = 'pjg-br-today';
+      t.style.left = pct(today) + '%';
+      el.appendChild(t);
+    }
+    var all = w.a <= st.s0 && w.b >= st.s1;
+    var win = document.createElement('div');
+    win.className = 'pjg-br-win' + (all ? ' pjg-br-all' : '');
+    win.style.left = pct(w.a) + '%';
+    win.style.width = Math.max(pct(w.b) - pct(w.a), 1.5) + '%';
+    win.title = dshort(diso(w.a)) + '.' + diso(w.a).slice(0, 4) + ' – ' + dshort(diso(w.b - 1)) + '.' + diso(w.b - 1).slice(0, 4);
+    ['a', 'b'].forEach(function (e) {
+      var h = document.createElement('span');
+      h.className = 'pjg-br-h';
+      h.setAttribute('data-e', e);
+      win.appendChild(h);
+    });
+    el.appendChild(win);
+    root.querySelectorAll('[data-pjgw="all"]').forEach(function (bt) { bt.classList.toggle('on', all); });
+  }
+  function gwPhases() {                 // «🔍 Фаза…» — фази з датами з діаграми
+    var sel = root.querySelector('[data-pjgw-phase]'), svg = oursSvg();
+    if (!sel || !svg) return;
+    var keep = sel.options[0];
+    sel.textContent = '';
+    sel.appendChild(keep);
+    sel.value = '';
+    svg.querySelectorAll('g[data-ph0]').forEach(function (g) {
+      var name = g.querySelector('.pjg-pname'), full = name && name.querySelector('[data-mv-full]');
+      var o = document.createElement('option');
+      o.value = g.getAttribute('data-ph0') + ',' + g.getAttribute('data-ph1');
+      o.textContent = (full ? name.textContent.replace(full.textContent, full.getAttribute('data-mv-full'))
+                            : (name ? name.textContent : '')).trim()
+        + ' · ' + dshort(g.getAttribute('data-ph0')) + '–' + dshort(g.getAttribute('data-ph1'));
+      o.setAttribute('translate', 'no');
+      sel.appendChild(o);
+    });
+  }
+  function zoomInit() { drawBrush(); gwPhases(); }
+  root.addEventListener('click', function (e) {
+    var t = e.target.closest && e.target.closest('[data-pjgw]');
+    if (!t || !root.contains(t)) return;
+    e.preventDefault();
+    var k = t.getAttribute('data-pjgw'), today = gwToday();
+    if (k === 'all') gwAll(true);
+    else if (k === 'in') gwZoom(1 / 1.6);
+    else if (k === 'out') gwZoom(1.6);
+    else if (k === 'm1') gwSet(today - 7, today + 24, true);
+    else if (k === 'm3') gwSet(today - 7, today + 84, true);
+  });
+  root.addEventListener('change', function (e) {
+    var sel = e.target;
+    if (!sel || !sel.matches || !sel.matches('[data-pjgw-phase]') || !sel.value) return;
+    var v = sel.value.split(',');
+    gwSet(dnum(v[0]) - 3, dnum(v[1]) + 4, true);
+  });
+  root.addEventListener('wheel', function (e) {
+    var svg = e.target.closest && e.target.closest('[data-pjg-pane="ours"] svg.pjg');
+    if (!svg) return;
+    var w = gwNow(), st = gwState();
+    if (!w || !st) return;
+    if (e.ctrlKey || e.metaKey) {                       // масштаб довкола дня під курсором
+      e.preventDefault();
+      var r = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal, x0 = +svg.getAttribute('data-x0');
+      var ppd = +svg.getAttribute('data-ppd'), pt = (e.clientX - r.left) / r.width * vb.width;
+      var at = pt > x0 ? dnum(svg.getAttribute('data-day0')) + (pt - x0) / ppd : null;
+      gwZoom(Math.exp(Math.max(Math.min(e.deltaY, 200), -200) * 0.004), at);
+    } else if ((e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) && !(w.a <= st.s0 && w.b >= st.s1)) {
+      e.preventDefault();                               // далі / раніше — лише коли показано не все
+      var dlt = e.deltaX || e.deltaY, step = Math.max(1, Math.round((w.b - w.a) * 0.08));
+      gwSet(w.a + (dlt > 0 ? step : -step), w.b + (dlt > 0 ? step : -step));
+    }
+  }, {passive: false});
+  root.addEventListener('pointerdown', function (e) {    // рамка періоду: тягнути, краї, клік поза рамкою
+    var el = e.target.closest && e.target.closest('[data-pjg-brush]');
+    if (!el || e.button !== 0) return;
+    var st = gwState(), w0 = gwNow();
+    if (!st || !w0) return;
+    e.preventDefault();
+    var r = el.getBoundingClientRect(), tot = st.s1 - st.s0;
+    var day = function (cx) { return st.s0 + (cx - r.left) / r.width * tot; };
+    var h = e.target.closest('.pjg-br-h'), inWin = e.target.closest('.pjg-br-win');
+    var mode = h ? h.getAttribute('data-e') : (inWin ? 'move' : 'jump');
+    var len = w0.b - w0.a, x0 = e.clientX;
+    if (mode === 'jump') {                               // клік поза рамкою — рамка туди (тієї ж довжини)
+      var c = day(e.clientX);
+      gwSet(c - len / 2, c + len / 2, true);
+      return;
+    }
+    try { el.setPointerCapture(e.pointerId); } catch (x) { /* ні */ }
+    el.classList.add('pjg-br-drag');
+    function mv(ev) {
+      var dd = (ev.clientX - x0) / r.width * tot;
+      if (mode === 'move') gwCur = {a: Math.round(w0.a + dd), b: Math.round(w0.a + dd) + len};
+      else if (mode === 'a') gwCur = {a: Math.round(Math.min(w0.a + dd, w0.b - WIN_MIN)), b: w0.b};
+      else gwCur = {a: w0.a, b: Math.round(Math.max(w0.b + dd, w0.a + WIN_MIN))};
+      drawBrush();
+    }
+    function up() {
+      el.removeEventListener('pointermove', mv);
+      el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', up);
+      el.classList.remove('pjg-br-drag');
+      if (gwCur) gwSet(gwCur.a, gwCur.b, true);
+    }
+    el.addEventListener('pointermove', mv);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+  });
+  root.addEventListener('dblclick', function (e) {
+    if (e.target.closest && e.target.closest('[data-pjg-brush]')) { e.preventDefault(); gwAll(true); return; }
+    var h = e.target.closest && e.target.closest('svg.pjg [data-pjg-nw]');
+    if (!h) return;
+    e.preventDefault();
+    var longest = 0;
+    root.querySelectorAll('[data-pjg-pane="ours"] [data-pjg-detail="full"] svg.pjg .pjg-t [data-mv-full]').forEach(function (n) {
+      longest = Math.max(longest, (n.getAttribute('data-mv-full') || '').length);
+    });
+    setPref('pj-gantt-nw', String(Math.min(Math.max(Math.ceil(longest * 6.6) + 22, NW_MIN), NW_MAX)));
+    gwFetch();
+  });
+  root.addEventListener('pointerdown', function (e) {    // ↔ межа колонки «КРОК» діаграми Minerva
+    var h = e.target.closest && e.target.closest('svg.pjg [data-pjg-nw]');
+    if (!h || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var svg = h.ownerSVGElement, r = svg.getBoundingClientRect(), k = svg.viewBox.baseVal.width / r.width;
+    var nw0 = +h.getAttribute('data-pjg-nw'), x0 = e.clientX, hx0 = +h.getAttribute('x'), nw = nw0;
+    try { h.setPointerCapture(e.pointerId); } catch (x) { /* ні */ }
+    document.documentElement.classList.add('pjg2-resizing');
+    function mv(ev) {
+      nw = Math.min(Math.max(nw0 + (ev.clientX - x0) * k, NW_MIN), NW_MAX);
+      h.setAttribute('x', hx0 + (nw - nw0));
+    }
+    function up() {
+      h.removeEventListener('pointermove', mv);
+      h.removeEventListener('pointerup', up);
+      h.removeEventListener('pointercancel', up);
+      document.documentElement.classList.remove('pjg2-resizing');
+      if (Math.abs(nw - nw0) >= 2) { setPref('pj-gantt-nw', String(Math.round(nw))); gwFetch(); }
+    }
+    h.addEventListener('pointermove', mv);
+    h.addEventListener('pointerup', up);
+    h.addEventListener('pointercancel', up);
   }, true);
   function scheduleDraw() {
     if (drawRaf) return;
@@ -1019,6 +1256,12 @@
     }
     items.push({label: folds()[id] ? 'Розгорнути кроки' : 'Згорнути кроки', icon: folds()[id] ? '▾' : '▸',
                 onSelect: function () { togglePhase(id); }});
+    var phg = oursSvg() && oursSvg().querySelector('g[data-phase="' + id + '"][data-ph0]');
+    if (phg) {                                      // 🔍 період діаграми Minerva — лише час цієї фази
+      items.push({label: 'Показати лише цю фазу', icon: '🔍', onSelect: function () {
+        gwSet(dnum(phg.getAttribute('data-ph0')) - 3, dnum(phg.getAttribute('data-ph1')) + 4, true);
+      }});
+    }
     items.push({label: 'Нова фаза…', icon: '＋', onSelect: function () { openPhase(''); }});
     if (id !== 'none') {
       items.push({type: 'separator'});
@@ -1068,6 +1311,7 @@
   });
   applyGantt();
   replanInit();
+  if (gwPref() || nwPref()) gwFetch(); else zoomInit();   // 🔍 збережений період / ширина «КРОК» — одразу
 
   // ── ⚙️ Поля проєкту: під пультом згорнуті; розгорнуті — коли форма з помилками або людина їх відкрила ──
   var FKEY = 'pj-fields-open';
@@ -1449,7 +1693,7 @@
     return fetch(url, {
       method: 'POST', credentials: 'same-origin',
       headers: {'X-CSRFToken': csrf(), 'Content-Type': 'application/json'},
-      body: JSON.stringify(Object.assign({range: range()}, body || {}))
+      body: JSON.stringify(Object.assign({range: range(), gw: gwPref(), nw: nwPref()}, body || {}))
     }).then(function (r) {
       return r.json().catch(function () { return {ok: false, error: 'HTTP ' + r.status}; });
     }).catch(function () { return {ok: false, error: 'сервер не відповідає'}; });
@@ -1457,7 +1701,7 @@
   function load(key) {
     var b = box();
     if (!b) return;
-    fetch(b.dataset.cockpit + '?range=' + encodeURIComponent(key), {credentials: 'same-origin'})
+    fetch(b.dataset.cockpit + '?range=' + encodeURIComponent(key) + '&' + gwQuery(), {credentials: 'same-origin'})
       .then(function (r) { return r.json(); })
       .then(function (j) { if (j && j.ok) put(j.html); })
       .catch(function () {});

@@ -690,3 +690,22 @@ html.pj-full-on, html.pj-full-on body { overflow: hidden; }
 .pjg2-colsz:hover, html.pjg2-resizing .pjg2-colsz { opacity: .8; }
 .pjg2-colln { stroke: var(--border-strong, #d0d7de); stroke-width: 1; pointer-events: none; }
 html.pjg2-resizing, html.pjg2-resizing * { cursor: col-resize !important; user-select: none; }
+/* 🔍 період діаграми Minerva: смуга з рамкою над діаграмою (pj.js drawBrush) і межа колонки «КРОК» */
+.pjg-brush { position: relative; height: 26px; margin: 2px 0 6px; border: 1px solid var(--border-strong, #d0d7de);
+  border-radius: 6px; background: var(--darkened-bg, rgba(127, 127, 127, .06)); cursor: pointer; user-select: none;
+  touch-action: none; overflow: hidden; }
+.pjg-br-m { position: absolute; top: 0; bottom: 0; padding-left: 3px; border-left: 1px solid var(--border-strong, #d0d7de);
+  font-size: 10.5px; line-height: 24px; color: var(--text-muted, #57606a); white-space: nowrap; pointer-events: none; }
+.pjg-br-today { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--err, #cf222e);
+  opacity: .7; pointer-events: none; }
+.pjg-br-win { position: absolute; top: 1px; bottom: 1px; box-sizing: border-box; border: 2px solid var(--accent, #0969da);
+  border-radius: 5px; background: color-mix(in srgb, var(--accent, #0969da) 20%, transparent); cursor: grab; }
+.pjg-br-win.pjg-br-all { background: color-mix(in srgb, var(--accent, #0969da) 8%, transparent); }
+.pjg-br-drag .pjg-br-win { cursor: grabbing; }
+.pjg-br-h { position: absolute; top: -1px; bottom: -1px; width: 8px; background: var(--accent, #0969da); opacity: .75;
+  cursor: ew-resize; }
+.pjg-br-h[data-e="a"] { left: -2px; border-radius: 4px 0 0 4px; }
+.pjg-br-h[data-e="b"] { right: -2px; border-radius: 0 4px 4px 0; }
+.pjg-zbar select { max-width: 220px; }
+.pjg .pjg-colsz { fill: var(--accent, #0969da); opacity: .35; cursor: col-resize; }
+.pjg .pjg-colsz:hover { opacity: .9; }

@@ -172,12 +172,35 @@ def overview_next_action_view(request, pk):
 
 def _cockpit(request, project, notice="", extra=None):
     """Свіжий HTML пульта (JS замінює #pj-cockpit, форма картки не перезавантажується)."""
-    from . import cockpit
-    if request.method == "POST":
-        range_key = str(_body(request).get("range") or request.GET.get("range") or "all")
-    else:
-        range_key = request.GET.get("range") or "all"
-    return JsonResponse({"ok": True, "html": cockpit.render(project, request.user, range_key, notice), **(extra or {})})
+    from . import cockpit, gantt
+    src = _body(request) if request.method == "POST" else {}
+    range_key = str(src.get("range") or request.GET.get("range") or "all")
+    view = gantt.clean_view({"gw": src.get("gw") or request.GET.get("gw"), "nw": src.get("nw") or request.GET.get("nw")})
+    return JsonResponse({"ok": True, "html": cockpit.render(project, request.user, range_key, notice, view),
+                         **(extra or {})})
+
+
+@staff_member_required
+@require_GET
+def gantt_view(request, pk):
+    """🔍 Діаграма Minerva в іншому вигляді без оновлення всього пульта: ?gw=YYYY-MM-DD,YYYY-MM-DD (період) &nw=
+    (ширина колонки «КРОК») → {full, brief, clean_full, clean_brief, span0, span1}. Право перегляду; пропозиції
+    звірки з нарадою — лише тому, хто звіряв і може змінювати проєкт (як у пульті)."""
+    from django.utils import timezone
+
+    from . import cockpit, gantt, plan_review, schedule
+    project = _project_for(request, pk, "view")
+    today = timezone.localdate()
+    can_change = request.user.has_perm("projects.change_project")
+    p = schedule.compute(project, today=today)
+    if not p.has_plan:
+        return JsonResponse({"ok": False, "error": "Плану ще немає"}, status=404)
+    ghosts = plan_review.ghosts(plan_review.active(project, request.user)) if can_change else None
+    v = cockpit.gantt_views(project, p, today, can_change, ghosts,
+                            gantt.clean_view({"gw": request.GET.get("gw"), "nw": request.GET.get("nw")}))
+    return JsonResponse({"ok": True, "full": v["gantt"], "brief": v["gantt_brief"], "clean_full": v["gantt_clean"],
+                         "clean_brief": v["gantt_brief_clean"], "span0": v["span0"].isoformat(),
+                         "span1": v["span1"].isoformat()})
 
 
 @staff_member_required

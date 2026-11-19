@@ -10,7 +10,7 @@
      data-plan-save-all="{{ urls.plan_save_all }}" data-plan-revise="{{ urls.plan_revise }}"{% if ai.on %} data-ai-on="1"{% endif %}
      data-ai-scan="{{ urls.ai_scan }}" data-ai-plan="{{ urls.ai_plan }}" data-ai-risks="{{ urls.ai_risks }}" data-ai-plan-apply="{{ urls.ai_plan_apply }}"
      data-ai-base="{{ urls.ai_base }}" data-forgotten="{{ urls.forgotten }}" data-forgotten-decide="{{ urls.forgotten_decide }}"
-     data-events="{{ urls.events }}" data-event-link="{{ urls.event_link }}" data-mail-handled="{{ urls.mail_handled }}" data-event-note="{{ urls.event_note }}" data-party="{{ urls.party }}" data-sourcing="{{ urls.sourcing }}" data-export="{{ urls.export }}" data-export-names="{{ urls.export_names }}" data-invite="{{ urls.invite }}" data-plan-review="{{ urls.plan_review }}" data-plan-review-base="{{ urls.plan_review_base }}" data-names-script="{{ names_script }}" data-party-base="{{ urls.party_base }}" data-party-suggest="{{ urls.party_suggest }}"
+     data-events="{{ urls.events }}" data-event-link="{{ urls.event_link }}" data-mail-handled="{{ urls.mail_handled }}" data-event-note="{{ urls.event_note }}" data-party="{{ urls.party }}" data-sourcing="{{ urls.sourcing }}" data-export="{{ urls.export }}" data-export-names="{{ urls.export_names }}" data-invite="{{ urls.invite }}" data-plan-review="{{ urls.plan_review }}" data-plan-review-base="{{ urls.plan_review_base }}" data-gantt="{{ urls.gantt }}" data-names-script="{{ names_script }}" data-party-base="{{ urls.party_base }}" data-party-suggest="{{ urls.party_suggest }}"
      data-ai-settings="{{ urls.ai_settings }}" data-ai-since="{{ ai.since|date:'Y-m-d' }}" data-start="{{ start|date:'Y-m-d' }}"
      data-steps="{{ plan.steps|default:0 }}"{% if can_change %}
      data-name="{{ project.name }}"{% endif %}>
@@ -429,10 +429,19 @@
             <button type="button" class="pjc-b" data-pjg-zoom="in" title="Наблизити (Ctrl + коліщатко)">＋</button>
           </span>
           <span class="pjc-hint" data-pjg-only="classic" hidden>{% if can_change %}Ctrl + коліщатко — масштаб · тягніть фон — прокрутка · тягніть смугу — нові дати, край — тривалість · правий клік — меню · клік на фазу — згорнути{% else %}Ctrl + коліщатко — масштаб · тягніть фон — прокрутка · клік на фазу — згорнути{% endif %}</span>
+          <span class="pjc-ranges pjg-zbar" role="group" aria-label="Період діаграми" data-pjg-only="ours">
+            <button type="button" class="pjc-b" data-pjgw="out" title="Віддалити — довший період (Ctrl + коліщатко над діаграмою)">－</button>
+            <button type="button" class="pjc-b" data-pjgw="all" title="Увесь проєкт">Усе</button>
+            <button type="button" class="pjc-b" data-pjgw="m3" title="Три місяці від тижня тому">3 міс</button>
+            <button type="button" class="pjc-b" data-pjgw="m1" title="Місяць від тижня тому">1 міс</button>
+            <button type="button" class="pjc-b" data-pjgw="in" title="Наблизити — коротший період (Ctrl + коліщатко над діаграмою)">＋</button>
+            <select data-pjgw-phase aria-label="Показати одну фазу" title="Показати лише час однієї фази"><option value="">🔍 Фаза…</option></select>
+          </span>
           {% if can_change %}<span class="pjc-hint" data-pjg-only="ours">Тягніть смугу чи ◆ — нові дати, край смуги — тривалість · клік — вікно кроку · правий клік — меню</span>{% endif %}
           <button type="button" class="pjc-b pjc-right" data-pjg-full aria-pressed="false" title="Діаграма на весь екран — Esc повертає">⛶ На весь екран</button>
           <button type="button" class="pjc-b" data-pjx="plan" title="PDF з таблицею кроків, картинка чи Excel — завантажити або надіслати листом">📤 Експорт / лист</button>
         </div>
+        <div class="pjg-brush" data-pjg-brush data-pjg-only="ours" title="Тягніть рамку — інший період · краї рамки — довший чи коротший · подвійний клік — увесь проєкт"></div>
         <div class="pjc-svg" data-pjg-pane="ours"><div data-pjg-detail="full">{{ plan.gantt|safe }}</div><div data-pjg-detail="brief" hidden>{{ plan.gantt_brief|safe }}</div></div>
         {% if plan.props %}<template id="pjg-clean-full">{{ plan.gantt_clean|safe }}</template><template id="pjg-clean-brief">{{ plan.gantt_brief_clean|safe }}</template>{% endif %}
         <div class="pjg2" data-pjg-pane="classic" hidden></div>
