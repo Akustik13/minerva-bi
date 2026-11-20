@@ -710,7 +710,14 @@ QUOTE_RULES = (
     "components), [] — лише якщо справді незрозуміло. Кілька варіантів (покриття, матеріал) — бери той, що "
     "відповідає нашому запиту, інші — у summary. lead_days і tiers.lead_days — у календарних днях (тижні × 7); "
     "строк різний для зразків і серії — у кожному ступені свій. Відмова / «не робимо» — declined: true. Цін немає "
-    "(лише питання чи підтвердження) — tiers: [], у summary — що саме написали.")
+    "(лише питання чи підтвердження) — tiers: [], у summary — що саме написали. Листування — за датою: «📥 Лист "
+    "постачальника» і «📤 НАШ лист» (наші уточнення, зустрічні ціни, домовленості — для контексту), можливо з різних "
+    "адрес і гілок однієї фірми. Ціни й умови — з найновішої пропозиції постачальника (новіший лист чи файл замінює "
+    "старіший; кілька варіантів — звичайний строк / довший дешевший — бери відповідний нашому запиту, інший — у "
+    "summary); ціну чи умову, яку ми запропонували в нашому листі, бери, лише якщо постачальник її підтвердив.")
+
+
+MAIL_READ = 14          # найновіших листів рядка в розборі відповіді
 
 
 def _template_label(key) -> str:
@@ -720,26 +727,28 @@ def _template_label(key) -> str:
 
 def quote(recipient, user=None, model=DEFAULT_MODEL) -> dict:
     """💶 Відповідь постачальника на запит → ціни за кількістю (без разових), разові витрати, що входить у ціну,
-    строк, умови (у recipient.ai; поля — лише порожні). Читає листи гілки й файли постачальника, збережені в запиті."""
+    строк, умови (у recipient.ai; поля — лише порожні). Читає все листування рядка (гілка запиту й прив'язані пізніше,
+    наші й постачальника, MAIL_READ найновіших) і файли постачальника, збережені в запиті."""
     from django.utils import timezone
-    from email_assistant.models import EmailMessage
     from email_assistant.quotes import new_text
     from email_assistant.reply_brief import attachment_text
     req = recipient.request
-    msgs = []
-    if recipient.thread_id:
-        msgs = list(EmailMessage.objects.filter(thread_id=recipient.thread_id, account__user=user, is_deleted=False)
-                    .exclude(pk=recipient.sent_message_id).order_by("sent_at")[:8])
-    elif recipient.reply_message_id:
-        msgs = list(EmailMessage.objects.filter(pk=recipient.reply_message_id, account__user=user))
-    msgs = [m for m in msgs if (m.from_email or "").lower() != (req.account.email_address.lower()
-                                                                  if req.account_id else "")]
-    if not msgs:
+    from suppliers.services import rfq_replies
+    # 📨 усе листування рядка (гілка запиту + прив'язані пізніше), лише з власних скриньок людини; наш перший лист —
+    # це сам запит (він нижче), наші подальші листи — для контексту (уточнення, зустрічні ціни)
+    own = rfq_replies._own()
+    allm = [m for m in rfq_replies.mail(recipient)
+            if m.pk != recipient.sent_message_id and user is not None and m.account.user_id == user.pk]
+    if not any(rfq_replies.theirs(m, own) for m in allm):
         raise AIError("Відповіді постачальника у ваших скриньках не знайдено.")
+    msgs = allm[-MAIL_READ:]
     parts = []
     for m in msgs:
-        part = f"Лист {m.sent_at:%Y-%m-%d} від {m.from_email} · {m.subject}\n{new_text(m.body_text or '')[:4000]}"
-        for att in (m.attachments or [])[:4]:
+        mine = not rfq_replies.theirs(m, own)
+        head = "📤 НАШ лист" if mine else "📥 Лист постачальника"
+        part = (f"{head} {m.sent_at:%Y-%m-%d %H:%M} від {m.from_email} · {m.subject}\n"
+                f"{new_text(m.body_text or '')[:2000 if mine else 5000]}")
+        for att in ([] if mine else (m.attachments or [])[:6]):
             if isinstance(att, dict) and not att.get("is_inline") and not recipient.reply_files.filter(
                     message=m, name=att.get("name")).exists():
                 t = attachment_text(att, limit=6000)
@@ -753,7 +762,7 @@ def quote(recipient, user=None, model=DEFAULT_MODEL) -> dict:
     except Exception:  # noqa: BLE001 — без IMAP: що вже на диску
         pass
     shown, files_part = {str(a.get("name")) for m in msgs for a in (m.attachments or []) if isinstance(a, dict)}, []
-    for f in recipient.reply_files.all()[:8]:
+    for f in recipient.reply_files.order_by("-pk")[:12]:          # найновіші файли першими
         try:
             with f.file.open("rb") as fh:
                 t = rfq_files.read(f.name, fh.read(rfq_files.FILE_MAX + 1))
@@ -767,7 +776,7 @@ def quote(recipient, user=None, model=DEFAULT_MODEL) -> dict:
              f"{_template_label(req.template)}\n{req.body[:2000]}")
     system = ("Ти розбираєш відповідь постачальника на наш запит пропозиції (RFQ). " + DATA_NOTE + QUOTE_RULES +
               " Відповідай лише JSON: " + QUOTE_JSON)
-    text, price = call(system, f"{asked}\n<<<ДАНІ\n" + "\n\n".join(parts)[:40000] + "\nДАНІ>>>",
+    text, price = call(system, f"{asked}\n<<<ДАНІ\n" + "\n\n".join(parts)[:60000] + "\nДАНІ>>>",
                        model=model_of(model), user=user, effort="low", max_tokens=6000)
     data = parse_json(text)
     tiers = []

@@ -333,6 +333,8 @@ class SupplierRequest(models.Model):
     copied_from = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="copies",
                                     verbose_name="Копія запиту")
     review = models.JSONField("Перевірити після копіювання", default=dict, blank=True)
+    # 🔎 «Не відповідь на запит» — листи, які людина відкинула в «Знайти пропущені відповіді» (suppliers/services/rfq_match.py)
+    missed_skip = models.JSONField("Не відповіді", default=list, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
     sent_at = models.DateTimeField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)
@@ -412,6 +414,9 @@ class SupplierRequestRecipient(models.Model):
                                related_name="+")
     reply_message = models.ForeignKey("email_assistant.EmailMessage", null=True, blank=True,
                                       on_delete=models.SET_NULL, related_name="+")
+    # 📥 відповідь окремою гілкою (інша адреса, без номера запиту) — теж листування цього рядка (rfq_match.link)
+    extra_threads = models.ManyToManyField("email_assistant.EmailThread", blank=True, related_name="+",
+                                           verbose_name="Ще гілки листування")
     sent_at = models.DateTimeField(null=True, blank=True)
     replied_at = models.DateTimeField(null=True, blank=True)
     reminded_at = models.DateTimeField(null=True, blank=True)

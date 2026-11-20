@@ -538,7 +538,7 @@ def on_incoming(msg) -> int:
         return 0
     cond = Q(pk__in=[])
     if msg.thread_id:
-        cond |= Q(thread_id=msg.thread_id)
+        cond |= Q(thread_id=msg.thread_id) | Q(extra_threads=msg.thread_id)   # і гілка, прив'язана пізніше
     if msg.in_reply_to:
         cond |= Q(message_id=msg.in_reply_to.strip())
     codes = CODE_RE.findall(f"{msg.subject or ''} {(msg.body_text or '')[:4000]}")
@@ -546,9 +546,10 @@ def on_incoming(msg) -> int:
         cond |= Q(request__code__in=codes)
     found = 0
     sender = match.addr(msg.from_email)
-    for r in R.objects.filter(cond).exclude(state=R.PLANNED).select_related("supplier", "request"):
-        if not (r.thread_id and r.thread_id == msg.thread_id) and (not msg.in_reply_to or
-                                                                  msg.in_reply_to.strip() != r.message_id):
+    for r in R.objects.filter(cond).exclude(state=R.PLANNED).select_related("supplier", "request").distinct():
+        in_thread = bool(msg.thread_id) and (r.thread_id == msg.thread_id or
+                                             r.extra_threads.filter(pk=msg.thread_id).exists())
+        if not in_thread and (not msg.in_reply_to or msg.in_reply_to.strip() != r.message_id):
             emails, domains = match.keys(r.supplier)   # лише за номером у темі — відправник має бути цей постачальник
             if sender not in emails and sender != r.email.lower() and not match.domain_matches(
                     sender.split("@", 1)[1] if sender else "", domains):
@@ -573,6 +574,13 @@ def on_incoming(msg) -> int:
             collect(r)
         except Exception:  # noqa: BLE001
             logger.warning("rfq reply files for recipient %s failed", r.pk, exc_info=True)
+    if not found and not R.objects.filter(cond).exists():
+        # окремим листом, з іншої адреси, без номера запиту — за номером деталі з запиту й назвою / адресою фірми
+        try:
+            from suppliers.services import rfq_match
+            found = rfq_match.auto(msg)
+        except Exception:  # noqa: BLE001 — пошта важливіша
+            logger.warning("rfq auto match failed for message %s", msg.pk, exc_info=True)
     return found
 
 

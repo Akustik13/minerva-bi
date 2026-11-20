@@ -92,6 +92,20 @@ class GroupFilter(admin.SimpleListFilter):
         return queryset.filter(group=self.value()) if self.value() else queryset
 
 
+def _new_mail(r) -> bool:
+    """📥 Після розбору AI прийшов ще лист постачальника (нова ціна, окремий лист) — розібрати знову."""
+    at = (r.ai or {}).get("at")
+    if not at:
+        return False
+    try:
+        parsed = datetime.datetime.fromisoformat(str(at))
+    except ValueError:
+        return False
+    from suppliers.services import rfq_replies
+    last = rfq_replies.last_theirs_at(r)
+    return bool(last and last > parsed)
+
+
 def _js(value) -> str:
     """Значення для <script> (JSON без «<», «>», «&» — не закриє тег)."""
     import json
@@ -189,6 +203,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             path("<int:pk>/work/", view(self.work_view), name="suppliers_supplierrequest_work"),
             path("<int:pk>/action/", view(self.action_view), name="suppliers_supplierrequest_action"),
             path("<int:pk>/letters/", view(self.letters_view), name="suppliers_supplierrequest_letters"),
+            path("<int:pk>/missed/", view(self.missed_view), name="suppliers_supplierrequest_missed"),
             path("<int:pk>/recipient/<int:rid>/panel/", view(self.panel_view), name="suppliers_supplierrequest_panel"),
             path("preview/", view(self.preview_view), name="suppliers_supplierrequest_preview"),
             path("ai-letter/", view(self.ai_letter_view), name="suppliers_supplierrequest_ai_letter"),
@@ -267,6 +282,23 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         return JsonResponse({"to": r.email or "⚠️ немає email", "cc": rfq.cc_for(draft, r), "subject": subject,
                              "body": body, "files": [f.name for f in self._form_files(request, req)],
                              **_letter_extras(account)})
+
+    def missed_view(self, request, pk):
+        """🔎 Пропущені відповіді: листи з ваших скриньок після надсилання запиту, ще не в листуванні рядків, схожі на
+        відповідь (номер запиту, номер деталі з запиту, адреса чи назва фірми отримувача) — rfq_match.missed.
+        Лише читання; прив'язати / «не відповідь» — action_view (link_msg / skip_msg)."""
+        from suppliers.services import rfq_match
+        req = self._request(request, pk, "change")
+        rows = [{"msg": x["msg"].pk, "date": x["msg"].sent_at.strftime("%d.%m.%Y %H:%M") if x["msg"].sent_at else "",
+                 "from": " ".join(v for v in (x["msg"].from_name, f"<{x['msg'].from_email}>") if v),
+                 "subject": x["msg"].subject or "(без теми)", "reasons": x["reasons"], "rid": x["rid"],
+                 "files": [str(a.get("name") or "") for a in (x["msg"].attachments or [])
+                           if isinstance(a, dict) and not a.get("is_inline")][:6],
+                 "url": f"/email/?msg={x['msg'].pk}"}
+                for x in rfq_match.missed(req, request.user)]
+        recipients = [{"rid": r.pk, "name": r.supplier.name, "email": r.email}
+                      for r in req.recipients.exclude(state=SupplierRequestRecipient.PLANNED).select_related("supplier")]
+        return JsonResponse({"items": rows, "recipients": recipients})
 
     def letters_view(self, request, pk):
         """👁 Перед «📤 Надіслати» на сторінці запиту: лист кожному, кому ще не надіслано (?rid= — лише йому), —
@@ -640,6 +672,8 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             review_must=", ".join(x["label"] for x in rfq_copy.pending(req) if x["level"] == rfq_copy.MUST),
             review_must_json=_js(", ".join(x["label"] for x in rfq_copy.pending(req) if x["level"] == rfq_copy.MUST)),
             letters_url_json=_js(reverse("admin:suppliers_supplierrequest_letters", args=[req.pk])),
+            missed_url_json=_js(reverse("admin:suppliers_supplierrequest_missed", args=[req.pk])),
+            act_json=_js(reverse("admin:suppliers_supplierrequest_action", args=[req.pk])),
             copies=list(req.copies.order_by("-created_at").values("pk", "code", "status")[:10]),
             states=[s for s in SupplierRequestRecipient.STATES if s[0] != SupplierRequestRecipient.PLANNED],
             more=more, more_mail=sum(1 for s in more if s.f_email), events=events, quantities=rfq.parse_quantities(req.quantities),
@@ -656,7 +690,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         R = SupplierRequestRecipient
         out = []
         for r in req.recipients.exclude(thread=None, reply_message=None).filter(state__in=[R.REPLIED, R.QUOTED]):
-            if overwrite or not (r.ai or {}).get("summary") or (r.ai or {}).get("v") != 2:
+            if overwrite or not (r.ai or {}).get("summary") or (r.ai or {}).get("v") != 2 or _new_mail(r):
                 out.append(r.pk)
         return out
 
@@ -763,6 +797,23 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             elif do == "remove" and r is not None:
                 if r.state in (SupplierRequestRecipient.PLANNED, SupplierRequestRecipient.FAILED):
                     r.delete()
+            elif do in ("link_msg", "skip_msg"):          # 🔎 пропущена відповідь: прив'язати / «не відповідь»
+                from email_assistant.models import EmailMessage
+                from suppliers.services import rfq_match
+                mid = request.POST.get("msg")
+                msg = EmailMessage.objects.filter(pk=int(mid) if str(mid or "").isdigit() else 0,
+                                                  account__user=request.user).first()   # лише зі своїх скриньок
+                if msg is None:
+                    return JsonResponse({"error": "Листа немає у ваших скриньках."}, status=404)
+                if do == "skip_msg":
+                    rfq_match.skip(req, msg.pk)
+                    return JsonResponse({"ok": True})
+                rr = req.recipients.select_related("supplier", "request").filter(
+                    pk=int(request.POST.get("rid")) if str(request.POST.get("rid") or "").isdigit() else 0).first()
+                if rr is None:
+                    return JsonResponse({"error": "Виберіть постачальника."}, status=400)
+                done = rfq_match.link(rr, msg, request.user)
+                return JsonResponse({"ok": True, "linked": done, "supplier": rr.supplier.name})
             elif do == "add":
                 from inventory.models import Supplier
                 ids = [int(x) for x in request.POST.getlist("rcp") if str(x).isdigit()]

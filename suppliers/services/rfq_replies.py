@@ -2,7 +2,8 @@
 suppliers/services/rfq_replies.py — 📥 Відповіді постачальника на запит (RFQ): листування рядка, вкладення → файли
 запиту, швидкий огляд (панель праворуч на сторінці запиту, suppliers/admin.py panel_view).
 
-  mail(r)              — листи рядка: гілка запиту (r.thread) + наш лист і відповідь, за датою (без видалених і спаму);
+  mail(r)              — листи рядка: гілка запиту (r.thread) і прив'язані пізніше (extra_threads) + наш лист і
+                         відповідь, за датою (без видалених і спаму); threads(r), last_theirs_at(r);
   theirs(msg)          — лист від постачальника, не наш;
   wanted(att)          — вкладення, яке береться: не вбудоване в текст, не логотип підпису (картинка < LOGO_MAX);
   collect(r, fetch)    — вкладення листів постачальника → SupplierReplyFile (той самий вміст — раз). Файл уже на диску
@@ -37,11 +38,27 @@ ICONS = (("pdf", "📕"), ("xls", "📗"), ("csv", "📗"), ("doc", "📘"), ("z
          ("dxf", "📐"), ("dwg", "📐"), ("gbr", "🟩"), ("ger", "🟩"))
 
 
+def threads(r) -> list:
+    """Гілки листування рядка: гілка запиту + прив'язані пізніше (окремий лист, інша адреса — rfq_match.link)."""
+    out = [r.thread_id] if r.thread_id else []
+    if r.pk:
+        out += [t for t in r.extra_threads.values_list("pk", flat=True) if t not in out]
+    return out
+
+
+def last_theirs_at(r):
+    """Коли прийшов найновіший лист постачальника в листуванні рядка (None — ще жодного)."""
+    own = _own()
+    times = [m.sent_at for m in mail(r) if m.sent_at and theirs(m, own)]
+    return max(times) if times else None
+
+
 def mail(r) -> list:
     from email_assistant.models import EmailMessage
     q = Q(pk__in=[x for x in (r.sent_message_id, r.reply_message_id) if x])
-    if r.thread_id:
-        q |= Q(thread_id=r.thread_id)
+    th = threads(r)
+    if th:
+        q |= Q(thread_id__in=th)
     return list(EmailMessage.objects.filter(q).filter(is_deleted=False, is_spam=False)
                 .select_related("account").order_by("sent_at", "pk")[:MAIL_MAX])
 

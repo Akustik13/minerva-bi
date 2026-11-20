@@ -140,6 +140,7 @@
         {% if cmp.counts.no_price %}<span class="spf-tag">💬 відповіли без цін: {{ cmp.counts.no_price }}</span>{% endif %}
         {% if cmp.counts.waiting %}<span class="spf-tag">⏳ ще не відповіли: {{ cmp.counts.waiting }}</span>{% endif %}
         {% if can_change and reparse %}<button type="button" class="button" id="rw-parse-all" title="AI по черзі прочитає кожну відповідь (лист і файли — таблиці xlsx, PDF) й внесе ціни за кількістю, разові витрати, що входить у ціну, строк. Нічого не надсилає.">🧠 Розібрати відповіді ({{ reparse }})</button><span class="spf-job" id="rw-parse-job"></span>{% endif %}
+        {% if can_change and req.sent_at %}<button type="button" class="button" id="rw-missed-btn" title="Шукає у ваших скриньках листи після надсилання запиту, які ще не прив'язані: з номером запиту, номером деталі з запиту (напр. з назви чи файлів), з адреси чи з назвою фірми, якій надсилали. Відповідь окремим листом чи з іншої адреси — прив'яжете одним кліком.">🔎 Знайти пропущені відповіді</button>{% endif %}
       </div>
     </div>
     {% endif %}
@@ -435,6 +436,78 @@
   }
 })();
 </script>
+{% if can_change and req.sent_at %}
+<dialog id="rw-missed" class="rw-pv" aria-labelledby="rw-missed-h">
+  <div class="rw-pv-head"><b id="rw-missed-h">🔎 Пропущені відповіді</b><button type="button" class="button" data-missed-close aria-label="Закрити">✕</button></div>
+  <div class="spf-muted" style="padding:8px 14px 0">Листи з ваших скриньок після надсилання запиту, ще не прив'язані до жодного постачальника в ньому. Прив'язаний лист (і вся його гілка) стає листуванням цього постачальника: його файли — у запиті, AI читає його при розборі.</div>
+  <div class="rw-pv-mail" id="rw-missed-list"></div>
+  <div class="rw-pv-foot"><span class="spf-muted" id="rw-missed-note"></span><button type="button" class="button" data-missed-close>Закрити</button></div>
+</dialog>
+<style>
+  .rw-ms-item { border: 1px solid var(--border-strong, #ddd); border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
+  .rw-ms-item.done { opacity: .55; }
+  .rw-ms-why { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+  .rw-ms-why span { font-size: 12px; border: 1px solid var(--border-strong, #ccc); border-radius: 9px; padding: 0 6px; }
+  .rw-ms-act { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; }
+</style>
+<script>
+(function(){
+  var dlg = document.getElementById('rw-missed'), btn = document.getElementById('rw-missed-btn');
+  if (!dlg || !btn || typeof dlg.showModal !== 'function') return;
+  var list = document.getElementById('rw-missed-list'), note = document.getElementById('rw-missed-note');
+  var url = {{ missed_url_json|safe }}, act = {{ act_json|safe }}, changed = false;
+  var tok = (document.querySelector('input[name=csrfmiddlewaretoken]') || {}).value || '';
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function post(data) {
+    var fd = new FormData(); Object.keys(data).forEach(function(k){ fd.append(k, data[k]); });
+    return fetch(act, {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-CSRFToken': tok}})
+      .then(function(r){ return r.json(); });
+  }
+  function render(data) {
+    list.innerHTML = '';
+    if (!data.items.length) { list.appendChild(el('div', 'spf-muted', '✓ Пропущених відповідей не знайдено.')); return; }
+    data.items.forEach(function(it){
+      var box = el('div', 'rw-ms-item');
+      var head = el('div'); head.appendChild(el('b', null, it.date + ' · ')); var f = el('span', null, it.from); f.setAttribute('translate', 'no'); head.appendChild(f);
+      box.appendChild(head);
+      var subj = el('div', null, it.subject); subj.setAttribute('translate', 'no'); box.appendChild(subj);
+      if (it.files.length) { var fl = el('div', 'spf-muted', '📎 ' + it.files.join(', ')); fl.setAttribute('translate', 'no'); box.appendChild(fl); }
+      var why = el('div', 'rw-ms-why'); it.reasons.forEach(function(w){ why.appendChild(el('span', null, w)); }); box.appendChild(why);
+      var row = el('div', 'rw-ms-act');
+      var sel = el('select'); sel.appendChild(el('option', null, '— до якого постачальника —')).value = '';
+      data.recipients.forEach(function(r){ var o = el('option', null, r.name + ' · ' + r.email); o.value = r.rid; if (r.rid === it.rid) o.selected = true; sel.appendChild(o); });
+      row.appendChild(sel);
+      var link = el('button', 'button', '🔗 Прив’язати'); link.type = 'button';
+      var skip = el('button', 'button', '✕ Не відповідь'); skip.type = 'button';
+      var open = el('a', null, '✉️ у пошті ↗'); open.href = it.url; open.target = '_blank';
+      var msg = el('span', 'spf-muted');
+      link.addEventListener('click', function(){
+        if (!sel.value) { msg.textContent = 'Виберіть постачальника.'; return; }
+        link.disabled = true;
+        post({do: 'link_msg', msg: it.msg, rid: sel.value}).then(function(j){
+          if (j.error) { msg.textContent = '⚠️ ' + j.error; link.disabled = false; return; }
+          msg.textContent = '✓ Прив’язано: ' + j.supplier; box.classList.add('done'); changed = true; skip.disabled = true;
+        }).catch(function(){ msg.textContent = '⚠️ Немає зв’язку'; link.disabled = false; });
+      });
+      skip.addEventListener('click', function(){
+        post({do: 'skip_msg', msg: it.msg}).then(function(){ msg.textContent = 'Більше не пропонуватиму.'; box.classList.add('done'); link.disabled = true; skip.disabled = true; });
+      });
+      row.appendChild(link); row.appendChild(skip); row.appendChild(open); row.appendChild(msg);
+      box.appendChild(row);
+      list.appendChild(box);
+    });
+  }
+  btn.addEventListener('click', function(){
+    list.innerHTML = ''; note.textContent = '⏳ Шукаю у ваших скриньках…'; dlg.showModal();
+    fetch(url, {credentials: 'same-origin'}).then(function(r){ return r.json(); }).then(function(data){
+      note.textContent = data.items.length ? 'Знайдено: ' + data.items.length + '. Після прив’язки — «🧠 Розібрати відповіді».' : '';
+      render(data);
+    }).catch(function(){ note.textContent = '⚠️ Не вдалося — спробуйте ще раз.'; });
+  });
+  dlg.querySelectorAll('[data-missed-close]').forEach(function(b){ b.addEventListener('click', function(){ dlg.close(); if (changed) location.reload(); }); });
+})();
+</script>
+{% endif %}
 {% if can_change %}
 <dialog id="rw-pv" class="rw-pv" aria-labelledby="rw-pv-h">
   <div class="rw-pv-head"><b id="rw-pv-h">👁 Перевірте лист перед надсиланням</b><button type="button" class="button" data-pv-close aria-label="Закрити">✕</button></div>
