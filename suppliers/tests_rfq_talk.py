@@ -470,3 +470,104 @@ class SavedLettersTests(TalkBase):
             self.client.post(self.act, {"do": "chat_send", "rid": self.r2.pk, "to": "sales8@hitechpcb.com",
                                         "body": "Dear Susie, ENIG price please."})
         self.assertEqual(rfq_talk.saved_letters(self.req, self.user)["letters"], [])   # 💬 надіслали — позначено
+
+
+class StatsScopeTests(TalkBase):
+    """📊 Біля найнижчої / найвищої — що в ціні; ціна далеко від медіани — ⚠️ (голі плати серед PCBA)."""
+
+    def test_scope_shown_and_outlier_flagged(self):
+        R.objects.filter(pk=self.r3.pk).update(               # «усе в ціні» за словами AI, а ціна — як за голу плату
+            state=R.QUOTED, currency="EUR", includes=["pcb", "assembly", "components"],
+            tiers=[{"qty": 5, "unit_price": "150"}, {"qty": 2500, "unit_price": "0.49"}])
+        t = rfq_compare.table(self.req)
+        for row in t["rows"]:
+            row["timing"] = rfq_stats.timing(row["recipient"])
+        st = rfq_stats.stats(self.req, t)
+        q = next(p for p in st["per_qty"] if p["qty"] == 2500)
+        self.assertEqual((q["min_who"], q["min_incl"]), ("Quiet PCB", "🟩 плати · 🔧 монтаж · 🔩 компоненти"))
+        self.assertIn("нижча за медіану", q["min_warn"])
+        self.assertEqual(q["max_warn"], "")
+        quiet = next(x for x in t["rows"] if x["recipient"].pk == self.r3.pk)
+        self.assertIn("перевірте, що входить", quiet["cells"][1]["suspect"])
+        page = self.client.get(reverse("admin:suppliers_supplierrequest_work", args=[self.req.pk])).content.decode()
+        self.assertIn("Найнижча — за 1 шт.", page)
+        self.assertIn("раза нижча за медіану", page)
+        self.assertIn("Просили: 🔧 монтаж", page)
+
+
+class AIUsageTests(TalkBase):
+    """🧠 Смуга AI: яка модель, скільки витрачено на запит (по моделях і діях), модель у рядку."""
+
+    def test_spend_recorded_and_shown(self):
+        answer = json.dumps({"currency": "EUR", "tiers": [{"qty": 5, "unit_price": 120}], "includes": ["assembly"],
+                             "summary": "PCBA 120"})
+        with mock.patch.object(ai, "call", return_value=(answer, Decimal("0.0123"))):
+            self.client.post(self.act, {"do": "ai_quote", "rid": self.r.pk, "model": "claude-haiku-5-5"})
+        brief = json.dumps({"status": "ok", "they_ask": [], "to_answer": [], "they_promised": [], "we_promised": [],
+                            "draft": "Dear Charles,"})
+        with mock.patch.object(ai, "call", return_value=(brief, Decimal("0.002"))):
+            self.client.post(self.act, {"do": "chat_brief", "rid": self.r.pk, "model": "claude-sonnet-5-5"})
+        self.req.refresh_from_db()
+        u = self.req.ai_usage
+        self.assertEqual((u["calls"], round(u["usd"], 4)), (2, 0.0143))
+        self.assertEqual(u["models"]["claude-haiku-5-5"]["calls"], 1)
+        self.assertEqual(set(u["kinds"]), {"parse", "brief"})
+        page = self.client.get(reverse("admin:suppliers_supplierrequest_work", args=[self.req.pk])).content.decode()
+        self.assertIn("витрачено на запит: <b>$0.014</b>", page)
+        self.assertIn("розбір відповідей $0.012", page)
+        self.assertIn('id="rw-model"', page)
+        self.assertIn('🧠 <span translate="no">Haiku 5.5</span> · $0.012', page)      # модель під рядком
+        self.assertIn("Sonnet 5.5", self.chat().content.decode())                        # «🧭 Коротко» — модель
+
+
+class ChatAITests(TalkBase):
+    """💬 AI у полі відповіді: ✍️ написати за побажанням, ✨ покращити мій текст — лише з власних листів."""
+
+    def test_write_and_improve(self):
+        oth = EmailThread.objects.create(account=self.other_account, subject="JY private")
+        self.mail(frm="charles@jypcba.com", body="SECRET 99", thread=oth, account=self.other_account)
+        self.r.extra_threads.add(oth)
+        answer = json.dumps({"body": "Dear Charles,\n\nthank you. What is the price with ENIG?\n\nBest regards,"})
+        with mock.patch.object(ai, "call", return_value=(answer, Decimal("0.004"))) as call:
+            j = self.client.post(self.act, {"do": "chat_ai", "rid": self.r.pk, "mode": "write",
+                                            "wish": "подякуй і запитай ціну з позолотою"}).json()
+        res = self.client.get(f"/admin/inventory/supplier/job/{j['job']}/").json()["result"]
+        self.assertIn("price with ENIG", res["body"])
+        sent = call.call_args[0][1]
+        self.assertTrue(sent.startswith("ПОБАЖАННЯ МЕНЕДЖЕРА — що написати: подякуй"))
+        self.assertIn("Can you share the BOM?", sent)
+        self.assertNotIn("SECRET 99", sent)
+        with mock.patch.object(ai, "call", return_value=(answer, Decimal("0.004"))) as call:
+            self.client.post(self.act, {"do": "chat_ai", "rid": self.r.pk, "mode": "improve",
+                                        "text": "pls price with gold contacts thx"})
+        self.assertIn("МІЙ ТЕКСТ:\npls price with gold contacts thx", call.call_args[0][1])
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.ai_usage["kinds"]["reply"]["calls"], 2)
+        self.assertEqual(self.client.post(self.act, {"do": "chat_ai", "rid": self.r.pk, "mode": "write",
+                                                     "wish": " "}).status_code, 400)
+        self.assertIn('data-rwc-ai="write"', self.chat().content.decode())
+
+
+class ChatFilesTests(TalkBase):
+    """📎 Вкладення в 💬 — посилання: свій лист — через сторінку запиту, збережений у запиті файл — його адреса."""
+
+    def test_attachment_links(self):
+        import os
+        path = os.path.join(self.media, "email_attachments", "q.pdf")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as fh:
+            fh.write(b"%PDF-1.4 quote")
+        EmailMessage.objects.filter(pk=self.ans.pk).update(attachments=[
+            {"name": "logo.png", "content_type": "image/png", "size": 900, "is_inline": True},
+            {"name": "Quotation.pdf", "content_type": "application/pdf", "size": 14, "file_path": "email_attachments/q.pdf"}])
+        page = self.chat().content.decode()
+        url = reverse("admin:suppliers_supplierrequest_chat_file", args=[self.req.pk, self.r.pk, self.ans.pk, 1])
+        self.assertIn(f'href="{url}"', page)
+        resp = self.client.get(url)
+        self.assertEqual((resp.status_code, resp["Content-Type"]), (200, "application/pdf"))
+        self.assertTrue(b"".join(resp.streaming_content if resp.streaming else [resp.content]).startswith(b"%PDF"))
+        # чужий лист / лист не цього рядка — ні
+        foreign = self.mail(frm="charles@jypcba.com", account=self.other_account,
+                            thread=EmailThread.objects.create(account=self.other_account, subject="o"))
+        self.assertEqual(self.client.get(reverse("admin:suppliers_supplierrequest_chat_file",
+                                                 args=[self.req.pk, self.r.pk, foreign.pk, 0])).status_code, 404)

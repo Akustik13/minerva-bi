@@ -50,7 +50,7 @@
       <label><input type="radio" name="rwe-mode" value="template"> 📝 Один текст для всіх, з підстановками: привітання на ім'я, ім'я, фірма, номер запиту</label>
       <div class="spf-muted" translate="no" style="margin-left:22px">{greeting} · {name} · {company} · {code}</div>
     </div>
-    <div class="rwc-row"><button type="button" class="button default" id="rwe-compose">✍️ Скласти листи</button><span class="spf-job" id="rwe-job"></span></div>
+    <div class="rwc-row"><button type="button" class="button default" id="rwe-compose">✍️ Скласти листи</button><span class="spf-muted" id="rwe-model-note"></span><span class="spf-job" id="rwe-job"></span></div>
   </div>
   <div id="rwe-step2" hidden>
     <div class="rwe-ccall">
@@ -95,7 +95,12 @@
   .rw-st small { font-size: 11px; }
   .rw-st-wide { min-width: 200px; }
   .rw-st-warn { border-color: var(--message-warning-bg, #e0a800); }
+  .rw-aibar { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin: 4px 0 8px; font-size: 13px; }
+  .rw-aibar select { max-width: 260px; }
+  .rw-aiinfo { white-space: nowrap; }
   .rw-st-prices { width: auto; }
+  .rw-st-prices td { vertical-align: top; }
+  .rw-st-incl { font-size: 11px; color: var(--text-muted, #888); }
   .rw-selbar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 1001; display: flex; gap: 10px; align-items: center; padding: 8px 14px; border-radius: 10px; background: var(--body-bg, #fff); border: 1px solid var(--border-strong, #ccc); box-shadow: 0 4px 18px rgba(0, 0, 0, .25); }
   .rw-selbar[hidden] { display: none; }
   .rwc-dlg { width: min(1180px, 97vw); height: 90vh; display: none; flex-direction: column; }
@@ -112,6 +117,8 @@
   .rwc-subj { font-weight: 600; margin-top: 2px; }
   .rwc-text { white-space: pre-wrap; margin-top: 4px; font-size: 13px; overflow-wrap: anywhere; }
   .rwc-files { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .rwc-files a.rwc-file { text-decoration: none; cursor: pointer; }
+  .rwc-files a.rwc-file:hover { text-decoration: underline; }
   .rwc-reply { border-top: 1px solid var(--border-strong, #ddd); padding: 8px 14px; display: flex; flex-direction: column; gap: 6px; }
   .rwc-to { display: flex; flex-wrap: wrap; gap: 8px; }
   .rwc-to label, .rwc-subjf { display: flex; gap: 6px; align-items: center; font-size: 13px; }
@@ -119,6 +126,8 @@
   .rwc-subjf { flex: none; }
   .rwc-to input, .rwc-subjf input, .rwc-subjf textarea { flex: 1; min-width: 0; }
   .rwc-reply textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+  .rwc-ai { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .rwc-ai input { flex: 1 1 280px; min-width: 0; }
   .rwc-act { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
   .rwc-act > .spf-muted:first-child { margin-right: auto; font-size: 12px; }
   .rwc-side { flex: 0 0 320px; overflow: auto; padding: 10px 14px; display: flex; flex-direction: column; gap: 14px; font-size: 13px; }
@@ -152,6 +161,14 @@
       .then(function(r){ return r.json(); });
   }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+  /* ── 🧠 модель AI для сторінки — запам’ятовується ── */
+  var ms = document.getElementById('rw-model');
+  if (ms) {
+    try { var mv = localStorage.getItem('rw-ai-model');
+      if (mv && Array.prototype.some.call(ms.options, function(o){ return o.value === mv; })) ms.value = mv; } catch (e) {}
+    ms.addEventListener('change', function(){ try { localStorage.setItem('rw-ai-model', ms.value); } catch (e) {} });
+  }
 
   /* ── 💬 листування з одним постачальником ── */
   var dlg = document.getElementById('rw-chat'), body = document.getElementById('rw-chat-body'),
@@ -194,6 +211,22 @@
     });
     if (!form) return;
     var ta = form.querySelector('textarea');
+    // 🧠 ✍️ написати за побажанням / ✨ покращити мій текст — модель зі смуги «🧠 AI»
+    var wishIn = form.querySelector('input[name=ai_wish]'), aiJob = form.querySelector('#rwc-ai-job');
+    function aiRun(mode) {
+      var m = document.getElementById('rw-model');
+      if (mode === 'write' && !wishIn.value.trim()) { aiJob.textContent = 'Напишіть, що відповісти.'; wishIn.focus(); return; }
+      if (mode === 'improve' && !ta.value.trim()) { aiJob.textContent = 'Спершу напишіть текст.'; ta.focus(); return; }
+      form.querySelectorAll('[data-rwc-ai]').forEach(function(b){ b.disabled = true; });
+      spJob(act, {do: 'chat_ai', rid: rid, mode: mode, wish: wishIn.value, text: ta.value, model: m ? m.value : ''}, aiJob, function(res){
+        form.querySelectorAll('[data-rwc-ai]').forEach(function(b){ b.disabled = false; });
+        if (mode === 'write' && ta.value.trim() && !confirm('Замінити написане текстом AI?')) { aiJob.textContent = res.message || ''; return; }
+        ta.value = res.body || ''; ta.focus(); aiJob.textContent = (res.message || '') + ' — перевірте й надішліть';
+      });
+      setTimeout(function(){ form.querySelectorAll('[data-rwc-ai]').forEach(function(b){ b.disabled = false; }); }, 90000);
+    }
+    form.querySelectorAll('[data-rwc-ai]').forEach(function(b){ b.addEventListener('click', function(){ aiRun(b.getAttribute('data-rwc-ai')); }); });
+    if (wishIn) wishIn.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); aiRun('write'); } });
     ta.addEventListener('keydown', function(e){ if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); form.requestSubmit(); } });
     form.addEventListener('submit', function(e){
       e.preventDefault();
@@ -290,6 +323,8 @@
     // відкрити: є збережені невідправлені листи — запропонувати їх (resume — одразу їх, з рядка над таблицею)
     function openEach(resume) {
       sentDone = false; letters = []; step(1); each.showModal();
+      var msel = document.getElementById('rw-model'), mn = document.getElementById('rwe-model-note');
+      if (msel && mn) mn.textContent = '🧠 ' + (msel.options[msel.selectedIndex] || {}).text + ' — модель угорі сторінки';
       enote.textContent = ids().length ? 'Вибрано: ' + ids().length : '';
       var box = document.getElementById('rwe-saved'); box.hidden = true; box.innerHTML = '';
       post({do: 'each_load'}).then(function(res){
@@ -316,7 +351,7 @@
         letters = (res.letters || []).map(function(L){ return Object.assign({on: !L.error || !!L.body}, L); });
         if (!letters.length) { job.textContent = '⚠️ Нікому писати.'; return; }
         cur = 0; step(2); show(0); count();
-        enote.textContent = 'Перегляньте кожен лист (вкладки вгорі) — можна виправити або зняти галочку.';
+        enote.textContent = (res.message ? res.message + ' · ' : '') + 'Перегляньте кожен лист (вкладки вгорі) — можна виправити або зняти галочку.';
       });
     });
     // 👥 копія всім: дописати / прибрати адреси в «Копія» кожного ще не надісланого листа

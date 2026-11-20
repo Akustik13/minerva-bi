@@ -7,6 +7,9 @@
                         й найвища ціна за 1 шт. з разовими у валюті Minerva (хто), розкид; строк — найкоротший /
                         найдовший. Ціни — лише повні пропозиції (як 🥇); немає повних — з неповних, позначено.
   human(seconds)      — «45 хв» · «3 год 20 хв» · «2 дн 4 год».
+  Біля найнижчої й найвищої — що в ціні (🟩 плата · 🔧 монтаж · 🔩 компоненти); ціна в OUTLIER і більше разів
+  нижча / вища за медіану — ⚠️ і в статистиці, і в клітинці таблиці (часто — голі плати серед PCBA: перевірте, що
+  входить, або 🧠 перечитайте відповідь).
 """
 import statistics
 from decimal import ROUND_HALF_UP, Decimal
@@ -42,6 +45,14 @@ def timing(r, letters=None) -> dict:
     return {"after": after, "after_text": human(after), "last_in": last_in,
             "newer": bool(last_in and r.replied_at and (last_in - r.replied_at).total_seconds() > 60),
             "letters_n": len(letters), "in_n": len(ins)}
+
+
+OUTLIER = Decimal(4)          # у стільки разів від медіани — підозріло (лише коли пропозицій ≥ 3)
+
+
+def _times(a, b) -> str:
+    """«21,2» — у скільки разів a більше за b, один знак після коми (тож завжди «раза»)."""
+    return str((a / b).quantize(Decimal("0.1"), ROUND_HALF_UP)).replace(".", ",")
 
 
 def _median(values):
@@ -88,18 +99,29 @@ def stats(req, table) -> dict:
             partial = bool(pool)
         if not pool:
             continue
-        vals = sorted(((row["cells"][i]["eff_home"], row["recipient"].supplier.name) for row in pool),
+        vals = sorted(((row["cells"][i]["eff_home"], row["recipient"].supplier.name, row["cells"][i]) for row in pool),
                       key=lambda x: x[0])
         lo, hi = vals[0], vals[-1]
+        med = Decimal(_median([v for v, _n, _c in vals]))
         spread = ""
         if lo[0] and hi[0] > lo[0]:
-            times_ = (hi[0] / lo[0]).quantize(Decimal("0.1"), ROUND_HALF_UP)
-            spread = f"×{str(times_).replace('.', ',')}"
-        per_qty.append({"qty": q, "n": len(vals), "min": price(lo[0]), "min_who": lo[1], "max": price(hi[0]),
-                        "max_who": hi[1], "median": price(Decimal(_median([v for v, _n in vals]))),
-                        "spread": spread, "partial": partial, "one": len(vals) == 1})
+            spread = "×" + _times(hi[0], lo[0])
+        item = {"qty": q, "n": len(vals), "min": price(lo[0]), "min_who": lo[1], "max": price(hi[0]),
+                "max_who": hi[1], "median": price(med), "spread": spread, "partial": partial, "one": len(vals) == 1,
+                "min_incl": lo[2].get("incl_text", ""), "max_incl": hi[2].get("incl_text", "")}
+        if len(vals) >= 3 and med:
+            # ⚠️ підозріло далеко від медіани — у статистиці й у клітинці таблиці
+            for v, _n, c in vals:
+                if v and med / v >= OUTLIER:
+                    c["suspect"] = f"у {_times(med, v)} раза нижча за медіану — перевірте, що входить у ціну"
+                elif v >= med * OUTLIER:
+                    c["suspect"] = f"у {_times(v, med)} раза вища за медіану — перевірте, що входить у ціну"
+            item["min_warn"] = lo[2].get("suspect", "")
+            item["max_warn"] = hi[2].get("suspect", "")
+        per_qty.append(item)
     out["per_qty"] = per_qty
     out["home"] = table["home"]
+    out["needed"] = table.get("needed", "")
     leads = [(row["recipient"].lead_days, row["recipient"].supplier.name) for row in rows
              if row["priced"] and row["recipient"].lead_days is not None]
     if leads:

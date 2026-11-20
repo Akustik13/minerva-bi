@@ -54,8 +54,11 @@ class TalkError(Exception):
 # ── листування рядка ──
 
 def letters(r, user) -> list:
+    from django.urls import reverse
     from suppliers.services import rfq_replies
     own = rfq_replies._own()
+    # 📎 файли постачальника, уже збережені в запиті, — їх бачать усі, хто бачить запит; решта — лише зі своїх листів
+    saved = {(f.message_id, f.index): f.file.url for f in r.reply_files.all() if f.file}
     out = []
     for m in rfq_replies.mail(r):
         readable = rfq_replies.can_read(m, user)
@@ -69,8 +72,10 @@ def letters(r, user) -> list:
             "subject": (m.subject or "") if readable else "",
             "text": rfq_replies.snippet(m, LETTER_CHARS) if readable else "",
             "files": [{"name": a.get("name"), "icon": rfq_replies.icon(a.get("name")),
-                       "size": rfq_replies.size_text(a.get("size"))}
-                      for a in (m.attachments or []) if rfq_replies.wanted(a)],
+                       "size": rfq_replies.size_text(a.get("size")),
+                       "url": saved.get((m.pk, i)) or (reverse("admin:suppliers_supplierrequest_chat_file",
+                                                               args=[r.request_id, r.pk, m.pk, i]) if readable else "")}
+                      for i, a in enumerate(m.attachments or []) if rfq_replies.wanted(a)],
         })
     return out
 
@@ -144,7 +149,9 @@ def brief_cached(user, r, items):
     got = cache.get(_key(user, r))
     if not isinstance(got, dict) or not got.get("data"):
         return None
-    return {**got, "fresh": got.get("fp") == fingerprint(items), "at_dt": _when(got.get("at"))}
+    from suppliers.services.rfq_usage import label
+    return {**got, "fresh": got.get("fp") == fingerprint(items), "at_dt": _when(got.get("at")),
+            "label": label(got.get("model")), "usd": f"${float((got.get('data') or {}).get('cost_usd') or 0):.3f}"}
 
 
 def _when(iso):
@@ -164,9 +171,12 @@ def brief(req, r, user, model=None) -> dict:
         raise TalkError("Листування з цим постачальником у ваших скриньках немає.")
     row = next((x for x in rfq_compare.table(req)["rows"] if x["recipient"].pk == r.pk), None)
     data = ai.chat_brief(req, r, mine[-BRIEF_MAILS:], _offer(row, r), user=user, model=model)
+    from suppliers.services import rfq_usage
+    rfq_usage.add(req, "brief", ai.model_of(model), data.get("cost_usd"))
     value = {"data": data, "fp": fingerprint(items), "at": timezone.now().isoformat(), "model": ai.model_of(model)}
     cache.set(_key(user, r), value, BRIEF_TTL)
-    return {**value, "fresh": True, "at_dt": _when(value["at"])}
+    return {**value, "fresh": True, "at_dt": _when(value["at"]), "label": rfq_usage.label(value["model"]),
+            "usd": f"${float(data.get('cost_usd') or 0):.3f}"}
 
 
 def _offer(row, r) -> str:
@@ -174,6 +184,33 @@ def _offer(row, r) -> str:
     if not row or not row["priced"]:
         return ""
     return "; ".join(f"{c['qty']} шт: {c['unit_text']} {r.currency}/шт" for c in row["cells"] if not c.get("missing"))
+
+
+# ── 💬 AI у полі відповіді ──
+
+IMPROVE_WISH = ("Виправ і покращ мій чорновий текст листа нижче: грамотно, ввічливо, мовою листування з цим "
+                "постачальником; зміст, цифри й прохання — як у мене, нічого не додавай і не прибирай.")
+
+
+def ai_reply(req, r, user, wish="", text="", mode="write", model=None) -> dict:
+    """«✍️ Написати» (лист за побажанням людини) або «✨ Покращити мій текст» — з листування цього постачальника
+    (лише власні скриньки), мовою листування, на ім'я → {body, usd, model}. Нічого не надсилає."""
+    from suppliers.services import ai, rfq_compare, rfq_usage
+    items = letters(r, user)
+    mine = [x for x in items if x["readable"]]
+    if mode == "improve":
+        if not (text or "").strip():
+            raise TalkError("Спершу напишіть текст — AI його виправить і покращить.")
+        wish = IMPROVE_WISH + "\nМІЙ ТЕКСТ:\n" + text.strip()[:4000]
+    elif not (wish or "").strip():
+        raise TalkError("Напишіть, що відповісти, — напр. «подякуй і запитай ціну з позолотою контактів».")
+    row = next((x for x in rfq_compare.table(req)["rows"] if x["recipient"].pk == r.pk), None)
+    got = ai.each_letter(req, r, mine[-BRIEF_MAILS:], _offer(row, r), wish.strip(), _person(r, items),
+                         user=user, model=model)
+    rfq_usage.add(req, "reply", ai.model_of(model), got.get("cost_usd"))
+    if not got.get("body"):
+        raise TalkError("AI не склав лист — спробуйте ще раз або напишіть самі.")
+    return {"body": got["body"], "usd": float(got.get("cost_usd") or 0), "model": rfq_usage.label(ai.model_of(model))}
 
 
 # ── ✉️ відповідь у гілку ──
@@ -286,8 +323,12 @@ def compose_each(req, rids, user, wish, mode="ai", model=None, report=None) -> l
             item["body"] = fill(req, r, items, wish)
         else:
             try:
-                item["body"] = ai.each_letter(req, r, mine[-BRIEF_MAILS:], _offer(row, r), wish, _person(r, items),
-                                              user=user, model=model)["body"]
+                got = ai.each_letter(req, r, mine[-BRIEF_MAILS:], _offer(row, r), wish, _person(r, items),
+                                     user=user, model=model)
+                item["body"] = got["body"]
+                from suppliers.services import rfq_usage
+                rfq_usage.add(req, "letters", ai.model_of(model), got.get("cost_usd"))
+                item["usd"] = float(got.get("cost_usd") or 0)
             except ai.AIError as e:
                 item["error"] = str(e)[:300]
             if not item["body"]:

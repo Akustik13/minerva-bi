@@ -333,6 +333,8 @@ class SupplierRequest(models.Model):
     copied_from = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="copies",
                                     verbose_name="Копія запиту")
     review = models.JSONField("Перевірити після копіювання", default=dict, blank=True)
+    # 🧠 витрати AI на цей запит: {"usd", "calls", "models": {модель: {calls, usd}}, "kinds": {дія: {calls, usd}}}
+    ai_usage = models.JSONField("Витрати AI", default=dict, blank=True)
     # 🔎 «Не відповідь на запит» — листи, які людина відкинула в «Знайти пропущені відповіді» (suppliers/services/rfq_match.py)
     missed_skip = models.JSONField("Не відповіді", default=list, blank=True)
     created_at = models.DateTimeField(default=timezone.now)

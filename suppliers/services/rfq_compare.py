@@ -260,6 +260,8 @@ def table(req) -> dict:
             cell["lacks"] = [n for k, _i, n in SCOPE if k in need and tin and k not in tin]
             cell["unknown"] = bool(need) and not tin
             cell["ok"] = not cell["lacks"] and not cell["unknown"] and rate is not None
+            cell["incl"] = list(tin or [])
+            cell["incl_text"] = scope_text(tin) or "не сказано"
             if t.get("includes") is not None and tin != includes:
                 cell["scope_text"] = scope_text(tin)
             if t.get("parts"):

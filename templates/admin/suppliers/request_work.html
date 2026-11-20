@@ -129,6 +129,15 @@
   <div class="spf-card">
     <div class="spf-ok" id="rw-flash" hidden></div>
     <div class="spf-h">🏭 Отримувачі й пропозиції</div>
+    <div class="rw-aibar">
+      <b>🧠 AI</b>
+      {% if can_change %}<label title="Цією моделлю — усі дії AI на сторінці: 🧠 розібрати відповіді, 🏆 порада, «Що відповісти?», «Написати кожному». Вибір запам’ятовується.">модель <select id="rw-model">{% for v, n in models %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select></label>{% endif %}
+      {% if ai_sum.any %}<span>витрачено на запит: <b>{{ ai_sum.usd }}</b> · запитів до AI: {{ ai_sum.calls }}</span>
+        <span class="spf-muted">{% for m in ai_sum.models %}<span translate="no">{{ m.name }}</span> — {{ m.calls }} · {{ m.usd }}{% if not forloop.last %}; {% endif %}{% endfor %}</span>
+        <span class="spf-muted">({% for k in ai_sum.kinds %}{{ k.name }} {{ k.usd }}{% if not forloop.last %}, {% endif %}{% endfor %})</span>
+      {% else %}<span class="spf-muted">витрат AI на цей запит ще не записано</span>{% endif %}
+      {% if ai_sum.parsed %}<span class="spf-muted">· відповіді розібрано: {% for p in ai_sum.parsed %}<span translate="no">{{ p.name }}</span> — {{ p.count }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% endif %}
+    </div>
     {% if cmp.counts.priced or cmp.counts.unparsed or cmp.counts.no_price %}
     <div class="rw-legend">
       <div>Ціни — <b>у {{ cmp.home }} за 1 шт. разом з разовими витратами</b> (оснастка, трафарет, NRE), окремо для кожної кількості; доставка — окремою колонкою.
@@ -182,6 +191,7 @@
               <div class="spf-muted rw-tot">разом {% if c.total_home_text %}{{ c.total_home_text }} {{ row.home }}{% else %}{{ c.total_text }} {{ r.currency }}{% endif %}</div>
               <div class="spf-muted rw-src" translate="no" title="Як у постачальника">{{ c.unit_text }} {{ r.currency|default:row.home }}/шт{% if c.one_time_text %} + {{ c.one_time_text }} разово{% endif %}{% if not c.exact %} · ≈ ціна на {{ c.tier_qty }} шт{% endif %}{% if c.lead is not None %} · {{ c.lead }} дн.{% endif %}</div>
               {% if c.parts_text %}<div class="spf-muted rw-src" translate="no" title="Складові ціни за шт., як назвав постачальник (🟩 плата · 🔧 монтаж · 🔩 компоненти) — Minerva їх додала">{{ c.parts_text }}</div>{% endif %}
+              {% if c.suspect %}<div class="rw-gapc" title="Ціна дуже далеко від медіани інших — часто це не та сама річ (лише плати замість PCBA). Перевірте лист і що входить; 🧠 — перечитати відповідь">⚠️ {{ c.suspect }}</div>{% endif %}
               {% if c.lacks %}<div class="rw-gapc" title="Для цієї кількості в ціні немає того, що просили — у 🥇 і статистиці не бере участі">⚠️ немає: {{ c.lacks|join:", " }}{% if c.scope_text %} · лише {{ c.scope_text }}{% endif %}</div>{% elif c.unknown %}<div class="rw-gapc" title="Не сказано, що входить у цю ціну — у 🥇 не бере участі">⚠️ не сказано, що в ціні</div>{% elif c.scope_text %}<div class="spf-muted rw-src">у ціні: {{ c.scope_text }}</div>{% endif %}
               {% if c.sup_total_text %}<div class="rw-sup{% if c.sum_mismatch %} bad{% else %} spf-muted{% endif %}" title="{% if c.sum_mismatch %}Наше «разом» (ціна за шт. × кількість + разові) не сходиться з сумою, яку написав постачальник — перевірте лист і ✏️ виправте{% else %}Сума постачальника сходиться з нашим «разом»{% endif %}{% if c.fixed %} · ціну за шт. Minerva перерахувала з цієї суми{% endif %}">у постачальника {{ c.sup_total_text }} {{ r.currency }} {% if c.sup_total_ot %}з разовими{% else %}без разових{% endif %}{% if c.sum_mismatch %} ⚠️ не сходиться{% else %} ✓{% endif %}</div>{% endif %}
             {% endif %}</td>
@@ -208,7 +218,7 @@
           <span class="spf-job" id="rw-job-{{ r.pk }}"></span>
         {% endif %}</td>
       </tr>
-      {% if r.ai.summary or r.quote_note %}<tr class="rw-sub{{ zebra }}"><td colspan="2"></td><td colspan="{{ ncols|add:'-2' }}" class="spf-muted">{% if r.ai.summary %}🧠 {{ r.ai.summary }}{% if r.ai.questions %} · <b>питають:</b> {{ r.ai.questions|join:"; " }}{% endif %}{% if r.ai.moq %} · MOQ {{ r.ai.moq }}{% endif %} {% endif %}{% if r.quote_note %}📝 {{ r.quote_note|truncatechars:240 }}{% endif %}{% if r.valid_until %} · діє до {{ r.valid_until|date:"d.m.Y" }}{% endif %}</td></tr>{% endif %}
+      {% if r.ai.summary or r.quote_note %}<tr class="rw-sub{{ zebra }}"><td colspan="2"></td><td colspan="{{ ncols|add:'-2' }}" class="spf-muted">{% if r.ai.summary %}🧠 {{ r.ai.summary }}{% if r.ai.questions %} · <b>питають:</b> {{ r.ai.questions|join:"; " }}{% endif %}{% if r.ai.moq %} · MOQ {{ r.ai.moq }}{% endif %} {% endif %}{% if r.quote_note %}📝 {{ r.quote_note|truncatechars:240 }}{% endif %}{% if r.valid_until %} · діє до {{ r.valid_until|date:"d.m.Y" }}{% endif %}{% if row.ai_info %} · <span class="rw-aiinfo" title="Яка модель розібрала відповідь, скільки коштувало, коли">🧠 <span translate="no">{{ row.ai_info.model }}</span> · {{ row.ai_info.usd }}{% if row.ai_info.at %} · {{ row.ai_info.at|date:"d.m H:i" }}{% endif %}</span>{% endif %}</td></tr>{% endif %}
       {% if can_change %}<tr class="rw-q{{ zebra }}" id="rq-{{ r.pk }}"><td colspan="{{ ncols }}">
         <form method="post" action="{{ act }}">{% csrf_token %}<input type="hidden" name="do" value="quote"><input type="hidden" name="rid" value="{{ r.pk }}">
           <input type="hidden" name="includes_set" value="1">
@@ -232,7 +242,7 @@
     </div>
     {% if can_change %}
     <div class="spf-row">
-      <select id="rw-model">{% for v, n in models %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
+      <span class="spf-muted" title="Модель — у смузі «🧠 AI» над таблицею">🧠 модель — угорі ·</span>
       <label class="spf-muted"><input type="checkbox" id="rw-over"> AI перезаписує вже внесене</label>
       <button type="button" class="button" id="rw-compare">🏆 AI: порівняти й порадити</button>
       <span class="spf-job" id="rw-cmp-job"></span>

@@ -10,7 +10,7 @@
         {% if l.readable %}
         {% if l.subject %}<div class="rwc-subj" translate="no">{{ l.subject }}</div>{% endif %}
         <div class="rwc-text" translate="no">{{ l.text|default:"(без тексту)" }}</div>
-        {% if l.files %}<div class="rwc-files">{% for f in l.files %}<span class="spf-tag" translate="no">{{ f.icon }} {{ f.name }} · {{ f.size }}</span>{% endfor %}</div>{% endif %}
+        {% if l.files %}<div class="rwc-files">{% for f in l.files %}{% if f.url %}<a class="spf-tag rwc-file" href="{{ f.url }}" target="_blank" rel="noopener" title="Відкрити (PDF, картинки — у браузері; інше — завантажиться)" translate="no">{{ f.icon }} {{ f.name }} · {{ f.size }}</a>{% else %}<span class="spf-tag" translate="no" title="Лист у скриньці колеги — файл відкриє власник скриньки">{{ f.icon }} {{ f.name }} · {{ f.size }}</span>{% endif %}{% endfor %}</div>{% endif %}
         {% else %}<div class="spf-muted">🔒 Лист у скриньці колеги — тему й текст бачить лише власник скриньки.</div>{% endif %}
       </div>
       {% empty %}<div class="spf-muted" style="padding:12px">{% if r.state == "planned" %}Запит ще не надіслано.{% else %}Листів ще немає.{% endif %}</div>{% endfor %}
@@ -23,6 +23,12 @@
       </div>
       <label class="rwc-subjf">Тема <input name="subject" value="{{ target.subject }}" translate="no"></label>
       {% if draft and draft.body %}<div class="spf-warn">📝 Ваш збережений лист «Написати кожному» (ще не надіслано) — перевірте й надішліть.</div>{% endif %}
+      <div class="rwc-ai">
+        <input type="text" name="ai_wish" placeholder="🧠 Що відповісти — напр. «подякуй і запитай ціну плати з позолотою контактів»" autocomplete="off">
+        <button type="button" class="button" data-rwc-ai="write" title="AI напише відповідь за вашим побажанням — мовою листування, на ім'я, з цього листування; нічого не надсилає">✍️ Написати</button>
+        <button type="button" class="button" data-rwc-ai="improve" title="AI виправить і покращить ваш текст нижче мовою листування — зміст і цифри ті самі">✨ Покращити мій текст</button>
+        <span class="spf-job" id="rwc-ai-job"></span>
+      </div>
       <textarea name="body" rows="6" placeholder="Відповідь постачальнику — піде в ту саму гілку листування, з підписом скриньки (Ctrl + Enter — надіслати)">{% if draft %}{{ draft.body }}{% endif %}</textarea>
       <input type="hidden" name="reply" value="{{ target.reply_pk|default:'' }}">
       <div class="rwc-act">
@@ -45,7 +51,7 @@
         {% if b.we_promised %}<div class="rwc-k">📌 Обіцяли ми</div><ul>{% for x in b.we_promised %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
         {% if b.draft and can_change %}<textarea hidden id="rwc-draft">{{ b.draft }}</textarea>
           <button type="button" class="button" data-rwc-draft title="Покласти чернетку AI у поле відповіді — перегляньте й допишіть [у дужках]">✍️ Чернетка у відповідь</button>{% endif %}
-        <div class="spf-muted rwc-small">🧠 AI{% if brief.at_dt %} · {{ brief.at_dt|date:"d.m.Y H:i" }}{% endif %} — лише для вас (з ваших листів)</div>
+        <div class="spf-muted rwc-small">🧠 <span translate="no">{{ brief.label|default:"AI" }}</span> · {{ brief.usd }}{% if brief.at_dt %} · {{ brief.at_dt|date:"d.m.Y H:i" }}{% endif %} — лише для вас (з ваших листів); модель — у смузі «🧠 AI» на сторінці</div>
       {% endwith %}{% else %}
         <div class="spf-muted">AI коротко підсумує листування: про що питають, що обіцяли вони й ми, на що треба відповісти — і запропонує чернетку відповіді.</div>
       {% endif %}

@@ -15,15 +15,17 @@
   </div>
   {% if st.per_qty %}
   <div class="rw-scroll"><table class="spf-table rw-st-prices">
-    <tr><th>Кількість</th><th>🟢 Найнижча</th><th>Медіана</th><th>🔴 Найвища</th><th>Розкид</th></tr>
+    <tr><th>Кількість</th><th>🟢 Найнижча — за 1 шт.</th><th>Медіана — за 1 шт.</th><th>🔴 Найвища — за 1 шт.</th><th>Розкид</th></tr>
     {% for p in st.per_qty %}<tr>
       <td><b>{{ p.qty }} шт</b> <span class="spf-muted">· {{ p.n }} пропоз.{% if p.partial %}, з неповних{% endif %}</span></td>
-      <td>{{ p.min }} {{ st.home }} <span class="spf-muted" translate="no">{{ p.min_who }}</span></td>
-      <td>{% if p.one %}—{% else %}{{ p.median }} {{ st.home }}{% endif %}</td>
-      <td>{% if p.one %}—{% else %}{{ p.max }} {{ st.home }} <span class="spf-muted" translate="no">{{ p.max_who }}</span>{% endif %}</td>
+      <td><b>{{ p.min }} {{ st.home }}</b>/шт <span class="spf-muted" translate="no">{{ p.min_who }}</span>
+        <div class="rw-st-incl">у ціні: {{ p.min_incl }}</div>{% if p.min_warn %}<div class="rw-gapc">⚠️ {{ p.min_warn }}</div>{% endif %}</td>
+      <td>{% if p.one %}—{% else %}{{ p.median }} {{ st.home }}/шт{% endif %}</td>
+      <td>{% if p.one %}—{% else %}<b>{{ p.max }} {{ st.home }}</b>/шт <span class="spf-muted" translate="no">{{ p.max_who }}</span>
+        <div class="rw-st-incl">у ціні: {{ p.max_incl }}</div>{% if p.max_warn %}<div class="rw-gapc">⚠️ {{ p.max_warn }}</div>{% endif %}{% endif %}</td>
       <td>{{ p.spread|default:"—" }}</td></tr>{% endfor %}
   </table></div>
-  <div class="spf-muted">Ціна за 1 шт. разом з разовими витратами, у {{ st.home }}; лише ціни з усім, що просили, для цієї кількості (як 🥇) — ціни лише за плати не порівнюються з PCBA; немає повних — з неповних.</div>
+  <div class="spf-muted">Ціна за 1 готову штуку цієї кількості, у {{ st.home }}: ціна постачальника за шт. + разові витрати (трафарет, оснастка, NRE), поділені на кількість; без доставки. «У ціні» — що входить, за даними постачальника: 🟩 плата · 🔧 монтаж · 🔩 компоненти.{% if st.needed %} Просили: {{ st.needed }}.{% endif %} Порівнюються лише ціни з усім, що просили, для цієї кількості (як 🥇): ціни лише за плати — ні; немає повних — з неповних.</div>
   {% endif %}
 </details>
 {% endif %}
