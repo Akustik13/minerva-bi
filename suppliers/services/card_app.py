@@ -88,13 +88,11 @@ def pair_state(user, key) -> dict:
     return {"paired": True, "device": state.get("device") or ""}
 
 
-def pair(code, name="", version="", ip=None):
-    """→ (CardAppDevice, ключ). Код — одноразовий, PAIR_TTL; з однієї адреси — PAIR_PER_HOUR спроб на годину."""
-    from django.contrib.auth import get_user_model
+def _rate(ip, kind="pair"):
+    """Спроби з однієї адреси за годину (підключення й «чий QR» — окремо) → PairError 429 понад PAIR_PER_HOUR."""
     from core.shared_cache import cache
-    from suppliers.models import CardAppDevice
     hour = timezone.now().strftime("%Y%m%d%H")
-    rate_key = f"sup-app-pair-ip:{ip or '-'}:{hour}"
+    rate_key = f"sup-app-{kind}-ip:{ip or '-'}:{hour}"
     cache.add(rate_key, 0, 3700)
     try:
         tries = cache.incr(rate_key)
@@ -102,6 +100,32 @@ def pair(code, name="", version="", ip=None):
         tries = 1
     if tries > PAIR_PER_HOUR:
         raise PairError("Забагато спроб підключення — спробуйте за годину.", 429)
+
+
+def pair_owner(code, ip=None):
+    """Чий QR підключення (код ще не використано) → людина; код лишається дійсним — телефон спершу питає
+    «Підключити до акаунта …?»."""
+    from django.contrib.auth import get_user_model
+    from core.shared_cache import cache
+    _rate(ip, "pair-info")
+    code = str(code or "").strip()
+    key = _hash(code)
+    data = cache.get(f"sup-app-pair:{key}") if code else None
+    if not data or cache.get(f"sup-app-pair-used:{key}"):
+        raise PairError("QR-код недійсний або застарів — на сторінці «📱 Додаток на телефон» у Minerva покажіть "
+                        "новий.", 410)
+    user = get_user_model().objects.filter(pk=data.get("user"), is_active=True, is_staff=True).first()
+    if user is None or not can_upload(user):
+        raise PairError("Цей акаунт Minerva не може додавати візитки.", 403)
+    return user
+
+
+def pair(code, name="", version="", ip=None):
+    """→ (CardAppDevice, ключ). Код — одноразовий, PAIR_TTL; з однієї адреси — PAIR_PER_HOUR спроб на годину."""
+    from django.contrib.auth import get_user_model
+    from core.shared_cache import cache
+    from suppliers.models import CardAppDevice
+    _rate(ip)
     code = str(code or "").strip()
     key = _hash(code)
     data = cache.get(f"sup-app-pair:{key}") if code else None
@@ -140,7 +164,7 @@ def device_for(header, ip=None):
 
 def devices_for(user, everyone=False):
     from suppliers.models import CardAppDevice
-    qs = CardAppDevice.objects.select_related("user")
+    qs = CardAppDevice.objects.select_related("user", "user__profile")
     return qs if everyone else qs.filter(user=user)
 
 
@@ -293,7 +317,7 @@ def _person(u) -> str:
 
 
 def card_json(m, user, cats=None) -> dict:
-    from suppliers.services import cards
+    from suppliers.services import card_access, cards
     d = cards.card_data(m)
     i = cards.info(m, cats)
     addr = ", ".join(x for x in (d.get("addr_street"), " ".join(y for y in (d.get("addr_zip"), d.get("addr_city"))
@@ -319,6 +343,10 @@ def card_json(m, user, cats=None) -> dict:
                    for p in m.photos.all()],
         "people": card_photos_people(m),
         "by": _person(m.created_by), "mine": m.created_by_id == user.pk, "editable": can_edit(user, m),
+        # 👁 хто бачить і хто / звідки зняв
+        "visibility": m.visibility, "can_set_visibility": card_access.can_set_visibility(user, m),
+        "by_role": card_access.role_label(m.created_by), "source": m.source,
+        "source_label": card_access.source_label(m),
         "preset": m.preset_id,
     }
 
@@ -328,17 +356,20 @@ def card_photos_people(m) -> list:
     return card_photos.people(m)
 
 
-def cards_qs():
+def cards_qs(user=None):
+    """Візитки для додатка — лише ті, які людина бачить (👥 усі + свої 🔒, card_access.visible)."""
     from suppliers.models import SupplierMedia
-    return SupplierMedia.objects.select_related("supplier", "customer", "created_by").prefetch_related(
-        "categories", "supplier__categories", "photos")
+    from suppliers.services import card_access
+    qs = SupplierMedia.objects.select_related("supplier", "customer", "created_by", "device", "created_by__profile") \
+        .prefetch_related("categories", "supplier__categories", "photos")
+    return card_access.visible(qs, user)
 
 
 def search(user, params) -> tuple:
     """Фільтри списку (як «🪪 Візитки й флаєри»): q, cat, ai (done / none / failed / nocat), event, mark, mine, role,
     show new; ids — лише ці (стан знімків, ще не прочитаних AI). → (візитки, є ще)."""
     from suppliers.models import SupplierCategory, SupplierMedia
-    qs = cards_qs()
+    qs = cards_qs(user)
     ids = _ids(params.get("ids"))
     if ids:
         qs = qs.filter(pk__in=ids[:200])
@@ -353,6 +384,8 @@ def search(user, params) -> tuple:
         qs = qs.filter(role=role)
     if params.get("show") == "new":
         qs = qs.filter(supplier=None, customer=None)
+    if params.get("vis") in (SupplierMedia.TEAM, SupplierMedia.PRIVATE):     # 👁 лише 🔒 мої / 👥 спільні
+        qs = qs.filter(visibility=params.get("vis"))
     event = " ".join(str(params.get("event") or "").split())[:200]
     if event == "-":
         qs = qs.filter(event="")
@@ -400,10 +433,12 @@ def search(user, params) -> tuple:
     return out, more
 
 
-def recent_events(limit=20) -> list:
+def recent_events(limit=20, user=None) -> list:
     from suppliers.models import SupplierMedia
+    from suppliers.services import card_access
     seen, out = set(), []
-    for e in SupplierMedia.objects.exclude(event="").order_by("-created_at").values_list("event", flat=True)[:500]:
+    qs = card_access.visible(SupplierMedia.objects.exclude(event=""), user)
+    for e in qs.order_by("-created_at").values_list("event", flat=True)[:500]:
         k = " ".join(e.lower().split())
         if k and k not in seen:
             seen.add(k)
@@ -415,6 +450,7 @@ def recent_events(limit=20) -> list:
 
 def meta(user) -> dict:
     from suppliers.models import SupplierCategory, SupplierMedia, SupplierMediaPhoto
+    from suppliers.services import card_access
     from suppliers.services.ai import DEFAULT_MODEL, MODELS
     return {
         "user": {"name": _person(user), "email": user.email},
@@ -429,7 +465,8 @@ def meta(user) -> dict:
         "kinds": [[k, v] for k, v in SupplierMedia.KINDS], "marks": [[k, v] for k, v in SupplierMedia.MARKS],
         "photo_kinds": [[k, v] for k, v in SupplierMediaPhoto.KINDS],
         "models": [[k, v] for k, v in MODELS], "default_model": DEFAULT_MODEL,
-        "events": recent_events(), "app_url": APP_URL,
+        "events": recent_events(user=user), "app_url": APP_URL,
+        "visibility": [[k, v] for k, v in SupplierMedia.VISIBILITY], "role_label": card_access.role_label(user),
     }
 
 

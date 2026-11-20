@@ -145,7 +145,10 @@ class CaptureFragment : Fragment() {
             v.setOnClickListener { setMode(m) }
         }
         b.btnFlash.setOnClickListener { Prefs.flash = !Prefs.flash; applyFlash(); chips() }
-        b.chipQueue.setOnClickListener { (activity as? MainActivity)?.select(R.id.nav_queue) }
+        b.chipQueue.setOnClickListener {
+            if (!Prefs.paired) startActivity(android.content.Intent(requireContext(), PairActivity::class.java))
+            else (activity as? MainActivity)?.select(R.id.nav_queue)
+        }
         b.preview.setOnTouchListener { v, e ->
             if (e.action == MotionEvent.ACTION_UP) {
                 camera?.cameraControl?.startFocusAndMetering(
@@ -181,7 +184,7 @@ class CaptureFragment : Fragment() {
 
     override fun onHiddenChanged(hidden: Boolean) {
         super.onHiddenChanged(hidden)
-        if (hidden) { live = null; provider?.unbindAll() } else { chips(); startCamera() }
+        if (hidden) { live = null; provider?.unbindAll() } else { chips(); queueChip(); startCamera() }
     }
 
     override fun onResume() {
@@ -360,10 +363,11 @@ class CaptureFragment : Fragment() {
         val bb = _b ?: return
         val c = CaptureStore.counts()
         bb.chipQueue.text = when {
-            !Prefs.paired -> "🔗 Не підключено"
+            !Prefs.paired -> "🔗 Не підключено" + ((c["local"] ?: 0).takeIf { it > 0 }?.let { " · 📱 $it" } ?: "")
             Prefs.needsPairing -> "🔗 Підключіть знову"
             (c["waiting"] ?: 0) > 0 -> "⏳ ${c["waiting"]} чекають"
             (c["failed"] ?: 0) > 0 -> "⚠️ ${c["failed"]} помилка"
+            (c["local"] ?: 0) > 0 -> "📱 ${c["local"]} на телефоні"
             (c["reading"] ?: 0) > 0 -> "🧠 AI читає ${c["reading"]}"
             else -> "✓ усе в Minerva"
         }

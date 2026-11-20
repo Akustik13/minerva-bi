@@ -28,6 +28,24 @@ object Prefs {
         get() = sp.getString("user_email", "") ?: ""
         set(v) = sp.edit().putString("user_email", v).apply()
 
+    /** Роль у Minerva того, від чийого імені працює телефон («🔑 Адміністратор»). */
+    var userRole: String
+        get() = sp.getString("user_role", "") ?: ""
+        set(v) = sp.edit().putString("user_role", v).apply()
+
+    /** Вікно підключення вже показували при першому запуску (далі — лише з «⚙ Налаштування»). */
+    var pairPrompted: Boolean
+        get() = sp.getBoolean("pair_prompted", false)
+        set(v) = sp.edit().putBoolean("pair_prompted", v).apply()
+
+    /** 👁 Хто бачить нові знімки в Minerva: team — усі, private — лише я (останній вибір). */
+    var visibility: String
+        get() = sp.getString("visibility", "team") ?: "team"
+        set(v) = sp.edit().putString("visibility", v).apply()
+
+    /** «Viacheslav · 🔑 Адміністратор». */
+    val who: String get() = listOf(userName, userRole).filter { it.isNotEmpty() }.joinToString(" · ")
+
     /** Ключ відкликали в Minerva (401) — треба підключити знову. */
     var needsPairing: Boolean
         get() = sp.getBoolean("needs_pairing", false)
@@ -97,7 +115,7 @@ object Prefs {
     fun meta(): Meta = Meta.parse(metaJson.takeIf { it.isNotBlank() }?.let { runCatching { JSONObject(it) }.getOrNull() })
 
     fun forget() {
-        sp.edit().remove("token").remove("user_name").remove("user_email").remove("needs_pairing")
+        sp.edit().remove("token").remove("user_name").remove("user_email").remove("user_role").remove("needs_pairing")
             .remove("meta").remove("browse").remove("preset").apply()
     }
 }

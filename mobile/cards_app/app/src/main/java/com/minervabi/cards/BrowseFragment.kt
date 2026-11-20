@@ -214,7 +214,7 @@ class BrowseFragment : Fragment() {
             val c = items[pos]
             val meta = Prefs.meta()
             ImageLoader.server(requireContext(), viewLifecycleOwner.lifecycleScope, h.v.thumb, c.id)
-            h.v.line1.text = (meta.roleIcon(c.role).let { if (it.isEmpty()) "" else "$it " }) +
+            h.v.line1.text = (if (c.private) "🔒 " else "") + (meta.roleIcon(c.role).let { if (it.isEmpty()) "" else "$it " }) +
                 listOf(c.company, c.person).filter { it.isNotEmpty() }.joinToString(" · ")
                     .ifEmpty { c.title.ifEmpty { meta.kindLabel(c.kind) } }
             val where = when {

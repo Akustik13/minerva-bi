@@ -80,7 +80,8 @@ class SettingsFragment : Fragment() {
 
         val acc = card("🔗 Minerva")
         if (Prefs.paired) {
-            acc.addView(ctx.label("👤 ${Prefs.userName}${if (Prefs.userEmail.isNotEmpty()) " · ${Prefs.userEmail}" else ""}"))
+            acc.addView(ctx.label("👤 ${Prefs.who}${if (Prefs.userEmail.isNotEmpty()) " · ${Prefs.userEmail}" else ""}"))
+            acc.addView(ctx.label("Знімки з цього телефона йдуть у Minerva від імені цієї людини, з її правами.", secondary = true))
             acc.addView(ctx.label("🌐 ${Prefs.server.removePrefix("https://")}", secondary = true))
             acc.addView(ctx.label("📱 ${Api.deviceName()}", secondary = true))
             if (Prefs.needsPairing) acc.addView(ctx.label("⚠️ Minerva не приймає ключ цього телефона (відключили?) — підключіть знову."))
@@ -93,7 +94,9 @@ class SettingsFragment : Fragment() {
                 }
             }.setTextColor(ContextCompat.getColor(ctx, R.color.bad))
         } else {
-            acc.addView(ctx.label("Ще не підключено. На комп'ютері: Minerva → Постачальники → 🪪 Візитки й флаєри → «📱 Додаток на телефон» → «🔗 Показати QR». Фотографувати можна вже зараз — надішлемо після підключення.", secondary = true))
+            val n = CaptureStore.counts()["local"] ?: 0
+            acc.addView(ctx.label("🔗 Не підключено до Minerva" + if (n > 0) " · 📱 на телефоні знімків: $n" else ""))
+            acc.addView(ctx.label("Знімати можна й так — усе лишається на телефоні. Щоб надіслати в Minerva, попросіть QR підключення в колеги з акаунтом Minerva (Minerva → Постачальники → 🪪 Візитки й флаєри → «📱 Додаток на телефон» → «🔗 Показати QR»). Телефон покаже, до чийого акаунта підключається, а потім запитає, які знімки надіслати.", secondary = true))
             button(acc, "📷 Сканувати QR з Minerva", "filled") { startActivity(Intent(ctx, PairActivity::class.java)) }
         }
 

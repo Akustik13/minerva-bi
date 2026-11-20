@@ -103,9 +103,21 @@ object Api {
         }
     }
 
+    /** Чий це QR (код ще не витрачається): {user: {name, email, role}}. Стара Minerva — 404. */
+    suspend fun pairInfo(server: String, code: String): JSONObject {
+        val saved = Prefs.token
+        Prefs.token = ""
+        return try {
+            postJson("pair/info/", JSONObject().put("code", code), server)
+        } finally {
+            Prefs.token = saved
+        }
+    }
+
     suspend fun meta(): Meta {
         val j = get("meta/")
         Prefs.metaJson = j.toString()
+        j.str("role_label").takeIf { it.isNotEmpty() }?.let { Prefs.userRole = it }   // роль могли змінити в Minerva
         return Meta.parse(j)
     }
 
@@ -122,7 +134,7 @@ object Api {
             "marks" to c.marks.joinToString(","), "categories" to c.categories.joinToString(","),
             // є ще фото групи — AI прочитає все разом, коли їх дошлемо (Capture.reread)
             "preset" to (c.presetId?.toString() ?: ""), "read_ai" to (if (c.readAi && c.extras.isEmpty()) "1" else ""),
-            "model" to c.model, "qr_front" to c.qrFront, "qr_back" to c.qrBack,
+            "model" to c.model, "qr_front" to c.qrFront, "qr_back" to c.qrBack, "visibility" to c.visibility,
         )
         fields.forEach { (k, v) -> if (v.isNotEmpty()) b.addFormDataPart(k, v) }
         val body: RequestBody = b.build()

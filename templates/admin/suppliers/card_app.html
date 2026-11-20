@@ -14,6 +14,7 @@
 <style>
   .ca-grid { display: flex; flex-wrap: wrap; gap: 14px; }
   .ca-grid > .spf-card { flex: 1 1 340px; min-width: 300px; }
+  .ca-public { margin: 6px 0; font-size: 13px; }
   .ca-qr { background: #fff; display: inline-block; padding: 10px; border-radius: 10px; line-height: 0; margin: 8px 0; }
   .ca-qr svg, .ca-qr img { width: 220px; height: 220px; display: block; }
   .ca-big { font-size: 15px; }
@@ -35,15 +36,19 @@
         <a class="button default" href="{{ app_url }}" rel="noopener">⬇ Завантажити APK</a>
         <a class="button" href="{{ releases_url }}" target="_blank" rel="noopener">Усі версії ↗</a>
       </div>
+      <div class="ca-public">🔗 Сторінка для всіх (без входу в Minerva) — QR, APK і як встановити:
+        <a href="{{ public_url }}" target="_blank" rel="noopener" translate="no">{{ public_url }}</a>
+        <button type="button" class="button" id="ca-copy" data-url="{{ public_url }}" title="Скопіювати — надіслати колегам чи надрукувати">📋</button></div>
       <ol class="ca-steps spf-muted">
         <li>Відскануйте цей QR камерою телефона або відкрийте посилання в Chrome на телефоні.</li>
         <li>Відкрийте завантажений <b translate="no">minerva-cards.apk</b>. Android спитає дозвіл «Встановлювати невідомі додатки» для Chrome / «Файли» — дозвольте.</li>
         <li>Оновлення — так само: завантажити й встановити поверх, дані й підключення лишаються.</li>
+        <li>Додаток працює й без підключення: знімки чекають на телефоні, а після підключення він запитає, які надіслати.</li>
       </ol>
     </div>
     <div class="spf-card">
       <div class="spf-h">2️⃣ Підключити телефон до вашого акаунта</div>
-      <div class="spf-muted">У додатку — «📷 Сканувати QR з Minerva». Телефон працюватиме від вашого імені (<b translate="no">{{ request.user.get_full_name|default:request.user.username }}</b>) з вашими правами.</div>
+      <div class="spf-muted">У додатку — «📷 Сканувати QR з Minerva». Телефон працюватиме від вашого імені (<b translate="no">{{ request.user.get_full_name|default:request.user.username }}</b>{% if me_role %} · {{ me_role }}{% endif %}) з вашими правами — перед підключенням він покаже, до чийого акаунта підключається.</div>
       <div class="spf-row"><button type="button" class="button default" id="ca-pair">🔗 Показати QR для підключення</button>
         <span class="spf-job" id="ca-msg"></span></div>
       <div id="ca-pair-box" hidden>
@@ -61,11 +66,11 @@
     <div class="spf-h">📱 Підключені телефони{% if admin_all %} (усі люди){% endif %} · діють: {{ active }}</div>
     {% if devices %}
     <table class="ca-tbl">
-      <tr><th>Телефон</th>{% if admin_all %}<th>Людина</th>{% endif %}<th>Версія</th><th>Підключено</th><th>Востаннє на зв'язку</th><th></th></tr>
+      <tr><th>Телефон</th>{% if admin_all %}<th>Людина</th><th>Роль</th>{% endif %}<th>Версія</th><th>Підключено</th><th>Востаннє на зв'язку</th><th></th></tr>
       {% for d in devices %}
       <tr class="{% if d.revoked_at %}ca-off{% endif %}">
         <td translate="no">📱 {{ d.name }} <span class="spf-muted">…{{ d.token_hint }}</span></td>
-        {% if admin_all %}<td translate="no">{{ d.user.get_full_name|default:d.user.username }}</td>{% endif %}
+        {% if admin_all %}<td translate="no">{{ d.user.get_full_name|default:d.user.username }}</td><td>{{ d.user.profile.get_role_display|default:"—" }}</td>{% endif %}
         <td translate="no">{{ d.app_version|default:"—" }}</td>
         <td>{{ d.created_at|date:"d.m.Y H:i" }}</td>
         <td>{% if d.last_seen_at %}{{ d.last_seen_at|date:"d.m.Y H:i" }}{% else %}—{% endif %}</td>
@@ -92,6 +97,12 @@
     box.innerHTML = q.createSvgTag({cellSize: 6, margin: 2, scalable: true});
   }
   drawQr(document.getElementById('ca-dl-qr'), JSON.parse(document.getElementById('ca-app-url').textContent));
+  var copy = document.getElementById('ca-copy');
+  if (copy) copy.addEventListener('click', function(){
+    var url = copy.getAttribute('data-url');
+    (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(function(){ copy.textContent = '✓'; },
+      function(){ window.prompt('Скопіюйте адресу:', url); });
+  });
   var btn = document.getElementById('ca-pair'), msg = document.getElementById('ca-msg'),
       box = document.getElementById('ca-pair-box'), state = document.getElementById('ca-pair-state'),
       tok = '{{ csrf_token }}', timer = null, tick = null;

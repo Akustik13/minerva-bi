@@ -145,7 +145,8 @@ class CardDetailActivity : AppCompatActivity() {
         }
         if (c.newCategory.isNotEmpty()) body.addView(label("💡 AI пропонує нову категорію: ${c.newCategory} — додайте її на комп'ютері або тут ↓", 13f, true))
         if (c.notes.isNotEmpty()) body.addView(label("ℹ️ ${c.notes}", 13f, true))
-        body.addView(label("🎪 ${c.event.ifEmpty { "—" }} · ${c.createdAt.take(10)}${if (c.by.isNotEmpty()) " · ${c.by}" else ""}", 13f, true))
+        body.addView(label("🎪 ${c.event.ifEmpty { "—" }} · ${c.createdAt.take(10)}", 13f, true))
+        if (c.whoText.isNotEmpty()) body.addView(label("👤 Зняв: ${c.whoText}", 13f, true))   // хто (роль) і звідки
 
         // що можна змінити
         val editable = c.editable
@@ -173,17 +174,26 @@ class CardDetailActivity : AppCompatActivity() {
         val (eventBox, event) = field("🎪 Де взяли", c.event)
         event.isEnabled = editable
         body.addView(eventBox)
+        // 👁 хто бачить: змінює лише той, хто зняв
+        body.addView(label("👁 Хто бачить у Minerva" + if (!c.canSetVisibility) " (змінює лише той, хто зняв)" else "", 14f))
+        val vis = ChipGroup(this).apply { isSingleSelection = true; isSelectionRequired = true }
+        meta.visibility.forEach { (k, l) ->
+            vis.addToggle(l, k == c.visibility, k).apply { isCheckedIconVisible = false; isEnabled = c.canSetVisibility }
+        }
+        body.addView(vis)
 
         val actions = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(12), 0, dp(24)) }
         fun add(btn: MaterialButton) {
             btn.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(54)).apply { topMargin = dp(6) }
             actions.addView(btn)
         }
-        if (editable) add(button("💾 Зберегти", tonal = false) {
+        if (editable || c.canSetVisibility) add(button("💾 Зберегти", tonal = false) {
             val body2 = JSONObject().put("note", note.text.toString()).put("event", event.text.toString())
                 .put("marks", JSONArray(marks.checkedTags())).put("categories", JSONArray(cats.checkedTags()))
             val role = roles.checkedTags().firstOrNull()?.toString() ?: ""
             if (role != c.role) body2.put("role", role)
+            val v = vis.checkedTags().firstOrNull()?.toString() ?: c.visibility
+            if (c.canSetVisibility && v != c.visibility) body2.put("visibility", v)
             push(body2, "💾 Збережено")
         })
         if (meta.perms.upload) add(button(if (c.ai == "ai") "🧠 Прочитати AI ще раз" else "🧠 Прочитати AI") {

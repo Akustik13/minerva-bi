@@ -127,6 +127,22 @@
             android:textSize="12sp" />
 
         <TextView
+            android:id="@+id/visTitle"
+            style="@style/TextAppearance.Material3.LabelLarge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="👁 Хто бачить у Minerva" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/vis"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:chipSpacingVertical="0dp"
+            app:selectionRequired="true"
+            app:singleSelection="true" />
+
+        <TextView
             style="@style/TextAppearance.Material3.LabelLarge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

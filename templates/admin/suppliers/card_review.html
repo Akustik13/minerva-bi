@@ -70,7 +70,11 @@
           <div class="spf-muted">Дві візитки від однієї фірми, флаєр, каталог, продукт, стенд — в одну групу: AI прочитає всі фото разом, людей з інших візиток внесе контактами.</div>
           {% endif %}
         </div>
-        <div class="spf-muted" style="margin-top:6px">{{ m.get_kind_display }} · {{ m.created_at|date:"d.m.Y H:i" }}{% if m.created_by %} · {{ m.created_by.get_full_name|default:m.created_by.username }}{% endif %}
+        <div class="spf-muted" style="margin-top:6px">{{ m.get_kind_display }} · {{ m.created_at|date:"d.m.Y H:i" }}
+          <div class="cr-who">👤 {% if who %}Зняв: <b translate="no">{{ who }}</b>{% else %}Хто зняв — невідомо{% endif %}{% if source_label %} · <span translate="no">{{ source_label }}</span>{% endif %}</div>
+          <div class="cr-vis">{% if can_vis %}<form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="visibility">
+            Хто бачить: <select name="visibility" onchange="this.form.submit()" title="«🔒 Лише я» — цю візитку не бачить ніхто, крім вас (і адміністратор теж)">{% for v, n in visibility %}<option value="{{ v }}" {% if v == m.visibility %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></form>
+            {% else %}{% if m.visibility == "private" %}🔒 Лише {{ who|default:"автор" }}{% else %}👥 Бачать усі{% endif %}{% endif %}</div>
           {% if m.supplier %}<div>🏭 <a href="{% url 'admin:inventory_supplier_change' m.supplier.pk %}" translate="no">{{ m.supplier.name }}</a></div>{% endif %}
           {% if m.customer %}<div>👤 {% if crm_view %}<a href="{% url 'admin:crm_customer_change' m.customer.pk %}" translate="no">{{ m.customer.company|default:m.customer.name }}</a>{% else %}у CRM{% endif %}</div>{% endif %}</div>
         <div class="spf-row">

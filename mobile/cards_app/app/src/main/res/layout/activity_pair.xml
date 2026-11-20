@@ -51,5 +51,14 @@
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:text="⌨ Ввести адресу й код вручну" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSkip"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="4dp"
+            android:text="Пропустити — знімати без Minerva"
+            android:textColor="@color/white" />
     </LinearLayout>
 </FrameLayout>

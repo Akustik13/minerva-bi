@@ -20,7 +20,9 @@ import java.util.concurrent.Executors
 
 /**
  * 🔗 Підключення до Minerva: QR зі сторінки «📱 Додаток на телефон» ({"minerva": "cards", "url", "code"}) →
- * POST pair/ → ключ телефону. Один раз; далі телефон працює від імені того, хто показав QR.
+ * pair/info/ — «Підключити до акаунта Viacheslav (🔑 Адміністратор)?» → POST pair/ → ключ телефону. Далі телефон
+ * працює від імені того, хто показав QR. Знімки, зроблені без підключення, — «⬆ Надіслати всі / вибрати / пізніше».
+ * «Пропустити» — знімати без Minerva (вгорі камери — «🔗 Не підключено»).
  */
 class PairActivity : AppCompatActivity() {
     private lateinit var b: ActivityPairBinding
@@ -41,7 +43,12 @@ class PairActivity : AppCompatActivity() {
         b.overlay.topInset = dp(170)
         b.overlay.bottomInset = dp(170)
         b.btnManual.setOnClickListener { manual() }
-        if (Prefs.paired) b.status.text = "Зараз підключено: ${Prefs.userName} · ${Prefs.server.removePrefix("https://")}\nНовий QR — підключить заново."
+        b.btnSkip.setOnClickListener { finish() }
+        Prefs.pairPrompted = true
+        if (Prefs.paired) {
+            b.status.text = "Зараз підключено: ${Prefs.who} · ${Prefs.server.removePrefix("https://")}\nНовий QR — підключить заново."
+            b.btnSkip.text = "Скасувати"
+        }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) startCamera()
         else permission.launch(Manifest.permission.CAMERA)
     }
@@ -74,15 +81,52 @@ class PairActivity : AppCompatActivity() {
         return if (url.isNotEmpty() && code.isNotEmpty()) url to code else null
     }
 
+    /** QR знайдено: спершу — чий це акаунт (і роль), людина підтверджує; стара Minerva без pair/info — одразу. */
     private fun pair(target: Pair<String, String>) {
         if (busy) return
         busy = true
         b.overlay.found = true
-        b.status.text = "⏳ Підключаюсь до ${target.first.removePrefix("https://")}…"
+        b.status.text = "⏳ Перевіряю QR у ${target.first.removePrefix("https://")}…"
         lifecycleScope.launch {
+            val server = try {
+                Api.checkServer(target.first)
+            } catch (e: ApiException) {
+                fail(e); return@launch
+            }
+            val info = try {
+                Api.pairInfo(server, target.second)
+            } catch (e: ApiException) {
+                if (e.status != 404) { fail(e); return@launch }
+                null                                           // стара Minerva — без питання
+            }
+            if (info == null) { connect(server, target.second); return@launch }
+            val u = info.optJSONObject("user") ?: JSONObject()
+            val text = listOfNotNull(
+                "👤 ${u.str("name")}" + (u.str("role").takeIf { it.isNotEmpty() }?.let { " · $it" } ?: ""),
+                u.str("email").takeIf { it.isNotEmpty() }?.let { "✉️ $it" },
+                "🌐 ${server.removePrefix("https://")}",
+            ).joinToString("\n") + "\n\nЗнімки з цього телефона йтимуть у Minerva від імені цієї людини, з її правами."
+            MaterialAlertDialogBuilder(this@PairActivity).setTitle("🔗 Підключити цей телефон?").setMessage(text)
+                .setCancelable(false)
+                .setPositiveButton("🔗 Підключити") { _, _ -> lifecycleScope.launch { connect(server, target.second) } }
+                .setNegativeButton("Скасувати") { _, _ ->
+                    busy = false; b.overlay.found = false
+                    b.status.text = "Не підключено. Наведіть на інший QR або «Пропустити»."
+                }.show()
+        }
+    }
+
+    private fun fail(e: ApiException) {
+        b.overlay.found = false
+        b.status.text = "⚠️ ${e.message}\n\nПокажіть у Minerva новий QR і наведіть ще раз."
+        busy = false
+    }
+
+    private suspend fun connect(server: String, code: String) {
+        b.status.text = "⏳ Підключаюсь до ${server.removePrefix("https://")}…"
+        run {
             try {
-                val server = Api.checkServer(target.first)
-                val j = Api.pair(server, target.second)
+                val j = Api.pair(server, code)
                 val user = j.optJSONObject("user") ?: JSONObject()
                 if (Prefs.server != server) {
                     Prefs.forget()       // інша Minerva — пресети, категорії й список звідти не беремо
@@ -91,18 +135,24 @@ class PairActivity : AppCompatActivity() {
                 Prefs.token = j.str("token")
                 Prefs.userName = user.str("name")
                 Prefs.userEmail = user.str("email")
+                Prefs.userRole = user.str("role")
                 Prefs.needsPairing = false
                 runCatching { Api.meta() }
                 Sync.schedulePeriodic(this@PairActivity)
                 Sync.uploadNow(this@PairActivity)
-                toast("✅ Підключено: ${Prefs.userName}", true)
-                finish()
+                toast("✅ Підключено: ${Prefs.who}", true)
+                offerLocal()
             } catch (e: ApiException) {
-                b.overlay.found = false
-                b.status.text = "⚠️ ${e.message}\n\nПокажіть у Minerva новий QR і наведіть ще раз."
-                busy = false
+                fail(e)
             }
         }
+    }
+
+    /** Знімки, зроблені без підключення: надіслати всі / вибрати / пізніше («📤 Мої знімки → ⬆ Надіслати»). */
+    private fun offerLocal() {
+        val local = CaptureStore.local()
+        if (local.isEmpty()) { finish(); return }
+        LocalSend.ask(this, local) { finish() }
     }
 
     private fun manual() {

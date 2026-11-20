@@ -135,6 +135,17 @@ class SupplierMedia(models.Model):
     # 📱 знімок з додатка «Minerva Візитки»: його id на телефоні — повторне надсилання (зник інтернет посеред
     # вивантаження) не створює другої візитки (suppliers/services/card_app.py)
     client_uuid = models.CharField("ID знімка в додатку", max_length=40, blank=True, default="", db_index=True)
+    # 👁 хто бачить: усі, хто має доступ до постачальників, або 🔒 лише той, хто зняв (suppliers/services/card_access.py)
+    TEAM, PRIVATE = "team", "private"
+    VISIBILITY = [(TEAM, "👥 Бачать усі"), (PRIVATE, "🔒 Лише я")]
+    visibility = models.CharField("Хто бачить", max_length=8, choices=VISIBILITY, default=TEAM, db_index=True)
+    # звідки фото: 📱 додаток (device — який телефон), 🌐 сторінка «📷 Візитка / флаєр», 🏭 картка постачальника
+    S_APP, S_WEB, S_SUPPLIER, S_OTHER = "app", "web", "supplier", "other"
+    SOURCES = [(S_APP, "📱 Додаток на телефоні"), (S_WEB, "🌐 Сторінка «📷 Візитка / флаєр»"),
+               (S_SUPPLIER, "🏭 Картка постачальника"), (S_OTHER, "📎 Інше")]
+    source = models.CharField("Звідки", max_length=8, choices=SOURCES, blank=True, default="")
+    device = models.ForeignKey("CardAppDevice", null=True, blank=True, on_delete=models.SET_NULL,
+                               related_name="cards", verbose_name="Телефон")
 
     class Meta:
         ordering = ["-created_at"]

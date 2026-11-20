@@ -395,7 +395,8 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         fair = set(SupplierMedia.objects.exclude(supplier=None).filter(marks__icontains='"fair"')
                    .values_list("supplier_id", flat=True))
         photos = {}                         # найновіша візитка з фото — показ при наведенні
-        for m in (SupplierMedia.objects.exclude(supplier=None).exclude(image="").order_by("-created_at")
+        for m in (SupplierMedia.objects.exclude(supplier=None).exclude(image="")      # 🔒 приватні — без фото
+                  .filter(visibility=SupplierMedia.TEAM).order_by("-created_at")
                   .only("pk", "supplier_id", "image", "event")):
             photos.setdefault(m.supplier_id, m)
         for s in sups:

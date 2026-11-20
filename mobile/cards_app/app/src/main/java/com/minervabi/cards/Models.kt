@@ -62,6 +62,8 @@ data class Meta(
     val roles: List<Pair<String, String>> = DEFAULT_ROLES,
     /** 📎 Що ще можна дознімати до візитки (друга візитка, флаєр, каталог…). */
     val photoKinds: List<Pair<String, String>> = DEFAULT_PHOTO_KINDS,
+    /** 👁 Хто бачить у Minerva: team — усі, private — лише я. */
+    val visibility: List<Pair<String, String>> = DEFAULT_VISIBILITY,
     val models: List<Pair<String, String>> = emptyList(),
     val defaultModel: String = "",
     val events: List<String> = emptyList(),
@@ -83,6 +85,7 @@ data class Meta(
             "check" to "❗ Перевірити", "sample" to "📦 Попросити зразки", "price" to "💶 Чекаємо ціни",
             "cheap" to "💸 Дешево", "quality" to "🏅 Якість", "no" to "👎 Не підходить")
         val DEFAULT_ROLES = listOf("supplier" to "🏭 Постачальник", "customer" to "👤 Клієнт", "other" to "🤝 Інше")
+        val DEFAULT_VISIBILITY = listOf("team" to "👥 Бачать усі", "private" to "🔒 Лише я")
         val DEFAULT_PHOTO_KINDS = listOf("card" to "🪪 Ще візитка", "flyer" to "📄 Флаєр", "catalog" to "📚 Каталог / прайс",
             "product" to "📦 Продукт / зразок", "stand" to "🎪 Стенд", "other" to "📷 Інше")
 
@@ -99,6 +102,7 @@ data class Meta(
                 marks = pairs(o.optJSONArray("marks")).ifEmpty { DEFAULT_MARKS },
                 roles = pairs(o.optJSONArray("roles")).filter { it.first.isNotEmpty() }.ifEmpty { DEFAULT_ROLES },
                 photoKinds = pairs(o.optJSONArray("photo_kinds")).ifEmpty { DEFAULT_PHOTO_KINDS },
+                visibility = pairs(o.optJSONArray("visibility")).ifEmpty { DEFAULT_VISIBILITY },
                 models = pairs(o.optJSONArray("models")),
                 defaultModel = o.str("default_model"),
                 events = o.optJSONArray("events").strings(),
@@ -154,6 +158,15 @@ data class ServerCard(val json: JSONObject) {
     val editable get() = json.optBoolean("editable")
     val mine get() = json.optBoolean("mine")
     val by get() = json.str("by")
+    val byRole get() = json.str("by_role")
+    val sourceLabel get() = json.str("source_label")
+    val visibility get() = json.str("visibility").ifEmpty { "team" }
+    val private get() = visibility == "private"
+    val canSetVisibility get() = json.optBoolean("can_set_visibility")
+    /** «👤 Viacheslav (🔑 Адміністратор) · 📱 Samsung SM-S918B». */
+    val whoText: String
+        get() = listOf(listOf(by, byRole.takeIf { it.isNotEmpty() }?.let { "($it)" }.orEmpty())
+            .filter { it.isNotEmpty() }.joinToString(" "), sourceLabel).filter { it.isNotEmpty() }.joinToString(" · ")
     val createdAt get() = json.str("created_at")
     val supplierName get() = json.optJSONObject("supplier")?.str("name") ?: ""
     val customerName get() = json.optJSONObject("customer")?.str("name") ?: ""

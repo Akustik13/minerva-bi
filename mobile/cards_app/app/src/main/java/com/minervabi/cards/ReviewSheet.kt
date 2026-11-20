@@ -48,6 +48,7 @@ class ReviewSheet : BottomSheetDialogFragment() {
     private var done = false
     private var leaving = false          // пішли знімати — не зберігати як «закрили»
     private var initialRole = ""
+    private var initialVis = "team"
 
     private val speech = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         if (r.resultCode == Activity.RESULT_OK) {
@@ -114,6 +115,14 @@ class ReviewSheet : BottomSheetDialogFragment() {
             b.roleHint.text = "🧠 Підказав AI" + (c.card?.roleWhy?.takeIf { it.isNotEmpty() }?.let { ": $it" } ?: "") +
                 ". Не так — виберіть інше."
         }
+        // 👁 хто бачить у Minerva: свій знімок — вибір; чужа візитка з «🪪 У Minerva» — не змінити
+        val canVis = c.status != Capture.UPLOADED || (c.card?.canSetVisibility ?: !c.adopted)
+        val vis = c.card?.visibility?.takeIf { c.status == Capture.UPLOADED } ?: c.visibility
+        initialVis = vis
+        meta.visibility.forEach { (k, label) ->
+            b.vis.addToggle(label, k == vis, k).apply { isCheckedIconVisible = false; isEnabled = canVis }
+        }
+        b.visTitle.text = if (canVis) "👁 Хто бачить у Minerva" else "👁 Хто бачить у Minerva (змінює лише той, хто зняв)"
         meta.marks.forEach { (k, label) -> b.marks.addToggle(label, k in c.marks, k) }
         fillCategories(c.categories)
         meta.kinds.forEach { (k, label) -> b.kinds.addToggle(label, k == c.kind, k).isCheckedIconVisible = false }
@@ -360,7 +369,7 @@ class ReviewSheet : BottomSheetDialogFragment() {
     }
 
     private class Fields(val kind: String, val role: String, val note: String, val event: String,
-                         val marks: List<String>, val cats: List<Int>, val readAi: Boolean)
+                         val marks: List<String>, val cats: List<Int>, val readAi: Boolean, val visibility: String)
 
     private fun fields() = Fields(
         kind = b.kinds.checkedTags().filterIsInstance<String>().firstOrNull() ?: "card",
@@ -368,6 +377,7 @@ class ReviewSheet : BottomSheetDialogFragment() {
         note = b.note.text?.toString()?.trim().orEmpty(), event = b.event.text?.toString()?.trim().orEmpty(),
         marks = b.marks.checkedTags().filterIsInstance<String>(), cats = b.cats.checkedTags().filterIsInstance<Int>(),
         readAi = b.readAi.isChecked,
+        visibility = b.vis.checkedTags().filterIsInstance<String>().firstOrNull() ?: initialVis,
     )
 
     /** Поля — у знімок (без зміни стану): пішли знімати — повернемось до тих самих. */
@@ -375,7 +385,7 @@ class ReviewSheet : BottomSheetDialogFragment() {
         val f = fields()
         CaptureStore.update(uuid) {
             it.kind = f.kind; it.role = f.role; it.note = f.note; it.event = f.event; it.marks = f.marks
-            it.categories = f.cats
+            it.categories = f.cats; it.visibility = f.visibility
             if (it.status != Capture.UPLOADED) it.readAi = f.readAi
         }
     }
@@ -391,20 +401,24 @@ class ReviewSheet : BottomSheetDialogFragment() {
             CaptureStore.update(uuid) {
                 it.kind = f.kind; it.role = f.role; it.event = f.event; it.note = f.note; it.marks = f.marks
                 it.categories = f.cats; it.readAi = f.readAi; it.status = Capture.PENDING
+                it.visibility = f.visibility
+                it.held = !Prefs.paired                 // без підключення — у Minerva лише після «⬆ Надіслати»
             }
             Prefs.kind = f.kind
+            Prefs.visibility = f.visibility
             Sync.uploadNow(requireContext())
-            requireContext().toast(if (Prefs.paired) "✅ Збережено — надішлемо в Minerva" else "✅ Збережено на телефоні — підключіть Minerva, щоб надіслати")
+            requireContext().toast(if (Prefs.paired) "✅ Збережено — надішлемо в Minerva" else "✅ Збережено на телефоні — Minerva не підключено; надіслати можна буде після підключення")
         } else {
             CaptureStore.update(uuid) {
                 it.kind = f.kind; it.role = f.role; it.event = f.event; it.note = f.note; it.marks = f.marks
-                it.categories = f.cats
+                it.categories = f.cats; it.visibility = f.visibility
                 if (it.status != Capture.UPLOADED) {
                     it.readAi = f.readAi
                     if (it.status == Capture.FAILED) it.status = Capture.PENDING
                 }
             }
-            if (c.status == Capture.UPLOADED && c.serverId > 0) pushEdit(c.serverId, f, f.role.takeIf { it != initialRole })
+            if (c.status == Capture.UPLOADED && c.serverId > 0) pushEdit(c.serverId, f, f.role.takeIf { it != initialRole },
+                f.visibility.takeIf { it != initialVis })
             Sync.uploadNow(requireContext())
         }
         setFragmentResult("review", bundleOf("action" to action, "uuid" to uuid))
@@ -412,11 +426,12 @@ class ReviewSheet : BottomSheetDialogFragment() {
     }
 
     /** Знімок уже в Minerva — правка полів іде туди ж (без інтернету — повідомити). */
-    private fun pushEdit(id: Int, f: Fields, role: String?) {
+    private fun pushEdit(id: Int, f: Fields, role: String?, visibility: String?) {
         val app = requireContext().applicationContext
         val body = JSONObject().put("kind", f.kind).put("event", f.event).put("note", f.note)
             .put("marks", JSONArray(f.marks)).put("categories", JSONArray(f.cats))
         if (role != null) body.put("role", role)          // лише якщо змінили — підказку AI не затираємо
+        if (visibility != null) body.put("visibility", visibility)
         requireActivity().lifecycleScope.launch {
             try {
                 val card = Api.updateCard(id, body)

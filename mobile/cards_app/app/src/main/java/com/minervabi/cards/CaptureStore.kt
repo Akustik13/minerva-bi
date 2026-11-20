@@ -65,13 +65,18 @@ data class Capture(
     var reread: Boolean = false,      // після змін фото — AI прочитати групу заново
     var pushError: String = "",       // Minerva не прийняла зміну фото (не повторюється само)
     var adopted: Boolean = false,     // візитка з «🪪 У Minerva», відкрита для правки фото (не моя зйомка)
+    var visibility: String = "team",  // 👁 у Minerva: team — бачать усі, private — лише я
+    var held: Boolean = false,        // 📱 знято без підключення — у Minerva лише після «⬆ Надіслати» людини
 ) {
     val card get() = server?.let { ServerCard(it) }
     val isDraft get() = status == DRAFT
     /** Надісланий знімок, а зміни фото ще не в Minerva. */
     val dirty get() = status == UPLOADED && (frontNew || backNew || backGone || dropPhotos.isNotEmpty() ||
         extras.any { it.serverId == 0 } || reread)
-    val waiting get() = status == PENDING || status == UPLOADING || status == DRAFT || (dirty && pushError.isEmpty())
+    val waiting get() = (status == PENDING && !held) || status == UPLOADING || status == DRAFT ||
+        (dirty && pushError.isEmpty())
+    /** 📱 Лише на телефоні: знято без Minerva, ще не вирішили надсилати. */
+    val local get() = status == PENDING && held
     val failed get() = status == FAILED || (dirty && pushError.isNotEmpty())
     /** Є зворотний бік: свій файл або в Minerva (і його не прибрали). */
     val hasBack get() = back.isNotEmpty() || (!backGone && card?.hasBack == true)
@@ -86,7 +91,7 @@ data class Capture(
         .put("error", error).put("attempts", attempts).put("server", server ?: JSONObject.NULL)
         .put("front_new", frontNew).put("back_new", backNew).put("back_gone", backGone)
         .put("drop_photos", JSONArray(dropPhotos)).put("reread", reread).put("push_error", pushError)
-        .put("adopted", adopted)
+        .put("adopted", adopted).put("visibility", visibility).put("held", held)
 
     companion object {
         const val DRAFT = "draft"            // ✏️ щойно знято, вікно приміток ще не закрили
@@ -107,6 +112,7 @@ data class Capture(
             frontNew = o.optBoolean("front_new"), backNew = o.optBoolean("back_new"),
             backGone = o.optBoolean("back_gone"), dropPhotos = o.optJSONArray("drop_photos").ints(),
             reread = o.optBoolean("reread"), pushError = o.str("push_error"), adopted = o.optBoolean("adopted"),
+            visibility = o.str("visibility").ifEmpty { "team" }, held = o.optBoolean("held"),
         )
     }
 }
@@ -146,7 +152,20 @@ object CaptureStore {
     fun byServer(id: Int): Capture? = synchronized(this) { items.firstOrNull { it.serverId == id }?.copy() }
 
     fun pending(): List<Capture> = synchronized(this) {
-        items.filter { it.status == Capture.PENDING }.sortedBy { it.createdAt }.map { it.copy() }
+        items.filter { it.status == Capture.PENDING && !it.held }.sortedBy { it.createdAt }.map { it.copy() }
+    }
+
+    /** 📱 Зняті без підключення — ще чекають рішення «⬆ Надіслати в Minerva». */
+    fun local(): List<Capture> = synchronized(this) { items.filter { it.local }.sortedBy { it.createdAt }.map { it.copy() } }
+
+    /** ⬆ Надіслати в Minerva ці (зняті без підключення). */
+    fun release(uuids: Collection<String>) {
+        val set = uuids.toSet()
+        synchronized(this) {
+            items.filter { it.uuid in set }.forEach { it.held = false }
+            save()
+        }
+        changed()
     }
 
     /** Надіслані, у яких змінили фото, — дослати в Minerva. */
@@ -158,6 +177,7 @@ object CaptureStore {
         val shown = items.filter { !it.adopted || it.dirty || it.failed }
         mapOf(
             "waiting" to shown.count { it.waiting },
+            "local" to shown.count { it.local },
             "failed" to shown.count { it.failed },
             "reading" to shown.count { it.status == Capture.UPLOADED && it.card?.reading == true },
             "done" to shown.count { it.status == Capture.UPLOADED },
@@ -208,6 +228,7 @@ object CaptureStore {
             event = preset?.event.orEmpty(), note = preset?.note.orEmpty(), marks = preset?.marks.orEmpty(),
             categories = preset?.categories.orEmpty(), presetId = preset?.id,
             readAi = preset?.readAi ?: Prefs.readAiDefault, model = preset?.model?.ifEmpty { null } ?: Prefs.model,
+            visibility = Prefs.visibility,
         )
         add(c)
         return c
@@ -222,6 +243,7 @@ object CaptureStore {
         val c = Capture(
             front = "", back = "", kind = card.kind.ifEmpty { "card" }, role = card.role, event = card.event,
             note = card.note, marks = card.marks, categories = card.ownCategories, readAi = false,
+            visibility = card.visibility,
             status = Capture.UPLOADED, serverId = card.id, adopted = true,
             createdAt = System.currentTimeMillis(),
         )

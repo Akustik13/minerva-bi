@@ -25,6 +25,7 @@ from django.utils.safestring import mark_safe
 
 from suppliers.models import (SupplierAnalysis, SupplierCardPreset, SupplierCategory, SupplierContact, SupplierEvent,
                               SupplierMedia, SupplierMediaPhoto)
+from suppliers.services import card_access
 
 VIEWER = "_sup_viewer"
 
@@ -240,7 +241,8 @@ class SupplierCardMixin:
         візитки, закупівлі, попередні запити, оцінка. Лише читання; право бачити постачальника."""
         from suppliers.models import SupplierRequestRecipient as R
         obj = self._supplier(request, pk)
-        cards = list(obj.media.exclude(image="").order_by("-created_at")[:4])
+        from suppliers.services import card_access
+        cards = list(card_access.visible(obj.media.exclude(image=""), request.user).order_by("-created_at")[:4])
         fair = obj.media.filter(marks__icontains='"fair"').exists()
         origin = obj.source or "manual"
         pos = obj.purchase_orders.exclude(status="cancelled")
@@ -249,7 +251,7 @@ class SupplierCardMixin:
             "s": obj, "cards": cards, "contacts": list(obj.contacts.all()), "cats": list(obj.categories.all()),
             "source": FAIR_LABEL if origin == "card" and fair else SOURCE_LABELS.get(origin, "—"),
             "fair_later": fair and origin != "card", "fair_later_text": FAIR_LATER,
-            "events": sorted({m.event for m in obj.media.exclude(event="")}),
+            "events": sorted({m.event for m in card_access.visible(obj.media.exclude(event=""), request.user)}),
             "po_count": pos.count(), "po_last": pos.order_by("-order_date").values_list("order_date", flat=True).first(),
             "asked": asked.count(), "quoted": asked.filter(state=R.QUOTED).count(),
             "chosen": asked.filter(chosen=True).count() if hasattr(R, "chosen") else 0,
@@ -606,7 +608,8 @@ class SupplierCardMixin:
     def sup_media(self, obj):
         if not obj or not obj.pk:
             return "—"
-        items = list(obj.media.all()[:24])
+        from suppliers.services import card_access
+        items = list(card_access.visible(obj.media.all(), self._viewer(obj))[:24])
         add = format_html('<a class="button" href="{}">📷 Додати фото / візитку</a>',
                           reverse("admin:inventory_supplier_card") + f"?supplier={obj.pk}")
         if not items:
@@ -1026,7 +1029,9 @@ class SupplierCardMixin:
                              note=P.get("note", ""), marks=P.getlist("marks"),
                              categories=self._categories_from_post(request), preset_id=P.get("preset"),
                              qr_front=P.get("qr_front", ""), qr_back=P.get("qr_back", ""), supplier=supplier,
-                             role=P.get("role", ""))
+                             role=P.get("role", ""),
+                             source=SupplierMedia.S_SUPPLIER if supplier is not None else SupplierMedia.S_WEB,
+                             visibility=P.get("visibility", ""))
             url =reverse("admin:inventory_supplier_card_review", args=[m.pk])
             job = ""
             if request.POST.get("read_ai"):
@@ -1057,7 +1062,8 @@ class SupplierCardMixin:
             sides=[("front", "Лицьовий бік", True), ("back", "Зворотний бік", False)],
             preset_now=int(chosen) if str(chosen or "").isdigit() else None,
             preset_default=self._default_preset(request.user),
-            recent=SupplierMedia.objects.select_related("supplier")[:8]))
+            recent=card_access.visible(SupplierMedia.objects.select_related("supplier"), request.user)[:8],
+            visibility=SupplierMedia.VISIBILITY))
 
     # ── 📌 Пресети візиток (виставка: однакові «де взяли», позначки, категорії) ──
     @staticmethod
@@ -1097,7 +1103,8 @@ class SupplierCardMixin:
         can_read = _can(request, "change") or _can(request, "add")
         def picked(values):
             ids = [int(x) for x in values if str(x).isdigit()][:cards.SHARE_MAX]
-            by_pk = {m.pk: m for m in SupplierMedia.objects.filter(pk__in=ids).select_related("supplier")}
+            by_pk = {m.pk: m for m in card_access.visible(SupplierMedia.objects.filter(pk__in=ids), request.user)
+                     .select_related("supplier")}
             return [by_pk[i] for i in ids if i in by_pk]          # у порядку, як вибрали на сторінці
         if request.method == "GET" and request.GET.get("vcf"):    # ⬇ vCard вибраних — одним файлом
             ms = picked(request.GET["vcf"].split(","))
@@ -1117,7 +1124,8 @@ class SupplierCardMixin:
             return redirect(f"/email/compose/?draft={d.pk}")
         if request.method == "POST" and request.POST.get("action") == "to_suppliers":  # 🏭 вибрані → постачальники
             ids = [int(x) for x in request.POST.getlist("ids") if str(x).isdigit()][:100]
-            mine = [m for m in SupplierMedia.objects.filter(pk__in=ids).select_related("supplier")
+            mine = [m for m in card_access.visible(SupplierMedia.objects.filter(pk__in=ids), request.user)
+                    .select_related("supplier")
                     .prefetch_related("categories").order_by("created_at")
                     if _can(request, "change") or (_can(request, "add") and m.created_by_id == request.user.pk)]
             if not mine:
@@ -1143,7 +1151,8 @@ class SupplierCardMixin:
                 self.message_user(request, "Немає права вносити клієнтів у CRM.", messages.ERROR)
                 return redirect(request.get_full_path())
             ids = [int(x) for x in request.POST.getlist("ids") if str(x).isdigit()][:100]
-            mine = [m for m in SupplierMedia.objects.filter(pk__in=ids).select_related("supplier", "customer")
+            mine = [m for m in card_access.visible(SupplierMedia.objects.filter(pk__in=ids), request.user)
+                    .select_related("supplier", "customer")
                     .order_by("created_at")
                     if _can(request, "change") or (_can(request, "add") and m.created_by_id == u.pk)]
             if not mine:
@@ -1165,7 +1174,7 @@ class SupplierCardMixin:
         if request.method == "POST" and request.POST.get("action") == "delete_many":  # 🗑 вибрані
             ids = [int(x) for x in request.POST.getlist("ids") if str(x).isdigit()][:200]
             gone = refused = 0
-            for m in SupplierMedia.objects.filter(pk__in=ids):
+            for m in card_access.visible(SupplierMedia.objects.filter(pk__in=ids), request.user):
                 if _can(request, "change") or (_can(request, "add") and m.created_by_id == request.user.pk):
                     cards.delete(m)
                     gone += 1
@@ -1197,8 +1206,12 @@ class SupplierCardMixin:
                     f" · ${out['cost']:.3f}" + (f" — {out['error']}" if out["error"] and not out["done"] else "")
                 return {"message": text}
             return JsonResponse({"job": jobs.start(user, f"cards read {scope}", run)})
-        qs = SupplierMedia.objects.select_related("supplier", "customer", "created_by").prefetch_related(
-            "categories", "supplier__categories", "photos")
+        qs = card_access.visible(SupplierMedia.objects.select_related(
+            "supplier", "customer", "created_by", "created_by__profile", "device").prefetch_related(
+            "categories", "supplier__categories", "photos"), request.user)
+        vis = request.GET.get("vis", "")                    # 👁 🔒 лише мої приватні / 👥 спільні
+        if vis in (SupplierMedia.TEAM, SupplierMedia.PRIVATE):
+            qs = qs.filter(visibility=vis)
         show = request.GET.get("show", "")
         if show == "new":
             qs = qs.filter(supplier=None, customer=None)
@@ -1251,18 +1264,19 @@ class SupplierCardMixin:
             if len(items) >= 120:
                 break
         u = request.user
-        stats = cards.stats()
+        stats = cards.stats(request.user)
         by_cat = stats["total"].get("by_cat", {})
         cat_opts = [(c, by_cat.get(c.pk, 0)) for c in all_cats if by_cat.get(c.pk) or c.pk == cat_id]
         return TemplateResponse(request, "admin/suppliers/cards.html", self._ctx(
             request, "🪪 Візитки й флаєри", items=items, show=show, q=q, mark=mark, marks=SupplierMedia.MARKS,
-            role=role, role_opts=cards.role_counts(),
+            role=role, role_opts=cards.role_counts(request.user), vis=vis, visibility=SupplierMedia.VISIBILITY,
             ai_filter=ai_filter, can_read=can_read, prefs=cards.tile_prefs(u), tile_fields=cards.TILE_FIELDS,
             event=event, stats=stats, cat_id=cat_id, cat_opts=cat_opts,
             cat_now=next((c for c in all_cats if c.pk == cat_id), None),
             desc_modes=cards.DESC_MODES,
             counts=cards.card_counts(u, _can(request, "change")) if can_read else {},
-            unassigned=SupplierMedia.objects.filter(supplier=None, customer=None).count(),
+            unassigned=card_access.visible(SupplierMedia.objects.filter(supplier=None, customer=None),
+                                           request.user).count(),
             crm_can=u.has_perm("crm.add_customer") or u.has_perm("crm.change_customer"),
             crm_view=u.has_perm("crm.view_customer"), can_add_category=u.has_perm("suppliers.add_suppliercategory")))
 
@@ -1296,7 +1310,8 @@ class SupplierCardMixin:
             app_url=card_app.APP_URL, releases_url=card_app.RELEASES_URL, base=self._site_base(request),
             pair_ttl=card_app.PAIR_TTL // 60, active=sum(1 for d in devices if d.revoked_at is None),
             uploaded=SupplierMedia.objects.exclude(client_uuid="").filter(created_by=request.user).count(),
-            CardAppDevice=CardAppDevice))
+            CardAppDevice=CardAppDevice, me_role=card_access.role_label(request.user),
+            public_url=self._site_base(request) + reverse("cards_app_download")))
 
     @staticmethod
     def _site_base(request) -> str:
@@ -1476,8 +1491,9 @@ class SupplierCardMixin:
 
     def card_review_view(self, request, media_pk):
         from suppliers.services import ai, draft, jobs, match, qr
-        m = SupplierMedia.objects.select_related("supplier", "contact", "created_by").filter(pk=media_pk).first()
-        if m is None or not _can(request, "view"):
+        from suppliers.services import card_access
+        m = SupplierMedia.objects.select_related("supplier", "contact", "created_by", "device").filter(pk=media_pk).first()
+        if m is None or not _can(request, "view") or not card_access.can_see(request.user, m):
             raise Http404
         can_edit = _can(request, "change") or (_can(request, "add") and m.created_by_id == request.user.pk)
         action = request.POST.get("action") if request.method == "POST" else ""
@@ -1510,6 +1526,14 @@ class SupplierCardMixin:
             return JsonResponse({"pk": cat.pk, "name": cat.name, "icon": cat.icon, "created": created})
         if action and not can_edit:
             raise Http404
+        if action == "visibility":                 # 👁 хто бачить — лише той, хто зняв
+            if not card_access.can_set_visibility(request.user, m):
+                raise Http404
+            m.visibility = card_access.clean(request.POST.get("visibility"))
+            SupplierMedia.objects.filter(pk=m.pk).update(visibility=m.visibility)
+            self.message_user(request, "🔒 Тепер бачите лише ви" if m.visibility == SupplierMedia.PRIVATE
+                              else "👥 Тепер бачать усі, хто має доступ до постачальників", messages.SUCCESS)
+            return redirect(url)
         if action == "note":
             m.note = request.POST.get("note", "")[:4000]
             m.event = request.POST.get("event", "")[:200]
@@ -1638,7 +1662,8 @@ class SupplierCardMixin:
                                  for k in ((data.get("web") or {}).get("filled") or [])
                                  if isinstance(data.get("web"), dict)),
             can_add_category=u.has_perm("suppliers.add_suppliercategory") and can_edit,
-            ai_info=cards.info(m)))
+            ai_info=cards.info(m), who=card_access.who(m.created_by), source_label=card_access.source_label(m),
+            can_vis=card_access.can_set_visibility(request.user, m), visibility=SupplierMedia.VISIBILITY))
 
 
 _STYLE = mark_safe("""<style>

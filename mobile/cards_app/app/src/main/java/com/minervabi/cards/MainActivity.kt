@@ -29,7 +29,9 @@ class MainActivity : AppCompatActivity() {
         current = savedInstanceState?.getInt("tab") ?: R.id.nav_capture
         b.nav.selectedItemId = current
         select(current)
-        if (!Prefs.paired && savedInstanceState == null) startActivity(Intent(this, PairActivity::class.java))
+        if (!Prefs.paired && !Prefs.pairPrompted && savedInstanceState == null) {
+            startActivity(Intent(this, PairActivity::class.java))   // раз; без підключення — знімати можна теж
+        }
         CaptureStore.listen(badgeListener)
         badge()
         if (savedInstanceState == null) handle(intent)

@@ -28,7 +28,7 @@ PREFS_KEY = "supplier_cards"
 TILE_FIELDS = [
     ("ai", "🧠 Стан AI"), ("company", "🏢 Фірма"), ("person", "👤 Людина й посада"), ("country", "🌍 Країна"),
     ("site", "🌐 Сайт"), ("cats", "🗂 Категорії"), ("newcat", "💡 Пропозиція нової категорії"),
-    ("date", "📅 Дата й де взяли"), ("where", "🏭 / 👤 Куди внесено"),
+    ("date", "📅 Дата й де взяли"), ("who", "👤 Хто зняв і звідки"), ("where", "🏭 / 👤 Куди внесено"),
     ("base", "✅ Уже в базі постачальників"), ("marks", "⭐ Позначки"),
     ("note", "📝 Наші примітки"), ("share", "✉️ Кнопка «Поділитись»"), ("crm", "👤 Кнопка «У CRM»"),
     ("vcard", "⬇ Кнопка «vCard»"),
@@ -118,7 +118,11 @@ def info(m, cats=None) -> dict:
     guessed = [] if chosen else match_categories(d.get("categories"), cats)
     new_cat = d.get("new_category") if isinstance(d.get("new_category"), dict) else {}
     key = ai_state(m)
+    from suppliers.services import card_access
     return {
+        # 👤 хто зняв (з роллю) і звідки (📱 телефон / 🌐 сторінка / 🏭 картка постачальника), 🔒 лише автор
+        "who": card_access.who(m.created_by), "source": card_access.source_label(m),
+        "private": m.visibility == m.PRIVATE,
         "role": m.role, "role_label": role_label(m), "role_why": d.get("role_why") or "" if m.role_ai else "",
         "company": d.get("name") or "", "person": d.get("contact_name") or "",
         "position": d.get("contact_position") or "",
@@ -150,11 +154,13 @@ def clean_role(value) -> str:
     return value if value in dict(SupplierMedia.ROLES) else ""
 
 
-def role_counts() -> list:
-    """[(роль, назва, скільки візиток)] — фільтр «👥 Хто це» у списку візиток."""
+def role_counts(user=None) -> list:
+    """[(роль, назва, скільки візиток)] — фільтр «👥 Хто це» у списку візиток (лише ті, які людина бачить)."""
     from django.db.models import Count
     from suppliers.models import SupplierMedia
-    n = dict(SupplierMedia.objects.values_list("role").annotate(c=Count("pk")).values_list("role", "c"))
+    from suppliers.services import card_access
+    qs = card_access.visible(SupplierMedia.objects.all(), user) if user is not None else SupplierMedia.objects.all()
+    n = dict(qs.values_list("role").annotate(c=Count("pk")).values_list("role", "c"))
     return [(v, label, n.get(v, 0)) for v, label in SupplierMedia.ROLES]
 
 
@@ -444,7 +450,8 @@ def to_read(user, scope, can_all=True):
     """unread — AI ще не читав (поля лише з QR теж); nocat — без жодної категорії (і перечитати). Уже внесені
     (постачальник чи клієнт CRM) — ні. Без права змінювати всі — лише свої фото."""
     from suppliers.models import SupplierMedia
-    qs = SupplierMedia.objects.exclude(image="").filter(supplier=None, customer=None)
+    from suppliers.services import card_access
+    qs = card_access.visible(SupplierMedia.objects.exclude(image="").filter(supplier=None, customer=None), user)
     if not can_all:
         qs = qs.filter(created_by=user)
     if scope == "nocat":
@@ -479,16 +486,19 @@ def read_many(ids, user, model) -> dict:
 # ── 📷 Нова візитка ──
 
 def create(user, image, back=None, *, kind="card", title="", event="", note="", marks=(), categories=(),
-           preset_id=None, qr_front="", qr_back="", supplier=None, client_uuid="", role=""):
+           preset_id=None, qr_front="", qr_back="", supplier=None, client_uuid="", role="", source="", device=None,
+           visibility=""):
     """📷 Нова візитка / флаєр — сторінка «📷 Візитка / флаєр» і додаток «Minerva Візитки»: фото обох боків, де
     взяли, примітка, позначки, категорії, пресет; QR, уже розшифрований браузером / телефоном, одразу заповнює поля
     (AI — окремо, ai.card). Постачальник — фото в його картці + подія в історії."""
     from suppliers.models import SupplierCardPreset, SupplierEvent, SupplierMedia
-    from suppliers.services import qr
+    from suppliers.services import card_access, qr
     m = SupplierMedia(supplier=supplier, kind=kind if kind in dict(SupplierMedia.KINDS) else SupplierMedia.CARD,
                       title=str(title or "")[:200], event=str(event or "")[:200], note=str(note or "")[:4000],
                       marks=[x for x in (marks or []) if x in dict(SupplierMedia.MARKS)], created_by=user,
-                      client_uuid=str(client_uuid or "")[:40])
+                      client_uuid=str(client_uuid or "")[:40],
+                      source=source if source in dict(SupplierMedia.SOURCES) else "", device=device,
+                      visibility=card_access.clean(visibility))
     m.image.save(os.path.basename(image.name or "") or "photo.jpg", image, save=False)
     if back is not None:
         m.image_back.save(os.path.basename(back.name or "") or "back.jpg", back, save=False)
@@ -648,8 +658,11 @@ def stats(user=None) -> dict:
 
     groups, total = {}, blank("Усього", "")
     marks = dict(SupplierMedia.MARKS)
+    from suppliers.services import card_access
     qs = (SupplierMedia.objects.select_related("supplier").prefetch_related("categories", "supplier__categories")
           .order_by("created_at"))
+    if user is not None:
+        qs = card_access.visible(qs, user)
     for m in qs:
         key = event_key(m.event)
         g = groups.setdefault(key, blank((m.event or "").strip() or NO_EVENT, key or "-"))

@@ -54,7 +54,12 @@ class QueueFragment : Fragment() {
         b.actions.show(true)
         b.actions.addRowButton(ctx.button("tonal", "⬆ Надіслати зараз") {
             if (!Prefs.paired || Prefs.needsPairing) startActivity(Intent(ctx, PairActivity::class.java))
-            else { Sync.uploadNow(ctx); ctx.toast("⬆ Надсилаю, щойно буде інтернет") }
+            else {
+                Sync.uploadNow(ctx)
+                val local = CaptureStore.local()
+                if (local.isNotEmpty()) LocalSend.ask(ctx, local)    // зняті без підключення — спершу спитати
+                else ctx.toast("⬆ Надсилаю, щойно буде інтернет")
+            }
         }, false)
         b.actions.addRowButton(ctx.button("outlined", "🧹 Прибрати надіслані") {
             ctx.confirm("Прибрати надіслані з телефона?",
@@ -94,17 +99,18 @@ class QueueFragment : Fragment() {
         val all = CaptureStore.mine()
         val c = CaptureStore.counts()
         bb.summary.text = when {
-            !Prefs.paired -> "🔗 Minerva не підключено — фото чекають на телефоні. «⚙ Налаштування → Підключити»."
+            !Prefs.paired -> "🔗 Minerva не підключено — знімки лише на телефоні. Підключіть («⚙ Налаштування → 📷 Сканувати QR») — тоді виберете, які надіслати."
+            (c["local"] ?: 0) > 0 -> "📱 Лише на телефоні: ${c["local"]} — «⬆ Надіслати зараз», щоб вибрати, які надіслати в Minerva"
             Prefs.needsPairing -> "🔗 Телефон відключили в Minerva — підключіть знову QR-кодом."
             (c["reading"] ?: 0) > 0 -> "🧠 AI читає: ${c["reading"]} · потягніть донизу — оновити"
             else -> "Потягніть донизу — оновити стан з Minerva"
         }
-        val labels = mapOf("all" to "Усі ${all.size}", "waiting" to "⏳ ${c["waiting"]}", "done" to "✅ ${c["done"]}",
+        val labels = mapOf("all" to "Усі ${all.size}", "waiting" to "⏳ ${(c["waiting"] ?: 0) + (c["local"] ?: 0)}", "done" to "✅ ${c["done"]}",
             "failed" to "⚠️ ${c["failed"]}")
         segIds.forEach { (k, id) -> bb.seg.findViewById<android.widget.Button>(id)?.text = labels[k] }
         val items = all.filter {
             when (filter) {
-                "waiting" -> it.waiting
+                "waiting" -> it.waiting || it.local
                 "done" -> it.status == Capture.UPLOADED
                 "failed" -> it.failed
                 else -> true
@@ -120,7 +126,11 @@ class QueueFragment : Fragment() {
         val card = c.card
         return when (c.status) {
             Capture.DRAFT -> "✏️ Чернетка — торкніться, щоб дописати й зберегти"
-            Capture.PENDING -> if (c.error.isNotEmpty()) "⏳ Чекає інтернету · ${c.error}" else "⏳ Чекає інтернету"
+            Capture.PENDING -> when {
+                c.held -> "📱 Лише на телефоні — ще не надіслано в Minerva"
+                c.error.isNotEmpty() -> "⏳ Чекає інтернету · ${c.error}"
+                else -> "⏳ Чекає інтернету"
+            }
             Capture.UPLOADING -> "⬆ Надсилається…"
             Capture.FAILED -> "⚠️ ${c.error.ifEmpty { "Minerva не прийняла" }} — торкніться, щоб виправити"
             else -> {
@@ -147,6 +157,12 @@ class QueueFragment : Fragment() {
         labels += "✏️ Фото (знову, зворотний бік, ще фото), примітка, позначки"
         acts += { ReviewSheet.forEdit(c.uuid).show(childFragmentManager, "edit") }
         if (c.front.isNotEmpty()) { labels += "🖼 Фото на весь екран"; acts += { PhotoActivity.openFile(requireContext(), c.front) } }
+        if (c.local) {
+            labels += "⬆ Надіслати в Minerva"; acts += {
+                if (!Prefs.paired) startActivity(Intent(requireContext(), PairActivity::class.java))
+                else LocalSend.send(requireContext(), listOf(c.uuid))
+            }
+        }
         if (c.failed) {
             labels += "⬆ Надіслати ще раз"; acts += {
                 CaptureStore.update(c.uuid) {
@@ -189,6 +205,7 @@ class QueueFragment : Fragment() {
             val bits = mutableListOf<String>()
             bits += shortDate(c.createdAt)
             meta.roleIcon(card?.role ?: c.role).takeIf { it.isNotEmpty() }?.let { bits += it }
+            if (c.visibility == "private") bits += "🔒"
             if (c.hasBack) bits += "2 боки"
             if (c.extras.isNotEmpty()) bits += "📎 +${c.extras.size}"
             if (c.qrFront.isNotEmpty() || c.qrBack.isNotEmpty()) bits += "🔳 QR"

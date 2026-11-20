@@ -19,6 +19,7 @@
 .spc.spc-sel{outline:2px solid var(--primary,#5b8def);outline-offset:1px}
 .spc-top{display:flex;justify-content:space-between;gap:4px;align-items:baseline}
 .spc-imgbox{display:block;position:relative}
+.spc-lock{position:absolute;left:4px;top:4px;background:rgba(0,0,0,.65);color:#fff;font-size:12px;border-radius:8px;padding:0 5px}
 .spc-nph{position:absolute;right:4px;bottom:4px;background:rgba(0,0,0,.65);color:#fff;font-size:11px;border-radius:8px;padding:0 6px}
 .spc-top a{text-decoration:none;color:inherit}
 .spc-ai{font-size:11px;white-space:nowrap;border-radius:8px;padding:0 5px;border:1px solid var(--border-strong,#ccc)}
@@ -61,6 +62,7 @@
     {% if can_read %}<a class="button" href="{% url 'admin:inventory_supplier_card_app' %}" title="Фотографувати візитки телефоном — навіть без інтернету, надішле само">📱 Додаток на телефон</a>{% endif %}
     <input type="search" name="q" value="{{ q }}" placeholder="Фірма, людина, що роблять, виставка, примітка…" style="min-width:260px">
     <select name="show"><option value="">усі</option><option value="new" {% if show == "new" %}selected{% endif %}>ще не внесені ({{ unassigned }})</option><option value="inbase" {% if show == "inbase" %}selected{% endif %}>✅ не внесені, але вже є в базі</option></select>
+    <select name="vis" title="Хто бачить візитку"><option value="">👁 усі доступні</option>{% for v, n in visibility %}<option value="{{ v }}" {% if v == vis %}selected{% endif %}>{{ n }}</option>{% endfor %}</select>
     <select name="role" title="Хто це для нас: постачальник чи клієнт"><option value="">👥 усі</option>{% for v, n, c in role_opts %}<option value="{{ v|default:'-' }}" {% if v|default:'-' == role %}selected{% endif %}>{{ n }} ({{ c }})</option>{% endfor %}</select>
     <select name="ai" title="Чи прочитав AI">
       <option value="">🧠 AI: усі</option>
@@ -116,7 +118,7 @@
   <div class="sp-cards" id="spc-list" data-desc="{{ prefs.desc }}">
     {% for m in items %}{% with i=m.info %}{% url 'admin:inventory_supplier_card_review' m.pk as review %}
     <div class="sp-card spc" data-pk="{{ m.pk }}">
-      <a href="{{ review }}" class="spc-imgbox">{% if m.image %}<img src="{{ m.image.url }}" alt="" loading="lazy">{% endif %}{% with n=m.photos.all|length %}{% if n or m.image_back %}<span class="spc-nph" title="Фото в групі: {% if m.image_back %}2 боки{% else %}1 бік{% endif %}{% if n %} + ще {{ n }}{% endif %}">{% if m.image_back %}2 боки{% endif %}{% if n %} 📎 +{{ n }}{% endif %}</span>{% endif %}{% endwith %}</a>
+      <a href="{{ review }}" class="spc-imgbox">{% if m.image %}<img src="{{ m.image.url }}" alt="" loading="lazy">{% endif %}{% if m.visibility == "private" %}<span class="spc-lock" title="🔒 Лише ви бачите цю візитку">🔒</span>{% endif %}{% with n=m.photos.all|length %}{% if n or m.image_back %}<span class="spc-nph" title="Фото в групі: {% if m.image_back %}2 боки{% else %}1 бік{% endif %}{% if n %} + ще {{ n }}{% endif %}">{% if m.image_back %}2 боки{% endif %}{% if n %} 📎 +{{ n }}{% endif %}</span>{% endif %}{% endwith %}</a>
       <div class="spc-top"><span class="spc-head"><input type="checkbox" class="spc-pick" value="{{ m.pk }}" title="Вибрати — поділитись разом з іншими" aria-label="Вибрати">
         <a href="{{ review }}"><b>{{ m.get_kind_display }}</b> <span translate="no">{{ m.title }}</span></a></span>
         <span class="spc-ai spc-ai-{{ i.ai.key }} spc-f-ai" title="{{ i.ai.title }}">{{ i.ai.label }}</span></div>
@@ -130,6 +132,7 @@
       {% endif %}
       {% if i.desc %}<details class="spc-desc spc-f-desc"{% if prefs.desc == "full" %} open{% endif %}><summary>📝 Що роблять</summary><div class="sp-note" translate="no">{{ i.desc }}</div></details>{% endif %}
       <div class="sp-muted spc-f-date">{{ m.created_at|date:"d.m.Y" }}{% if m.event %} · <span translate="no">{{ m.event }}</span>{% endif %}</div>
+      {% if i.who or i.source %}<div class="sp-muted spc-f-who" title="Хто зняв і звідки">👤 <span translate="no">{{ i.who|default:"—" }}</span>{% if i.source %} · <span translate="no">{{ i.source }}</span>{% endif %}</div>{% endif %}
       <div class="spc-f-where">
         {% if m.supplier %}🏭 <a href="{% url 'admin:inventory_supplier_change' m.supplier.pk %}" translate="no">{{ m.supplier.name }}</a>{% endif %}
         {% if m.customer %}{% if crm_view %}👤 <a href="{% url 'admin:crm_customer_change' m.customer.pk %}" translate="no">{{ m.customer.company|default:m.customer.name }}</a>{% else %}👤 у CRM{% endif %}{% endif %}

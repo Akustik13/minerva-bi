@@ -5,6 +5,8 @@ suppliers/app_api.py — JSON API для 📱 додатка «Minerva Візи�
 ролі Minerva людини, під якою підключено телефон: візитки — inventory.add|change|view_supplier (як сторінки
 «📷 Візитка / флаєр» і «🪪 Візитки й флаєри»), категорії — suppliers.add|change_suppliercategory.
 
+  POST pair/info/                {code} → {user: {name, email, role}} — чий це QR (телефон питає «Підключити до
+                                   акаунта …?»); код не витрачається;
   POST pair/                     {code, device, version} → {token, user} — QR зі сторінки «📱 Додаток на телефон»;
   GET  me/                       — хто підключений, права;
   GET  meta/                     — категорії, пресети, види, позначки, моделі AI, недавні «де взяли»;
@@ -110,17 +112,52 @@ def pair(request):
         device, token = card_app.pair(d.get("code"), d.get("device"), d.get("version"), _ip(request))
     except card_app.PairError as e:
         return _err(str(e), e.status)
-    u = device.user
-    return JsonResponse({"token": token, "device": device.pk,
-                         "user": {"name": u.get_full_name() or u.username, "email": u.email}})
+    return JsonResponse({"token": token, "device": device.pk, "user": _user_json(device.user)})
+
+
+def _user_json(u) -> dict:
+    from suppliers.services import card_access
+    return {"name": u.get_full_name() or u.username, "email": u.email, "role": card_access.role_label(u)}
+
+
+def download_page(request):
+    """📱 Публічна сторінка (без входу) /suppliers/app/: встановити «Minerva Візитки» — QR, APK, кроки. Додаток
+    працює й без акаунта Minerva; надіслати знімки — після підключення QR колеги з акаунтом."""
+    from django.shortcuts import render
+    from config.models import SystemSettings
+    from suppliers.services import card_app
+    s = SystemSettings.objects.filter(pk=1).first()
+    return render(request, "landing/cards_app.html", {
+        "company_name": s.company_name if s is not None else "", "apk_url": card_app.APP_URL,
+        "releases_url": card_app.RELEASES_URL})
+
+
+def download_apk(request):
+    """Коротка постійна адреса APK (/suppliers/app/minerva-cards.apk) → остання версія (card_app.APP_URL)."""
+    from django.http import HttpResponseRedirect
+    from suppliers.services import card_app
+    return HttpResponseRedirect(card_app.APP_URL)
+
+
+@csrf_exempt
+def pair_info(request):
+    """Чий це QR: телефон показує «Підключити до акаунта Viacheslav (🔑 Адміністратор)?» до підключення. Код не
+    витрачається; спроби з однієї адреси — як у pair."""
+    from suppliers.services import card_app
+    if request.method != "POST":
+        return _err("Метод не дозволено", 405)
+    try:
+        u = card_app.pair_owner(_data(request).get("code"), _ip(request))
+    except card_app.PairError as e:
+        return _err(str(e), e.status)
+    return JsonResponse({"user": _user_json(u)})
 
 
 @api()
 def me(request):
     from suppliers.services import card_app
     u, dev = request.app_user, request.device
-    return JsonResponse({"user": {"name": u.get_full_name() or u.username, "email": u.email},
-                         "device": {"id": dev.pk, "name": dev.name},
+    return JsonResponse({"user": _user_json(u), "device": {"id": dev.pk, "name": dev.name},
                          "perms": card_app.meta(u)["perms"]})
 
 
@@ -171,7 +208,7 @@ def _card(request, pk):
     from suppliers.services import card_app
     if not card_app.can(request.app_user, "view"):
         raise PermissionError("Немає доступу до постачальників у Minerva.")
-    return card_app.cards_qs().filter(pk=pk).first()
+    return card_app.cards_qs(request.app_user).filter(pk=pk).first()
 
 
 @api(("GET", "POST"))
@@ -189,7 +226,7 @@ def cards(request):
     d = _data(request)
     uuid = str(d.get("uuid") or "")[:40]
     if uuid:                                   # повтор після обриву зв'язку — та сама візитка
-        old = card_app.cards_qs().filter(client_uuid=uuid, created_by=u).first()
+        old = card_app.cards_qs(u).filter(client_uuid=uuid, created_by=u).first()
         if old is not None:
             return JsonResponse({"card": card_app.card_json(old, u), "created": False})
     image, back = request.FILES.get("image"), request.FILES.get("image_back")
@@ -202,11 +239,12 @@ def cards(request):
     m = card_svc.create(u, image, back, kind=d.get("kind"), title=d.get("title") or "", event=d.get("event") or "",
                         note=d.get("note") or "", marks=d.getlist("marks"), categories=cats,
                         preset_id=d.get("preset"), qr_front=d.get("qr_front") or "", qr_back=d.get("qr_back") or "",
-                        client_uuid=uuid, role=d.get("role") or "")
+                        client_uuid=uuid, role=d.get("role") or "", source=SupplierMedia.S_APP,
+                        device=request.device, visibility=d.get("visibility") or "")
     job = ""
     if card_app._bool(d.get("read_ai")):
         job = card_app.start_read(m, u, d.get("model"))
-    m = card_app.cards_qs().get(pk=m.pk)
+    m = card_app.cards_qs(u).get(pk=m.pk)
     return JsonResponse({"card": card_app.card_json(m, u), "created": True, "job": job,
                          "state": SupplierMedia.objects.filter(pk=m.pk).values_list("state", flat=True).first()},
                         status=201)
@@ -215,7 +253,7 @@ def cards(request):
 @api(("GET", "POST"))
 def card(request, pk):
     from suppliers.models import SupplierCategory, SupplierMedia
-    from suppliers.services import card_app
+    from suppliers.services import card_access, card_app
     u = request.app_user
     m = _card(request, pk)
     if m is None:
@@ -238,6 +276,9 @@ def card(request, pk):
         if "role" in d and (d.get("role") or "") in dict(SupplierMedia.ROLES):
             m.role, m.role_ai = d.get("role") or "", False          # людина вибрала — AI вже не міняє
             fields += ["role", "role_ai"]
+        if "visibility" in d and card_access.can_set_visibility(u, m):   # 👁 лише той, хто зняв
+            m.visibility = card_access.clean(d.get("visibility"))
+            fields.append("visibility")
         if fields:
             m.save(update_fields=fields)
         if "categories" in d:

@@ -109,6 +109,7 @@
     <div class="spf-grid">
       <label>Що це<select name="kind" id="sc-kind">{% for v, n in kinds %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select></label>
       <label>Хто це для нас<select name="role" id="sc-role" title="🏭 постачальник — «🏭 У постачальники», 👤 клієнт — «👤 У CRM»; не вказано — AI підкаже">{% for v, n in roles %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select></label>
+      <label>Хто бачить<select name="visibility" title="«🔒 Лише я» — цю візитку не бачить ніхто, крім вас (і адміністратор теж); змінити — потім на сторінці фото">{% for v, n in visibility %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select></label>
       <label>Назва (необов'язково)<input name="title" maxlength="200" placeholder="напр. Візитка менеджера"></label>
       <label>Де взяли<input name="event" id="sc-event" maxlength="200" placeholder="напр. electronica 2026, хол B3"></label>
     </div>
