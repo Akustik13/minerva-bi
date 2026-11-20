@@ -207,6 +207,59 @@ class LowStockTests(Base):
             self.assertIn(part, seen["text"])
 
 
+class ReportTests(Base):
+    def setUp(self):
+        super().setUp()
+        self.none = PackagingMaterial.objects.create(name="Gone", length_cm=10, width_cm=10, height_cm=10,
+                                                     track_stock=True, min_stock=1, reorder_qty=30)
+        self.few = PackagingMaterial.objects.create(name="Few", length_cm=30, width_cm=20, height_cm=10,
+                                                    track_stock=True, min_stock=3, buy_url="https://shop.example.com/b")
+        PackagingMaterial.objects.filter(pk=self.few.pk).update(stock_qty=2)
+        self.free = PackagingMaterial.objects.create(name="Loose", length_cm=40, width_cm=30, height_cm=20)
+        self.old = PackagingMaterial.objects.create(name="Old", length_cm=50, width_cm=40, height_cm=30,
+                                                    track_stock=True, is_active=False)
+
+    def test_states_and_order(self):
+        rep = packaging_stock.report()
+        self.assertEqual([(str(r["material"]), r["state"]) for r in rep["rows"]],
+                         [("Gone", "missing"), ("Few", "critical"), (str(self.box), "ok")])
+        self.assertEqual(rep["counts"], {"missing": 1, "critical": 1, "ok": 1, "untracked": 0})
+        rep = packaging_stock.report(untracked=True)
+        self.assertEqual(rep["rows"][-1]["state"], "untracked")
+        rep = packaging_stock.report(ids=[self.old.pk, self.few.pk])           # вибрані — і з архіву
+        self.assertEqual({str(r["material"]) for r in rep["rows"]}, {"Old", "Few"})
+
+    def test_mail_and_telegram_text(self):
+        from config.models import NotificationSettings
+        from dashboard import notifications
+        ns = NotificationSettings.get()
+        ns.email_host, ns.telegram_bot_token, ns.telegram_chat_id = "smtp.example.com", "1:x", "111"
+        ns.save()
+        seen = {}
+
+        def mail(ns_, subject, html):
+            seen["to"], seen["subject"], seen["html"] = notifications.recipients(ns_), subject, html
+
+        def tg(ns_, text, chat_id_override=None):
+            seen["text"] = text
+
+        with mock.patch.object(notifications, "_send_event_email", side_effect=mail), \
+                mock.patch.object(notifications, "_send_telegram", side_effect=tg):
+            sent = packaging_stock.send_report(packaging_stock.report(), ["boss@example.com"], True)
+        self.assertEqual(sent, ["лист", "Telegram"])
+        self.assertEqual(seen["to"], ["boss@example.com"])
+        self.assertIn("⛔ немає 1 · ⚠️ мало 1", seen["subject"])
+        for part in ("Gone", "⛔ Немає", "#ffebee", "купити ≈ 30 шт", "⚠️ Мало", "https://shop.example.com/b",
+                     "✓ Є: 1"):
+            self.assertIn(part, seen["html"])
+        self.assertNotIn("Old", seen["html"])
+        self.assertIn("⛔", seen["text"])
+        self.assertIn("купити ≈ 30 шт", seen["text"])
+        with mock.patch.object(notifications, "_send_event_email") as m:      # без «лише цим» — нікому не шле сам
+            packaging_stock.send_report(packaging_stock.report(), [], False)
+        m.assert_not_called()
+
+
 class AdminTests(Base):
     def setUp(self):
         super().setUp()
@@ -263,6 +316,33 @@ class AdminTests(Base):
             self.client.post(url + "?archive=yes", {"action": "restore_selected", "_selected_action": [unused.pk]})
         self.assertTrue(PackagingMaterial.objects.get(pk=unused.pk).is_active)
 
+    def test_stock_report_page_and_send(self):
+        from config.models import NotificationSettings
+        ns = NotificationSettings.get()
+        ns.email_host, ns.email_to = "smtp.example.com", "team@example.com"
+        ns.routes = {"packaging": {"to": ["boxes@example.com"]}}
+        ns.save()
+        PackagingMaterial.objects.filter(pk=self.box.pk).update(stock_qty=0)
+        url = "/admin/shipping/packagingmaterial/stock-report/"
+        self.assertContains(self.client.get("/admin/shipping/packagingmaterial/"), url)
+        page = self.client.get(url)
+        self.assertContains(page, "⛔ Немає")
+        self.assertContains(page, "boxes@example.com")                         # адреси виду «Мало коробок»
+        with mock.patch("dashboard.notifications._send_event_email") as mail:
+            r = self.client.post(url, {"to": "bad-address"})
+            self.assertContains(r, "Неправильні адреси")
+            mail.assert_not_called()
+            r = self.client.post(url, {"to": "boss@example.com"})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(mail.call_count, 1)
+        self.assertIn("⛔ немає 1", mail.call_args.args[1])
+
+    def test_stock_report_action_keeps_selection(self):
+        r = self.client.post("/admin/shipping/packagingmaterial/",
+                             {"action": "stock_report_selected", "_selected_action": [self.box.pk]})
+        self.assertEqual(r.status_code, 302)
+        self.assertIn(f"stock-report/?ids={self.box.pk}", r["Location"])
+
     def test_viewer_has_no_archive_action(self):
         viewer = User.objects.create_user("viewer", password="x", is_staff=True)
         viewer.profile.role = "readonly"                                 # склад / доставка — лише перегляд
@@ -274,6 +354,11 @@ class AdminTests(Base):
                              {"action": "archive_selected", "_selected_action": [self.box.pk]})
         self.assertTrue(PackagingMaterial.objects.get(pk=self.box.pk).is_active)
         self.assertIn(r.status_code, (200, 302, 403))
+        url = "/admin/shipping/packagingmaterial/stock-report/"
+        self.assertNotContains(self.client.get(url), "Надіслати звіт</button>")   # дивитись — так, надсилати — ні
+        with mock.patch("dashboard.notifications._send_event_email") as mail:
+            self.assertEqual(self.client.post(url, {"to": "x@example.com"}).status_code, 403)
+        mail.assert_not_called()
 
     def test_settings_panel_and_send_now(self):
         ShippingSettings.get()

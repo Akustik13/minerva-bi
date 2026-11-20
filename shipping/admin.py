@@ -91,9 +91,12 @@ class PackagingStockFilter(admin.SimpleListFilter):
     parameter_name = 'stock'
 
     def lookups(self, request, model_admin):
-        return (('low', _('⚠️ Мало — треба купити')), ('tracked', _('З обліком')), ('untracked', _('Без обліку')))
+        return (('missing', _('⛔ Немає (0 шт)')), ('low', _('⚠️ Мало — треба купити')), ('tracked', _('З обліком')),
+                ('untracked', _('Без обліку')))
 
     def queryset(self, request, queryset):
+        if self.value() == 'missing':
+            return queryset.filter(track_stock=True, stock_qty__lte=0)
         if self.value() == 'low':
             return queryset.filter(track_stock=True, min_stock__isnull=False, stock_qty__lte=F('min_stock'))
         if self.value() == 'tracked':
@@ -165,7 +168,76 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
     list_editable = ('is_active',)
     search_fields = ('name',)
     readonly_fields = ('stock_panel', 'movements_panel')
-    actions = ('archive_selected', 'restore_selected')
+    actions = ('archive_selected', 'restore_selected', 'stock_report_selected')
+
+    def get_urls(self):
+        from django.urls import path
+        return [path('stock-report/', self.admin_site.admin_view(self.stock_report_view),
+                     name='shipping_packagingmaterial_stock_report')] + super().get_urls()
+
+    @admin.action(description=_('✉️ Звіт про залишки вибраних…'), permissions=['view'])
+    def stock_report_selected(self, request, queryset):
+        ids = ','.join(str(pk) for pk in queryset.values_list('pk', flat=True))
+        return redirect(reverse('admin:shipping_packagingmaterial_stock_report') + f'?ids={ids}&untracked=1')
+
+    def stock_report_view(self, request):
+        """✉️ Звіт про залишки упаковки: GET — перегляд і «Кому» (адреси виду «📦 Мало коробок»), POST — надіслати
+        лише вибраним (право змінювати пакувальні матеріали)."""
+        from django.core.exceptions import PermissionDenied
+        from django.template.response import TemplateResponse
+        from config.models import NotificationSettings
+        from dashboard.notifications import (MAX_RECIPIENTS, PACKAGING_STATES, configured_recipients,
+                                             parse_recipients)
+        from dashboard.notify_routes import default_chat, route_chats, route_to
+        from .services import packaging_stock
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        src = request.POST if request.method == 'POST' else request.GET
+        ids = [int(x) for x in (src.get('ids') or '').split(',') if x.strip().isdigit()][:500]
+        untracked = src.get('untracked') == '1'
+        rep = packaging_stock.report(ids=ids or None, untracked=untracked)
+        ns = NotificationSettings.get()
+        configured = route_to(ns, 'packaging') or configured_recipients(ns)
+        tg_ready = bool(ns.telegram_bot_token and (route_chats(ns, 'packaging') or default_chat(ns)))
+        can_send = self.has_change_permission(request)
+        text, telegram, error = ', '.join(configured), False, ''
+        changelist = reverse('admin:shipping_packagingmaterial_changelist')
+        if request.method == 'POST':
+            if not can_send:
+                raise PermissionDenied
+            text = request.POST.get('to', '')
+            telegram = tg_ready and request.POST.get('telegram') == '1'
+            emails, bad = parse_recipients(text)
+            if not rep['rows']:
+                error = _('Немає коробок для звіту.')
+            elif bad:
+                error = _('Неправильні адреси: {}').format(', '.join(bad))
+            elif len(emails) > MAX_RECIPIENTS:
+                error = _('Забагато адрес — не більше {}.').format(MAX_RECIPIENTS)
+            elif emails and not ns.email_host:
+                error = _('Пошту (SMTP) не налаштовано — «Налаштування → Сповіщення» → «Email (SMTP)».')
+            elif not emails and not telegram:
+                error = _('Кому надсилати? Впишіть адресу або виберіть Telegram.')
+            else:
+                sent = packaging_stock.send_report(rep, emails, telegram)
+                if sent:
+                    where = [', '.join(emails)] if 'лист' in sent else []
+                    where += ['Telegram'] if 'Telegram' in sent else []
+                    self.message_user(request, _('✅ Звіт про залишки надіслано: {}.').format('; '.join(where)),
+                                      messages.SUCCESS)
+                    return redirect(changelist)
+                error = _('Не вдалося надіслати — перевірте пошту (SMTP) і Telegram у «Налаштування → Сповіщення».')
+        rows = [{**r, 'mark': PACKAGING_STATES[r['state']]} for r in rep['rows']]
+        query = (f'ids={",".join(map(str, ids))}&' if ids else '')
+        return TemplateResponse(request, 'admin/shipping/packagingmaterial/stock_report.html', {
+            **self.admin_site.each_context(request), 'opts': self.model._meta,
+            'title': _('✉️ Звіт про залишки упаковки'), 'rows': rows, 'counts': rep['counts'],
+            'ids': ','.join(map(str, ids)), 'selected': bool(ids), 'untracked': untracked,
+            'toggle_url': '?' + query + ('' if untracked else 'untracked=1'),
+            'to': text, 'configured': ', '.join(configured), 'my_email': request.user.email or '',
+            'telegram': telegram, 'tg_ready': tg_ready, 'error': error, 'can_send': can_send,
+            'back_url': changelist, 'routes_url': reverse('admin:config_notificationsettings_changelist'),
+        })
 
     fieldsets = (
         ('📦 Упаковка', {
@@ -240,6 +312,9 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
     def stock_col(self, obj):
         if not obj.track_stock:
             return format_html('<span style="color:var(--text-muted,#607d8b)">{}</span>', '—')
+        if obj.stock_qty <= 0:
+            return format_html('<b style="color:var(--err,#f85149)" title="{}">⛔ {} шт</b>', _('Немає — треба купити'),
+                               obj.stock_qty)
         if obj.is_low:
             return format_html('<b style="color:var(--err,#f85149)" title="{}">⚠️ {} шт</b>',
                                _('Мінімум: {}').format(obj.min_stock), obj.stock_qty)

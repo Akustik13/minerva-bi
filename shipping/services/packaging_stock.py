@@ -174,6 +174,45 @@ def remind_due(now=None) -> list:
     return due
 
 
+# ── Звіт про залишки («✉️ Звіт про залишки» у списку пакувальних матеріалів) ──────
+
+MISSING, CRITICAL, OK, UNTRACKED = "missing", "critical", "ok", "untracked"
+STATE_ORDER = (MISSING, CRITICAL, OK, UNTRACKED)
+
+
+def state_of(m) -> str:
+    """⛔ немає (0 і менше) / ⚠️ мало (≤ мінімуму) / ✓ є / без обліку."""
+    if not m.track_stock:
+        return UNTRACKED
+    if m.stock_qty <= 0:
+        return MISSING
+    if m.is_low:
+        return CRITICAL
+    return OK
+
+
+def report(ids=None, untracked=False) -> dict:
+    """Залишки коробок: {rows: [{material, state}], counts: {стан: N}, at}. Без ids — усі, що використовуємо
+    (не в архіві), з ids — саме вибрані (і архівні); без обліку — лише з untracked. Порядок: немає, мало, є,
+    без обліку; далі за назвою."""
+    from shipping.models import PackagingMaterial
+    qs = PackagingMaterial.objects.all()
+    qs = qs.filter(pk__in=ids) if ids else qs.filter(is_active=True)
+    if not untracked:
+        qs = qs.filter(track_stock=True)
+    rows = [{"material": m, "state": state_of(m)} for m in qs]
+    rows.sort(key=lambda r: (STATE_ORDER.index(r["state"]), str(r["material"]).lower()))
+    counts = {s: sum(1 for r in rows if r["state"] == s) for s in STATE_ORDER}
+    return {"rows": rows, "counts": counts, "at": timezone.now()}
+
+
+def send_report(rep, emails, telegram) -> list:
+    """Надіслати звіт лише на emails (і в Telegram, якщо telegram). → куди надіслано ['лист', 'Telegram']."""
+    from dashboard.notifications import send_only_to, send_packaging_report
+    with send_only_to(emails, telegram):
+        return send_packaging_report(rep)
+
+
 def notify(materials) -> list:
     """Надіслати «📦 Мало коробок» (лист і / або Telegram). → куди надіслано ['лист', 'Telegram']."""
     from dashboard.notifications import notify_packaging_low

@@ -275,6 +275,7 @@
 {"uk": "(без ціни)", "en": "(no price)", "de": "(ohne Preis)"}
 {"uk": "(безкоштовно, одразу активний)", "en": "(free, active immediately)", "de": "(kostenlos, sofort aktiv)"}
 {"uk": "(бот або чат не налаштовані)", "en": "(bot or chat not configured)", "de": "(Bot oder Chat nicht konfiguriert)"}
+{"uk": "(в архіві)", "en": "(archived)", "de": "(im Archiv)"}
 {"uk": "(в коробці кілька товарів — вага на всю коробку)", "en": "(the box contains several products — weight is for the whole box)", "de": "(im Karton befinden sich mehrere Artikel — das Gewicht gilt für den ganzen Karton)"}
 {"uk": "(валюта Minerva)", "en": "(Minerva currency)", "de": "(Minerva-Währung)"}
 {"uk": "(валюта вашого акаунта продавця). Зараз курс береться: «{0}».", "en": "(the currency of your seller account). The rate currently comes from: «{0}».", "de": "(Währung Ihres Verkäuferkontos). Der Kurs kommt derzeit aus: «{0}»."}
@@ -3709,6 +3710,7 @@
 {"uk": "«🖼 Фото й даташити на DigiKey» (bots/admin_dk_media.media_view): на DigiKey зараз → у картці лістингу", "en": "“🖼 Photos and datasheets on DigiKey” (bots/admin_dk_media.media_view): on DigiKey now → in the listing card", "de": "„🖼 Fotos und Datenblätter bei DigiKey“ (bots/admin_dk_media.media_view): aktuell bei DigiKey → in der Listing-Karte"}
 {"uk": "«🖼 Фото й даташити на DigiKey» (bots/admin_dk_media.media_view): на DigiKey зараз → у картці лістингу → за правилом; перевірка й надсилання — у фоні (bots/services/dk_media.py), хід — media/status/.", "en": "“🖼 Photos and datasheets on DigiKey” (bots/admin_dk_media.media_view): on DigiKey now → in the listing card → by the rule; checking and sending run in the background (bots/services/dk_media.py), progress — media/status/.", "de": "„🖼 Fotos und Datenblätter bei DigiKey“ (bots/admin_dk_media.media_view): aktuell bei DigiKey → in der Listing-Karte → nach Regel; Prüfung und Versand laufen im Hintergrund (bots/services/dk_media.py), Fortschritt — media/status/."}
 {"uk": "«🗑 + видаляє» в розділі діє лише разом з «🗑 Видаляти записи».", "en": "“🗑 + deletes” in a section works only together with “🗑 Delete records”.", "de": "„🗑 + löscht“ in einem Bereich gilt nur zusammen mit „🗑 Datensätze löschen“."}
+{"uk": "«🗺 Хто що отримує». Кілька адрес — через кому.", "en": "«🗺 Who gets what». Several addresses — separated by commas.", "de": "«🗺 Wer bekommt was». Mehrere Adressen — durch Kommas getrennt."}
 {"uk": "«🚀 Опублікувати» — надіслати товар у DigiKey", "en": "“🚀 Publish” — send the product to DigiKey", "de": "„🚀 Veröffentlichen“ — Artikel an DigiKey senden"}
 {"uk": "«🚚 Створити відправлення»", "en": "“🚚 Create shipment”", "de": "„🚚 Sendung erstellen“"}
 {"uk": "«🤝 Прийнято → замовлення» створює замовлення в цьому джерелі (документ Angebot — у його папці media/orders/", "en": "“🤝 Accepted → order” creates the order in this source (the Angebot document goes to its folder media/orders/", "de": "„🤝 Angenommen → Auftrag“ legt den Auftrag in dieser Quelle an (das Angebot-Dokument liegt in deren Ordner media/orders/"}
@@ -3770,6 +3772,7 @@
 {"uk": "Є розбіжність нумерації — інвойс не згенеровано автоматично. Обери варіант нижче.", "en": "There is a numbering discrepancy — the invoice was not generated automatically. Choose an option below.", "de": "Die Nummerierung weicht ab — die Rechnung wurde nicht automatisch erstellt. Wählen Sie unten eine Variante."}
 {"uk": "Є ступені цін", "en": "Has price breaks", "de": "Hat Staffelpreise"}
 {"uk": "Є токен", "en": "Token present", "de": "Token vorhanden"}
+{"uk": "Є: {0}", "en": "In stock: {0}", "de": "Vorhanden: {0}"}
 {"uk": "ЄС", "en": "EU", "de": "EU"}
 {"uk": "ЄЦБ", "en": "ECB", "de": "EZB"}
 {"uk": "ЄЦБ на", "en": "ECB on", "de": "EZB am"}
@@ -4578,6 +4581,7 @@
 {"uk": "Без ліміту", "en": "No limit", "de": "Kein Limit"}
 {"uk": "Без ліміту.", "en": "No limit.", "de": "Kein Limit."}
 {"uk": "Без обліку", "en": "Not tracked", "de": "Ohne Bestandsführung"}
+{"uk": "Без обліку: {0}", "en": "Not tracked: {0}", "de": "Ohne Bestandsführung: {0}"}
 {"uk": "Без окремої ціни (після округлення та сама, що в меншої кількості)", "en": "No separate price (after rounding the same as for the smaller quantity)", "de": "Kein eigener Preis (nach dem Runden gleich wie bei der kleineren Menge)"}
 {"uk": "Без округлення", "en": "No rounding", "de": "Ohne Rundung"}
 {"uk": "Без опису", "en": "Without a note", "de": "Ohne Beschreibung"}
@@ -7700,6 +7704,7 @@
 {"uk": "Залишки на складі", "en": "Stock levels", "de": "Lagerbestände"}
 {"uk": "Залишки на складі & БОМ", "en": "Stock levels & BOM", "de": "Lagerbestände & BOM"}
 {"uk": "Залишки товарів, транзакції, аналіз reorder. Purchase Orders постачальникам. Датасіти та фото товарів. Історія руху товару. Налаштування: коли списувати залишки.", "en": "Product stock levels, transactions, reorder analysis. Purchase Orders to suppliers. Datasheets and product photos. Product movement history. Settings: when to write off stock.", "de": "Artikelbestände, Transaktionen, Nachbestellanalyse. Purchase Orders an Lieferanten. Datenblätter und Artikelfotos. Bewegungshistorie des Artikels. Einstellungen: wann der Bestand ausgebucht wird."}
+{"uk": "Залишки упаковки", "en": "Packaging stock", "de": "Verpackungsbestand"}
 {"uk": "Залишки, аналіз reorder, Purchase Orders. Система попереджає коли товар закінчується — до того, як стане проблемою.", "en": "Stock levels, reorder analysis, Purchase Orders. The system warns you when a product is running out — before it becomes a problem.", "de": "Bestände, Reorder-Analyse, Purchase Orders. Das System warnt, wenn ein Artikel zur Neige geht – bevor es zum Problem wird."}
 {"uk": "Залишки, аналіз reorder, Purchase Orders. Система попереджає коли товар закінчується.", "en": "Stock levels, reorder analysis, Purchase Orders. The system warns you when a product is running out.", "de": "Bestände, Nachbestellanalyse, Purchase Orders. Das System warnt, wenn ein Artikel zur Neige geht."}
 {"uk": "Залишки, транзакції, аналіз reorder, Purchase Orders", "en": "Stock levels, transactions, reorder analysis, Purchase Orders", "de": "Bestände, Transaktionen, Nachbestellanalyse, Purchase Orders"}
@@ -8579,6 +8584,10 @@
 {"uk": "Звіт по товару", "en": "Product report", "de": "Artikelbericht"}
 {"uk": "Звіт по товару {0}", "en": "Product report {0}", "de": "Artikelbericht {0}"}
 {"uk": "Звіт поштою", "en": "Report by e-mail", "de": "Bericht per E-Mail"}
+{"uk": "Звіт про залишки", "en": "Stock report", "de": "Bestandsbericht"}
+{"uk": "Звіт про залишки вибраних…", "en": "Stock report for the selected…", "de": "Bestandsbericht für die ausgewählten…"}
+{"uk": "Звіт про залишки надіслано: {0}.", "en": "Stock report sent: {0}.", "de": "Bestandsbericht gesendet: {0}."}
+{"uk": "Звіт про залишки упаковки", "en": "Packaging stock report", "de": "Bestandsbericht Verpackung"}
 {"uk": "Звіт про зроблене", "en": "Report on what was done", "de": "Bericht über das Erledigte"}
 {"uk": "Звіт сайту", "en": "Site report", "de": "Bericht der Website"}
 {"uk": "Звіт статусів", "en": "Status report", "de": "Statusbericht"}
@@ -10094,6 +10103,7 @@
 {"uk": "Лише важливі моменти, фази й віхи, терміни й зустрічі, ваші наради", "en": "Only key moments, phases and milestones, deadlines and meetings, your meetings", "de": "Nur wichtige Momente, Phasen und Meilensteine, Termine und Besprechungen, Ihre Besprechungen"}
 {"uk": "Лише ви бачите цю візитку", "en": "Only you see this business card", "de": "Nur Sie sehen diese Visitenkarte"}
 {"uk": "Лише вибрані вручну", "en": "Only manually selected", "de": "Nur manuell ausgewählte"}
+{"uk": "Лише вибрані коробки.", "en": "Only the selected boxes.", "de": "Nur die ausgewählten Kartons."}
 {"uk": "Лише вручну", "en": "Manual only", "de": "Nur manuell"}
 {"uk": "Лише візитки цієї категорії (і ті, що AI лише запропонував)", "en": "Only business cards of this category (including those AI only proposed)", "de": "Nur Visitenkarten dieser Kategorie (auch die, die die KI nur vorgeschlagen hat)"}
 {"uk": "Лише групу поточної сторінки", "en": "Only the group of the current page", "de": "Nur die Gruppe der aktuellen Seite"}
@@ -10368,6 +10378,7 @@
 {"uk": "Мало на складі", "en": "Low stock", "de": "Geringer Bestand"}
 {"uk": "Мало — треба замовити", "en": "Low — needs to be ordered", "de": "Wenig — muss bestellt werden"}
 {"uk": "Мало — треба купити", "en": "Low — need to buy", "de": "Wenig — bitte nachkaufen"}
+{"uk": "Мало: {0}", "en": "Low: {0}", "de": "Knapp: {0}"}
 {"uk": "Мальдіви", "en": "Maldives", "de": "Malediven"}
 {"uk": "Мальта", "en": "Malta", "de": "Malta"}
 {"uk": "Малюю етикетку…", "en": "Drawing the label…", "de": "Etikett wird gezeichnet…"}
@@ -10795,6 +10806,7 @@
 {"uk": "Надсилати email якщо DigiKey або авто-трекінг знайшли зміни.", "en": "Send email if DigiKey or auto-tracking found changes.", "de": "E-Mail senden, wenn DigiKey oder das Auto-Tracking Änderungen gefunden haben."}
 {"uk": "Надсилати email-сповіщення", "en": "Send email notifications", "de": "E-Mail-Benachrichtigungen senden"}
 {"uk": "Надсилати зведений звіт за розкладом.", "en": "Send a summary report on a schedule.", "de": "Zusammenfassenden Bericht nach Zeitplan senden."}
+{"uk": "Надсилати звіт може той, хто може змінювати пакувальні матеріали.", "en": "The report can be sent by those who can change packaging materials.", "de": "Den Bericht kann senden, wer Verpackungsmaterialien ändern darf."}
 {"uk": "Надсилати звіт через Email/Telegram після кожного запуску", "en": "Send a report via Email/Telegram after each run", "de": "Nach jedem Lauf einen Bericht per E-Mail/Telegram senden"}
 {"uk": "Надсилати зображення товарів після текстового повідомлення. Кілька товарів — альбомом (до 10 фото).", "en": "Send product images after the text message. Several products — as an album (up to 10 photos).", "de": "Artikelbilder nach der Textnachricht senden. Mehrere Artikel — als Album (bis zu 10 Fotos)."}
 {"uk": "Надсилати підсумок після автоматичних синхронізацій — DigiKey (нові замовлення) та авто-трекінг (зміни статусу відправлень). Сповіщення надходить лише якщо були реальні зміни.", "en": "Send a summary after automatic synchronizations — DigiKey (new orders) and auto-tracking (shipment status changes). A notification is sent only if there were real changes.", "de": "Zusammenfassung nach automatischen Synchronisierungen senden — DigiKey (neue Aufträge) und Auto-Tracking (Statusänderungen von Sendungen). Eine Benachrichtigung erfolgt nur, wenn es tatsächliche Änderungen gab."}
@@ -10881,6 +10893,7 @@
 {"uk": "Надіслати зараз про коробки, яких мало", "en": "Send now about boxes that are low", "de": "Jetzt zu knappen Kartons senden"}
 {"uk": "Надіслати зараз усім", "en": "Send to everyone now", "de": "Jetzt an alle senden"}
 {"uk": "Надіслати зараз — {0}", "en": "Send now — {0}", "de": "Jetzt senden — {0}"}
+{"uk": "Надіслати звіт", "en": "Send report", "de": "Bericht senden"}
 {"uk": "Надіслати звіт зараз", "en": "Send report now", "de": "Bericht jetzt senden"}
 {"uk": "Надіслати звіти робочого часу askDANTE поштою", "en": "Send askDANTE working time reports by e-mail", "de": "askDANTE-Arbeitszeitberichte per E-Mail senden"}
 {"uk": "Надіслати зміни товару на перевірку DigiKey", "en": "Send product changes to DigiKey for review", "de": "Artikeländerungen zur Prüfung an DigiKey senden"}
@@ -11368,6 +11381,7 @@
 {"uk": "Не вдалося звірити — спробуйте ще раз", "en": "Could not check — try again", "de": "Abgleich fehlgeschlagen — erneut versuchen"}
 {"uk": "Не вдалося зібрати файл: {0}: {1}", "en": "Could not build the file: {0}: {1}", "de": "Datei konnte nicht erstellt werden: {0}: {1}"}
 {"uk": "Не вдалося надіслати SIGHUP до PID 1: {0}", "en": "Failed to send SIGHUP to PID 1: {0}", "de": "SIGHUP konnte nicht an PID 1 gesendet werden: {0}"}
+{"uk": "Не вдалося надіслати — перевірте пошту (SMTP) і Telegram у «Налаштування → Сповіщення».", "en": "Could not send — check e-mail (SMTP) and Telegram in «Settings → Notifications».", "de": "Senden fehlgeschlagen — prüfen Sie E-Mail (SMTP) und Telegram unter «Einstellungen → Benachrichtigungen»."}
 {"uk": "Не вдалося намалювати діаграму", "en": "Could not draw the chart", "de": "Diagramm konnte nicht gezeichnet werden"}
 {"uk": "Не вдалося натиснути кнопку входу: {0}", "en": "Could not click the login button: {0}", "de": "Login-Schaltfläche konnte nicht angeklickt werden: {0}"}
 {"uk": "Не вдалося оновити на DigiKey: {0} лістингів.", "en": "Failed to update on DigiKey: {0} listings.", "de": "Aktualisierung auf DigiKey fehlgeschlagen: {0} Listings."}
@@ -11645,6 +11659,7 @@
 {"uk": "Нема локації MAIN.", "en": "No MAIN location.", "de": "Kein Lagerort MAIN vorhanden."}
 {"uk": "Нема продажів", "en": "No sales", "de": "Keine Verkäufe"}
 {"uk": "Немає", "en": "None", "de": "Keine"}
+{"uk": "Немає (0 шт)", "en": "None left (0 pcs)", "de": "Keine mehr (0 Stk.)"}
 {"uk": "Немає (0)", "en": "None (0)", "de": "Keine (0)"}
 {"uk": "Немає API ключа", "en": "No API key", "de": "Kein API-Schlüssel"}
 {"uk": "Немає DIGIKEY_LOGIN / DIGIKEY_PASSWORD в .env", "en": "DIGIKEY_LOGIN / DIGIKEY_PASSWORD missing in .env", "de": "DIGIKEY_LOGIN / DIGIKEY_PASSWORD fehlen in .env"}
@@ -11731,6 +11746,8 @@
 {"uk": "Немає кому надсилати — оновіть сторінку.", "en": "Nobody to send to — reload the page.", "de": "Niemand zum Senden — Seite neu laden."}
 {"uk": "Немає користувачів з увімкненим IMAP", "en": "No users with IMAP enabled", "de": "Keine Benutzer mit aktiviertem IMAP"}
 {"uk": "Немає користувачів з увімкненим IMAP — пропускаємо", "en": "No users with IMAP enabled — skipping", "de": "Keine Benutzer mit aktiviertem IMAP — wird übersprungen"}
+{"uk": "Немає коробок для звіту.", "en": "No boxes for the report.", "de": "Keine Kartons für den Bericht."}
+{"uk": "Немає коробок з обліком на складі. Увімкніть «Вести облік на складі» в картці коробки або покажіть коробки без обліку.", "en": "No boxes with stock tracking. Turn on «Track stock» in the box card or show boxes without tracking.", "de": "Keine Kartons mit Bestandsführung. Aktivieren Sie «Bestand führen» in der Kartonkarte oder zeigen Sie Kartons ohne Bestandsführung an."}
 {"uk": "Немає курсу (пропущено)", "en": "No rate (skipped)", "de": "Kein Kurs (übersprungen)"}
 {"uk": "Немає курсу {0} у «Курсах валют»", "en": "No {0} rate in «Exchange rates»", "de": "Kein Kurs für {0} in «Wechselkurse»"}
 {"uk": "Немає курсу {0} → {1}", "en": "No exchange rate {0} → {1}", "de": "Kein Wechselkurs {0} → {1}"}
@@ -11855,6 +11872,9 @@
 {"uk": "Немає інтернет-магазину — листи надсилаються з його пошти.", "en": "No web shop — the emails are sent from its mailbox.", "de": "Kein Onlineshop — die E-Mails gehen über dessen Postfach."}
 {"uk": "Немає інтернет-магазину — рахунки покупцям надсилаються з його пошти.", "en": "No web shop — invoices are sent to buyers from its mailbox.", "de": "Kein Onlineshop — Rechnungen an Käufer gehen über dessen Postfach."}
 {"uk": "Немає — задайте в картці товару (Склад → Товари → «💰 Базові ціни»).", "en": "None — set in the product card (Stock → Products → “💰 Base prices”).", "de": "Keine — in der Artikelkarte festlegen (Lager → Artikel → „💰 Basispreise“)."}
+{"uk": "Немає — на складі 0; ⚠️ Мало — залишок дійшов до «Мінімального запасу».", "en": "None left — 0 in stock; ⚠️ Low — stock has reached the «Minimum stock».", "de": "Keine mehr — 0 auf Lager; ⚠️ Knapp — der Bestand hat den «Mindestbestand» erreicht."}
+{"uk": "Немає — треба купити", "en": "None left — needs buying", "de": "Keine mehr — nachkaufen"}
+{"uk": "Немає: {0}", "en": "None left: {0}", "de": "Keine mehr: {0}"}
 {"uk": "Неможливо перенадіслати відправлення в поточному статусі.", "en": "The shipment cannot be resent in its current status.", "de": "Die Sendung kann im aktuellen Status nicht erneut gesendet werden."}
 {"uk": "Необов'язково — потрапить в історію змін базових цін.", "en": "Optional — will go into the base price change history.", "de": "Optional — gelangt in die Änderungshistorie der Basispreise."}
 {"uk": "Необов'язково. Задайте акценти або стиль: мова, тон, додаткові метрики. AI завжди може включити критично важливе навіть без вказівки.", "en": "Optional. Set accents or style: language, tone, additional metrics. AI can always include critically important items even without an instruction.", "de": "Optional. Legen Sie Schwerpunkte oder den Stil fest: Sprache, Ton, zusätzliche Kennzahlen. Die KI kann kritisch wichtige Punkte auch ohne Anweisung immer aufnehmen."}
@@ -11879,6 +11899,7 @@
 {"uk": "Неправильний формат cron", "en": "Invalid cron format", "de": "Ungültiges Cron-Format"}
 {"uk": "Неправильний шаблон.", "en": "Invalid template.", "de": "Ungültige Vorlage."}
 {"uk": "Неправильні адреси", "en": "Invalid addresses", "de": "Ungültige Adressen"}
+{"uk": "Неправильні адреси: {0}", "en": "Invalid addresses: {0}", "de": "Ungültige Adressen: {0}"}
 {"uk": "Неправильні дані запиту", "en": "Invalid request data", "de": "Ungültige Anfragedaten"}
 {"uk": "Неправильні параметри: {0}", "en": "Invalid parameters: {0}", "de": "Ungültige Parameter: {0}"}
 {"uk": "Неприпустиме ім'я", "en": "Invalid name", "de": "Ungültiger Name"}
@@ -12911,6 +12932,7 @@
 {"uk": "Пакувальні матеріали", "en": "Packaging materials", "de": "Verpackungsmaterialien"}
 {"uk": "Пакувальні матеріали (в розробці)", "en": "Packaging materials (in development)", "de": "Verpackungsmaterial (in Entwicklung)"}
 {"uk": "Пакувальні матеріали [demo]", "en": "Packaging materials [demo]", "de": "Verpackungsmaterial [demo]"}
+{"uk": "Пакувальні матеріали в Minerva", "en": "Packaging materials in Minerva", "de": "Verpackungsmaterialien in Minerva"}
 {"uk": "Пакування", "en": "Packaging", "de": "Verpackung"}
 {"uk": "Пакування / доставка", "en": "Packing / delivery", "de": "Verpackung / Lieferung"}
 {"uk": "Пакування й доставка", "en": "Packaging and shipping", "de": "Verpackung und Versand"}
@@ -13751,6 +13773,7 @@
 {"uk": "Показати всім, хто бачить картку", "en": "Show to everyone who can see the card", "de": "Allen zeigen, die die Karte sehen"}
 {"uk": "Показати деталі", "en": "Show details", "de": "Details anzeigen"}
 {"uk": "Показати знайдені листи без збереження", "en": "Show the found e-mails without saving", "de": "Gefundene E-Mails anzeigen, ohne zu speichern"}
+{"uk": "Показати й коробки без обліку", "en": "Show boxes without tracking too", "de": "Auch Kartons ohne Bestandsführung zeigen"}
 {"uk": "Показати лист і надіслати лише йому", "en": "Show the e-mail and send to this one only", "de": "E-Mail anzeigen und nur an diesen senden"}
 {"uk": "Показати лише постачальників звідти", "en": "Show only suppliers from there", "de": "Nur Lieferanten von dort zeigen"}
 {"uk": "Показати лише цей", "en": "Show only this one", "de": "Nur diesen anzeigen"}
@@ -14373,6 +14396,7 @@
 {"uk": "Поштовий індекс.", "en": "Postal code.", "de": "Postleitzahl."}
 {"uk": "Поштові домени", "en": "Mail domains", "de": "E-Mail-Domains"}
 {"uk": "Поштомат", "en": "Parcel locker", "de": "Paketautomat"}
+{"uk": "Пошту (SMTP) не налаштовано — «Налаштування → Сповіщення» → «Email (SMTP)».", "en": "E-mail (SMTP) is not set up — «Settings → Notifications» → «Email (SMTP)».", "de": "E-Mail (SMTP) ist nicht eingerichtet — «Einstellungen → Benachrichtigungen» → «Email (SMTP)»."}
 {"uk": "Пошту (SMTP) не налаштовано — заповніть «Email (SMTP)» у налаштуваннях сповіщень.", "en": "Mail (SMTP) is not configured — fill in “Email (SMTP)” in the notification settings.", "de": "E-Mail (SMTP) ist nicht konfiguriert — füllen Sie „E-Mail (SMTP)“ in den Benachrichtigungseinstellungen aus."}
 {"uk": "Пошту оновлено: {0}", "en": "Mail refreshed: {0}", "de": "E-Mails aktualisiert: {0}"}
 {"uk": "Пошук", "en": "Search", "de": "Suche"}
@@ -15111,6 +15135,7 @@
 {"uk": "Підставлено автоматично з рекомендації, не зважено", "en": "Filled in automatically from the recommendation, not weighed", "de": "Automatisch aus der Empfehlung übernommen, nicht gewogen"}
 {"uk": "Підставлено адреси з «Кому (email)» налаштувань сповіщень. Змініть", "en": "The addresses from “To (email)” in the notification settings are pre-filled. Change", "de": "Die Adressen aus „An (E-Mail)“ in den Benachrichtigungseinstellungen sind vorausgefüllt. Ändern Sie"}
 {"uk": "Підставлено адреси з «Кому (email)» налаштувань сповіщень. Змініть або впишіть свою; кілька — через кому. Надсилається лише цим адресам — решта команди нічого не отримає, і розклад автоматичних листів не зсувається.", "en": "The addresses from “To (email)” in the notification settings are pre-filled. Change them or enter your own; several — separated by commas. It is sent only to these addresses — the rest of the team will receive nothing, and the schedule of automatic e-mails does not shift.", "de": "Die Adressen aus „An (E-Mail)“ in den Benachrichtigungseinstellungen sind vorausgefüllt. Ändern Sie sie oder tragen Sie eine eigene ein; mehrere — durch Komma getrennt. Es wird nur an diese Adressen gesendet — der Rest des Teams erhält nichts, und der Zeitplan der automatischen E-Mails verschiebt sich nicht."}
+{"uk": "Підставлено адреси сповіщення «📦 Мало коробок» — змінити їх можна в", "en": "Filled in with the addresses of the «📦 Low on boxes» notification — you can change them in", "de": "Eingesetzt sind die Adressen der Meldung «📦 Kartons knapp» — ändern können Sie sie unter"}
 {"uk": "Підставляється у CN23 якщо у товарі немає назви для документів.", "en": "Inserted into CN23 if the product has no name for documents.", "de": "Wird in CN23 eingesetzt, wenn der Artikel keinen Namen für Dokumente hat."}
 {"uk": "Підстановки", "en": "Placeholders", "de": "Platzhalter"}
 {"uk": "Підсумки (subtotal/VAT/total) розраховуються автоматично.", "en": "Totals (subtotal/VAT/total) are calculated automatically.", "de": "Summen (subtotal/VAT/total) werden automatisch berechnet."}
@@ -16827,6 +16852,7 @@
 {"uk": "Сховані свої категорії", "en": "Hidden own categories", "de": "Ausgeblendete eigene Kategorien"}
 {"uk": "Сховати", "en": "Hide", "de": "Ausblenden"}
 {"uk": "Сховати в магазині", "en": "Hide in shop", "de": "Im Shop ausblenden"}
+{"uk": "Сховати коробки без обліку", "en": "Hide boxes without tracking", "de": "Kartons ohne Bestandsführung ausblenden"}
 {"uk": "Сховати розділ", "en": "Hide section", "de": "Bereich ausblenden"}
 {"uk": "Сховати фільтри в кнопку «⚙ Фільтри» над списком", "en": "Hide filters behind the “⚙ Filters” button above the list", "de": "Filter hinter der Schaltfläche „⚙ Filter“ über der Liste ausblenden"}
 {"uk": "Сховати цю сторінку", "en": "Hide this page", "de": "Diese Seite ausblenden"}
@@ -17857,6 +17883,7 @@
 {"uk": "Усі категорії Minerva", "en": "All Minerva categories", "de": "Alle Minerva-Kategorien"}
 {"uk": "Усі ключі", "en": "All keys", "de": "Alle Schlüssel"}
 {"uk": "Усі коробки, яких мало", "en": "All boxes that are low", "de": "Alle knappen Kartons"}
+{"uk": "Усі коробки, які використовуєте (без архіву).", "en": "All boxes in use (without the archive).", "de": "Alle verwendeten Kartons (ohne Archiv)."}
 {"uk": "Усі кроки вертикально. Поточний крок відображає", "en": "All steps vertically. The current step shows", "de": "Alle Schritte vertikal. Der aktuelle Schritt zeigt"}
 {"uk": "Усі кроки кожної фази", "en": "All steps of every phase", "de": "Alle Schritte jeder Phase"}
 {"uk": "Усі листи з № {0}", "en": "All e-mails with № {0}", "de": "Alle E-Mails mit Nr. {0}"}
@@ -20151,6 +20178,7 @@
 {"uk": "до лістингу", "en": "to the listing", "de": "zum Listing"}
 {"uk": "до лістингів", "en": "to the listings", "de": "zu den Listings"}
 {"uk": "до налаштувань сповіщень", "en": "to the notification settings", "de": "zu den Benachrichtigungseinstellungen"}
+{"uk": "до пакувальних матеріалів", "en": "to packaging materials", "de": "zu den Verpackungsmaterialien"}
 {"uk": "до профілю", "en": "to profile", "de": "zum Profil"}
 {"uk": "до центів", "en": "to the cent", "de": "auf Cent"}
 {"uk": "добавка", "en": "add-on", "de": "Zuschlag"}
@@ -21221,6 +21249,7 @@
 {"uk": "майбутній день", "en": "future day", "de": "zukünftiger Tag"}
 {"uk": "майбутній квартал", "en": "future quarter", "de": "zukünftiges Quartal"}
 {"uk": "мало", "en": "low", "de": "wenig"}
+{"uk": "мало {0}", "en": "low {0}", "de": "knapp {0}"}
 {"uk": "мало — треба замовити", "en": "low — needs ordering", "de": "wenig — nachbestellen"}
 {"uk": "мало — треба купити", "en": "low — need to buy", "de": "wenig — bitte nachkaufen"}
 {"uk": "маржа {0}", "en": "margin {0}", "de": "Marge {0}"}
@@ -21677,6 +21706,7 @@
 {"uk": "немає email", "en": "no e-mail address", "de": "keine E-Mail-Adresse"}
 {"uk": "немає email покупця", "en": "no buyer email", "de": "keine E-Mail des Käufers"}
 {"uk": "немає email — допишіть у", "en": "no email — add it in the", "de": "keine E-Mail — ergänzen in der"}
+{"uk": "немає {0}", "en": "none left {0}", "de": "keine mehr {0}"}
 {"uk": "немає адрес", "en": "no addresses", "de": "keine Adressen"}
 {"uk": "немає адреси", "en": "no address", "de": "keine Adresse"}
 {"uk": "немає адреси доставки", "en": "no delivery address", "de": "keine Lieferadresse"}
@@ -23300,6 +23330,7 @@
 {"uk": "травня", "en": "May", "de": "Mai"}
 {"uk": "транзакцію типу ADJUSTMENT.", "en": "a transaction of type ADJUSTMENT.", "de": "eine Transaktion vom Typ ADJUSTMENT."}
 {"uk": "треба змінити: {0}", "en": "needs changing: {0}", "de": "muss geändert werden: {0}"}
+{"uk": "треба купити", "en": "needs buying", "de": "nachkaufen"}
 {"uk": "трек {0}", "en": "tracking no. {0}", "de": "Sendungsnr. {0}"}
 {"uk": "трек {0} {1}", "en": "tracking {0} {1}", "de": "Sendungsnummer {0} {1}"}
 {"uk": "трек номер", "en": "tracking number", "de": "Sendungsnummer"}
@@ -23517,6 +23548,7 @@
 {"uk": "усе замовлення одним підтвердженням — кожна посилка своїм трек-номером (так приймає DigiKey)", "en": "the whole order in one confirmation — each parcel with its own tracking number (that is how DigiKey accepts it)", "de": "der ganze Auftrag in einer Bestätigung — jedes Paket mit eigener Sendungsnummer (so akzeptiert es DigiKey)"}
 {"uk": "усе підтверджено", "en": "all confirmed", "de": "alles bestätigt"}
 {"uk": "усе як у ролі / пакеті (ручні модулі, операції, сховані сторінки й особливі права скинуто)", "en": "everything as in the role / bundle (manual modules, operations, hidden pages and special permissions reset)", "de": "alles wie in der Rolle / im Paket (manuelle Module, Operationen, ausgeblendete Seiten und Sonderrechte zurückgesetzt)"}
+{"uk": "усе є", "en": "all in stock", "de": "alles vorhanden"}
 {"uk": "усе, що на DigiKey ще не відправлено; у коробці лише частина — спершу вкажіть її вміст у блоці «📦 Що в цій посилці»", "en": "everything not yet shipped on DigiKey; if the box holds only part, first enter its contents in the “📦 What is in this parcel” block", "de": "alles, was auf DigiKey noch nicht versendet ist; ist im Karton nur ein Teil, zuerst den Inhalt im Block „📦 Was in diesem Paket ist“ angeben"}
 {"uk": "усього {0}", "en": "{0} in total", "de": "insgesamt {0}"}
 {"uk": "усього вистачає", "en": "enough of everything", "de": "alles reicht aus"}

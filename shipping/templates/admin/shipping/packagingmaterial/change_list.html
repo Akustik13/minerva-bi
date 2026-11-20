@@ -1,0 +1,7 @@
+{% extends "admin/change_list.html" %}
+{# Packaging materials list: «✉️ stock report» button (PackagingMaterialAdmin.stock_report_view) #}
+
+{% block object-tools-items %}
+    <li><a href="{% url 'admin:shipping_packagingmaterial_stock_report' %}">✉️ Звіт про залишки</a></li>
+    {{ block.super }}
+{% endblock %}

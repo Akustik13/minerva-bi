@@ -1827,14 +1827,19 @@ def notify_incoming_delivered(shipment, out, *, email=True, telegram=True):
             logger.warning('Вхідна посилка #%s: Telegram не надіслано: %s', shipment.pk, e)
 
 
-def packaging_low_message(materials) -> dict:
-    """Текст «📦 Мало коробок»: {subject, head, items: [{name, line, buy, link}], link} — для листа й Telegram."""
+def _site_base() -> str:
+    """https://домен Minerva для посилань у листах ('' — домен не задано, посилання відносні)."""
     try:
         from config.models import SystemSettings
         ss = SystemSettings.objects.filter(pk=1).first()
-        base = ss.site_url.rstrip('/') if ss is not None and ss.site_domain else ''
+        return ss.site_url.rstrip('/') if ss is not None and ss.site_domain else ''
     except Exception:  # noqa: BLE001
-        base = ''
+        return ''
+
+
+def packaging_low_message(materials) -> dict:
+    """Текст «📦 Мало коробок»: {subject, head, items: [{name, line, buy, link}], link} — для листа й Telegram."""
+    base = _site_base()
     items = []
     for m in materials:
         line = f'на складі {m.stock_qty} шт · мінімум {m.min_stock} шт'
@@ -1888,6 +1893,111 @@ def notify_packaging_low(materials, *, email=True, telegram=True) -> list:
             sent.append('Telegram')
         except Exception as e:  # noqa: BLE001
             logger.warning('Мало коробок: Telegram не надіслано: %s', e)
+    return sent
+
+
+PACKAGING_STATES = {   # стан коробки у звіті (shipping/services/packaging_stock.state_of): значок, текст, фон рядка
+    'missing': ('⛔', 'Немає', '#ffebee', '#b71c1c'),
+    'critical': ('⚠️', 'Мало', '#fff3e0', '#e65100'),
+    'ok': ('✓', 'Є', '#ffffff', '#2e7d32'),
+    'untracked': ('—', 'Без обліку', '#f5f5f5', '#616161'),
+}
+
+
+def packaging_report_message(rep) -> dict:
+    """Звіт «📦 Залишки упаковки» (packaging_stock.report): {subject, head, summary, items, link} — лист і Telegram."""
+    base = _site_base()
+    c = rep['counts']
+    items = []
+    for r in rep['rows']:
+        m, state = r['material'], r['state']
+        icon, label, _bg, _fg = PACKAGING_STATES[state]
+        todo = ''
+        if state in ('missing', 'critical'):
+            todo = f'купити ≈ {m.reorder_qty} шт' if m.reorder_qty else 'треба купити'
+        items.append({
+            'name': str(m), 'dims': m._dim_str(), 'state': state, 'icon': icon, 'label': label,
+            'stock': f'{m.stock_qty} шт' if m.track_stock else '—',
+            'min': f'{m.min_stock} шт' if m.track_stock and m.min_stock is not None else '—',
+            'todo': todo, 'buy': m.buy_url or '', 'archived': not m.is_active,
+            'link': f'{base}/admin/shipping/packagingmaterial/{m.pk}/change/'})
+    parts = [f'⛔ немає {c["missing"]}' if c['missing'] else '', f'⚠️ мало {c["critical"]}' if c['critical'] else '']
+    parts = [p for p in parts if p]
+    head = '📦 Залишки упаковки: ' + (' · '.join(parts) if parts else 'усе є')
+    summary = ' · '.join(p for p in (
+        f'⛔ Немає: {c["missing"]}', f'⚠️ Мало: {c["critical"]}', f'✓ Є: {c["ok"]}',
+        f'— Без обліку: {c["untracked"]}' if c['untracked'] else '') if p)
+    when = timezone.localtime(rep['at']).strftime('%d.%m.%Y %H:%M')
+    return {'subject': head, 'head': head, 'summary': summary, 'when': when, 'items': items,
+            'link': f'{base}/admin/shipping/packagingmaterial/'}
+
+
+def packaging_report_html(m) -> str:
+    """HTML листа «📦 Залишки упаковки» (значення екрановано)."""
+    cell = 'padding:6px 8px;border-bottom:1px solid #e0e0e0;color:#212121'
+    rows = []
+    for i in m['items']:
+        _icon, _label, bg, fg = PACKAGING_STATES[i['state']]
+        todo = esc(i['todo']) + (f'<br><a href="{esc(i["buy"])}">🛒 Де купувати</a>' if i['buy'] else '')
+        rows.append(
+            f'<tr style="background:{bg}"><td style="{cell}"><a href="{esc(i["link"])}" style="color:#0d47a1">'
+            f'<b>{esc(i["name"])}</b></a>' + (' <span style="color:#757575">(в архіві)</span>' if i['archived'] else '')
+            + f'<br><span style="color:#616161;font-size:12px">{esc(i["dims"])}</span></td>'
+            f'<td style="{cell};text-align:right;white-space:nowrap"><b>{esc(i["stock"])}</b></td>'
+            f'<td style="{cell};text-align:right;white-space:nowrap">{esc(i["min"])}</td>'
+            f'<td style="{cell};white-space:nowrap;color:{fg}"><b>{esc(i["icon"])} {esc(i["label"])}</b></td>'
+            f'<td style="{cell};font-size:12px">{todo}</td></tr>')
+    th = 'padding:6px 8px;text-align:left;border-bottom:2px solid #bdbdbd;color:#424242;font-size:12px'
+    color = '#b71c1c' if any(i['state'] == 'missing' for i in m['items']) else (
+        '#e65100' if any(i['state'] == 'critical' for i in m['items']) else '#2e7d32')
+    return (
+        '<html><head></head><body style="font-family:Arial,sans-serif">'
+        '<div style="font-family:Arial,sans-serif;max-width:680px;margin:0 auto;border:1px solid #e0e0e0;'
+        f'border-radius:8px;overflow:hidden"><div style="background:{color};padding:16px 20px">'
+        f'<span style="color:#fff;font-size:18px;font-weight:700">{esc(m["head"])}</span><br>'
+        f'<span style="color:#fff;font-size:12px">{esc(m["when"])}</span></div>'
+        '<div style="padding:16px 20px;background:#fafafa;font-size:14px;line-height:1.5">'
+        f'<p style="margin:0 0 12px;color:#212121"><b>{esc(m["summary"])}</b></p>'
+        '<table style="width:100%;border-collapse:collapse">'
+        f'<tr><th style="{th}">Коробка</th><th style="{th};text-align:right">На складі</th>'
+        f'<th style="{th};text-align:right">Мінімум</th><th style="{th}">Стан</th><th style="{th}">Що робити</th></tr>'
+        + ''.join(rows) + '</table>'
+        f'<p style="margin:14px 0 0"><a href="{esc(m["link"])}" style="color:#0d47a1">Пакувальні матеріали в Minerva →</a>'
+        '</p></div></div></body></html>')
+
+
+@for_event('packaging')
+def send_packaging_report(rep, *, email=True, telegram=True) -> list:
+    """📦 Звіт про залишки упаковки (shipping/services/packaging_stock.report) — лист і Telegram; викликається з
+    send_only_to (вибрані людиною адреси). → куди надіслано: ['лист', 'Telegram']."""
+    ns = _get_ns()
+    if not ns or not rep['rows']:
+        return []
+    send_email, send_tg = channels(ns, email and ns.email_enabled, telegram and ns.telegram_enabled)
+    m = packaging_report_message(rep)
+    sent = []
+    if send_email and recipients(ns):
+        try:
+            _send_event_email(ns, m['subject'], packaging_report_html(m))
+            sent.append('лист')
+        except Exception as e:  # noqa: BLE001
+            logger.warning('Звіт про залишки упаковки: email не надіслано: %s', e)
+    if send_tg:
+        try:
+            lines = []
+            for i in m['items']:
+                line = f'{esc(i["icon"])} <a href="{esc(i["link"])}">{esc(i["name"])}</a> — {esc(i["stock"])}'
+                if i['min'] != '—':
+                    line += f' (мін. {esc(i["min"])})'
+                if i['todo']:
+                    line += f' · {esc(i["todo"])}'
+                if i['buy']:
+                    line += f' · <a href="{esc(i["buy"])}">де купувати</a>'
+                lines.append(line)
+            _send_telegram(ns, tg_cut(f'<b>{esc(m["head"])}</b>\n{esc(m["summary"])}\n\n' + '\n'.join(lines)))
+            sent.append('Telegram')
+        except Exception as e:  # noqa: BLE001
+            logger.warning('Звіт про залишки упаковки: Telegram не надіслано: %s', e)
     return sent
 
 

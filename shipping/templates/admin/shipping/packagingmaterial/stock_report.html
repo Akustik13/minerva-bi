@@ -1,0 +1,103 @@
+{% extends "admin/base_site.html" %}
+{# Stock report page (PackagingMaterialAdmin.stock_report_view): preview of the mail, recipients, Telegram yes / no #}
+
+{% block title %}{{ title }} — Minerva{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Головна</a> ›
+  <a href="{{ back_url }}">{{ opts.verbose_name_plural|capfirst }}</a> › {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .sr-box { max-width: 860px; padding: 16px 20px; border: 1px solid var(--border-strong, #243347); border-radius: 8px;
+            background: var(--bg-card, #1a2535); margin-bottom: 16px; }
+  .sr-box label { display: block; float: none; width: auto; padding: 0; font-weight: 600; margin: 14px 0 4px; }
+  .sr-box textarea { width: 100%; box-sizing: border-box; min-height: 56px; font-size: 13px; }
+  .sr-muted { color: var(--body-quiet-color, #8aa0b4); font-size: 12px; }
+  .sr-err { margin: 10px 0 0; padding: 8px 12px; border-radius: 6px; background: rgba(229, 72, 77, .14); }
+  .sr-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
+  .sr-chk { display: flex !important; gap: 8px; align-items: center; font-weight: 400 !important; }
+  .sr-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .sr-chip { padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 13px;
+             border: 1px solid var(--border-strong, #243347); }
+  .sr-chip.missing { background: rgba(229, 72, 77, .18); }
+  .sr-chip.critical { background: rgba(245, 158, 11, .18); }
+  .sr-chip.ok { background: rgba(63, 185, 80, .14); }
+  .sr-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .sr-table th, .sr-table td { padding: 6px 8px; border-bottom: 1px solid var(--border-color, #2a3a4e); text-align: left; }
+  .sr-table td.num, .sr-table th.num { text-align: right; white-space: nowrap; }
+  .sr-table tr.missing td { background: rgba(229, 72, 77, .12); }
+  .sr-table tr.critical td { background: rgba(245, 158, 11, .12); }
+  .sr-state { white-space: nowrap; font-weight: 700; }
+  tr.missing .sr-state { color: var(--err, #f85149); }
+  tr.critical .sr-state { color: var(--warn, #d29922); }
+  tr.ok .sr-state { color: var(--ok, #3fb950); }
+</style>
+
+<div class="sr-box">
+  <div class="sr-chips">
+    <span class="sr-chip missing">⛔ Немає: {{ counts.missing }}</span>
+    <span class="sr-chip critical">⚠️ Мало: {{ counts.critical }}</span>
+    <span class="sr-chip ok">✓ Є: {{ counts.ok }}</span>
+    {% if untracked %}<span class="sr-chip">— Без обліку: {{ counts.untracked }}</span>{% endif %}
+  </div>
+  <div class="sr-muted" style="margin-bottom:8px">
+    {% if selected %}Лише вибрані коробки.{% else %}Усі коробки, які використовуєте (без архіву).{% endif %}
+    ⛔ Немає — на складі 0; ⚠️ Мало — залишок дійшов до «Мінімального запасу».
+    <a href="{{ toggle_url }}">{% if untracked %}Сховати коробки без обліку{% else %}＋ Показати й коробки без обліку{% endif %}</a>
+  </div>
+  {% if rows %}
+  <table class="sr-table">
+    <tr><th>Коробка</th><th class="num">На складі</th><th class="num">Мінімум</th>
+        <th>Стан</th><th>Що робити</th></tr>
+    {% for r in rows %}{% with m=r.material %}
+    <tr class="{{ r.state }}">
+      <td><a href="{% url 'admin:shipping_packagingmaterial_change' m.pk %}" translate="no">{{ m }}</a>
+        {% if not m.is_active %}<span class="sr-muted">(в архіві)</span>{% endif %}
+        <div class="sr-muted" translate="no">{{ m.length_cm }}×{{ m.width_cm }}×{{ m.height_cm }} см</div></td>
+      <td class="num">{% if m.track_stock %}<b>{{ m.stock_qty }} шт</b>{% else %}—{% endif %}</td>
+      <td class="num">{% if m.track_stock and m.min_stock is not None %}{{ m.min_stock }} шт{% else %}—{% endif %}</td>
+      <td class="sr-state">{{ r.mark.0 }} {{ r.mark.1 }}</td>
+      <td>{% if r.state == "missing" or r.state == "critical" %}{% if m.reorder_qty %}купити ≈ {{ m.reorder_qty }} шт{% else %}треба купити{% endif %}{% if m.buy_url %} · <a href="{{ m.buy_url }}" target="_blank" rel="noopener noreferrer">🛒 Де купувати</a>{% endif %}{% endif %}</td>
+    </tr>
+    {% endwith %}{% endfor %}
+  </table>
+  {% else %}
+  <div>Немає коробок з обліком на складі. Увімкніть «Вести облік на складі» в картці коробки або покажіть коробки без обліку.</div>
+  {% endif %}
+</div>
+
+<form method="post" class="sr-box">{% csrf_token %}
+  <input type="hidden" name="ids" value="{{ ids }}">
+  {% if untracked %}<input type="hidden" name="untracked" value="1">{% endif %}
+  <label for="sr-to">Кому (email)</label>
+  <textarea id="sr-to" name="to" placeholder="адреса@фірма.de, ще@адреса.com">{{ to }}</textarea>
+  <div class="sr-row">
+    {% if my_email %}<button type="button" class="button" data-sr-set="{{ my_email }}">👤 Лише мені (<span translate="no">{{ my_email }}</span>)</button>{% endif %}
+    {% if configured %}<button type="button" class="button" data-sr-set="{{ configured }}">↺ Як у налаштуваннях</button>{% endif %}
+    <button type="button" class="button" data-sr-set="">✕ Очистити</button>
+  </div>
+  <div class="sr-muted" style="margin-top:4px">Підставлено адреси сповіщення «📦 Мало коробок» — змінити їх можна в
+    <a href="{{ routes_url }}">Налаштування → Сповіщення</a> → «🗺 Хто що отримує». Кілька адрес — через кому.</div>
+
+  <label class="sr-chk"><input type="checkbox" name="telegram" value="1"{% if telegram %} checked{% endif %}{% if not tg_ready %} disabled{% endif %}>
+    📱 Також у Telegram{% if not tg_ready %} <span class="sr-muted">(бот або чат не налаштовані)</span>{% endif %}</label>
+
+  {% if error %}<div class="sr-err">{{ error }}</div>{% endif %}
+  <div class="sr-row" style="margin-top:16px">
+    {% if can_send %}{% if rows %}<button type="submit" class="button default">📤 Надіслати звіт</button>{% endif %}
+    {% else %}<span class="sr-muted">Надсилати звіт може той, хто може змінювати пакувальні матеріали.</span>{% endif %}
+    <a href="{{ back_url }}">← до пакувальних матеріалів</a>
+  </div>
+</form>
+<script>
+  document.querySelectorAll('[data-sr-set]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var to = document.getElementById('sr-to'); to.value = b.dataset.srSet; to.focus();
+    });
+  });
+</script>
+{% endblock %}
