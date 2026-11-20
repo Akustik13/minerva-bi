@@ -218,6 +218,7 @@
 {"uk": "(DigiKey) піде лише з цими кількостями.", "en": "(DigiKey) is sent with these quantities only.", "de": "(DigiKey) wird nur mit diesen Mengen gesendet."}
 {"uk": "(Firefox: «Прийняти ризик і продовжити»). Сторінка покаже", "en": "(Firefox: “Accept the Risk and Continue”). The page will show", "de": "(Firefox: „Risiko akzeptieren und fortfahren“). Die Seite zeigt"}
 {"uk": "(ID немає)", "en": "(no ID)", "de": "(keine ID)"}
+{"uk": "(Minerva забере останню версію з GitHub при першому завантаженні)", "en": "(Minerva will fetch the latest version from GitHub on the first download)", "de": "(Minerva holt beim ersten Download die neueste Version von GitHub)"}
 {"uk": "(MyDHL API трекає тільки DHL Express відправлення, не DHL Paket/Post)", "en": "(MyDHL API tracks only DHL Express shipments, not DHL Paket/Post)", "de": "(Die MyDHL API verfolgt nur DHL-Express-Sendungen, nicht DHL Paket/Post)"}
 {"uk": "(None = авто за роллю)", "en": "(None = automatic by role)", "de": "(None = automatisch nach Rolle)"}
 {"uk": "(SMTP не задано)", "en": "(SMTP not set)", "de": "(SMTP nicht eingerichtet)"}
@@ -284,6 +285,7 @@
 {"uk": "(варіант 3 — в розробці).", "en": "(option 3 — in development).", "de": "(Variante 3 — in Entwicklung)."}
 {"uk": "(ваша)", "en": "(yours)", "de": "(Ihr Postfach)"}
 {"uk": "(ваше «що вирішили» лишиться)", "en": "(your “what was decided” stays)", "de": "(Ihr „Was beschlossen wurde“ bleibt)"}
+{"uk": "(вгорі камери або «⚙️ Налаштування»): назва, де взяли, що це, хто це для нас, позначки, категорії — підставляються в кожне нове фото. Наприклад, «electronica 2026, Halle B3».", "en": "(at the top of the camera or «⚙️ Налаштування»): name, where taken, what it is, who it is for us, marks, categories — filled into every new photo. For example, «electronica 2026, Halle B3».", "de": "(oben in der Kamera oder «⚙️ Налаштування»): Name, wo erhalten, was es ist, wer es für uns ist, Markierungen, Kategorien — werden in jedes neue Foto übernommen. Zum Beispiel «electronica 2026, Halle B3»."}
 {"uk": "(ви адміністратор Minerva)", "en": "(you are a Minerva administrator)", "de": "(Sie sind Minerva-Administrator)"}
 {"uk": "(видалено", "en": "(deleted", "de": "(gelöscht"}
 {"uk": "(виконано)", "en": "(done)", "de": "(erledigt)"}
@@ -409,6 +411,7 @@
 {"uk": "(пусто)", "en": "(empty)", "de": "(leer)"}
 {"uk": "(рахунок #{0} — без PDF)", "en": "(invoice #{0} — no PDF)", "de": "(Rechnung #{0} — ohne PDF)"}
 {"uk": "(реальні продажі).", "en": "(real sales).", "de": "(echte Verkäufe)."}
+{"uk": "(рекомендовано) — APK зберігає ваша Minerva, тож він завантажується й у мережі фірми.", "en": "(recommended) — your Minerva stores the APK, so it also downloads inside the company network.", "de": "(empfohlen) — Ihre Minerva speichert die APK, daher lädt sie auch im Firmennetz."}
 {"uk": "(решту DigiKey ще не опублікував — пропустимо)", "en": "(DigiKey has not published the rest yet — they will be skipped)", "de": "(den Rest hat DigiKey noch nicht veröffentlicht — wird übersprungen)"}
 {"uk": "(реєстрація з підтвердженням email) — вони з'являються тут автоматично.", "en": "(registration with e-mail confirmation) — they appear here automatically.", "de": "(Registrierung mit E-Mail-Bestätigung) – sie erscheinen hier automatisch."}
 {"uk": "(реєстрація з підтвердженням email) — вони з'являються тут автоматично. Можна створити й за покупця", "en": "(registration with e-mail confirmation) — they appear here automatically. You can also create one on behalf of the customer", "de": "(Registrierung mit E-Mail-Bestätigung) – sie erscheinen hier automatisch. Sie können auch im Namen des Kunden eines erstellen"}
@@ -607,6 +610,7 @@
 {"uk": ". Сторінка перезавантажиться…", "en": ". The page will reload…", "de": ". Die Seite wird neu geladen…"}
 {"uk": ". Так в одному місці видно покупця, його замовлення і клієнта CRM, а на вебсервері немає бази з персональними даними.", "en": ". This way the buyer, their orders and the CRM customer are visible in one place, and the web server holds no database of personal data.", "de": ". So sind Käufer, seine Aufträge und der CRM-Kunde an einer Stelle sichtbar, und auf dem Webserver gibt es keine Datenbank mit personenbezogenen Daten."}
 {"uk": ". Також переконайтесь, що", "en": ". Also make sure that", "de": ". Stellen Sie außerdem sicher, dass"}
+{"uk": ". Там два QR", "en": ". There are two QR codes", "de": ". Dort gibt es zwei QR-Codes"}
 {"uk": ". Тут вказуємо", "en": ". Here we specify", "de": ". Hier geben wir an"}
 {"uk": ". Уточніть у митного брокера або перевірте поріг для країни призначення.", "en": ". Check with your customs broker or verify the threshold for the destination country.", "de": ". Klären Sie dies mit Ihrem Zollagenten oder prüfen Sie die Schwelle für das Bestimmungsland."}
 {"uk": ". Щоб лишились — поставте галочку «однаковий курс з DigiKey».", "en": ". To keep them as they are, tick “same rate as DigiKey”.", "de": ". Damit sie bleiben, setzen Sie das Häkchen „gleicher Kurs wie DigiKey“."}
@@ -689,6 +693,7 @@
 {"uk": "1. **Прогрес** — що виконано, що ні, чи є відхилення від плану", "en": "1. **Progress** — what has been done, what has not, whether there are deviations from the plan", "de": "1. **Fortschritt** — was erledigt ist, was nicht, ob es Abweichungen vom Plan gibt"}
 {"uk": "1. @BotFather → /newbot → скопіювати токен. 2. Додати бота в чат/канал (для каналу — зробити адміністратором). 3. Chat ID: для каналу @username або числовий ID (дізнатись через @userinfobot).", "en": "1. @BotFather → /newbot → copy the token. 2. Add the bot to the chat/channel (for a channel — make it an administrator). 3. Chat ID: for a channel @username or the numeric ID (find it via @userinfobot).", "de": "1. @BotFather → /newbot → Token kopieren. 2. Bot zum Chat/Kanal hinzufügen (bei einem Kanal — als Administrator festlegen). 3. Chat ID: bei einem Kanal @username oder die numerische ID (über @userinfobot ermitteln)."}
 {"uk": "1. AN220207-001 Resistor | 48 шт", "en": "1. AN220207-001 Resistor | 48 pcs", "de": "1. AN220207-001 Resistor | 48 Stk."}
+{"uk": "1. Встановити", "en": "1. Install", "de": "1. Installieren"}
 {"uk": "1. Відкрий Word і зроби документ", "en": "1. Open Word and create a document", "de": "1. Öffnen Sie Word und erstellen Sie ein Dokument"}
 {"uk": "1. Відкрийте Minerva в", "en": "1. Open Minerva in", "de": "1. Öffnen Sie Minerva in"}
 {"uk": "1. Відкрийте Minerva в Chrome", "en": "1. Open Minerva in Chrome", "de": "1. Öffnen Sie Minerva in Chrome"}
@@ -753,6 +758,7 @@
 {"uk": "2. Натисни «🚀 Опублікувати»", "en": "2. Click “🚀 Publish”", "de": "2. Klicken Sie auf „🚀 Veröffentlichen“"}
 {"uk": "2. Перевірте та відредагуйте дані", "en": "2. Review and edit the data", "de": "2. Daten prüfen und bearbeiten"}
 {"uk": "2. Поточний статус стосунків (активний/відходить/потенційний)", "en": "2. Current relationship status (active/drifting away/potential)", "de": "2. Aktueller Beziehungsstatus (aktiv/abwandernd/potenziell)"}
+{"uk": "2. Підключити до Minerva", "en": "2. Connect to Minerva", "de": "2. Mit Minerva verbinden"}
 {"uk": "200 — таке замовлення вже існувало, дубль не створено (повтор безпечний).", "en": "200 — this order already existed, no duplicate was created (repeating is safe).", "de": "200 — dieser Auftrag existierte bereits, es wurde kein Duplikat angelegt (Wiederholung ist unbedenklich)."}
 {"uk": "200 — успішно.", "en": "200 — success.", "de": "200 — erfolgreich."}
 {"uk": "200 — цю доставку вже прийнято раніше, на склад нічого не додано (повтор безпечний).", "en": "200 — this delivery was already accepted earlier, nothing was added to stock (repeating is safe).", "de": "200 — diese Lieferung wurde bereits angenommen, dem Lager wurde nichts hinzugefügt (Wiederholung ist unbedenklich)."}
@@ -777,6 +783,7 @@
 {"uk": "3. **Рекомендація** — чи потрібно скоригувати стратегію, що змінити", "en": "3. **Recommendation** — whether the strategy needs adjusting, what to change", "de": "3. **Empfehlung** — ob die Strategie angepasst werden muss, was zu ändern ist"}
 {"uk": "3. ID групи можна дізнатись через", "en": "3. You can find out the group ID via", "de": "3. Die Gruppen-ID erfahren Sie über"}
 {"uk": "3. LM358 Op-Amp | 20 шт", "en": "3. LM358 Op-Amp | 20 pcs", "de": "3. LM358 Op-Amp | 20 Stk."}
+{"uk": "3. Без Minerva — теж можна", "en": "3. Without Minerva — works too", "de": "3. Ohne Minerva — geht auch"}
 {"uk": "3. Для рядків таблиці: обгорни рядок в", "en": "3. For table rows: wrap the row in", "de": "3. Für Tabellenzeilen: Umschließen Sie die Zeile mit"}
 {"uk": "3. Завантаж файл сюди — Minerva розпарсить і покаже preview перед записом.", "en": "3. Upload the file here — Minerva will parse it and show a preview before saving.", "de": "3. Laden Sie die Datei hier hoch — Minerva liest sie ein und zeigt vor dem Speichern eine Vorschau."}
 {"uk": "3. Натисніть", "en": "3. Click", "de": "3. Klicken Sie auf"}
@@ -803,6 +810,7 @@
 {"uk": "4. **Наступна дія** — конкретна дія сьогодні/цього тижня", "en": "4. **Next action** — a specific action today/this week", "de": "4. **Nächste Maßnahme** — eine konkrete Maßnahme für heute/diese Woche"}
 {"uk": "4. ВІДМОВА ВІД ГАРАНТІЙ", "en": "4. DISCLAIMER OF WARRANTIES", "de": "4. GEWÄHRLEISTUNGSAUSSCHLUSS"}
 {"uk": "4. Збережи як .docx і завантаж тут", "en": "4. Save as .docx and upload it here", "de": "4. Speichern Sie als .docx und laden Sie die Datei hier hoch"}
+{"uk": "4. Знімати візитку", "en": "4. Shoot a business card", "de": "4. Visitenkarte fotografieren"}
 {"uk": "4. Найкращий час для контакту", "en": "4. Best time to make contact", "de": "4. Bester Zeitpunkt für die Kontaktaufnahme"}
 {"uk": "4. Натисни «🔄 Перевірити статус DigiKey»", "en": "4. Click “🔄 Check DigiKey status”", "de": "4. Klicken Sie auf „🔄 DigiKey-Status prüfen“"}
 {"uk": "4. Підтвердіть назву", "en": "4. Confirm the name", "de": "4. Bestätigen Sie den Namen"}
@@ -822,17 +830,22 @@
 {"uk": "5. Готово", "en": "5. Done", "de": "5. Fertig"}
 {"uk": "5. ПІДТРИМКА ТА ОНОВЛЕННЯ", "en": "5. SUPPORT AND UPDATES", "de": "5. SUPPORT UND UPDATES"}
 {"uk": "5. Тон спілкування (офіційний/дружній/тощо)", "en": "5. Tone of communication (formal/friendly/etc.)", "de": "5. Kommunikationston (formell/freundlich/usw.)"}
+{"uk": "5. Ще фото до фірми", "en": "5. More photos for the company", "de": "5. Weitere Fotos zur Firma"}
 {"uk": "50 Ω, VSWR < 1.3 до 6 GHz", "en": "50 Ω, VSWR < 1.3 up to 6 GHz", "de": "50 Ω, VSWR < 1,3 bis 6 GHz"}
 {"uk": "500 — Помилка сервера | Minerva", "en": "500 — Server error | Minerva", "de": "500 — Serverfehler | Minerva"}
 {"uk": "6 міс", "en": "6 mo", "de": "6 Mon."}
 {"uk": "6 місяців", "en": "6 months", "de": "6 Monate"}
+{"uk": "6. Примітка, пресет, позначки", "en": "6. Note, preset, marks", "de": "6. Notiz, Voreinstellung, Markierungen"}
 {"uk": "6. РОЗІРВАННЯ ЛІЦЕНЗІЇ", "en": "6. TERMINATION OF LICENSE", "de": "6. BEENDIGUNG DER LIZENZ"}
 {"uk": "6. Стан доставок — чи є незавершені відправлення, затримки, проблеми", "en": "6. Delivery status — whether there are unfinished shipments, delays, problems", "de": "6. Lieferstatus — ob es offene Sendungen, Verzögerungen oder Probleme gibt"}
 {"uk": "60 д", "en": "60 d", "de": "60 T"}
 {"uk": "60 днів (2 міс)", "en": "60 days (2 mo.)", "de": "60 Tage (2 Mon.)"}
 {"uk": "7 днів", "en": "7 days", "de": "7 Tage"}
 {"uk": "7 днів 9:00", "en": "7 days 9:00", "de": "7 Tage 9:00"}
+{"uk": "7. 👁 Хто бачить у Minerva", "en": "7. 👁 Who sees it in Minerva", "de": "7. 👁 Wer es in Minerva sieht"}
+{"uk": "8. 📤 Мої знімки", "en": "8. 📤 My shots", "de": "8. 📤 Meine Aufnahmen"}
 {"uk": "8.50 або $8.50", "en": "8.50 or $8.50", "de": "8.50 oder $8.50"}
+{"uk": "9. 🪪 У Minerva: хто зняв і звідки", "en": "9. 🪪 In Minerva: who took it and from where", "de": "9. 🪪 In Minerva: wer es aufgenommen hat und woher"}
 {"uk": "90 д", "en": "90 d", "de": "90 T"}
 {"uk": "90 днів", "en": "90 days", "de": "90 Tage"}
 {"uk": "90 днів / 3 міс", "en": "90 days / 3 mo.", "de": "90 Tage / 3 Mon."}
@@ -1069,6 +1082,9 @@
 {"uk": "API-ключі", "en": "API keys", "de": "API-Schlüssel"}
 {"uk": "API-інтеграції", "en": "API integrations", "de": "API-Integrationen"}
 {"uk": "API: {0} оновлено, {1} з кешу.", "en": "API: {0} updated, {1} from cache.", "de": "API: {0} aktualisiert, {1} aus dem Cache."}
+{"uk": "APK з цієї Minerva", "en": "APK from this Minerva", "de": "APK von dieser Minerva"}
+{"uk": "APK завантажується з", "en": "The APK is downloaded from", "de": "Die APK wird geladen von"}
+{"uk": "APK завелика", "en": "APK is too large", "de": "APK ist zu groß"}
 {"uk": "Access Key не заповнено.", "en": "Access Key is not filled in.", "de": "Access Key ist nicht ausgefüllt."}
 {"uk": "Access Token (кеш)", "en": "Access Token (cache)", "de": "Access Token (Cache)"}
 {"uk": "Admin — повний доступ", "en": "Admin — full access", "de": "Admin — Vollzugriff"}
@@ -1773,6 +1789,9 @@
 {"uk": "Minerva Business Intelligence — автоматичне сповіщення", "en": "Minerva Business Intelligence — automatic notification", "de": "Minerva Business Intelligence — automatische Benachrichtigung"}
 {"uk": "Minerva DB — замовлення {0}", "en": "Minerva DB — order {0}", "de": "Minerva-DB — Auftrag {0}"}
 {"uk": "Minerva Web Scraper — завантаження рахунків з сайтів постачальників", "en": "Minerva Web Scraper — downloading invoices from supplier websites", "de": "Minerva Web Scraper — Rechnungen von Lieferanten-Websites herunterladen"}
+{"uk": "Minerva Візитки", "en": "Minerva Візитки", "de": "Minerva Візитки"}
+{"uk": "Minerva Візитки · {0}", "en": "Minerva Візитки · {0}", "de": "Minerva Візитки · {0}"}
+{"uk": "Minerva Візитки — інструкція", "en": "Minerva Візитки — instructions", "de": "Minerva Візитки — Anleitung"}
 {"uk": "Minerva автоматично оновлює статуси всіх активних відправлень через Jumingo та DHL API за розкладом.", "en": "Minerva automatically updates the statuses of all active shipments via the Jumingo and DHL APIs on a schedule.", "de": "Minerva aktualisiert die Status aller aktiven Sendungen automatisch nach Zeitplan über die Jumingo- und DHL-API."}
 {"uk": "Minerva бере його сама з товарів DigiKey («📥 Стягнути поля», звірка фото й даташитів). Порожньо — даташит на DigiKey не надсилається.", "en": "Minerva takes it by itself from the DigiKey products (“📥 Pull fields”, photo and datasheet reconciliation). Empty — the datasheet is not sent to DigiKey.", "de": "Minerva übernimmt es selbst aus den DigiKey-Artikeln („📥 Felder abrufen“, Abgleich von Fotos und Datenblättern). Leer — das Datenblatt wird nicht an DigiKey gesendet."}
 {"uk": "Minerva вже знає упаковку всіх товарів", "en": "Minerva already knows the packaging of all products", "de": "Minerva kennt die Verpackung aller Artikel bereits"}
@@ -2011,11 +2030,13 @@
 {"uk": "QR прочитано", "en": "QR read", "de": "QR gelesen"}
 {"uk": "QR прочитано, але це не візитка (vCard / MeCard / посилання) — текст збережено біля фото.", "en": "QR read, but it is not a business card (vCard / MeCard / link) — the text is saved with the photo.", "de": "QR gelesen, aber keine Visitenkarte (vCard / MeCard / Link) — der Text ist beim Foto gespeichert."}
 {"uk": "QR уже прочитано — тепер «⏺ Зробити фото» всієї візитки.", "en": "QR already read — now «⏺ Take photo» of the whole card.", "de": "QR bereits gelesen — jetzt «⏺ Foto aufnehmen» der ganzen Karte."}
+{"uk": "QR і кнопка — APK з цієї Minerva. Не відкривається", "en": "QR and button — APK from this Minerva. Doesn't open", "de": "QR und Schaltfläche — APK von dieser Minerva. Öffnet sich nicht"}
 {"uk": "QR і код діють {0} хв і лише один раз. Не показуйте їх іншим — хто підключиться, читатиме вашу пошту.", "en": "The QR code and the code are valid for {0} min and only once. Do not show them to others — whoever connects will read your mail.", "de": "QR-Code und Code gelten {0} Min. und nur einmal. Zeigen Sie sie niemandem — wer sich verbindet, liest Ihre Mails."}
 {"uk": "QR і код діють {0} хв і лише один раз. Не показуйте їх іншим — хто підключиться, читатиме вашу пошту. Адреса Minerva для телефона", "en": "The QR code and the code are valid for {0} min and only once. Do not show them to others — whoever connects will read your mail. Minerva address for the phone", "de": "QR-Code und Code gelten {0} Min. und nur einmal. Zeigen Sie sie niemandem — wer sich verbindet, liest Ihre Mails. Minerva-Adresse für das Telefon"}
 {"uk": "QR і код застаріли — покажіть нові.", "en": "The QR code and the code have expired — show new ones.", "de": "QR-Code und Code sind abgelaufen — zeigen Sie neue an."}
 {"uk": "QR-код", "en": "QR code", "de": "QR-Code"}
 {"uk": "QR-код (vCard, сайт) Minerva читає одразу — ці дані точні, AI лише доповнить решту. Не прочитався — «✂️ Обрізати» навколо коду або «🔳 Сканувати лише QR» і піднесіть телефон ближче.", "en": "Minerva reads the QR code (vCard, website) immediately — this data is exact, AI only adds the rest. Not read — «✂️ Crop» around the code or «🔳 Scan QR only» and hold the phone closer.", "de": "Minerva liest den QR-Code (vCard, Website) sofort — diese Daten sind exakt, die KI ergänzt nur den Rest. Nicht gelesen — «✂️ Zuschneiden» um den Code oder «🔳 Nur QR scannen» und das Handy näher halten."}
+{"uk": "QR-код на візитці (vCard) читається сам — контакти заповнюються з нього.", "en": "A QR code on the card (vCard) is read automatically — the contacts are filled in from it.", "de": "Ein QR-Code auf der Karte (vCard) wird automatisch gelesen — die Kontakte werden daraus ausgefüllt."}
 {"uk": "QR-код недійсний або застарів — на сторінці «📱 Додаток на телефон» у Minerva покажіть новий.", "en": "The QR code is invalid or expired — show a new one on the «📱 Phone app» page in Minerva.", "de": "Der QR-Code ist ungültig oder abgelaufen — zeigen Sie auf der Seite «📱 Handy-App» in Minerva einen neuen."}
 {"uk": "QR-код недійсний або застарів — на сторінці «📱 Пошта на телефоні» в Minerva покажіть новий.", "en": "The QR code is invalid or expired — show a new one on the «📱 Mail on phone» page in Minerva.", "de": "Der QR-Code ist ungültig oder abgelaufen — zeigen Sie auf der Seite «📱 Mail auf dem Telefon» in Minerva einen neuen."}
 {"uk": "QR-коду на фото не знайдено.", "en": "No QR code found in the photo.", "de": "Kein QR-Code auf dem Foto gefunden."}
@@ -3658,7 +3679,9 @@
 {"uk": "«Потребує уваги» — у пульті вгорі картки", "en": "\"Needs attention\" is in the cockpit at the top of the card", "de": "„Erfordert Aufmerksamkeit“ steht im Cockpit oben in der Karte"}
 {"uk": "«Прийшов» / «Пішов» у Minerva", "en": "“Clock in” / “Clock out” in Minerva", "de": "„Kommen“ / „Gehen“ in Minerva"}
 {"uk": "«Прийшов» відмічено {0} — понад {1} годин тому. Скасуйте відмітку й запишіть день вручну в календарі.", "en": "“Clock in” was marked {0} — more than {1} hours ago. Cancel the mark and record the day manually in the calendar.", "de": "„Kommen“ wurde {0} markiert – vor mehr als {1} Stunden. Heben Sie die Markierung auf und tragen Sie den Tag manuell im Kalender ein."}
+{"uk": "«Пропустити — знімати без Minerva»", "en": "«Пропустити — знімати без Minerva»", "de": "«Пропустити — знімати без Minerva»"}
 {"uk": "«Підтвердити і відправити»", "en": "“Confirm and ship”", "de": "„Bestätigen und versenden“"}
+{"uk": "«Пізніше» або «☑ Вибрати…» — які саме. Пресети з телефона переходять у Minerva самі й лишаються вибраними.", "en": "«Пізніше» or «☑ Вибрати…» — which ones exactly. Presets from the phone move to Minerva by themselves and stay selected.", "de": "«Пізніше» oder «☑ Вибрати…» — welche genau. Voreinstellungen vom Telefon gehen von selbst nach Minerva und bleiben ausgewählt."}
 {"uk": "«Пішов» автоматично о відході", "en": "“Clock out” automatically at departure time", "de": "„Gehen“ automatisch zur Gehen-Zeit"}
 {"uk": "«Пішов» автоматично — не записано", "en": "“Clock out” automatically — not recorded", "de": "„Gehen“ automatisch – nicht eingetragen"}
 {"uk": "«Пішов» автоматично — стандартний відхід", "en": "“Clock out” automatically — standard clock-out", "de": "„Gehen“ automatisch – Standard-Gehen"}
@@ -3687,27 +3710,36 @@
 {"uk": "«шестерня»", "en": "“gear”", "de": "„Zahnrad“"}
 {"uk": "«що вирішили» в агенді пишеться мовою пунктів агенди", "en": "“what was decided” in the agenda is written in the language of the agenda items", "de": "„Was beschlossen wurde“ in der Agenda wird in der Sprache der Agendapunkte geschrieben"}
 {"uk": "«↓» — до поля на цій сторінці (незбережені зміни тут ще не враховано), «→» — інша сторінка; дані сайту — з його останнього звіту.", "en": "«↓» — to the field on this page (unsaved changes are not reflected here yet), «→» — another page; site data — from its latest report.", "de": "«↓» — zum Feld auf dieser Seite (ungespeicherte Änderungen sind hier noch nicht berücksichtigt), «→» — andere Seite; Website-Daten — aus ihrem letzten Bericht."}
+{"uk": "«↩ Зворот»", "en": "«↩ Зворот»", "de": "«↩ Зворот»"}
 {"uk": "«⌨ Ввести або вставити код» — код підставиться сам.", "en": "«⌨ Enter or paste the code» — the code is filled in automatically.", "de": "«⌨ Code eingeben oder einfügen» — der Code wird automatisch eingesetzt."}
+{"uk": "«⌨ Ввести адресу й код вручну»", "en": "«⌨ Ввести адресу й код вручну»", "de": "«⌨ Ввести адресу й код вручну»"}
 {"uk": "«⏱ Строки відвантаження DigiKey» (bots/admin_dk_tools.lead_view): вибрати лістинги → новий строк", "en": "“⏱ DigiKey lead times” (bots/admin_dk_tools.lead_view): select listings → new lead time", "de": "„⏱ DigiKey-Lieferzeiten“ (bots/admin_dk_tools.lead_view): Listings auswählen → neue Lieferzeit"}
 {"uk": "«⏱ Строки відвантаження DigiKey» (bots/admin_dk_tools.lead_view): вибрати лістинги → новий строк; «одразу на DigiKey» — лише leadTimeToShip (bots/services/dk_lead.py), хід — status/.", "en": "“⏱ DigiKey lead times” (bots/admin_dk_tools.lead_view): select listings → new lead time; “straight to DigiKey” — only leadTimeToShip (bots/services/dk_lead.py), progress — status/.", "de": "„⏱ DigiKey-Lieferzeiten“ (bots/admin_dk_tools.lead_view): Listings auswählen → neue Lieferzeit; „direkt an DigiKey“ — nur leadTimeToShip (bots/services/dk_lead.py), Fortschritt — status/."}
 {"uk": "«⛔ Не працювати» в запит не потрапляють.", "en": "«⛔ Do not work with» suppliers are not included in the request.", "de": "Lieferanten «⛔ Nicht zusammenarbeiten» kommen nicht in die Anfrage."}
 {"uk": "«✅ Відправлено», лист клієнту — на сторінці відправлення.", "en": "«✅ Shipped», email to the customer — on the shipment page.", "de": "«✅ Versendet», E-Mail an den Kunden — auf der Sendungsseite."}
 {"uk": "«✉️ Надіслати листом…» відкриє новий лист з вашої скриньки в новій вкладці: файли вже вкладені", "en": "«✉️ Send by e-mail…» opens a new e-mail from your mailbox in a new tab: the files are attached", "de": "«✉️ Per E-Mail senden…» öffnet eine neue E-Mail aus Ihrem Postfach in einem neuen Tab: die Dateien sind angehängt"}
 {"uk": "«✉️ Надіслати листом…» відкриє новий лист з вашої скриньки в новій вкладці: файли вже вкладені, «Кому» — клієнт проєкту. Перевірте адресу й текст і надішліть самі — без вас нічого не відправляється.", "en": "«✉️ Send by e-mail…» opens a new e-mail from your mailbox in a new tab: the files are attached, «To» — the project customer. Check the address and text and send it yourself — nothing is sent without you.", "de": "«✉️ Per E-Mail senden…» öffnet eine neue E-Mail aus Ihrem Postfach in einem neuen Tab: die Dateien sind angehängt, «An» — der Projektkunde. Prüfen Sie Adresse und Text und senden Sie selbst — ohne Sie wird nichts verschickt."}
+{"uk": "«✓ Готово»", "en": "«✓ Готово»", "de": "«✓ Готово»"}
 {"uk": "«✓ Застосувати план» замінить поточний план (кроків: {0}): старі кроки, їхні дати й прив’язки зникнуть.", "en": "«✓ Apply the plan» will replace the current plan (steps: {0}): the old steps, their dates and links will disappear.", "de": "«✓ Plan übernehmen» ersetzt den aktuellen Plan (Schritte: {0}): die alten Schritte, ihre Daten und Verknüpfungen verschwinden."}
 {"uk": "«✕ Без значка» — лише назва.", "en": "«✕ No icon» — name only.", "de": "«✕ Ohne Symbol» — nur der Name."}
 {"uk": "«❓ Запитати» й огляд одразу беруть його в джерела.", "en": "“❓ Ask” and the overview use it as a source right away.", "de": "„❓ Fragen“ und die Übersicht nehmen es sofort in die Quellen auf."}
 {"uk": "«❗ Позначати такі листи»: щойно такий лист прийде — лист і Telegram власнику скриньки (тема, від кого, початок тексту, примітка з «Що робити»).", "en": "«❗ Mark such emails»: as soon as such an email arrives — an email and Telegram to the mailbox owner (subject, sender, start of the text, note from «What to do»).", "de": "«❗ Solche E-Mails markieren»: sobald so eine E-Mail eintrifft — E-Mail und Telegram an den Postfachinhaber (Betreff, Absender, Textanfang, Notiz aus «Was tun»)."}
 {"uk": "«❗ Позначати такі листи»: ❗ Важливо або ‼️ Дуже важливо — у списку листів і в папці «⭐ Важливі». Позначку, яку ви змінили вручну, доручення не перебиває.", "en": "«❗ Mark such emails»: ❗ Important or ‼️ Very important — in the email list and in the «⭐ Important» folder. A mark you changed by hand is not overridden by the instruction.", "de": "«❗ Solche E-Mails markieren»: ❗ Wichtig oder ‼️ Sehr wichtig — in der E-Mail-Liste und im Ordner «⭐ Wichtig». Eine von Hand geänderte Markierung überschreibt der Auftrag nicht."}
+{"uk": "«⬆ Надіслати всі»", "en": "«⬆ Надіслати всі»", "de": "«⬆ Надіслати всі»"}
+{"uk": "«⬆ Надіслати зараз»", "en": "«⬆ Надіслати зараз»", "de": "«⬆ Надіслати зараз»"}
 {"uk": "«⬇ Завантажити APK» на телефоні (або QR камерою).", "en": "«⬇ Завантажити APK» on the phone (or the QR with the camera).", "de": "«⬇ Завантажити APK» auf dem Handy (oder den QR mit der Kamera)."}
 {"uk": "«＋ Запит постачальникам»", "en": "«＋ Supplier request»", "de": "«＋ Lieferantenanfrage»"}
 {"uk": "«＋ Запит постачальникам» — один запит (PCB, PCBA, кабелі, корпуси…) кільком постачальникам; відповіді Minerva знайде в пошті, а тут буде видно, кому писали, хто що запропонував, кого обрали на яку партію і кого не взяли.", "en": "«＋ Supplier request» — one request (PCB, PCBA, cables, housings…) to several suppliers; Minerva finds the replies in the mail, and here you see whom you wrote to, who offered what, who was chosen for which batch and who was not taken.", "de": "«＋ Lieferantenanfrage» — eine Anfrage (PCB, PCBA, Kabel, Gehäuse…) an mehrere Lieferanten; Minerva findet die Antworten in der Mail, und hier sehen Sie, wen Sie angeschrieben haben, wer was angeboten hat, wer für welche Charge gewählt und wer nicht genommen wurde."}
+{"uk": "«＋ Ще фото»", "en": "«＋ Ще фото»", "de": "«＋ Ще фото»"}
+{"uk": "«＋ Ще фото» — що саме", "en": "«＋ Ще фото» — what exactly", "de": "«＋ Ще фото» — was genau"}
 {"uk": "«🌍 Вибрати країни» відкриває список за регіонами (ЄС, Європа поза ЄС, Північна, Центральна й Південна Америка, Азія, Близький Схід, Африка, Океанія): повна назва і код, напр. «Швейцарія (CH)».", "en": "“🌍 Select countries” opens a list by region (EU, Europe outside the EU, North, Central and South America, Asia, Middle East, Africa, Oceania): full name and code, e.g. “Switzerland (CH)”.", "de": "„🌍 Länder auswählen“ öffnet eine Liste nach Regionen (EU, Europa außerhalb der EU, Nord-, Mittel- und Südamerika, Asien, Naher Osten, Afrika, Ozeanien): vollständiger Name und Code, z. B. „Schweiz (CH)“."}
 {"uk": "«🌍 Вибрати країни» відкриває список за регіонами (ЄС, Європа поза ЄС, Північна, Центральна й Південна Америка, Азія, Близький Схід, Африка, Океанія): повна назва і код, напр. «Швейцарія (CH)». Регіон — «✓ усі» / «✕ жодної», потім зняти галочки з країн, куди не відправляємо. Пошук — за назвою (uk/de/en) або кодом. «Усі інші країни (*)» — решта світу.", "en": "“🌍 Select countries” opens a list by region (EU, Europe outside the EU, North, Central and South America, Asia, Middle East, Africa, Oceania): full name and code, e.g. “Switzerland (CH)”. Region — “✓ all” / “✕ none”, then untick the countries we do not ship to. Search — by name (uk/de/en) or code. “All other countries (*)” — the rest of the world.", "de": "„🌍 Länder auswählen“ öffnet eine Liste nach Regionen (EU, Europa außerhalb der EU, Nord-, Mittel- und Südamerika, Asien, Naher Osten, Afrika, Ozeanien): vollständiger Name und Code, z. B. „Schweiz (CH)“. Region — „✓ alle“ / „✕ keines“, danach Häkchen bei den Ländern entfernen, in die wir nicht liefern. Suche — nach Name (uk/de/en) oder Code. „Alle übrigen Länder (*)“ — der Rest der Welt."}
 {"uk": "«🏭 Створити постачальника» / «➕ Додати до наявного» внесе їх контактними особами разом з людиною з візитки.", "en": "«🏭 Create supplier» / «➕ Add to existing» adds them as contact persons together with the person from the card.", "de": "«🏭 Lieferant anlegen» / «➕ Zu vorhandenem hinzufügen» trägt sie zusammen mit der Person von der Karte als Ansprechpartner ein."}
 {"uk": "«👁 Як бачить Minerva", "en": "“👁 Minerva as they see it", "de": "„👁 Minerva aus Sicht der Person"}
+{"uk": "«👤 Зняв: …»", "en": "«👤 Зняв: …»", "de": "«👤 Зняв: …»"}
 {"uk": "«💲 Налаштування цін DigiKey»", "en": "“💲 DigiKey price settings”", "de": "„💲 DigiKey-Preiseinstellungen“"}
 {"uk": "«💲 Ціни DigiKey ← Minerva», параметри з технічних атрибутів. Чого бракує — впишіть нижче: це збережеться", "en": "“💲 DigiKey prices ← Minerva”, parameters from the technical attributes. Enter what is missing below: it will be saved", "de": "„💲 DigiKey-Preise ← Minerva“, Parameter aus den technischen Attributen. Was fehlt, tragen Sie unten ein: Es wird gespeichert"}
+{"uk": "«💾 Зберегти й наступну» — одразу до наступної візитки.", "en": "«💾 Зберегти й наступну» — straight on to the next card.", "de": "«💾 Зберегти й наступну» — direkt zur nächsten Karte."}
 {"uk": "«📂 Джерело знань»: поля папки / сайту за видом, «📂 Вибрати на сервері» з підказками шляху, «📤 Файли з ПК»", "en": "“📂 Knowledge source”: folder / website fields by type, “📂 Choose on server” with path suggestions, “📤 Files from PC”", "de": "„📂 Wissensquelle“: Ordner-/Website-Felder je nach Art, „📂 Auf dem Server wählen“ mit Pfadvorschlägen, „📤 Dateien vom PC“"}
 {"uk": "«📂 Джерело знань»: поля папки / сайту за видом, «📂 Вибрати на сервері» з підказками шляху, «📤 Файли з ПК» (upload_panel.html; на «Додати» — вибране завантажується після «Зберегти») і 🗑 у «Документи джерела»", "en": "“📂 Knowledge source”: folder / website fields by type, “📂 Choose on server” with path suggestions, “📤 Files from PC” (upload_panel.html; on “Add” — the selection is uploaded after “Save”) and 🗑 in “Source documents”", "de": "„📂 Wissensquelle“: Ordner-/Website-Felder je nach Art, „📂 Auf dem Server wählen“ mit Pfadvorschlägen, „📤 Dateien vom PC“ (upload_panel.html; unter „Hinzufügen“ wird die Auswahl nach „Speichern“ hochgeladen) und 🗑 in „Dokumente der Quelle“"}
 {"uk": "«📈 Ціни й продажі» вгорі картки товару (inventory/admin_report.card_context → product_report.build(tables=False)).", "en": "“📈 Prices and sales” at the top of the product card (inventory/admin_report.card_context → product_report.build(tables=False)).", "de": "„📈 Preise und Verkäufe“ oben in der Artikelkarte (inventory/admin_report.card_context → product_report.build(tables=False))."}
@@ -3719,8 +3751,11 @@
 {"uk": "«📦 Створити Offer» — товар затверджено, можна виставляти", "en": "“📦 Create Offer” — the product is approved, you can list it", "de": "„📦 Offer erstellen“ — Artikel freigegeben, kann eingestellt werden"}
 {"uk": "«📨 Писати клієнту замовлення»: замовлення, знайдене за трек-номером листа", "en": "«📨 Write to the order's customer»: the order found by the email's tracking number", "de": "«📨 Kunden des Auftrags schreiben»: Auftrag, gefunden über die Sendungsnummer der E-Mail"}
 {"uk": "«📨 Писати клієнту замовлення»: прийшов новий такий лист (UPS «Reminder», «Final Reminder»), а клієнту про це замовлення вже писали — агент пише ще раз як повторне нагадування (знає дату й текст попереднього листа). Чернетка, яку ви ще не надіслали, — друга не створюється.", "en": "«📨 Write to the order's customer»: a new email of this kind has arrived (UPS «Reminder», «Final Reminder») and the customer has already been written to about this order — the agent writes again as a repeat reminder (it knows the date and text of the previous email). If a draft you have not sent yet exists, no second one is created.", "de": "«📨 Dem Kunden des Auftrags schreiben»: Eine neue E-Mail dieser Art ist eingegangen (UPS «Reminder», «Final Reminder»), und dem Kunden wurde zu diesem Auftrag bereits geschrieben — der Agent schreibt erneut als wiederholte Erinnerung (er kennt Datum und Text der vorherigen E-Mail). Liegt noch ein nicht gesendeter Entwurf vor, wird kein zweiter erstellt."}
+{"uk": "«📱 Додаток на телефон» у Minerva (QR на картинці розмито)", "en": "«📱 Додаток на телефон» in Minerva (QR codes in the picture are blurred)", "de": "«📱 Додаток на телефон» in Minerva (QR-Codes im Bild unscharf gemacht)"}
+{"uk": "«📱 Лише на телефоні»", "en": "«📱 Лише на телефоні»", "de": "«📱 Лише на телефоні»"}
 {"uk": "«🔄 Записати в Minerva»", "en": "“🔄 Write to Minerva”", "de": "„🔄 In Minerva schreiben“"}
 {"uk": "«🔄 Запустити оновлення зараз»", "en": "“🔄 Run update now”", "de": "„🔄 Update jetzt ausführen“"}
+{"uk": "«🔄 знову»", "en": "«🔄 знову»", "de": "«🔄 знову»"}
 {"uk": "«🔌 Перевірити пошук RAG»", "en": "“🔌 Check RAG search”", "de": "„🔌 RAG-Suche prüfen“"}
 {"uk": "«🔍 Що бачить DigiKey» (bots/admin_dk_tools.py): один лістинг (v) — офер і товар наживо у двох видах", "en": "“🔍 What DigiKey sees” (bots/admin_dk_tools.py): one listing (v) — the offer and product live in two views", "de": "„🔍 Was DigiKey sieht“ (bots/admin_dk_tools.py): ein Listing (v) — Offer und Artikel live in zwei Ansichten"}
 {"uk": "«🔍 Що бачить DigiKey» (bots/admin_dk_tools.py): один лістинг (v) — офер і товар наживо у двох видах (перемикач, localStorage dv-mode): «🛒 Як бачить покупець» (v.buyer — картка, як на digikey.com) і «🔧 Усі поля» (поле за полем + v.hidden — службові); або звірка оферів багатьох (bulk).", "en": "“🔍 What DigiKey sees” (bots/admin_dk_tools.py): one listing (v) — the offer and product live in two views (switch, localStorage dv-mode): “🛒 As the buyer sees it” (v.buyer — a card, like on digikey.com) and “🔧 All fields” (field by field + v.hidden — internal fields); or a reconciliation of many offers (bulk).", "de": "„🔍 Was DigiKey sieht“ (bots/admin_dk_tools.py): ein Listing (v) — Offer und Artikel live in zwei Ansichten (Umschalter, localStorage dv-mode): „🛒 So sieht es der Käufer“ (v.buyer — eine Karte wie auf digikey.com) und „🔧 Alle Felder“ (Feld für Feld + v.hidden — interne Felder); oder ein Abgleich vieler Offers (bulk)."}
@@ -3728,6 +3763,7 @@
 {"uk": "«🔎 Підставити з даних проєкту» додасть замовника, нас, постачальників закупівель і JLCPCB; далі — «＋ Сторона» для виробника, підрядника, логістики.", "en": "«🔎 Fill in from project data» adds the customer, us, purchase suppliers and JLCPCB; then «＋ Party» for a manufacturer, contractor, logistics.", "de": "«🔎 Aus Projektdaten übernehmen» fügt den Kunden, uns, die Lieferanten der Bestellungen und JLCPCB hinzu; danach «＋ Beteiligter» für Hersteller, Auftragnehmer, Logistik."}
 {"uk": "«🔒 Лише я» — цю візитку не бачить ніхто, крім вас (і адміністратор теж)", "en": "«🔒 Лише я» — nobody but you sees this business card (not even an administrator)", "de": "«🔒 Лише я» — niemand außer Ihnen sieht diese Visitenkarte (auch kein Administrator)"}
 {"uk": "«🔒 Лише я» — цю візитку не бачить ніхто, крім вас (і адміністратор теж); змінити — потім на сторінці фото", "en": "«🔒 Лише я» — nobody but you sees this business card (not even an administrator); change it later on the photo page", "de": "«🔒 Лише я» — niemand außer Ihnen sieht diese Visitenkarte (auch kein Administrator); später auf der Fotoseite änderbar"}
+{"uk": "«🔗 Показати QR для підключення»", "en": "«🔗 Показати QR для підключення»", "de": "«🔗 Показати QR для підключення»"}
 {"uk": "«🖼 Фото й даташити на DigiKey» (bots/admin_dk_media.media_view): на DigiKey зараз → у картці лістингу", "en": "“🖼 Photos and datasheets on DigiKey” (bots/admin_dk_media.media_view): on DigiKey now → in the listing card", "de": "„🖼 Fotos und Datenblätter bei DigiKey“ (bots/admin_dk_media.media_view): aktuell bei DigiKey → in der Listing-Karte"}
 {"uk": "«🖼 Фото й даташити на DigiKey» (bots/admin_dk_media.media_view): на DigiKey зараз → у картці лістингу → за правилом; перевірка й надсилання — у фоні (bots/services/dk_media.py), хід — media/status/.", "en": "“🖼 Photos and datasheets on DigiKey” (bots/admin_dk_media.media_view): on DigiKey now → in the listing card → by the rule; checking and sending run in the background (bots/services/dk_media.py), progress — media/status/.", "de": "„🖼 Fotos und Datenblätter bei DigiKey“ (bots/admin_dk_media.media_view): aktuell bei DigiKey → in der Listing-Karte → nach Regel; Prüfung und Versand laufen im Hintergrund (bots/services/dk_media.py), Fortschritt — media/status/."}
 {"uk": "«🗑 + видаляє» в розділі діє лише разом з «🗑 Видаляти записи».", "en": "“🗑 + deletes” in a section works only together with “🗑 Delete records”.", "de": "„🗑 + löscht“ in einem Bereich gilt nur zusammen mit „🗑 Datensätze löschen“."}
@@ -3735,12 +3771,15 @@
 {"uk": "«🚀 Опублікувати» — надіслати товар у DigiKey", "en": "“🚀 Publish” — send the product to DigiKey", "de": "„🚀 Veröffentlichen“ — Artikel an DigiKey senden"}
 {"uk": "«🚚 Створити відправлення»", "en": "“🚚 Create shipment”", "de": "„🚚 Sendung erstellen“"}
 {"uk": "«🤝 Прийнято → замовлення» створює замовлення в цьому джерелі (документ Angebot — у його папці media/orders/", "en": "“🤝 Accepted → order” creates the order in this source (the Angebot document goes to its folder media/orders/", "de": "„🤝 Angenommen → Auftrag“ legt den Auftrag in dieser Quelle an (das Angebot-Dokument liegt in deren Ordner media/orders/"}
+{"uk": "«🧠 AI ✓» — AI прочитав фірму, людину й контакти.", "en": "«🧠 AI ✓» — AI has read the company, the person and the contacts.", "de": "«🧠 AI ✓» — AI hat Firma, Person und Kontakte gelesen."}
 {"uk": "«🧠 AI-помічник» (моменти й ризики, план з листування, забуті листи) читає листи проєкту лише з цієї дати; порожньо — усі", "en": "«🧠 AI assistant» (moments and risks, plan from the correspondence, forgotten e-mails) reads project e-mails only from this date; empty — all", "de": "«🧠 KI-Assistent» (Momente und Risiken, Plan aus der Korrespondenz, vergessene E-Mails) liest Projekt-E-Mails nur ab diesem Datum; leer — alle"}
 {"uk": "«🧠 База знань» → «Індексувати від»", "en": "“🧠 Knowledge base” → “Index from”", "de": "„🧠 Wissensdatenbank“ → „Indexieren ab“"}
 {"uk": "«🧠 База знань» → категорії, або «🧠 Передати» для окремої гілки", "en": "“🧠 Knowledge base” → categories, or “🧠 Send” for a single thread", "de": "„🧠 Wissensdatenbank“ → Kategorien oder „🧠 Übertragen“ für einen einzelnen Verlauf"}
 {"uk": "«🧠 База знань» → скриньки", "en": "“🧠 Knowledge base” → mailboxes", "de": "„🧠 Wissensdatenbank“ → Postfächer"}
 {"uk": "«🧠 Передати в базу знань»: гілка йде в RAG, навіть якщо категорія чи дата листів поза правилами (скринька має бути вибрана для бази знань)", "en": "“🧠 Send to knowledge base”: the thread goes to RAG even if the category or date of the emails is outside the rules (the mailbox must be selected for the knowledge base)", "de": "„🧠 In die Wissensdatenbank übertragen“: Der Verlauf geht an RAG, auch wenn Kategorie oder Datum der E-Mails außerhalb der Regeln liegen (das Postfach muss für die Wissensdatenbank ausgewählt sein)"}
 {"uk": "«🧭 Огляд» і «❓ Запитати» в картці (rag_assistant/entity_help.py).", "en": "“🧭 Overview” and “❓ Ask” on the card (rag_assistant/entity_help.py).", "de": "„🧭 Übersicht“ und „❓ Fragen“ in der Karte (rag_assistant/entity_help.py)."}
+{"uk": "«🧹 Прибрати надіслані»", "en": "«🧹 Прибрати надіслані»", "de": "«🧹 Прибрати надіслані»"}
+{"uk": "«🪪 У Minerva»", "en": "«🪪 У Minerva»", "de": "«🪪 У Minerva»"}
 {"uk": "» (core/access_preview.py): меню, дозволи, модулі, база знань, перевірка", "en": "” (core/access_preview.py): menu, permissions, modules, knowledge base, address check", "de": "“ (core/access_preview.py): Menü, Berechtigungen, Module, Wissensdatenbank, Adressprüfung"}
 {"uk": "» (core/access_preview.py): меню, дозволи, модулі, база знань, перевірка адреси. Нічого не відкривається й не виконується від імені людини. «✏️ Змінити доступ» (core/access_editor.py): кліки й правий клік змінюють чернетку, сторінка одразу перемальовується з неї (POST action=preview, замінюється #ap-root), «💾 Зберегти» — POST action=save.", "en": "” (core/access_preview.py): menu, permissions, modules, knowledge base, address check. Nothing is opened or executed on behalf of the person. “✏️ Change access” (core/access_editor.py): clicks and right-clicks change the draft, the page is immediately redrawn from it (POST action=preview, replaces #ap-root), “💾 Save” — POST action=save.", "de": "“ (core/access_preview.py): Menü, Berechtigungen, Module, Wissensdatenbank, Adressprüfung. Im Namen der Person wird nichts geöffnet oder ausgeführt. „✏️ Zugriff ändern“ (core/access_editor.py): Klicks und Rechtsklicks ändern den Entwurf, die Seite wird sofort daraus neu aufgebaut (POST action=preview, ersetzt #ap-root), „💾 Speichern“ — POST action=save."}
 {"uk": "» (відсоток). Для виведення значень використовуй {0}, для циклів", "en": "” (percent sign). To output values use {0}, for loops", "de": "“ (Prozentzeichen). Zur Ausgabe von Werten verwenden Sie {0}, für Schleifen"}
@@ -3925,9 +3964,11 @@
 {"uk": "Індія", "en": "India", "de": "Indien"}
 {"uk": "Інструкція", "en": "Instructions", "de": "Anleitung"}
 {"uk": "Інструкція UPS — кому виставити рахунок", "en": "UPS instruction — who to bill", "de": "UPS-Anleitung — wem die Rechnung gestellt wird"}
+{"uk": "Інструкція · Minerva Візитки", "en": "Instructions · Minerva Візитки", "de": "Anleitung · Minerva Візитки"}
 {"uk": "Інструкція відправника для експедитора.", "en": "Shipper's instructions for the forwarder.", "de": "Anweisungen des Versenders an den Spediteur."}
 {"uk": "Інструкція для AI (автовідповідь)", "en": "AI instruction (auto-reply)", "de": "Anweisung für die KI (Automatikantwort)"}
 {"uk": "Інструкція для відповіді (необов'язково): напр. «вибачся і запропонуй повернення»…", "en": "Reply instruction (optional): e.g. “apologize and offer a return”…", "de": "Anweisung für die Antwort (optional): z. B. „entschuldige dich und biete eine Rücksendung an“…"}
+{"uk": "Інструкція з картинками", "en": "Instructions with pictures", "de": "Anleitung mit Bildern"}
 {"uk": "Інструкції для AI", "en": "Instructions for AI", "de": "Anweisungen für die KI"}
 {"uk": "Інструменти", "en": "Tools", "de": "Werkzeuge"}
 {"uk": "Інструменти діють на", "en": "The tools apply to", "de": "Die Werkzeuge wirken auf"}
@@ -4873,6 +4914,7 @@
 {"uk": "Важливий момент", "en": "Key moment", "de": "Wichtiger Moment"}
 {"uk": "Важливий момент проєкту — що сталося?", "en": "Key project moment — what happened?", "de": "Wichtiger Projektmoment — was ist passiert?"}
 {"uk": "Важливий момент…", "en": "Key moment…", "de": "Wichtiger Moment…"}
+{"uk": "Важливий, З виставки, Зустрічались, Попросити зразки, Чекаємо ціни…", "en": "Important, From the trade fair, We met, Ask for samples, Waiting for prices…", "de": "Wichtig, Von der Messe, Getroffen, Muster anfragen, Warten auf Preise…"}
 {"uk": "Важливих моментів ще немає.", "en": "No key moments yet.", "de": "Noch keine wichtigen Momente."}
 {"uk": "Важливо", "en": "Important", "de": "Wichtig"}
 {"uk": "Важливо: дані форми не збережуться — після оновлення потрібно натиснути «Зберегти» вручну.", "en": "Important: form data will not be saved — after the refresh you need to click “Save” manually.", "de": "Wichtig: Die Formulardaten werden nicht gespeichert — nach der Aktualisierung müssen Sie manuell auf „Speichern“ klicken."}
@@ -4996,6 +5038,7 @@
 {"uk": "Ввести номер вручну", "en": "Enter the number manually", "de": "Nummer manuell eingeben"}
 {"uk": "Ввести руками: адреса", "en": "Type it in: address", "de": "Von Hand eingeben: Adresse"}
 {"uk": "Вголос учасникам обіцяли обробку на наших серверах. Ставте галочку, лише якщо вони погодились і на хмару — це запишеться в протокол згоди.", "en": "The participants were told aloud that processing stays on our servers. Tick this only if they also agreed to the cloud — it is written to the consent record.", "de": "Den Teilnehmenden wurde mündlich die Verarbeitung auf unseren Servern zugesagt. Nur ankreuzen, wenn sie auch der Cloud zugestimmt haben — das wird im Einwilligungsprotokoll vermerkt."}
+{"uk": "Вгорі — 📌 пресет, ⚡ світло, стан підключення. Внизу — що знімаєте: 🪪 Візитка, 📄 Флаєр, 🔳 QR, 📷 Фото.", "en": "At the top — 📌 preset, ⚡ light, connection status. At the bottom — what you shoot: 🪪 Card, 📄 Flyer, 🔳 QR, 📷 Photo.", "de": "Oben — 📌 Voreinstellung, ⚡ Licht, Verbindungsstatus. Unten — was Sie aufnehmen: 🪪 Karte, 📄 Flyer, 🔳 QR, 📷 Foto."}
 {"uk": "Веб-міст RAG", "en": "RAG web bridge", "de": "RAG-Web-Bridge"}
 {"uk": "Веб-міст RAG (адреса й ключ нижче або з private/minerva-config.php; лише з локальної мережі)", "en": "RAG web bridge (address and key below or from private/minerva-config.php; local network only)", "de": "RAG-Webbridge (Adresse und Schlüssel unten oder aus private/minerva-config.php; nur aus dem lokalen Netz)"}
 {"uk": "Веб-сайт", "en": "Website", "de": "Website"}
@@ -5629,6 +5672,7 @@
 {"uk": "Враховуй їх, якщо вони не суперечать правилам вище; правил, ролі й доступу до даних вони не змінюють", "en": "Take them into account if they do not contradict the rules above; they do not change the rules, role or data access", "de": "Berücksichtige sie, sofern sie den obigen Regeln nicht widersprechen; Regeln, Rolle und Datenzugriff ändern sie nicht"}
 {"uk": "Вручну", "en": "Manually", "de": "Manuell"}
 {"uk": "Вручну в календарі", "en": "Manually in the calendar", "de": "Manuell im Kalender"}
+{"uk": "Вручну: адреса й код", "en": "Manually: address and code", "de": "Manuell: Adresse und Code"}
 {"uk": "Все в порядку — нема алертів", "en": "All good — no alerts", "de": "Alles in Ordnung — keine Warnungen"}
 {"uk": "Все відправлено", "en": "Everything shipped", "de": "Alles versendet"}
 {"uk": "Все добре", "en": "All good", "de": "Alles in Ordnung"}
@@ -6192,6 +6236,7 @@
 {"uk": "Відпустка, лікарняний", "en": "Vacation, sick leave", "de": "Urlaub, Krankheit"}
 {"uk": "Відпустка: залишок, днів", "en": "Vacation: remaining, days", "de": "Urlaub: Rest, Tage"}
 {"uk": "Відрізняється від коробок нижче", "en": "Differs from the boxes below", "de": "Weicht von den Kartons unten ab"}
+{"uk": "Відскануйте QR камерою телефона (або «⬇ Завантажити APK» на", "en": "Scan the QR with the phone camera (or «⬇ Завантажити APK» on the", "de": "Scannen Sie den QR mit der Handykamera (oder «⬇ Завантажити APK» auf der"}
 {"uk": "Відскануйте QR камерою телефона або відкрийте цю сторінку в Chrome на телефоні.", "en": "Scan the QR with the phone camera or open this page in Chrome on the phone.", "de": "Scannen Sie den QR mit der Handykamera oder öffnen Sie diese Seite in Chrome auf dem Handy."}
 {"uk": "Відскануйте цей QR камерою телефона або відкрийте посилання в Chrome на телефоні.", "en": "Scan this QR with the phone camera or open the link in Chrome on the phone.", "de": "Scannen Sie diesen QR mit der Handykamera oder öffnen Sie den Link in Chrome auf dem Handy."}
 {"uk": "Відслідковування", "en": "Tracking", "de": "Sendungsverfolgung"}
@@ -6232,7 +6277,10 @@
 {"uk": "Відхід має бути пізніше за прихід (той самий день; 00:00 — кінець доби).", "en": "Clock-out must be later than clock-in (same day; 00:00 — end of day).", "de": "Gehen muss später sein als Kommen (am selben Tag; 00:00 – Ende des Tages)."}
 {"uk": "Візитка / флаєр", "en": "Business card / flyer", "de": "Visitenkarte / Flyer"}
 {"uk": "Візитка покупця — внести клієнтом у CRM", "en": "A buyer's business card — add as a CRM customer", "de": "Visitenkarte eines Käufers — als CRM-Kunden erfassen"}
+{"uk": "Візитка: контакти, хто зняв і звідки", "en": "Business card: contacts, who took it and from where", "de": "Visitenkarte: Kontakte, wer sie aufgenommen hat und woher"}
 {"uk": "Візитки ({0})", "en": "Business cards ({0})", "de": "Visitenkarten ({0})"}
+{"uk": "Візитки в Minerva: список", "en": "Business cards in Minerva: list", "de": "Visitenkarten in Minerva: Liste"}
+{"uk": "Візитки з Minerva — з пошуком і ⚙ фільтрами; 🔒 — приватна.", "en": "Business cards from Minerva — with search and ⚙ filters; 🔒 — private.", "de": "Visitenkarten aus Minerva — mit Suche und ⚙ Filtern; 🔒 — privat."}
 {"uk": "Візитки й флаєри", "en": "Business cards & flyers", "de": "Visitenkarten & Flyer"}
 {"uk": "Візитки й фото постачальника", "en": "The supplier's business cards and photos", "de": "Visitenkarten und Fotos des Lieferanten"}
 {"uk": "Візитки немає", "en": "No such business card", "de": "Keine solche Visitenkarte"}
@@ -6269,6 +6317,7 @@
 {"uk": "Габаритні розміри корпусу (Д×Ш×В)", "en": "Overall dimensions of the housing (L×W×H)", "de": "Außenmaße des Gehäuses (L×B×H)"}
 {"uk": "Габаритні розміри у форматі Д × Ш × В", "en": "Overall dimensions in the format L × W × H", "de": "Außenmaße im Format L × B × H"}
 {"uk": "Габон", "en": "Gabon", "de": "Gabun"}
+{"uk": "Галерея", "en": "Gallery", "de": "Galerie"}
 {"uk": "Галочка «Безкоштовна доставка» + поріг «Безкоштовно від (нетто)». Діє в зонах з галочкою «Діє безкоштовна доставка» (наприклад, не для США). Вимкнути — зняти галочку.", "en": "The “Free shipping” checkbox + the threshold “Free from (net)”. It applies in zones with the “Free shipping applies” checkbox (for example, not for the USA). To turn it off, untick the checkbox.", "de": "Häkchen „Kostenloser Versand“ + Schwelle „Kostenlos ab (netto)“. Gilt in Zonen mit dem Häkchen „Kostenloser Versand gilt“ (z. B. nicht für die USA). Zum Deaktivieren Häkchen entfernen."}
 {"uk": "Галочка «однаковий курс з DigiKey» (стоїть за замовчуванням) — курс той", "en": "The “same rate as DigiKey” checkbox (set by default) — the rate is the", "de": "Das Häkchen „gleicher Kurs wie DigiKey“ (standardmäßig gesetzt) — der Kurs ist derselbe,"}
 {"uk": "Галочка спрацює при «Зберегти» — разом зі зміненими вище базовими цінами. Позиція з базовими цінами далі оновлюється сама; % — від базової ціни (100 = як базова, 95 = −5 %). Валюта магазину — за курсом із «Налаштувань цін». Усе інше по магазину", "en": "The checkbox takes effect on “Save” — together with the base prices changed above. An item with base prices keeps updating itself; % — of the base price (100 = same as base, 95 = −5 %). The shop currency follows the exchange rate from “Price settings”. Everything else for the shop", "de": "Das Häkchen wirkt beim „Speichern“ — zusammen mit den oben geänderten Basispreisen. Eine Position mit Basispreisen wird danach automatisch aktualisiert; % — vom Basispreis (100 = wie Basispreis, 95 = −5 %). Die Shop-Währung richtet sich nach dem Wechselkurs aus den „Preiseinstellungen“. Alles Weitere zum Shop"}
@@ -7348,6 +7397,7 @@
 {"uk": "З AI", "en": "With AI", "de": "Mit KI"}
 {"uk": "З AI-огляду проєкту", "en": "From the project's AI overview", "de": "Aus der AI-Projektübersicht"}
 {"uk": "З AI-чернетки", "en": "From an AI draft", "de": "Aus einem KI-Entwurf"}
+{"uk": "З GitHub", "en": "From GitHub", "de": "Von GitHub"}
 {"uk": "З QR-коду", "en": "From QR code", "de": "Aus QR-Code"}
 {"uk": "З БД", "en": "From DB", "de": "Aus DB"}
 {"uk": "З ПДВ (Німеччина / покупець без USt-IdNr)", "en": "With VAT (Germany / buyer without VAT ID)", "de": "Mit MwSt. (Deutschland / Käufer ohne USt-IdNr.)"}
@@ -7392,6 +7442,7 @@
 {"uk": "З цього листа завдання не буде", "en": "No task will be made from this email", "de": "Aus dieser E-Mail wird keine Aufgabe"}
 {"uk": "З цін Minerva стане", "en": "From Minerva prices it will become", "de": "Aus den Minerva-Preisen wird"}
 {"uk": "З цінами, реквізитами компанії та банківськими даними.", "en": "With prices, company details and bank details.", "de": "Mit Preisen, Firmendaten und Bankdaten."}
+{"uk": "З цієї Minerva", "en": "From this Minerva", "de": "Von dieser Minerva"}
 {"uk": "З якої адреси", "en": "From which address", "de": "Von welcher Adresse"}
 {"uk": "З якої адреси листи клієнтам", "en": "Sender address for customer e-mails", "de": "Absenderadresse für Kunden-E-Mails"}
 {"uk": "З якої скриньки", "en": "From which mailbox", "de": "Aus welchem Postfach"}
@@ -7524,9 +7575,12 @@
 {"uk": "Завантажити або оновити .dymo файли", "en": "Upload or update .dymo files", "de": ".dymo-Dateien hochladen oder aktualisieren"}
 {"uk": "Завантажити відсутні файли на сервер", "en": "Download missing files to the server", "de": "Fehlende Dateien auf den Server herunterladen"}
 {"uk": "Завантажити демо-дані", "en": "Load demo data", "de": "Demodaten laden"}
+{"uk": "Завантажити додаток", "en": "Download the app", "de": "App herunterladen"}
 {"uk": "Завантажити документи", "en": "Upload documents", "de": "Dokumente hochladen"}
 {"uk": "Завантажити етикетки", "en": "Download labels", "de": "Etiketten herunterladen"}
 {"uk": "Завантажити етикетку замовлення", "en": "Download the order label", "de": "Auftragsetikett herunterladen"}
+{"uk": "Завантажити з GitHub", "en": "Download from GitHub", "de": "Von GitHub herunterladen"}
+{"uk": "Завантажити з Minerva", "en": "Download from Minerva", "de": "Von Minerva herunterladen"}
 {"uk": "Завантажити з UPS API", "en": "Download from UPS API", "de": "Von der UPS-API herunterladen"}
 {"uk": "Завантажити з ПК", "en": "Upload from PC", "de": "Vom PC hochladen"}
 {"uk": "Завантажити з ПК (.eml або .zip)", "en": "Upload from PC (.eml or .zip)", "de": "Vom PC hochladen (.eml oder .zip)"}
@@ -8560,6 +8614,7 @@
 {"uk": "Звідки: усі", "en": "Source: all", "de": "Herkunft: alle"}
 {"uk": "Звідси — про проєкт", "en": "From here — about project", "de": "Ab hier — zum Projekt"}
 {"uk": "Звідси — про проєкт…", "en": "From here — about project…", "de": "Ab hier — zum Projekt…"}
+{"uk": "Звідти ж — «🏭 У постачальники», «👤 У CRM», «🧠 Прочитати AI».", "en": "From there too — «🏭 У постачальники», «👤 У CRM», «🧠 Прочитати AI».", "de": "Von dort auch — «🏭 У постачальники», «👤 У CRM», «🧠 Прочитати AI»."}
 {"uk": "Звільнити відеопам'ять; наступний запит завантажить потрібну модель сам (перший запит буде повільніший)", "en": "Free video memory; the next request will load the needed model by itself (the first request will be slower)", "de": "Videospeicher freigeben; die nächste Anfrage lädt das benötigte Modell selbst (die erste Anfrage ist langsamer)"}
 {"uk": "Звірено з нарадами", "en": "Checked against the meetings", "de": "Mit den Besprechungen abgeglichen"}
 {"uk": "Звірено з нарадою", "en": "Checked against the meeting", "de": "Mit der Besprechung abgeglichen"}
@@ -8749,6 +8804,7 @@
 {"uk": "Змінити категорію…", "en": "Change category…", "de": "Kategorie ändern…"}
 {"uk": "Змінити клієнта CRM (усі поля)", "en": "Edit CRM customer (all fields)", "de": "CRM-Kunden bearbeiten (alle Felder)"}
 {"uk": "Змінити крок…", "en": "Edit the step…", "de": "Schritt bearbeiten…"}
+{"uk": "Змінити може лише той, хто зняв, — у візитці в додатку чи в Minerva.", "en": "Only the person who took it can change this — in the card in the app or in Minerva.", "de": "Ändern kann das nur, wer sie aufgenommen hat — in der Karte in der App oder in Minerva."}
 {"uk": "Змінити може той, хто додав документ, або адміністратор", "en": "Only the person who added the document or an administrator can change it", "de": "Ändern kann, wer das Dokument hinzugefügt hat, oder ein Administrator"}
 {"uk": "Змінити окремі поля замовлення", "en": "Edit individual order fields", "de": "Einzelne Auftragsfelder bearbeiten"}
 {"uk": "Змінити окремі поля клієнта CRM", "en": "Edit individual CRM customer fields", "de": "Einzelne Felder eines CRM-Kunden bearbeiten"}
@@ -8932,10 +8988,13 @@
 {"uk": "Знімайте одразу: знімки, примітки й позначки зберігаються на телефоні (вгорі — «🔗 Не підключено»).", "en": "Start shooting right away: shots, notes and marks are stored on the phone (at the top — «🔗 Не підключено»).", "de": "Sofort aufnehmen: Aufnahmen, Notizen und Markierungen bleiben auf dem Handy (oben — «🔗 Не підключено»)."}
 {"uk": "Знімається само, коли askDANTE відповів «Die Verwendung einer Dauer ist nicht erlaubt»: тоді Minerva пише «з … по …» у вільний відрізок дня.", "en": "Cleared automatically when askDANTE answered “Die Verwendung einer Dauer ist nicht erlaubt”: then Minerva writes “from … to …” into a free slot of the day.", "de": "Wird automatisch entfernt, wenn askDANTE mit „Die Verwendung einer Dauer ist nicht erlaubt“ geantwortet hat: dann schreibt Minerva „von … bis …“ in einen freien Zeitabschnitt des Tages."}
 {"uk": "Знімки бази знань", "en": "Knowledge base snapshots", "de": "Snapshots der Wissensdatenbank"}
+{"uk": "Знімки без Minerva: надіслати всі, пізніше, вибрати", "en": "Shots without Minerva: send all, later, choose", "de": "Aufnahmen ohne Minerva: alle senden, später, auswählen"}
+{"uk": "Знімки чекають у «📤 Мої знімки» з позначкою", "en": "Shots wait in «📤 Мої знімки» marked", "de": "Aufnahmen warten in «📤 Мої знімки» mit der Markierung"}
 {"uk": "Знімок бази знань", "en": "Knowledge base snapshot", "de": "Snapshot der Wissensdatenbank"}
 {"uk": "Знімок не знайдено — створіть новий.", "en": "Snapshot not found — create a new one.", "de": "Snapshot nicht gefunden – erstellen Sie einen neuen."}
 {"uk": "Знімок продажів", "en": "Sales snapshot", "de": "Verkaufs-Snapshot"}
 {"uk": "Знімок прострочений — створіть новий; нічого не видаляйте.", "en": "The snapshot has expired — create a new one; do not delete anything.", "de": "Der Snapshot ist abgelaufen – erstellen Sie einen neuen; löschen Sie nichts."}
+{"uk": "Знімок чекає на телефоні", "en": "The shot waits on the phone", "de": "Die Aufnahme wartet auf dem Telefon"}
 {"uk": "Зніміть галочку з кроків, які не потрібні. Після застосування план змінюється як звичайно", "en": "Untick the steps that are not needed. After applying, the plan can be changed as usual", "de": "Entfernen Sie den Haken bei nicht benötigten Schritten. Nach dem Übernehmen lässt sich der Plan wie gewohnt ändern"}
 {"uk": "Зніміть галочку з кроків, які не потрібні. Після застосування план змінюється як звичайно: тривалості, дати, хто робить, залежності. «Уже зроблено» — з листа, на який посилається крок.", "en": "Untick the steps that are not needed. After applying, the plan can be changed as usual: durations, dates, who does it, dependencies. «Already done» — from the email the step refers to.", "de": "Entfernen Sie den Haken bei nicht benötigten Schritten. Nach dem Übernehmen lässt sich der Plan wie gewohnt ändern: Dauer, Daten, wer es macht, Abhängigkeiten. «Bereits erledigt» — aus der E-Mail, auf die sich der Schritt bezieht."}
 {"uk": "Зображення", "en": "Image", "de": "Bild"}
@@ -9074,7 +9133,9 @@
 {"uk": "Календарів: {0}", "en": "Calendars: {0}", "de": "Kalender: {0}"}
 {"uk": "Калькулятор інвойсу", "en": "Invoice calculator", "de": "Rechnungsrechner"}
 {"uk": "Камбоджа", "en": "Cambodia", "de": "Kambodscha"}
+{"uk": "Камера з рамкою на візитці", "en": "Camera with the frame on a business card", "de": "Kamera mit dem Rahmen auf einer Visitenkarte"}
 {"uk": "Камера знімає на той бік, який вибрано", "en": "The camera captures the side that is selected", "de": "Die Kamera nimmt die gewählte Seite auf"}
+{"uk": "Камера не читає QR", "en": "The camera does not read the QR", "de": "Die Kamera liest den QR nicht"}
 {"uk": "Камера не читає QR або Minerva відкрита на цьому ж телефоні? Скопіюйте код і в додатку натисніть", "en": "The camera does not read the QR code, or Minerva is open on this very phone? Copy the code and in the app press", "de": "Die Kamera liest den QR-Code nicht, oder Minerva ist auf genau diesem Telefon geöffnet? Code kopieren und in der App"}
 {"uk": "Камера не читає QR або Minerva відкрита на цьому ж телефоні? Скопіюйте код і в додатку натисніть «⌨ Ввести або вставити код» — код підставиться сам.", "en": "The camera does not read the QR code, or Minerva is open on this very phone? Copy the code and in the app press «⌨ Enter or paste the code» — the code is filled in automatically.", "de": "Die Kamera liest den QR-Code nicht, oder Minerva ist auf genau diesem Telefon geöffnet? Code kopieren und in der App «⌨ Code eingeben oder einfügen» drücken — der Code wird automatisch eingesetzt."}
 {"uk": "Камера не читає QR? Ввести вручну", "en": "Camera does not read the QR? Enter it manually", "de": "Kamera liest den QR nicht? Manuell eingeben"}
@@ -9176,6 +9237,7 @@
 {"uk": "Категорії листів → askDANTE", "en": "Mail categories → askDANTE", "de": "E-Mail-Kategorien → askDANTE"}
 {"uk": "Категорії немає", "en": "No such category", "de": "Keine solche Kategorie"}
 {"uk": "Категорії постачальників", "en": "Supplier categories", "de": "Lieferantenkategorien"}
+{"uk": "Категорії постачальників живуть у Minerva — нову категорію додають після підключення.", "en": "Supplier categories live in Minerva — a new category is added after connecting.", "de": "Lieferantenkategorien gibt es nur in Minerva — eine neue Kategorie wird nach dem Verbinden angelegt."}
 {"uk": "Категорії товарів", "en": "Product categories", "de": "Artikelkategorien"}
 {"uk": "Категорії-листки каталогу DigiKey", "en": "Leaf categories of the DigiKey catalog", "de": "Blattkategorien des DigiKey-Katalogs"}
 {"uk": "Квартал", "en": "Quarter", "de": "Quartal"}
@@ -10129,7 +10191,9 @@
 {"uk": "Литва", "en": "Lithuania", "de": "Litauen"}
 {"uk": "Лицьовий бік", "en": "Front side", "de": "Vorderseite"}
 {"uk": "Лицьовий бік відскановано — можна зняти зворотний.", "en": "Front side scanned — you can capture the back.", "de": "Vorderseite gescannt — Sie können die Rückseite aufnehmen."}
+{"uk": "Лицьовий бік знято", "en": "Front side taken", "de": "Vorderseite aufgenommen"}
 {"uk": "Лицьовий бік знято — можна зняти зворотний (виберіть «зворотний»).", "en": "Front side captured — you can capture the back (select «back»).", "de": "Vorderseite aufgenommen — Sie können die Rückseite aufnehmen (wählen Sie «Rückseite»)."}
+{"uk": "Лицьовий бік знято: знову, зворот, готово", "en": "Front side taken: again, back, done", "de": "Vorderseite aufgenommen: erneut, Rückseite, fertig"}
 {"uk": "Лицьовий бік не прибрати — зніміть його знову.", "en": "The front side cannot be removed — take it again.", "de": "Die Vorderseite lässt sich nicht entfernen — neu aufnehmen."}
 {"uk": "Лицьову сторону прибрано — зворотна тепер перша", "en": "Front side removed — the back side is now the first one", "de": "Vorderseite entfernt — die Rückseite ist jetzt die erste"}
 {"uk": "Лише Chrome або Edge.", "en": "Chrome or Edge only.", "de": "Nur Chrome oder Edge."}
@@ -10634,6 +10698,8 @@
 {"uk": "Моя компанія", "en": "My company", "de": "Meine Firma"}
 {"uk": "Моя мова (мікрофон)", "en": "My language (microphone)", "de": "Meine Sprache (Mikrofon)"}
 {"uk": "Мої", "en": "Mine", "de": "Meine"}
+{"uk": "Мої знімки: лише на телефоні", "en": "My shots: only on the phone", "de": "Meine Aufnahmen: nur auf dem Telefon"}
+{"uk": "Мої знімки: у Minerva, AI прочитав", "en": "My shots: in Minerva, AI has read it", "de": "Meine Aufnahmen: in Minerva, AI hat gelesen"}
 {"uk": "Мої й розділи", "en": "My and sections", "de": "Meine und Bereiche"}
 {"uk": "Мої налаштування", "en": "My settings", "de": "Meine Einstellungen"}
 {"uk": "Мої налаштування — Minerva", "en": "My settings — Minerva", "de": "Meine Einstellungen – Minerva"}
@@ -10810,6 +10876,7 @@
 {"uk": "Наведіть на смугу — дати кроку.", "en": "Hover over a bar — the step dates.", "de": "Mit der Maus auf einen Balken zeigen — Daten des Schritts."}
 {"uk": "Наведіть рамку на QR-код — фото зробиться само, щойно Minerva його прочитає.", "en": "Point the frame at the QR code — the photo is taken by itself as soon as Minerva reads it.", "de": "Rahmen auf den QR-Code richten — das Foto wird automatisch aufgenommen, sobald Minerva ihn liest."}
 {"uk": "Наведіть рамку на візитку й натисніть «⏺ Зробити фото». QR-код Minerva шукає вже зараз.", "en": "Point the frame at the business card and press «⏺ Take photo». Minerva is already looking for the QR code.", "de": "Rahmen auf die Visitenkarte richten und «⏺ Foto aufnehmen» drücken. Minerva sucht den QR-Code schon jetzt."}
+{"uk": "Наведіть рамку на візитку й натисніть ⭕. З 📐 «по краях» додаток сам обріже фото по краях візитки.", "en": "Point the frame at the card and press ⭕. With 📐 «по краях» the app crops the photo to the card edges by itself.", "de": "Richten Sie den Rahmen auf die Karte und drücken Sie ⭕. Mit 📐 «по краях» schneidet die App das Foto selbst an den Kartenrändern zu."}
 {"uk": "Навіть без номера замовлення в листі. Не вмикайте для джерела, через яке замовляє майже кожен.", "en": "Even without an order number in the email. Do not enable it for a source that almost everyone orders through.", "de": "Auch ohne Auftragsnummer in der E-Mail. Aktivieren Sie das nicht für eine Quelle, über die fast jeder bestellt."}
 {"uk": "Нагадали", "en": "Reminded", "de": "Erinnert"}
 {"uk": "Нагадали про коробки: {0}", "en": "Reminded about boxes: {0}", "de": "An Kartons erinnert: {0}"}
@@ -11140,6 +11207,7 @@
 {"uk": "Налаштування авто-трекінгу", "en": "Auto tracking settings", "de": "Einstellungen der automatischen Sendungsverfolgung"}
 {"uk": "Налаштування автобекапу", "en": "Auto-backup settings", "de": "Einstellungen der automatischen Sicherung"}
 {"uk": "Налаштування бази знань і помічника по продукції, ключі, переіндексація, пауза, 📊 огляд бази знань, розмови помічника.", "en": "Knowledge base and product assistant settings, keys, reindexing, pause, 📊 knowledge base overview, assistant conversations.", "de": "Einstellungen der Wissensdatenbank und des Produktassistenten, Schlüssel, Neuindexierung, Pause, 📊 Übersicht der Wissensdatenbank, Assistentengespräche."}
+{"uk": "Налаштування без Minerva: пресет лише на телефоні", "en": "Settings without Minerva: preset only on the phone", "de": "Einstellungen ohne Minerva: Voreinstellung nur auf dem Telefon"}
 {"uk": "Налаштування бекапу", "en": "Backup settings", "de": "Sicherungseinstellungen"}
 {"uk": "Налаштування брифінгу", "en": "Briefing settings", "de": "Briefing-Einstellungen"}
 {"uk": "Налаштування для Packing List — супровідний список позицій.", "en": "Settings for the Packing List — the accompanying list of items.", "de": "Einstellungen für die Packing List — die begleitende Positionsliste."}
@@ -11162,6 +11230,7 @@
 {"uk": "Налаштування помічника по продукції", "en": "Product assistant settings", "de": "Einstellungen des Produktassistenten"}
 {"uk": "Налаштування проєктів", "en": "Project settings", "de": "Projekteinstellungen"}
 {"uk": "Налаштування під ваші процеси: поля, статуси, звіти, нові модулі. Minerva підлаштовується під будь-який workflow.", "en": "Tailored to your processes: fields, statuses, reports, new modules. Minerva adapts to any workflow.", "de": "Anpassung an Ihre Prozesse: Felder, Status, Berichte, neue Module. Minerva passt sich jedem Workflow an."}
+{"uk": "Налаштування після підключення", "en": "Settings after connecting", "de": "Einstellungen nach dem Verbinden"}
 {"uk": "Налаштування рахунків", "en": "Invoice settings", "de": "Rechnungseinstellungen"}
 {"uk": "Налаштування сервера, Docker, SSL, домен. Розгортання Minerva на вашому обладнанні або хмарі.", "en": "Server setup, Docker, SSL, domain. Deploying Minerva on your own hardware or in the cloud.", "de": "Server-Einrichtung, Docker, SSL, Domain. Bereitstellung von Minerva auf Ihrer Hardware oder in der Cloud."}
 {"uk": "Налаштування системи", "en": "System settings", "de": "Systemeinstellungen"}
@@ -11178,6 +11247,7 @@
 {"uk": "Налаштування — {0}", "en": "Settings — {0}", "de": "Einstellungen — {0}"}
 {"uk": "Налаштування → Сповіщення", "en": "Settings → Notifications", "de": "Einstellungen → Benachrichtigungen"}
 {"uk": "Налаштування → Сповіщення → «🗺 Хто що отримує»", "en": "Settings → Notifications → «🗺 Who gets what»", "de": "Einstellungen → Benachrichtigungen → «🗺 Wer bekommt was»"}
+{"uk": "Налаштування: підключено, людина й роль, пресети", "en": "Settings: connected, person and role, presets", "de": "Einstellungen: verbunden, Person und Rolle, Voreinstellungen"}
 {"uk": "Налаштуваннях документів", "en": "Document settings", "de": "Dokumenteinstellungen"}
 {"uk": "Налаштувань сповіщень", "en": "Notification settings", "de": "Benachrichtigungseinstellungen"}
 {"uk": "Налаштувати", "en": "Configure", "de": "Konfigurieren"}
@@ -11278,6 +11348,7 @@
 {"uk": "Напрямки передачі даних між модулями Minerva", "en": "Data transfer directions between Minerva modules", "de": "Datenübertragungsrichtungen zwischen den Minerva-Modulen"}
 {"uk": "Напрямленість", "en": "Directivity", "de": "Richtwirkung"}
 {"uk": "Напрямок", "en": "Direction", "de": "Richtung"}
+{"uk": "Напряму з GitHub — якщо телефон не бачить Minerva (інша мережа, VPN). Завжди остання версія.", "en": "Directly from GitHub — if the phone cannot see Minerva (another network, VPN). Always the latest version.", "de": "Direkt von GitHub — wenn das Telefon Minerva nicht erreicht (anderes Netz, VPN). Immer die neueste Version."}
 {"uk": "Нарад ще немає", "en": "No meetings yet", "de": "Noch keine Besprechungen"}
 {"uk": "Нарада", "en": "Meeting", "de": "Besprechung"}
 {"uk": "Нарада #{0}", "en": "Meeting #{0}", "de": "Besprechung #{0}"}
@@ -12080,6 +12151,7 @@
 {"uk": "Новий магазин за хвилину", "en": "A new shop in a minute", "de": "Neuer Shop in einer Minute"}
 {"uk": "Новий магазин отримає всі налаштування «{0}»", "en": "The new shop will get all settings of “{0}”", "de": "Der neue Shop erhält alle Einstellungen von „{0}“"}
 {"uk": "Новий пароль", "en": "New password", "de": "Neues Passwort"}
+{"uk": "Новий пресет: назва, де взяли, що це, хто це, позначки", "en": "New preset: name, where taken, what it is, who it is, marks", "de": "Neue Voreinstellung: Name, wo erhalten, was es ist, wer es ist, Markierungen"}
 {"uk": "Новий провайдер на сайті → після оплати", "en": "New provider on the website → after payment", "de": "Neuer Anbieter auf der Website → nach der Zahlung"}
 {"uk": "Новий профіль", "en": "New profile", "de": "Neues Profil"}
 {"uk": "Новий проєкт", "en": "New project", "de": "Neues Projekt"}
@@ -12319,6 +12391,7 @@
 {"uk": "Оберіть хоча б одну країну.", "en": "Select at least one country.", "de": "Wählen Sie mindestens ein Land aus."}
 {"uk": "Оберіть що саме перевіряти та що робити з відсутніми товарами.", "en": "Choose what exactly to check and what to do with missing products.", "de": "Wählen Sie, was genau geprüft werden soll und was mit fehlenden Artikeln geschehen soll."}
 {"uk": "Оберіть які операції дозволені для цього ключа.", "en": "Select which operations are allowed for this key.", "de": "Wählen Sie, welche Operationen für diesen Schlüssel erlaubt sind."}
+{"uk": "Обидва боки + флаєр", "en": "Both sides + flyer", "de": "Beide Seiten + Flyer"}
 {"uk": "Облік витрат з категоріями (ієрархія), прив'язкою до постачальника, завантаженням чеків. Прапорець VAT-deductible для EU-звітності.", "en": "Expense tracking with categories (hierarchy), supplier linking and receipt uploads. VAT-deductible flag for EU reporting.", "de": "Ausgabenerfassung mit Kategorien (Hierarchie), Zuordnung zum Lieferanten und Hochladen von Belegen. Kennzeichen VAT-deductible für die EU-Berichterstattung."}
 {"uk": "Облік з", "en": "Tracked since", "de": "Bestand geführt seit"}
 {"uk": "Облік не ведеться — увімкніть «Вести облік на складі» і впишіть «Фактично є зараз».", "en": "Stock is not tracked — turn on «Track stock» and enter «Actually on hand now».", "de": "Kein Bestand geführt — «Bestand führen» einschalten und «Jetzt tatsächlich vorhanden» eintragen."}
@@ -12541,6 +12614,7 @@
 {"uk": "Оновлення цін DigiKey #{0}", "en": "DigiKey price update #{0}", "de": "DigiKey-Preisaktualisierung #{0}"}
 {"uk": "Оновлення цін DigiKey #{0} · {1}", "en": "DigiKey price update #{0} · {1}", "de": "DigiKey-Preisaktualisierung #{0} · {1}"}
 {"uk": "Оновлення цін, кількості", "en": "Updates prices, quantities", "de": "Aktualisiert Preise, Mengen"}
+{"uk": "Оновлення — так само, поверх старого: знімки й пресети на телефоні лишаються.", "en": "Updates — the same way, over the old one: shots and presets on the phone are kept.", "de": "Updates — genauso, über die alte Version: Aufnahmen und Voreinstellungen auf dem Telefon bleiben erhalten."}
 {"uk": "Оновлення — так само: завантажити й встановити поверх, дані й підключення лишаються.", "en": "Updates — the same: download and install over it, data and connection stay.", "de": "Updates — genauso: herunterladen und darüber installieren, Daten und Verbindung bleiben."}
 {"uk": "Оновлення — так само: завантажити й встановити поверх, підключення лишається.", "en": "Updates work the same way: download and install over it, the connection stays.", "de": "Updates genauso: herunterladen und drüber installieren, die Verbindung bleibt."}
 {"uk": "Оновлення — так само: завантажити й встановити поверх; знімки на телефоні лишаються.", "en": "Updates — the same: download and install over it; shots on the phone stay.", "de": "Updates — genauso: herunterladen und darüber installieren; Aufnahmen auf dem Handy bleiben."}
@@ -13215,6 +13289,7 @@
 {"uk": "Перевірка та виправлення", "en": "Check and fix", "de": "Prüfung und Korrektur"}
 {"uk": "Перевірка цін DigiKey: {0}", "en": "DigiKey price check: {0}", "de": "Prüfung der DigiKey-Preise: {0}"}
 {"uk": "Перевірка як автооновлення: {0}.", "en": "Check as auto-update: {0}.", "de": "Prüfung wie bei der automatischen Aktualisierung: {0}."}
+{"uk": "Перевірка: лицьовий і зворотний бік, флаєр, примітка", "en": "Review: front and back side, flyer, note", "de": "Prüfung: Vorder- und Rückseite, Flyer, Notiz"}
 {"uk": "Перевірка…", "en": "Checking…", "de": "Prüfung läuft…"}
 {"uk": "Перевірку джерела запущено у фоні — стан оновиться за хвилину.", "en": "Source check started in the background — the status will update in a minute.", "de": "Die Prüfung der Quelle wurde im Hintergrund gestartet — der Status wird in einer Minute aktualisiert."}
 {"uk": "Перевірку запущено — прогрес на сторінці.", "en": "The check has started — progress is shown on the page.", "de": "Die Prüfung wurde gestartet — der Fortschritt wird auf der Seite angezeigt."}
@@ -13308,6 +13383,7 @@
 {"uk": "Перед застосуванням ви її переглянете.", "en": "You will review it before applying.", "de": "Vor dem Übernehmen sehen Sie ihn durch."}
 {"uk": "Перед збереженням шаблон перевіряється на тестових даних.", "en": "Before saving, the template is checked against test data.", "de": "Vor dem Speichern wird die Vorlage anhand von Testdaten geprüft."}
 {"uk": "Перед першим використанням потрібно додати перевізника", "en": "Before first use, you need to add a carrier", "de": "Vor der ersten Verwendung muss ein Versanddienstleister hinzugefügt werden"}
+{"uk": "Перед підключенням телефон показує", "en": "Before connecting, the phone shows", "de": "Vor dem Verbinden zeigt das Telefon"}
 {"uk": "Перед ▶ спитайте", "en": "Before ▶ ask", "de": "Vor ▶ fragen Sie"}
 {"uk": "Передав іншому", "en": "Delegated", "de": "Weitergeleitet"}
 {"uk": "Передала зовнішня система через REST API", "en": "Passed by an external system via the REST API", "de": "Von einem externen System über die REST API übergeben"}
@@ -13450,6 +13526,9 @@
 {"uk": "Перше джерело замовлень", "en": "First order source", "de": "Erste Auftragsquelle"}
 {"uk": "Перше листування: «{0}»", "en": "First correspondence: «{0}»", "de": "Erste Korrespondenz: «{0}»"}
 {"uk": "Перший / останній", "en": "First / last", "de": "Erster / Letzter"}
+{"uk": "Перший запуск", "en": "First launch", "de": "Erster Start"}
+{"uk": "Перший запуск — камера чекає QR підключення. На комп'ютері у «📱 Додаток на телефон» натисніть", "en": "First launch — the camera waits for the connection QR. On the computer in «📱 Додаток на телефон» press", "de": "Erster Start — die Kamera wartet auf den Verbindungs-QR. Am Computer in «📱 Додаток на телефон» drücken Sie"}
+{"uk": "Перший запуск: підключити QR, ввести вручну або пропустити", "en": "First launch: connect by QR, enter manually or skip", "de": "Erster Start: per QR verbinden, manuell eingeben oder überspringen"}
 {"uk": "Перший покупець веб-магазину отримує цей номер, кожен наступний — на одиницю більший. Від нього номери документів: PO / OC / CI / PI / PL", "en": "The first web shop customer gets this number, each next one gets a number one higher. Document numbers are built from it: PO / OC / CI / PI / PL", "de": "Der erste Webshop-Kunde erhält diese Nummer, jeder weitere eine um eins höhere. Daraus werden die Dokumentnummern gebildet: PO / OC / CI / PI / PL"}
 {"uk": "Перший раз на цьому ПК?", "en": "First time on this PC?", "de": "Zum ersten Mal an diesem PC?"}
 {"uk": "Перший раз — заповніть реквізити", "en": "First time — fill in the company details", "de": "Beim ersten Mal — Firmendaten ausfüllen"}
@@ -14358,6 +14437,7 @@
 {"uk": "Постачальник не назвав ціну на {0} шт", "en": "The supplier gave no price for {0} pcs", "de": "Der Lieferant nannte keinen Preis für {0} Stk."}
 {"uk": "Постачальник ще не відповідав — вкладень немає.", "en": "The supplier has not replied yet — no attachments.", "de": "Der Lieferant hat noch nicht geantwortet — keine Anhänge."}
 {"uk": "Постачальник, PO-12, номер підтвердження, артикул або трек-номер; порожньо — останні відкриті", "en": "Supplier, PO-12, confirmation number, SKU or tracking number; empty — latest open ones", "de": "Lieferant, PO-12, Bestätigungsnummer, Artikel oder Sendungsnummer; leer — die letzten offenen"}
+{"uk": "Постачальник, 👤 Клієнт, 🤝 Інше. Не вибрали — AI підкаже з візитки.", "en": "Supplier, 👤 Customer, 🤝 Other. Not chosen — AI will suggest it from the card.", "de": "Lieferant, 👤 Kunde, 🤝 Sonstiges. Nicht gewählt — AI schlägt es anhand der Karte vor."}
 {"uk": "Постачальник: {0} ({1}).", "en": "Supplier: {0} ({1}).", "de": "Lieferant: {0} ({1})."}
 {"uk": "Постачальник: {0} | Статус: {1} | Відкрито: {2}", "en": "Supplier: {0} | Status: {1} | Opened: {2}", "de": "Lieferant: {0} | Status: {1} | Eröffnet: {2}"}
 {"uk": "Постачальник: {0} — підтвердіть або видаліть", "en": "Supplier: {0} — confirm or delete", "de": "Lieferant: {0} — bestätigen oder löschen"}
@@ -14365,6 +14445,7 @@
 {"uk": "Постачальники", "en": "Suppliers", "de": "Lieferanten"}
 {"uk": "Постачальники з пошти", "en": "Suppliers from mail", "de": "Lieferanten aus der Post"}
 {"uk": "Постачальники й запити (RFQ)", "en": "Suppliers and requests (RFQ)", "de": "Lieferanten und Anfragen (RFQ)"}
+{"uk": "Постачальники → 🪪 Візитки й флаєри → «📱 Додаток на телефон»", "en": "Suppliers → 🪪 Business cards & flyers → «📱 Додаток на телефон»", "de": "Lieferanten → 🪪 Visitenkarten & Flyer → «📱 Додаток на телефон»"}
 {"uk": "Постачальників", "en": "Suppliers", "de": "Lieferanten"}
 {"uk": "Постачання", "en": "Deliveries", "de": "Lieferungen"}
 {"uk": "Постачання й склад", "en": "Supply and stock", "de": "Lieferung und Lager"}
@@ -14609,6 +14690,7 @@
 {"uk": "Працівників: {0} (прив'язано за email: {1}) · проєктів: {2} · видів робіт: {3}", "en": "Employees: {0} (linked by email: {1}) · projects: {2} · work types: {3}", "de": "Mitarbeiter: {0} (per E-Mail verknüpft: {1}) · Projekte: {2} · Tätigkeitsarten: {3}"}
 {"uk": "Преміум", "en": "Premium", "de": "Premium"}
 {"uk": "Пресет", "en": "Preset", "de": "Vorlage"}
+{"uk": "Пресет виставки", "en": "Trade fair preset", "de": "Messe-Voreinstellung"}
 {"uk": "Пресет візиток", "en": "Business card preset", "de": "Visitenkarten-Vorlage"}
 {"uk": "Пресет збережено", "en": "Preset saved", "de": "Vorlage gespeichert"}
 {"uk": "Пресет підставляє «Де взяли», що це, позначки, примітку, категорії й AI — на виставці не треба вводити те саме для кожної візитки.", "en": "A preset fills in «Where obtained», type, marks, note, categories and AI — at a trade fair you do not have to enter the same for every card.", "de": "Eine Vorlage setzt «Woher», Art, Markierungen, Notiz, Kategorien und KI ein — auf der Messe muss nicht für jede Karte dasselbe eingegeben werden."}
@@ -15167,9 +15249,11 @@
 {"uk": "Підключені календарі", "en": "Connected calendars", "de": "Verbundene Kalender"}
 {"uk": "Підключені телефони", "en": "Connected phones", "de": "Verbundene Handys"}
 {"uk": "Підключити Telegram-сповіщення", "en": "Connect Telegram notifications", "de": "Telegram-Benachrichtigungen verbinden"}
+{"uk": "Підключити вручну: адреса й код", "en": "Connect manually: address and code", "de": "Manuell verbinden: Adresse und Code"}
 {"uk": "Підключити до проєкту", "en": "Link to a project", "de": "Mit Projekt verknüpfen"}
 {"uk": "Підключити сайт (код)", "en": "Connect site (code)", "de": "Website verbinden (Code)"}
 {"uk": "Підключити телефон", "en": "Connect phone", "de": "Telefon verbinden"}
+{"uk": "Підключити цей телефон? Ім'я, роль, email", "en": "Connect this phone? Name, role, email", "de": "Dieses Telefon verbinden? Name, Rolle, E-Mail"}
 {"uk": "Підключіть сайт", "en": "Connect the website", "de": "Website verbinden"}
 {"uk": "Підкреслений", "en": "Underline", "de": "Unterstrichen"}
 {"uk": "Підкреслені посилання видно й без розрізнення кольорів.", "en": "Underlined links are visible even without telling colors apart.", "de": "Unterstrichene Links sind auch ohne Farbunterscheidung erkennbar."}
@@ -15299,6 +15383,7 @@
 {"uk": "Підтримується лише формат .xlsx", "en": "Only the .xlsx format is supported", "de": "Es wird nur das Format .xlsx unterstützt"}
 {"uk": "Підтримується формат .xlsx", "en": "The .xlsx format is supported", "de": "Das Format .xlsx wird unterstützt"}
 {"uk": "Пізніше", "en": "Later", "de": "Später"}
+{"uk": "Пізніше теж можна: «🪪 У Minerva» → візитка → «📷 Фото: знову, зворотний бік, ще фото».", "en": "Later is possible too: «🪪 У Minerva» → card → «📷 Фото: знову, зворотний бік, ще фото».", "de": "Auch später möglich: «🪪 У Minerva» → Karte → «📷 Фото: знову, зворотний бік, ще фото»."}
 {"uk": "Після", "en": "After", "de": "Nach"}
 {"uk": "Після «Зберегти» — за новими налаштуваннями. Під ним, як завжди, — підпис скриньки.", "en": "After “Save” — with the new settings. Below it, as always, — the mailbox signature.", "de": "Nach „Speichern“ — mit den neuen Einstellungen. Darunter wie immer — die Signatur des Postfachs."}
 {"uk": "Після «Зберегти» — на DigiKey", "en": "After «Save» — to DigiKey", "de": "Nach «Speichern» — an DigiKey"}
@@ -15317,6 +15402,7 @@
 {"uk": "Після кроку", "en": "After the step", "de": "Nach dem Schritt"}
 {"uk": "Після кроків", "en": "After steps", "de": "Nach den Schritten"}
 {"uk": "Після кількох збоїв Minerva не звертається до RAG до", "en": "After several failures Minerva does not contact RAG until", "de": "Nach mehreren Fehlern wendet sich Minerva nicht an RAG bis"}
+{"uk": "Після лицьового боку", "en": "After the front side", "de": "Nach der Vorderseite"}
 {"uk": "Після мого тексту", "en": "After my text", "de": "Nach meinem Text"}
 {"uk": "Після мого тексту (перед цитатою)", "en": "After my text (before the quote)", "de": "Nach meinem Text (vor dem Zitat)"}
 {"uk": "Після надсилання ця сторінка покаже, що DigiKey повертає тепер — так видно, що дані дійшли.", "en": "After sending, this page will show what DigiKey returns now — so you can see that the data arrived.", "de": "Nach dem Senden zeigt diese Seite, was DigiKey jetzt zurückgibt — so sehen Sie, dass die Daten angekommen sind."}
@@ -15324,6 +15410,8 @@
 {"uk": "Після нашого оновлення ціни змінено на DigiKey ({0}): {1}", "en": "After our update, the prices were changed on DigiKey ({0}): {1}", "de": "Nach unserer Aktualisierung wurden die Preise auf DigiKey geändert ({0}): {1}"}
 {"uk": "Після оплати трекінг-номер з'явиться автоматично (або натисніть «🔄 Оновити трекінг»).", "en": "After payment the tracking number will appear automatically (or click “🔄 Refresh tracking”).", "de": "Nach der Zahlung erscheint die Sendungsnummer automatisch (oder klicken Sie auf „🔄 Tracking aktualisieren“)."}
 {"uk": "Після оплати: змінити status → active, встановити paid_until на дату закінчення.", "en": "After payment: change status → active, set paid_until to the end date.", "de": "Nach der Zahlung: status → active ändern, paid_until auf das Enddatum setzen."}
+{"uk": "Після підключення телефон запитає", "en": "After connecting, the phone asks", "de": "Nach dem Verbinden fragt das Telefon"}
+{"uk": "Після підключення — надіслати", "en": "After connecting — send", "de": "Nach dem Verbinden — senden"}
 {"uk": "Після підтвердження токени збережуться автоматично", "en": "After confirmation the tokens are saved automatically", "de": "Nach der Bestätigung werden die Tokens automatisch gespeichert"}
 {"uk": "Після рядків", "en": "After rows", "de": "Nach Zeilen"}
 {"uk": "Після увімкнення та збереження — перший бекап виконається через ≈1 годину", "en": "After enabling and saving, the first backup runs in about 1 hour", "de": "Nach dem Aktivieren und Speichern wird die erste Sicherung in ca. 1 Stunde durchgeführt"}
@@ -15365,6 +15453,7 @@
 {"uk": "Разів", "en": "Times", "de": "Anzahl"}
 {"uk": "Разів у коді", "en": "Times in the code", "de": "Vorkommen im Code"}
 {"uk": "Рамка алюмінієва 60×60", "en": "Aluminum frame 60×60", "de": "Aluminiumrahmen 60×60"}
+{"uk": "Рамка на візитці", "en": "Frame on the business card", "de": "Rahmen auf der Visitenkarte"}
 {"uk": "Рамка фокусу", "en": "Focus outline", "de": "Fokusrahmen"}
 {"uk": "Рамка фокусу завжди, і після кліку мишею", "en": "Focus outline always, including after a mouse click", "de": "Fokusrahmen immer, auch nach einem Mausklick"}
 {"uk": "Рамка фокусу при роботі з клавіатури", "en": "Focus outline when using the keyboard", "de": "Fokusrahmen bei Tastaturbedienung"}
@@ -16276,6 +16365,7 @@
 {"uk": "Скопіювати права з…", "en": "Copy permissions from…", "de": "Berechtigungen kopieren von…"}
 {"uk": "Скопіювати — надіслати колегам чи надрукувати", "en": "Copy — send to colleagues or print", "de": "Kopieren — an Kollegen senden oder drucken"}
 {"uk": "Скопіюйте агенду", "en": "Copy the agenda", "de": "Tagesordnung kopieren"}
+{"uk": "Скопіюйте адресу", "en": "Copy the address", "de": "Adresse kopieren"}
 {"uk": "Скопіюйте токен", "en": "Copy the token", "de": "Kopieren Sie den Token"}
 {"uk": "Скопіюйте токен ще раз з @BotFather", "en": "Copy the token again from @BotFather", "de": "Kopieren Sie den Token erneut aus @BotFather"}
 {"uk": "Скори оновлюються автоматично при зміні замовлень через Django signals.", "en": "Scores are updated automatically when orders change via Django signals.", "de": "Die Scores werden bei Auftragsänderungen automatisch über Django-Signals aktualisiert."}
@@ -16747,6 +16837,7 @@
 {"uk": "Сторінка", "en": "Page", "de": "Seite"}
 {"uk": "Сторінка Minerva, де зараз користувач: {0}", "en": "Minerva page the user is currently on: {0}", "de": "Minerva-Seite, auf der sich der Benutzer gerade befindet: {0}"}
 {"uk": "Сторінка {0} · показано {1} з {2}", "en": "Page {0} · showing {1} of {2}", "de": "Seite {0} · {1} von {2} angezeigt"}
+{"uk": "Сторінка «Додаток на телефон» у Minerva: QR з цієї Minerva, QR з GitHub і QR підключення", "en": "The «Додаток на телефон» page in Minerva: QR from this Minerva, QR from GitHub and the connection QR", "de": "Die Seite «Додаток на телефон» in Minerva: QR von dieser Minerva, QR von GitHub und der Verbindungs-QR"}
 {"uk": "Сторінка «🏪 Інтернет-магазин → 🖼 Фото й даташити». Для кожного товару магазину Minerva бере", "en": "The page “🏪 Web shop → 🖼 Photos and datasheets”. For each product of the shop, Minerva takes", "de": "Die Seite „🏪 Webshop → 🖼 Fotos und Datenblätter“. Für jeden Artikel des Shops nimmt Minerva"}
 {"uk": "Сторінка «📷 Візитка / флаєр»", "en": "Page «📷 Візитка / флаєр»", "de": "Seite «📷 Візитка / флаєр»"}
 {"uk": "Сторінка Системи", "en": "System page", "de": "Systemseite"}
@@ -17676,7 +17767,9 @@
 {"uk": "Тільки тіло листа без теми, без підпису.", "en": "Only the email body, no subject, no signature.", "de": "Nur der Textkörper der E-Mail, ohne Betreff, ohne Signatur."}
 {"uk": "Тільки ядро", "en": "Core only", "de": "Nur Kern"}
 {"uk": "У CRM", "en": "To CRM", "de": "Ins CRM"}
+{"uk": "У Minerva", "en": "In Minerva", "de": "In Minerva"}
 {"uk": "У Minerva {0} зон, а сайт їх не отримав — стара версія сайту або ключу бракує права products:read.", "en": "Minerva has {0} zones, but the site did not receive them — an old site version or the key lacks the products:read permission.", "de": "Minerva hat {0} Zonen, die Website hat sie jedoch nicht erhalten – alte Website-Version, oder dem Schlüssel fehlt die Berechtigung products:read."}
+{"uk": "У Minerva · 🧠 AI", "en": "In Minerva · 🧠 AI", "de": "In Minerva · 🧠 AI"}
 {"uk": "У Minerva буде записано", "en": "The following will be recorded in Minerva", "de": "In Minerva wird eingetragen"}
 {"uk": "У Minerva вимкнено, а сайт ще показує кнопку — оновиться протягом хвилини.", "en": "Disabled in Minerva, but the site still shows the button — it will update within a minute.", "de": "In Minerva deaktiviert, aber die Website zeigt die Schaltfläche noch – sie wird sich innerhalb einer Minute aktualisieren."}
 {"uk": "У Minerva відкрито з {0} (ще не в askDANTE)", "en": "Opened in Minerva since {0} (not yet in askDANTE)", "de": "In Minerva seit {0} geöffnet (noch nicht in askDANTE)"}
@@ -17702,6 +17795,7 @@
 {"uk": "У «Мої»", "en": "To “My”", "de": "In „Meine“"}
 {"uk": "У «Мої» вже", "en": "Already in “My”", "de": "In „Meine“ bereits"}
 {"uk": "У «⚙️ Налаштування помічника» (Minerva AI) не задано адресу або ключ.", "en": "The “⚙️ Assistant settings” (Minerva AI) have no address or key set.", "de": "In den „⚙️ Assistenteneinstellungen“ (Minerva AI) sind Adresse oder Schlüssel nicht festgelegt."}
+{"uk": "У «⚙️ Налаштування» видно, до кого підключено. «🚪 Забути Minerva на цьому телефоні» — від'єднати.", "en": "«⚙️ Налаштування» shows who it is connected to. «🚪 Забути Minerva на цьому телефоні» — disconnect.", "de": "In «⚙️ Налаштування» sieht man, mit wem verbunden ist. «🚪 Забути Minerva на цьому телефоні» — trennen."}
 {"uk": "У ЄЦБ немає", "en": "Not available at the ECB", "de": "Bei der EZB nicht vorhanden"}
 {"uk": "У базі знань", "en": "In the knowledge base", "de": "In der Wissensdatenbank"}
 {"uk": "У блоці «🔗 Медіа та документи» — «🖼 Для сайту»: що взято, звідки, помилки, чи вже на сайті, і «🔄 Перевірити зараз».", "en": "In the “🔗 Media and documents” block — “🖼 For the website”: what was taken, from where, errors, whether it is already on the website, and “🔄 Check now”.", "de": "Im Block „🔗 Medien und Dokumente“ — „🖼 Für die Website“: was übernommen wurde, woher, Fehler, ob es schon auf der Website ist, und „🔄 Jetzt prüfen“."}
@@ -17724,6 +17818,8 @@
 {"uk": "У вашому тексті старі", "en": "In your text the old", "de": "In Ihrem Text wurden die alte(n)"}
 {"uk": "У вашій пошті й документах бази знань нічого не знайдено за запитом «{0}»", "en": "Nothing found in your mail and knowledge base documents for the query “{0}”", "de": "In Ihren E-Mails und Dokumenten der Wissensdatenbank wurde zur Anfrage „{0}“ nichts gefunden"}
 {"uk": "У виробництві", "en": "In production", "de": "In Fertigung"}
+{"uk": "У візитці: фірма, людина, контакти (дотик — подзвонити, написати, сайт), адреса, що роблять, де взяли.", "en": "In the card: company, person, contacts (tap — call, write, website), address, what they do, where taken.", "de": "In der Karte: Firma, Person, Kontakte (Tippen — anrufen, schreiben, Website), Adresse, was sie machen, wo erhalten."}
+{"uk": "У вікні перевірки: «📷 Знову» для кожного боку, «↻» — повернути, 🗑 — прибрати зворот.", "en": "In the review window: «📷 Знову» for each side, «↻» — rotate, 🗑 — remove the back.", "de": "Im Prüffenster: «📷 Знову» für jede Seite, «↻» — drehen, 🗑 — Rückseite entfernen."}
 {"uk": "У гіді немає сторінок про це — спробуйте інакше сформулювати.", "en": "The guide has no pages about this — try rephrasing.", "de": "Der Leitfaden enthält keine Seiten dazu — versuchen Sie es mit einer anderen Formulierung."}
 {"uk": "У гіді цього немає", "en": "This is not in the guide", "de": "Das steht nicht im Leitfaden"}
 {"uk": "У гілці листів: {0} · показано останній", "en": "E-mails in the thread: {0} · showing the latest", "de": "E-Mails im Verlauf: {0} · die neueste wird gezeigt"}
@@ -18371,6 +18467,7 @@
 {"uk": "Хто розпізнає", "en": "Who recognises", "de": "Wer erkennt"}
 {"uk": "Хто це", "en": "Who is it", "de": "Wer ist das"}
 {"uk": "Хто це для нас", "en": "Who is it for us", "de": "Wer ist das für uns"}
+{"uk": "Хто це для нас, хто бачить: бачать усі або лише я, позначки", "en": "Who it is for us, who sees it: everyone or only me, marks", "de": "Wer es für uns ist, wer es sieht: alle oder nur ich, Markierungen"}
 {"uk": "Хто це для нас: постачальник чи клієнт", "en": "Who is it for us: supplier or customer", "de": "Wer ist das für uns: Lieferant oder Kunde"}
 {"uk": "Хто це — підказав AI", "en": "Who is it — suggested by AI", "de": "Wer ist das — von AI vorgeschlagen"}
 {"uk": "Хто чекає товар", "en": "Who is waiting for the product", "de": "Wer auf den Artikel wartet"}
@@ -18800,6 +18897,7 @@
 {"uk": "Чи натиснув клієнт на посилання або відповів на email?", "en": "Did the customer click a link or reply to the email?", "de": "Hat der Kunde auf einen Link geklickt oder auf die E-Mail geantwortet?"}
 {"uk": "Чи прочитав AI", "en": "Whether AI has read it", "de": "Ob die KI gelesen hat"}
 {"uk": "Чи підключається скринька до IMAP і SMTP і чи доходить лист.", "en": "Whether the mailbox connects to IMAP and SMTP and whether e-mail arrives.", "de": "Ob sich das Postfach mit IMAP und SMTP verbindet und ob E-Mails ankommen."}
+{"uk": "Чий акаунт і роль — до підключення", "en": "Whose account and role — before connecting", "de": "Wessen Konto und Rolle — vor dem Verbinden"}
 {"uk": "Чилі", "en": "Chile", "de": "Chile"}
 {"uk": "Чим «Ціна продажу» товару відрізняється від ціни в магазині?", "en": "How does the product’s “Sale price” differ from the price in the shop?", "de": "Wie unterscheidet sich der „Verkaufspreis“ des Artikels vom Preis im Shop?"}
 {"uk": "Чим зараз відповідає RAG (локальна модель — без оплати, хмара — платить ключ RAG), що він робить, хто звертається; зупинка зайвого запиту й звільнення відеопам'яті.", "en": "What RAG is currently answering with (a local model — free, cloud — paid by the RAG key), what it is doing, who is calling; stopping an unnecessary request and freeing video memory.", "de": "Womit RAG derzeit antwortet (lokales Modell — kostenlos, Cloud — bezahlt über den RAG-Schlüssel), was es tut, wer anfragt; Abbrechen einer überflüssigen Anfrage und Freigabe des Grafikspeichers."}
@@ -19119,6 +19217,7 @@
 {"uk": "Що дали AI", "en": "What the AI was given", "de": "Was die KI bekam"}
 {"uk": "Що далі", "en": "What next", "de": "Wie geht es weiter"}
 {"uk": "Що дає", "en": "What it gives", "de": "Was es bringt"}
+{"uk": "Що дознімати: ще візитка, флаєр, каталог", "en": "What to add: another card, flyer, catalog", "de": "Was nachfotografieren: weitere Karte, Flyer, Katalog"}
 {"uk": "Що доручаємо — партія, кількість, строк", "en": "What we assign — batch, quantity, date", "de": "Was wir vergeben — Charge, Menge, Termin"}
 {"uk": "Що доручили", "en": "What was assigned", "de": "Was vergeben wurde"}
 {"uk": "Що доручити", "en": "What to delegate", "de": "Was übertragen wird"}
@@ -19331,6 +19430,7 @@
 {"uk": "Як підключити RAG", "en": "How to connect RAG", "de": "So binden Sie RAG an"}
 {"uk": "Як підключити зовнішній сайт або CRM: залишки складу, замовлення з магазину, закупівлі в постачальників з CRM (трекінг, «доставлено» без дублів), доставка, вебхуки, приклади коду і тестування.", "en": "How to connect an external site or CRM: stock levels, orders from the shop, purchases from suppliers from the CRM (tracking, “delivered” without duplicates), shipping, webhooks, code examples and testing.", "de": "So binden Sie eine externe Website oder ein CRM an: Lagerbestände, Aufträge aus dem Shop, Bestellungen bei Lieferanten aus dem CRM (Sendungsverfolgung, „zugestellt“ ohne Duplikate), Versand, Webhooks, Codebeispiele und Tests."}
 {"uk": "Як підключити сайт: залишки складу, замовлення, доставка, вебхуки, приклади коду PHP / Node.js / Python і як усе протестувати.", "en": "How to connect a site: stock levels, orders, shipping, webhooks, code examples in PHP / Node.js / Python and how to test everything.", "de": "So binden Sie eine Website an: Lagerbestände, Aufträge, Versand, Webhooks, Codebeispiele in PHP / Node.js / Python und wie Sie alles testen."}
+{"uk": "Як підключити, знімати обидва боки й ще фото, пресети, 🔒 «лише я»", "en": "How to connect, shoot both sides and more photos, presets, 🔒 «лише я»", "de": "Wie verbinden, beide Seiten und weitere Fotos aufnehmen, Voreinstellungen, 🔒 «лише я»"}
 {"uk": "Як пішов", "en": "How it was sent", "de": "Wie versendet"}
 {"uk": "Як раніше", "en": "As before", "de": "Wie früher"}
 {"uk": "Як рахувати ціну для DigiKey", "en": "How to calculate the price for DigiKey", "de": "Wie der Preis für DigiKey berechnet wird"}
@@ -19534,6 +19634,7 @@
 {"uk": "адміністратором", "en": "by an administrator", "de": "durch einen Administrator"}
 {"uk": "адреса", "en": "address", "de": "Adresse"}
 {"uk": "адреса (anna@firma.de) або весь домен (@firma.de)", "en": "an address (anna@firma.de) or a whole domain (@firma.de)", "de": "eine Adresse (anna@firma.de) oder eine ganze Domain (@firma.de)"}
+{"uk": "адреса Minerva (https://…) і код, що під QR.", "en": "the Minerva address (https://…) and the code under the QR.", "de": "die Minerva-Adresse (https://…) und der Code unter dem QR."}
 {"uk": "адреса RAG API в «⚙️ Налаштування помічника» не підходить для сайту: потрібен https://", "en": "the RAG API address in “⚙️ Assistant settings” is not suitable for the site: https:// is required", "de": "die RAG-API-Adresse in „⚙️ Assistenten-Einstellungen“ ist für die Website nicht geeignet: https:// ist erforderlich"}
 {"uk": "адреса RAG не підходить: потрібен https:// або http:// до IP локальної мережі", "en": "the RAG address is not suitable: https:// or http:// to a local network IP is required", "de": "die RAG-Adresse ist nicht geeignet: erforderlich ist https:// oder http:// zu einer IP im lokalen Netz"}
 {"uk": "адреса {0}", "en": "address {0}", "de": "Adresse {0}"}
@@ -19641,6 +19742,7 @@
 {"uk": "банківські реквізити", "en": "bank details", "de": "Bankverbindung"}
 {"uk": "банківські реквізити (немає, коли вже оплачено)", "en": "bank details (none when already paid)", "de": "Bankverbindung (keine, wenn bereits bezahlt)"}
 {"uk": "бачите лише ви", "en": "only you can see this", "de": "nur Sie sehen das"}
+{"uk": "бачите тільки ви, у додатку й у Minerva; інші, навіть адміністратор, — ні. Наприклад, особистий контакт.", "en": "only you see it, in the app and in Minerva; nobody else, not even an administrator. For example, a personal contact.", "de": "nur Sie sehen es, in der App und in Minerva; sonst niemand, auch kein Administrator. Zum Beispiel ein privater Kontakt."}
 {"uk": "бачить крізь дані", "en": "sees through data", "de": "blickt durch Daten hindurch"}
 {"uk": "бежевий", "en": "beige", "de": "beige"}
 {"uk": "без AI, безкоштовно: частота, роз'єм і стандарт у запиті, схожі товари, кабелі, наступник, «часто купують разом».", "en": "without AI, free of charge: frequency, connector and standard in the query, similar products, cables, successor, “frequently bought together”.", "de": "ohne KI, kostenlos: Frequenz, Steckverbinder und Standard in der Anfrage, ähnliche Artikel, Kabel, Nachfolger, „wird oft zusammen gekauft“."}
@@ -19660,6 +19762,7 @@
 {"uk": "без групування", "en": "no grouping", "de": "ohne Gruppierung"}
 {"uk": "без дати", "en": "no date", "de": "ohne Datum"}
 {"uk": "без закупівлі", "en": "no purchase order", "de": "ohne Bestellung"}
+{"uk": "без звороту.", "en": "without the back.", "de": "ohne Rückseite."}
 {"uk": "без змін", "en": "no changes", "de": "keine Änderungen"}
 {"uk": "без змін (уже в {0} або без цін): {1}", "en": "unchanged (already in {0} or without prices): {1}", "de": "unverändert (bereits in {0} oder ohne Preise): {1}"}
 {"uk": "без змін полів: {0}", "en": "no changes to fields: {0}", "de": "keine Änderungen an den Feldern: {0}"}
@@ -19830,6 +19933,7 @@
 {"uk": "вже є відправлення #{0} ({1})", "en": "shipment #{0} ({1}) already exists", "de": "Sendung #{0} ({1}) bereits vorhanden"}
 {"uk": "вже існує для цього замовлення ({0} USD).", "en": "already exists for this order ({0} USD).", "de": "existiert bereits für diesen Auftrag ({0} USD)."}
 {"uk": "вже існує.", "en": "already exists.", "de": "existiert bereits."}
+{"uk": "взяти вже зроблене фото з телефона (лицьовий бік, зворот чи ще фото).", "en": "take a photo already on the phone (front side, back or more photos).", "de": "ein bereits vorhandenes Foto vom Telefon nehmen (Vorderseite, Rückseite oder weitere Fotos)."}
 {"uk": "взяти з DigiKey, далі змінювати самостійно. Під таблицею видно, звідки ціни (напр. «DigiKey · офер … · синхр. …» або", "en": "be taken from DigiKey, then changed on your own. Below the table you can see where the prices come from (e.g. “DigiKey · offer … · sync. …” or", "de": "von DigiKey übernommen und danach selbst geändert werden. Unter der Tabelle sehen Sie, woher die Preise stammen (z. B. „DigiKey · Offer … · Sync. …“ oder"}
 {"uk": "ви вибрали самі", "en": "you chose yourself", "de": "Sie haben selbst gewählt"}
 {"uk": "ви відкриваєте його в пошті й надсилаєте самі.", "en": "you open it in Mail and send it yourself.", "de": "Sie öffnen ihn in der E-Mail-Ansicht und senden ihn selbst."}
@@ -19914,6 +20018,7 @@
 {"uk": "виробник — як у наших лістингів ({0})", "en": "manufacturer — as in our listings ({0})", "de": "Hersteller — wie in unseren Listings ({0})"}
 {"uk": "виробництво", "en": "production", "de": "Fertigung"}
 {"uk": "висока", "en": "high", "de": "hoch"}
+{"uk": "виставка, зустріч.", "en": "trade fair, meeting.", "de": "Messe, Treffen."}
 {"uk": "виставлено", "en": "listed", "de": "gelistet"}
 {"uk": "вистачає", "en": "sufficient", "de": "ausreichend"}
 {"uk": "вистачає поточного листування", "en": "the current correspondence is enough", "de": "die aktuelle Korrespondenz reicht aus"}
@@ -20382,6 +20487,7 @@
 {"uk": "доступно після: {0}", "en": "available after: {0}", "de": "verfügbar nach: {0}"}
 {"uk": "досягнуто ліміт {0} $ на одне заповнення", "en": "the limit of {0} $ per fill was reached", "de": "Limit von {0} $ pro Ausfüllen erreicht"}
 {"uk": "досягнуто ліміт витрат {0}", "en": "the spending limit of {0} reached", "de": "Ausgabenlimit von {0} erreicht"}
+{"uk": "друга візитка тієї ж фірми, флаєр, каталог / прайс, продукт / зразок, стенд. AI прочитає все разом.", "en": "another card of the same company, flyer, catalog / price list, product / sample, booth. AI reads everything together.", "de": "eine weitere Karte derselben Firma, Flyer, Katalog / Preisliste, Produkt / Muster, Stand. AI liest alles zusammen."}
 {"uk": "друковані плати / складання", "en": "printed circuit boards / assembly", "de": "Leiterplatten / Bestückung"}
 {"uk": "друкувати можна.", "en": "printing is possible.", "de": "Drucken ist möglich."}
 {"uk": "друкується", "en": "is printed", "de": "wird gedruckt"}
@@ -20814,6 +20920,7 @@
 {"uk": "звуку наради не було", "en": "there was no meeting audio", "de": "kein Besprechungston"}
 {"uk": "звідки", "en": "source", "de": "Herkunft"}
 {"uk": "звідки за {0} днів", "en": "from where in {0} days", "de": "von wo in {0} Tagen"}
+{"uk": "звільнити місце на телефоні (у Minerva вони лишаються).", "en": "free up space on the phone (they stay in Minerva).", "de": "Platz auf dem Telefon freigeben (in Minerva bleiben sie)."}
 {"uk": "звірено з планом проєкту", "en": "checked against the project plan", "de": "mit dem Projektplan abgeglichen"}
 {"uk": "звірив записи нарад на RAG-ПК", "en": "reconciled the meeting recordings on the RAG PC", "de": "hat die Besprechungsaufnahmen auf dem RAG-PC abgeglichen"}
 {"uk": "звірка записів нарад", "en": "meeting recordings reconciliation", "de": "Abgleich der Besprechungsaufnahmen"}
@@ -20901,6 +21008,7 @@
 {"uk": "знову показано {0}", "en": "shown again {0}", "de": "wieder angezeigt {0}"}
 {"uk": "зняти блокування · 🚪 завершити всі входи · ⛔ вимкнути", "en": "remove the lock · 🚪 end all sessions · ⛔ disable", "de": "Sperre aufheben · 🚪 alle Anmeldungen beenden · ⛔ deaktivieren"}
 {"uk": "зняти всі", "en": "clear all", "de": "alle abwählen"}
+{"uk": "зняти зворотний бік", "en": "take the back side", "de": "Rückseite aufnehmen"}
 {"uk": "знято з виробництва; плюс «Рекомендована заміна».", "en": "discontinued; plus “Recommended replacement”.", "de": "abgekündigt; zusätzlich „Empfohlener Ersatz“."}
 {"uk": "знято з виробництва; плюс «Рекомендована заміна». На сайті жовта (NRND) або сіра (EOL) наліпка на фото, попередження і посилання «Empfohlener Nachfolger». EOL продається лише із залишку на складі (без «під замовлення»), такі товари — внизу каталогу.", "en": "discontinued; plus “Recommended replacement”. On the website: a yellow (NRND) or grey (EOL) sticker on the photo, a warning and a link “Empfohlener Nachfolger”. EOL items are sold only from stock on hand (no “on order”), and such products are at the bottom of the catalog.", "de": "abgekündigt; zusätzlich „Empfohlener Ersatz“. Auf der Website: gelber (NRND) oder grauer (EOL) Aufkleber auf dem Foto, ein Warnhinweis und der Link „Empfohlener Nachfolger“. EOL wird nur aus dem Lagerbestand verkauft (nicht „auf Bestellung“), solche Artikel stehen am Ende des Katalogs."}
 {"uk": "знімати само, коли контур тримається", "en": "shoot automatically when the outline holds steady", "de": "automatisch aufnehmen, wenn der Umriss ruhig bleibt"}
@@ -20966,6 +21074,7 @@
 {"uk": "календар askDANTE не повернув днів", "en": "the askDANTE calendar returned no days", "de": "der askDANTE-Kalender hat keine Tage geliefert"}
 {"uk": "календар завеликий (понад 10 МБ)", "en": "the calendar is too large (over 10 MB)", "de": "der Kalender ist zu groß (über 10 MB)"}
 {"uk": "календар не публічний: візьміть «Секретна адреса у форматі iCal».", "en": "the calendar is not public: use “Secret address in iCal format”.", "de": "der Kalender ist nicht öffentlich: Verwenden Sie die „Geheime Adresse im iCal-Format“."}
+{"uk": "камера, обидва боки, ще фото, примітки, позначки й 📌 пресети працюють. Вгорі камери — «🔗 Не підключено».", "en": "camera, both sides, more photos, notes, marks and 📌 presets work. At the top of the camera — «🔗 Не підключено».", "de": "Kamera, beide Seiten, weitere Fotos, Notizen, Markierungen und 📌 Voreinstellungen funktionieren. Oben in der Kamera — «🔗 Не підключено»."}
 {"uk": "каналу", "en": "channel", "de": "Kanal"}
 {"uk": "каналів продажу: {0}", "en": "sales channels: {0}", "de": "Vertriebskanäle: {0}"}
 {"uk": "картинка", "en": "picture", "de": "Bild"}
@@ -20987,6 +21096,7 @@
 {"uk": "категорія «{0}» не індексується", "en": "category “{0}” is not indexed", "de": "Kategorie „{0}“ wird nicht indexiert"}
 {"uk": "категорія: {0}", "en": "category: {0}", "de": "Kategorie: {0}"}
 {"uk": "категорією товарів. Дані оновлюються в реальному часі.", "en": "product category. Data is updated in real time.", "de": "Artikelkategorie. Die Daten werden in Echtzeit aktualisiert."}
+{"uk": "категорії", "en": "categories", "de": "Kategorien"}
 {"uk": "категорії {0} немає в каталозі DigiKey — знайди через dk_find_category", "en": "category {0} is not in the DigiKey catalog — find it with dk_find_category", "de": "Kategorie {0} ist nicht im DigiKey-Katalog — mit dk_find_category suchen"}
 {"uk": "категорії «{0}»", "en": "of category «{0}»", "de": "der Kategorie «{0}»"}
 {"uk": "категорії «{0}» немає в довіднику складу", "en": "category «{0}» is not in the stock category list", "de": "Kategorie «{0}» ist nicht in der Lagerkategorienliste"}
@@ -21088,6 +21198,7 @@
 {"uk": "колега", "en": "colleague", "de": "Kollege"}
 {"uk": "колега@фірма", "en": "colleague@company", "de": "kollege@firma"}
 {"uk": "колеги", "en": "a colleague", "de": "eines Kollegen"}
+{"uk": "колеги, яким у Minerva відкрито постачальників.", "en": "colleagues who have access to suppliers in Minerva.", "de": "Kollegen, die in Minerva Zugriff auf Lieferanten haben."}
 {"uk": "колегу", "en": "colleague", "de": "Kollegen"}
 {"uk": "колекцій {0}", "en": "collections {0}", "de": "Collections {0}"}
 {"uk": "коли на візитці мало даних (лише сайт чи назва): AI знайде фірму в інтернеті й допише порожні поля, підкаже категорію.", "en": "when the card has little data (only a website or name): AI finds the company online, fills in empty fields and suggests a category.", "de": "wenn auf der Karte wenig steht (nur Website oder Name): AI findet die Firma im Internet, füllt leere Felder und schlägt eine Kategorie vor."}
@@ -21646,6 +21757,7 @@
 {"uk": "напр. коротко; спершу зразки 50 шт; згадати RoHS і маркування; ціни в EUR можна кількома рядками — кожне побажання з нового рядка", "en": "e.g. short; 50 samples first; mention RoHS and marking; prices in EUR several lines are fine — each wish on a new line", "de": "z. B. kurz; zuerst 50 Muster; RoHS und Kennzeichnung erwähnen; Preise in EUR mehrere Zeilen möglich — jeder Wunsch in einer neuen Zeile"}
 {"uk": "напр.: «Звернення: Привіт, Сергію!», «коротше», «на ти»", "en": "e.g.: «Greeting: Hi Sergey!», «shorter», «informal»", "de": "z. B.: «Anrede: Hallo Sergey!», «kürzer», «duzen»"}
 {"uk": "наприклад", "en": "for example", "de": "zum Beispiel"}
+{"uk": "напряму з GitHub", "en": "directly from GitHub", "de": "direkt von GitHub"}
 {"uk": "нарада", "en": "meeting", "de": "Besprechung"}
 {"uk": "нарада {0}", "en": "meeting {0}", "de": "Besprechung {0}"}
 {"uk": "наради — службовий протокол RAG-ПК (квиток, ключ надсилання й стан запису) — без наслідків не перевірити", "en": "meetings — RAG PC service protocol (ticket, push key and recording status) — cannot be checked without side effects", "de": "Besprechungen — Dienstprotokoll des RAG-PCs (Ticket, Sendeschlüssel und Aufnahmestatus) — ohne Folgen nicht prüfbar"}
@@ -21675,6 +21787,7 @@
 {"uk": "наявні шаблони не змінюються", "en": "existing templates are not changed", "de": "vorhandene Vorlagen werden nicht geändert"}
 {"uk": "нд", "en": "нд", "de": "нд"}
 {"uk": "не", "en": "not", "de": "nicht"}
+{"uk": "не APK", "en": "not an APK", "de": "keine APK"}
 {"uk": "не JSON-RPC 2.0", "en": "not JSON-RPC 2.0", "de": "kein JSON-RPC 2.0"}
 {"uk": "не авторизовано", "en": "not authorized", "de": "nicht autorisiert"}
 {"uk": "не брати", "en": "don't take", "de": "nicht übernehmen"}
@@ -21800,6 +21913,7 @@
 {"uk": "не частіше ніж раз на 3 дні", "en": "at most once every 3 days", "de": "höchstens einmal in 3 Tagen"}
 {"uk": "не частіше ніж раз на день", "en": "at most once a day", "de": "höchstens einmal am Tag"}
 {"uk": "не частіше ніж раз на тиждень", "en": "at most once a week", "de": "höchstens einmal pro Woche"}
+{"uk": "не чекати", "en": "don't wait", "de": "nicht warten"}
 {"uk": "не читали", "en": "not read", "de": "nicht gelesen"}
 {"uk": "не читається: {0}", "en": "cannot be read: {0}", "de": "nicht lesbar: {0}"}
 {"uk": "не чіпати", "en": "leave as is", "de": "unverändert lassen"}
@@ -22348,6 +22462,7 @@
 {"uk": "перенести в askDANTE", "en": "transfer to askDANTE", "de": "in askDANTE übertragen"}
 {"uk": "перенести сюди", "en": "move here", "de": "hierher verschieben"}
 {"uk": "перервано ({0})", "en": "interrupted ({0})", "de": "abgebrochen ({0})"}
+{"uk": "переробити", "en": "redo", "de": "neu machen"}
 {"uk": "пересилання готове", "en": "forward is ready", "de": "Weiterleitung ist bereit"}
 {"uk": "переслав {0}", "en": "forwarded by {0}", "de": "weitergeleitet von {0}"}
 {"uk": "переслано (адреса постачальника в тексті)", "en": "forwarded (supplier’s address in the text)", "de": "weitergeleitet (Adresse des Lieferanten im Text)"}
@@ -22681,6 +22796,8 @@
 {"uk": "працює, але варто поправити", "en": "works, but should be fixed", "de": "funktioniert, sollte aber korrigiert werden"}
 {"uk": "працівник не прив'язаний до користувача Minerva", "en": "the employee is not linked to a Minerva user", "de": "der Mitarbeiter ist keinem Minerva-Benutzer zugeordnet"}
 {"uk": "працівникам: {0}", "en": "to employees: {0}", "de": "an Mitarbeiter: {0}"}
+{"uk": "пресет — лише на телефоні", "en": "preset — only on the phone", "de": "Voreinstellung — nur auf dem Telefon"}
+{"uk": "пресети — «📱 лише на телефоні».", "en": "presets — «📱 лише на телефоні».", "de": "Voreinstellungen — «📱 лише на телефоні»."}
 {"uk": "при вказанні → створює транзакцію ADJUSTMENT.", "en": "when specified → creates an ADJUSTMENT transaction.", "de": "bei Angabe → erzeugt eine ADJUSTMENT-Transaktion."}
 {"uk": "при збереженні Minerva допише", "en": "when saving, Minerva will append", "de": "beim Speichern ergänzt Minerva"}
 {"uk": "при збереженні замовлення через Django signals. Примусова синхронізація — кнопка", "en": "when an order is saved, via Django signals. Forced sync — the button", "de": "beim Speichern eines Auftrags über Django-Signals. Erzwungene Synchronisierung — die Schaltfläche"}
@@ -23235,6 +23352,7 @@
 {"uk": "сторінка оновлюється сама", "en": "the page refreshes itself", "de": "die Seite aktualisiert sich selbst"}
 {"uk": "сторінку можна закрити — переведення не зупиниться", "en": "you can close the page — the conversion will not stop", "de": "Sie können die Seite schließen — die Umrechnung wird nicht gestoppt"}
 {"uk": "сторінці Системи", "en": "the System page", "de": "der Systemseite"}
+{"uk": "сторінці додатка", "en": "app page", "de": "App-Seite"}
 {"uk": "стратегію повторів", "en": "retry strategy", "de": "Wiederholungsstrategie"}
 {"uk": "стратегія", "en": "strategy", "de": "Strategie"}
 {"uk": "стратегія завершена", "en": "strategy completed", "de": "Strategie abgeschlossen"}
@@ -23368,6 +23486,7 @@
 {"uk": "тексти всіх листів — «Шаблони листів» (DE / EN, перегляд, тестовий лист)", "en": "texts of all e-mails — “E-mail templates” (DE / EN, preview, test e-mail)", "de": "Texte aller E-Mails — „E-Mail-Vorlagen“ (DE / EN, Vorschau, Test-E-Mail)"}
 {"uk": "текстове значення, яке зберігається в замовленнях.", "en": "a text value stored in orders.", "de": "ein Textwert, der in den Aufträgen gespeichert wird."}
 {"uk": "текстове значення, яке зберігається в товарах.", "en": "a text value stored in products.", "de": "ein Textwert, der in den Artikeln gespeichert wird."}
+{"uk": "текстом або 🎤 голосом.", "en": "as text or by 🎤 voice.", "de": "als Text oder per 🎤 Sprache."}
 {"uk": "тексту немає (скан) — AI бачить сторінки зображеннями", "en": "no text (scan) — the AI sees the pages as images", "de": "kein Text (Scan) — die KI sieht die Seiten als Bilder"}
 {"uk": "тексту немає — AI отримає лише назву файлу", "en": "no text — the AI only gets the file name", "de": "kein Text — die KI erhält nur den Dateinamen"}
 {"uk": "тел", "en": "tel", "de": "Tel."}
@@ -23707,6 +23826,7 @@
 {"uk": "усі", "en": "all", "de": "alle"}
 {"uk": "усі ({0})", "en": "all ({0})", "de": "alle ({0})"}
 {"uk": "усі активні ({0})", "en": "all active ({0})", "de": "alle aktiven ({0})"}
+{"uk": "усі версії", "en": "all versions", "de": "alle Versionen"}
 {"uk": "усі види", "en": "all types", "de": "alle Typen"}
 {"uk": "усі джерела", "en": "all sources", "de": "alle Quellen"}
 {"uk": "усі документи джерела", "en": "all source documents", "de": "alle Dokumente der Quelle"}
@@ -23784,6 +23904,8 @@
 {"uk": "фото (JPG, PNG, WebP, GIF)", "en": "photo (JPG, PNG, WebP, GIF)", "de": "Foto (JPG, PNG, WebP, GIF)"}
 {"uk": "фото в «📎 Документи»: {0}", "en": "photos in «📎 Documents»: {0}", "de": "Fotos in «📎 Dokumente»: {0}"}
 {"uk": "фото видно мініатюрою (клік — відкрити повністю), даташит — «📄 відкрити» («{0}»", "en": "the photo is shown as a thumbnail (click to open in full), the datasheet — “📄 open” (“{0}”", "de": "das Foto wird als Miniaturansicht angezeigt (Klick — vollständig öffnen), das Datenblatt — „📄 öffnen“ („{0}“"}
+{"uk": "фото візиток, флаєрів і стендів на виставці чи зустрічі — камера з рамкою, обидва боки, QR-код, примітки голосом.", "en": "photos of business cards, flyers and booths at a trade fair or meeting — camera with a frame, both sides, QR code, voice notes.", "de": "Fotos von Visitenkarten, Flyern und Ständen auf einer Messe oder einem Treffen — Kamera mit Rahmen, beide Seiten, QR-Code, Sprachnotizen."}
+{"uk": "фото візиток, флаєрів і стендів на виставці чи зустрічі. На картинках — вигадана фірма.", "en": "photos of business cards, flyers and booths at a trade fair or meeting. The pictures show a made-up company.", "de": "Fotos von Visitenkarten, Flyern und Ständen auf einer Messe oder einem Treffen. Die Bilder zeigen eine erfundene Firma."}
 {"uk": "фото збережено з кадру", "en": "photo saved from the frame", "de": "Foto aus dem Kamerabild gespeichert"}
 {"uk": "фото й даташит є", "en": "photo and datasheet present", "de": "Foto und Datenblatt vorhanden"}
 {"uk": "фото й даташити для сайту «{0}» вимкнено на сторінці «🖼 Фото й даташити»", "en": "photos and datasheets for the website “{0}” are switched off on the “🖼 Photos and datasheets” page", "de": "Fotos und Datenblätter für die Website „{0}“ sind auf der Seite „🖼 Fotos und Datenblätter“ ausgeschaltet"}
@@ -23813,6 +23935,7 @@
 {"uk": "хв тому", "en": "min ago", "de": "Min. her"}
 {"uk": "хвилин дії посилання", "en": "minutes the link is valid", "de": "Minuten Gültigkeit des Links"}
 {"uk": "хмара, платно — ключем RAG", "en": "cloud, paid — with the RAG key", "de": "Cloud, kostenpflichtig – über den RAG-Schlüssel"}
+{"uk": "хто зняв, з роллю, і звідки: 📱 телефон, 🌐 сторінка Minerva чи 🏭 картка постачальника.", "en": "who took it, with their role, and from where: 📱 phone, 🌐 Minerva page or 🏭 supplier card.", "de": "wer sie aufgenommen hat, mit Rolle, und woher: 📱 Telefon, 🌐 Minerva-Seite oder 🏭 Lieferantenkarte."}
 {"uk": "хто на нараді", "en": "who attends", "de": "Teilnehmer"}
 {"uk": "хто робить", "en": "who does it", "de": "wer macht es"}
 {"uk": "хто робить — {0}", "en": "who does it — {0}", "de": "wer macht es — {0}"}
@@ -23916,6 +24039,7 @@
 {"uk": "чекають рішення: {0}", "en": "waiting for a decision: {0}", "de": "warten auf Entscheidung: {0}"}
 {"uk": "чекають ✓ /", "en": "awaiting ✓ /", "de": "warten auf ✓ /"}
 {"uk": "чекають ✓ / ✕: {0}", "en": "awaiting ✓ / ✕: {0}", "de": "warten auf ✓ / ✕: {0}"}
+{"uk": "чекають, ✅ — у Minerva, ⚠️ — не вдалося. Без інтернету знімки чекають і підуть самі, щойно з'явиться зв'язок.", "en": "waiting, ✅ — in Minerva, ⚠️ — failed. Without internet, shots wait and go by themselves as soon as there is a connection.", "de": "warten, ✅ — in Minerva, ⚠️ — fehlgeschlagen. Ohne Internet warten die Aufnahmen und gehen von selbst, sobald eine Verbindung besteht."}
 {"uk": "чекає", "en": "awaits", "de": "wartet"}
 {"uk": "чекає RAG", "en": "waiting for RAG", "de": "wartet auf RAG"}
 {"uk": "чекає RAG: {0}", "en": "waiting for RAG: {0}", "de": "wartet auf RAG: {0}"}
@@ -23954,6 +24078,7 @@
 {"uk": "чернетку агента ви надіслали зі змінами", "en": "you sent the agent's draft with changes", "de": "Sie haben den Entwurf des Agenten mit Änderungen gesendet"}
 {"uk": "чеську", "en": "Czech", "de": "Tschechische"}
 {"uk": "четвер", "en": "Thursday", "de": "Donnerstag"}
+{"uk": "чий це акаунт", "en": "whose account it is", "de": "wessen Konto es ist"}
 {"uk": "числа", "en": "dates", "de": "Datumsangaben"}
 {"uk": "числовий ідентифікатор застосунку.", "en": "numeric application identifier.", "de": "numerische Anwendungskennung."}
 {"uk": "читання", "en": "reading", "de": "Lesen"}
@@ -24148,6 +24273,7 @@
 {"uk": "якщо недоступне", "en": "if unavailable", "de": "falls nicht verfügbar"}
 {"uk": "якщо немає й його — сайт показує", "en": "if there is none of that either, the website shows", "de": "gibt es auch den nicht, zeigt die Website"}
 {"uk": "якщо посилка має трекінг-номер, система спочатку запитує пряму API (DHL/UPS), потім Jumingo.", "en": "if the parcel has a tracking number, the system first queries the direct API (DHL/UPS), then Jumingo.", "de": "hat das Paket eine Sendungsnummer, fragt das System zuerst die direkte API (DHL/UPS) ab, danach Jumingo."}
+{"uk": "якщо телефон не бачить Minerva (інша мережа, VPN). Завжди остання версія.", "en": "if the phone cannot see Minerva (another network, VPN). Always the latest version.", "de": "wenn das Telefon Minerva nicht erreicht (anderes Netz, VPN). Immer die neueste Version."}
 {"uk": "якщо у товару є і локально завантажений файл, і посилання (URL) — вкажіть що відображати в першу чергу. Fallback: якщо пріоритетне джерело порожнє — використовується інше.", "en": "if a product has both a locally uploaded file and a link (URL), specify which to show first. Fallback: if the priority source is empty, the other one is used.", "de": "wenn ein Artikel sowohl eine lokal hochgeladene Datei als auch einen Link (URL) hat, legen Sie fest, was zuerst angezeigt wird. Fallback: Ist die bevorzugte Quelle leer, wird die andere verwendet."}
 {"uk": "якщо увімкнено — при надходженні замовлення створюється м'яке бронювання (товар ще на складі, але позначений як зарезервований). При переведенні замовлення у «Відправлено» — резерв автоматично стає фактичним списанням. Це дозволяє бачити", "en": "if enabled — a soft reservation is created when an order arrives (the product is still in stock but marked as reserved). When the order is moved to “Shipped”, the reservation automatically becomes an actual write-off. This allows you to see", "de": "wenn aktiviert — beim Eingang eines Auftrags wird eine weiche Reservierung angelegt (der Artikel ist noch im Lager, aber als reserviert markiert). Wird der Auftrag auf „Versendet“ gesetzt, wird die Reservierung automatisch zur tatsächlichen Ausbuchung. Dadurch sehen Sie"}
 {"uk": "якщо це помилка, зверніться до адміністратора.", "en": "if this is a mistake, contact the administrator.", "de": "falls dies ein Fehler ist, wenden Sie sich an den Administrator."}
@@ -24185,6 +24311,7 @@
 {"uk": "і застосувати в магазинах", "en": "and apply in shops", "de": "und in Webshops anwenden"}
 {"uk": "і збережіть. Замовлення лишиться відкритим для решти, склад спише лише відправлене, а підтвердження в магазині", "en": "and save. The order stays open for the rest, stock deducts only what was shipped, and the shop confirmation", "de": "und speichern Sie. Der Auftrag bleibt für den Rest offen, das Lager bucht nur Versendetes aus, und die Bestätigung im Shop"}
 {"uk": "і кладе копію в «Документи замовлення» (замовлення з сайту — і в кабінет покупця)", "en": "and puts a copy in “Order documents” (website orders — also in the customer account)", "de": "und legt eine Kopie in „Auftragsdokumente“ (Website-Bestellungen — auch ins Kundenkonto)"}
+{"uk": "і наведіть телефон. QR діє 10 хвилин і лише один раз.", "en": "and point the phone at it. The QR is valid for 10 minutes and only once.", "de": "und richten Sie das Telefon darauf. Der QR gilt 10 Minuten und nur einmal."}
 {"uk": "і надіслати на DigiKey", "en": "and send to DigiKey", "de": "und an DigiKey senden"}
 {"uk": "і надіслати на DigiKey (DigiKey перевіряє зміни товару окремо)", "en": "and send to DigiKey (DigiKey reviews product changes separately)", "de": "und an DigiKey senden (DigiKey prüft Artikeländerungen separat)"}
 {"uk": "і напишіть нотатку. Натисніть", "en": "and write a note. Click", "de": "und schreiben Sie eine Notiz. Klicken Sie auf"}
@@ -24223,6 +24350,7 @@
 {"uk": "ім'я людини (FABIEN SANTOS).", "en": "person's name (FABIEN SANTOS).", "de": "Name der Person (FABIEN SANTOS)."}
 {"uk": "ім'я отримувача", "en": "recipient name", "de": "Name des Empfängers"}
 {"uk": "ім'я покупця", "en": "customer’s name", "de": "Name des Kunden"}
+{"uk": "ім'я, роль (🔑 Адміністратор, менеджер…), email і адресу Minerva. Знімки йтимуть від імені цієї людини, з її правами. Не той акаунт — «Скасувати».", "en": "name, role (🔑 Адміністратор, manager…), email and the Minerva address. Shots will go on behalf of this person, with their rights. Wrong account — «Скасувати».", "de": "Name, Rolle (🔑 Адміністратор, Manager…), E-Mail und Minerva-Adresse. Aufnahmen gehen im Namen dieser Person, mit ihren Rechten. Falsches Konto — «Скасувати»."}
 {"uk": "імпорт", "en": "import", "de": "Import"}
 {"uk": "імпорт / API", "en": "import / API", "de": "Import / API"}
 {"uk": "імпорт / Drittland", "en": "import / third country", "de": "Import / Drittland"}
@@ -24243,6 +24371,7 @@
 {"uk": "індексацію вимкнено («🧠 База знань» → «Індексувати пошту»)", "en": "indexing is disabled (“🧠 Knowledge base” → “Index mail”)", "de": "die Indexierung ist deaktiviert („🧠 Wissensdatenbank“ → „E-Mails indexieren“)"}
 {"uk": "індексацію пошти вимкнено («🧠 База знань»)", "en": "mail indexing is disabled (“🧠 Knowledge base”)", "de": "die E-Mail-Indexierung ist deaktiviert („🧠 Wissensdatenbank“)"}
 {"uk": "індексація", "en": "indexing", "de": "Indexierung"}
+{"uk": "інструкція з картинками", "en": "instructions with pictures", "de": "Anleitung mit Bildern"}
 {"uk": "інша валюта — × курс із «Налаштувань цін» магазину; ціна, введена вручну, — як є", "en": "another currency — × the rate from the web shop's “Price settings”; a manually entered price — as is", "de": "andere Währung — × Kurs aus den „Preiseinstellungen“ des Webshops; ein manuell eingegebener Preis — unverändert"}
 {"uk": "інша компанія з власним UPS-акаунтом; заповніть акаунт і адресу.", "en": "another company with its own UPS account; fill in the account and address.", "de": "ein anderes Unternehmen mit eigenem UPS-Konto; tragen Sie Konto und Adresse ein."}
 {"uk": "інша компанія з власним UPS-акаунтом; заповніть акаунт і адресу. Назва й контактна особа зберігаються в Minerva, в UPS передаються акаунт і адреса.", "en": "another company with its own UPS account; fill in the account and address. The name and contact person are stored in Minerva; the account and address are sent to UPS.", "de": "ein anderes Unternehmen mit eigenem UPS-Konto; tragen Sie Konto und Adresse ein. Name und Ansprechpartner werden in Minerva gespeichert, an UPS werden Konto und Adresse übermittelt."}
@@ -24258,6 +24387,7 @@
 {"uk": "існує", "en": "exists", "de": "vorhanden"}
 {"uk": "іспанську", "en": "Spanish", "de": "Spanische"}
 {"uk": "італійську", "en": "Italian", "de": "Italienische"}
+{"uk": "її можна дати колезі, вхід не потрібен).", "en": "you can give it to a colleague, no login needed).", "de": "Sie können sie einem Kollegen geben, keine Anmeldung nötig)."}
 {"uk": "’-]*(?:[ ,()]+[А-ЩЬЮЯЄІЇҐа-щьюяєіїґ0-9][А-ЩЬЮЯЄІЇҐа-щьюяєіїґ0-9", "en": "’-]*(?:[ ,()]+[А-ЩЬЮЯЄІЇҐа-щьюяєіїґ0-9][А-ЩЬЮЯЄІЇҐа-щьюяєіїґ0-9", "de": "’-]*(?:[ ,()]+[А-ЩЬЮЯЄІЇҐа-щьюяєіїґ0-9][А-ЩЬЮЯЄІЇҐа-щьюяєіїґ0-9"}
 {"uk": "… або додати до наявного", "en": "… or add to an existing one", "de": "… oder einem vorhandenen hinzufügen"}
 {"uk": "… або знайти клієнта: фірма, ім'я, email", "en": "… or find a customer: company, name, e-mail", "de": "… oder Kunden suchen: Firma, Name, E-Mail"}

@@ -470,6 +470,90 @@ def meta(user) -> dict:
     }
 
 
+# ── ⬇ APK з самої Minerva ──
+
+APK_CHECK = 1800                 # нову версію на GitHub перевіряти не частіше (с)
+APK_MAX = 80 * 1024 * 1024
+_TAG_RE = re.compile(r"/releases/download/([A-Za-z0-9._-]+)/minerva-cards\.apk")
+
+
+def _apk_folder() -> str:
+    return os.path.join(str(settings.MEDIA_ROOT), "cards_app")
+
+
+def apk_cached():
+    """(шлях, версія) — найновіша APK, уже збережена на сервері, або (None, "")."""
+    folder = _apk_folder()
+    try:
+        files = [f for f in os.listdir(folder) if f.startswith("minerva-cards-") and f.endswith(".apk")]
+    except OSError:
+        return None, ""
+    if not files:
+        return None, ""
+    best = max(files, key=lambda f: os.path.getmtime(os.path.join(folder, f)))
+    return os.path.join(folder, best), version_of(best[len("minerva-cards-"):-len(".apk")])
+
+
+def version_of(tag) -> str:
+    """«cards-app-v1.0.4» → «1.0.4»."""
+    m = re.search(r"v?(\d+(?:\.\d+)+)$", str(tag or ""))
+    return m.group(1) if m else str(tag or "")
+
+
+def latest_apk():
+    """(шлях, версія) — остання APK «Minerva Візитки» на сервері Minerva: раз на APK_CHECK питає GitHub (публічний
+    реліз, без ключа), яка версія остання; нової ще немає на диску — завантажує (MEDIA_ROOT/cards_app/, старі
+    версії прибирає). GitHub недоступний — остання збережена; нічого немає — (None, "")."""
+    import requests
+    from core.shared_cache import cache
+    tag = cache.get("cards-apk-tag")
+    if tag is None:
+        try:
+            r = requests.head(APP_URL, allow_redirects=False, timeout=10)
+            m = _TAG_RE.search(r.headers.get("Location", ""))
+            tag = m.group(1) if m else ""
+        except Exception:  # noqa: BLE001 — немає інтернету: що вже є
+            tag = ""
+        cache.set("cards-apk-tag", tag, APK_CHECK if tag else 300)
+    if not tag:
+        return apk_cached()
+    folder = _apk_folder()
+    path = os.path.join(folder, f"minerva-cards-{tag}.apk")
+    if os.path.exists(path):
+        return path, version_of(tag)
+    url = APP_URL.replace("/releases/latest/download/", f"/releases/download/{tag}/")
+    tmp = f"{path}.{secrets.token_hex(4)}.part"
+    try:
+        os.makedirs(folder, exist_ok=True)
+        with requests.get(url, stream=True, timeout=60) as r:
+            r.raise_for_status()
+            size = 0
+            with open(tmp, "wb") as fh:
+                for chunk in r.iter_content(256 * 1024):
+                    size += len(chunk)
+                    if size > APK_MAX:
+                        raise ValueError("APK завелика")
+                    fh.write(chunk)
+        with open(tmp, "rb") as fh:
+            if fh.read(2) != b"PK":                                  # APK — це ZIP
+                raise ValueError("не APK")
+        os.replace(tmp, path)
+    except Exception:  # noqa: BLE001
+        logger.warning("cards app: APK download failed", exc_info=True)
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        return apk_cached()
+    for f in os.listdir(folder):                                     # старі версії — геть
+        if f.startswith("minerva-cards-") and f.endswith(".apk") and os.path.join(folder, f) != path:
+            try:
+                os.remove(os.path.join(folder, f))
+            except OSError:
+                pass
+    return path, version_of(tag)
+
+
 # ── 🖼 Мініатюри ──
 
 def side_field(m, side):

@@ -221,7 +221,7 @@ object CaptureStore {
     /** ✏️ Щойно знято — чернетка (вікно приміток ще відкрите): значення — з пресету. */
     fun newDraft(front: String, back: String, frontAlt: String, backAlt: String, qrFront: String, qrBack: String): Capture {
         val meta = Prefs.meta()
-        val preset = meta.preset(Prefs.presetId?.takeIf { it > 0 } ?: if (Prefs.presetId == null) meta.defaultPreset else null)
+        val preset = meta.preset(Prefs.presetId?.takeIf { it != -1 } ?: if (Prefs.presetId == null) meta.defaultPreset else null)
         val c = Capture(
             front = front, back = back, frontAlt = frontAlt, backAlt = backAlt, qrFront = qrFront, qrBack = qrBack,
             status = Capture.DRAFT, kind = preset?.kind ?: Prefs.kind, role = preset?.role.orEmpty(),

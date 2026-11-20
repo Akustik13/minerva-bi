@@ -20,7 +20,7 @@ h2 { font-size:1.1rem; margin:26px 0 6px; color:var(--accent); }
 .card { border:1px solid var(--line); border-radius:12px; padding:16px; margin-top:18px; display:flex; gap:20px; flex-wrap:wrap; align-items:center; }
 .qr { background:#fff; padding:10px; border-radius:10px; line-height:0; }
 .qr svg { width:200px; height:200px; display:block; }
-.btn { display:inline-block; background:var(--btn); color:#fff; text-decoration:none; padding:12px 18px; border-radius:10px; font-weight:600; }
+.btn { display:inline-block; background:var(--btn); color:#fff; text-decoration:none; padding:12px 18px; border-radius:10px; font-weight:600; margin:3px 0; }
 .btn.light { background:transparent; color:var(--accent); border:1px solid var(--line); }
 ol, ul { padding-left:22px; }
 li { margin:6px 0; }
@@ -35,8 +35,8 @@ a { color:var(--accent); }
 <div class="card">
   <div class="qr" id="qr" translate="no"></div>
   <div>
-    <p><a class="btn" href="{{ apk_url }}" rel="noopener">⬇ Завантажити APK</a></p>
-    <p><a class="btn light" href="{{ releases_url }}" target="_blank" rel="noopener">Усі версії ↗</a></p>
+    <p><a class="btn" href="{{ apk_url }}" rel="noopener">⬇ Завантажити APK</a> <a class="btn light" href="{{ guide_url }}">📖 Інструкція з картинками</a></p>
+    <p class="meta">QR і кнопка — APK з цієї Minerva. Не відкривається — <a href="{{ github_url }}" rel="noopener">⬇ напряму з GitHub</a> · <a href="{{ releases_url }}" target="_blank" rel="noopener">усі версії ↗</a></p>
     <p class="meta">Відскануйте QR камерою телефона або відкрийте цю сторінку в Chrome на телефоні.</p>
   </div>
 </div>
@@ -53,6 +53,7 @@ a { color:var(--accent); }
   <li>Знімайте одразу: знімки, примітки й позначки зберігаються на телефоні (вгорі — «🔗 Не підключено»).</li>
   <li>Щоб надіслати їх у Minerva, попросіть у колеги з акаунтом Minerva QR підключення («🏭 Постачальники → 🪪 Візитки й флаєри → 📱 Додаток на телефон»). Телефон покаже, до чийого акаунта підключається, а після підключення запитає, які знімки надіслати.</li>
 </ul>
+<p>Як підключити, знімати обидва боки й ще фото, пресети, 🔒 «лише я» — <a href="{{ guide_url }}">📖 інструкція з картинками</a>.</p>
 <p class="meta">Android 8.0 і новіше. Додаток не збирає даних для реклами; знімки йдуть лише в Minerva вашої фірми, і лише коли телефон підключено.</p>
 </main>
 {{ apk_url|json_script:"apk-url" }}

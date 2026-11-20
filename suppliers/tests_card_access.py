@@ -4,6 +4,7 @@
 python manage.py test suppliers.tests_card_access --settings=tabele.settings_test
 """
 import json
+from unittest import mock
 
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -121,13 +122,83 @@ class CardAccessTests(Base):
                                           content_type="application/json").status_code, 410)
 
     def test_public_download_page_without_login(self):
+        from core.shared_cache import cache
+        cache.delete("cards-apk-tag")
         self.client.logout()
         page = self.client.get(reverse("cards_app_download"))
         self.assertEqual(page.status_code, 200)
         self.assertContains(page, "⬇ Завантажити APK")
-        self.assertContains(page, card_app.APP_URL)
-        r = self.client.get(reverse("cards_app_apk"))
+        self.assertContains(page, reverse("cards_app_apk"))                    # QR — APK з цієї Minerva
+        self.assertContains(page, card_app.APP_URL)                             # і запасне — з GitHub
+        self.assertContains(page, reverse("cards_app_guide"))                   # 📖 інструкція з картинками
+        # GitHub недоступний і на сервері ще нічого — на GitHub
+        with mock.patch("requests.head", side_effect=OSError("offline")):
+            r = self.client.get(reverse("cards_app_apk"))
         self.assertEqual((r.status_code, r["Location"]), (302, card_app.APP_URL))
         self.client.force_login(self.user)
-        app_page = self.client.get(reverse("admin:inventory_supplier_card_app")).content.decode()
+        with mock.patch("threading.Thread"):
+            app_page = self.client.get(reverse("admin:inventory_supplier_card_app")).content.decode()
         self.assertIn(reverse("cards_app_download"), app_page)
+        self.assertIn("Ⓐ З цієї Minerva", app_page)
+        self.assertIn("Ⓑ З GitHub", app_page)
+        self.assertIn(reverse("cards_app_apk"), app_page)
+        self.assertIn(reverse("cards_app_guide"), app_page)
+        self.assertIn("📖 Інструкція з картинками", app_page)
+
+    def test_public_guide_page_with_pictures(self):
+        """📖 /suppliers/app/guide/ — без входу; кожна картинка є в static/suppliers/app_guide/."""
+        import re
+        from pathlib import Path
+        from django.conf import settings
+        self.client.logout()
+        page = self.client.get(reverse("cards_app_guide"))
+        self.assertEqual(page.status_code, 200)
+        html = page.content.decode()
+        for anchor in ("install", "pair", "offline", "shoot", "extra", "preset", "visibility", "my", "minerva"):
+            self.assertIn(f'id="{anchor}"', html)
+        self.assertIn(reverse("cards_app_apk"), html)
+        self.assertIn(reverse("cards_app_download"), html)
+        images = re.findall(r'src="[^"]*/suppliers/app_guide/([\w-]+\.webp)"', html)
+        self.assertGreaterEqual(len(images), 15)
+        folder = Path(settings.BASE_DIR) / "static" / "suppliers" / "app_guide"
+        missing = [name for name in images if not (folder / name).is_file()]
+        self.assertEqual(missing, [])
+
+    def test_apk_served_by_minerva_cached_from_github(self):
+        from core.shared_cache import cache
+        cache.delete("cards-apk-tag")
+        self.client.logout()
+
+        def head(tag):
+            resp = mock.Mock()
+            resp.headers = {"Location": f"https://github.com/x/y/releases/download/{tag}/minerva-cards.apk"}
+            return resp
+
+        def get_resp(data):
+            resp = mock.MagicMock()
+            resp.__enter__.return_value = resp
+            resp.iter_content.return_value = [data[:10], data[10:]]
+            return resp
+        apk = b"PK" + b"x" * 100
+        with mock.patch("requests.head", return_value=head("cards-app-v1.0.4")),                 mock.patch("requests.get", return_value=get_resp(apk)) as get:
+            r = self.client.get(reverse("cards_app_apk"))
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r["Content-Type"], "application/vnd.android.package-archive")
+            self.assertEqual(r["X-App-Version"], "1.0.4")
+            self.assertEqual(b"".join(r.streaming_content), apk)
+            self.client.get(reverse("cards_app_apk"))                          # удруге — з диска
+            self.assertEqual(get.call_count, 1)
+            self.assertIn("/releases/download/cards-app-v1.0.4/", get.call_args[0][0])
+        # нова версія — завантажується, стара прибирається
+        cache.delete("cards-apk-tag")
+        with mock.patch("requests.head", return_value=head("cards-app-v1.0.5")),                 mock.patch("requests.get", return_value=get_resp(apk)):
+            r = self.client.get(reverse("cards_app_apk"))
+        self.assertEqual(r["X-App-Version"], "1.0.5")
+        self.assertEqual(card_app.apk_cached()[1], "1.0.5")
+        import os
+        self.assertEqual(len(os.listdir(os.path.join(self.media, "cards_app"))), 1)
+        # не APK — не зберігається, лишається попередня
+        cache.delete("cards-apk-tag")
+        with mock.patch("requests.head", return_value=head("cards-app-v1.0.6")),                 mock.patch("requests.get", return_value=get_resp(b"<html>not found</html>")):
+            r = self.client.get(reverse("cards_app_apk"))
+        self.assertEqual(r["X-App-Version"], "1.0.5")

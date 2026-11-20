@@ -45,7 +45,11 @@ object Dialogs {
                         context.toast(if (cat == null) "🗂 Категорію «${c.name}» додано в Minerva" else "💾 Збережено")
                         onDone(c)
                     } catch (e: ApiException) {
-                        context.alert("Не збережено", if (e.offline) "Немає інтернету — категорії живуть у Minerva, спробуйте, коли буде зв'язок." else e.message.orEmpty())
+                        context.alert("Не збережено", when {
+                            e.offline -> "Немає інтернету — категорії живуть у Minerva, спробуйте, коли буде зв'язок."
+                            e.unpaired -> "Категорії живуть у Minerva — спершу підключіть телефон (⚙️ Налаштування → «📷 Сканувати QR з Minerva»)."
+                            else -> e.message.orEmpty()
+                        })
                     }
                 }
             }
@@ -82,6 +86,7 @@ object Dialogs {
         box.addView(noteBox)
         val ai = MaterialSwitch(context).apply { text = "🧠 Читати AI"; isChecked = p?.readAi ?: true }
         val shared = MaterialSwitch(context).apply { text = "👥 Для всіх (колеги на тій самій виставці)"; isChecked = p?.shared ?: false }
+        if (!Prefs.paired || p?.local == true) box.addView(context.label("📱 Телефон не підключено — пресет збережеться на телефоні й сам перейде в Minerva після підключення.", 13f, true))
         val def = MaterialSwitch(context).apply { text = "★ За замовчуванням"; isChecked = p == null || meta.defaultPreset == p.id }
         listOf(ai, shared, def).forEach { box.addView(it) }
         MaterialAlertDialogBuilder(context)
@@ -99,7 +104,7 @@ object Dialogs {
                 save(context, scope, body, onDone)
             }
             .apply { if (p != null && p.mine) setNeutralButton("🗑 Видалити") { _, _ ->
-                context.confirm("Видалити пресет?", "«${p.name}» зникне й у Minerva. Фото, зроблені з ним, лишаються.", "🗑 Видалити") {
+                context.confirm("Видалити пресет?", if (p.local) "«${p.name}» зникне з телефона. Фото, зроблені з ним, лишаються." else "«${p.name}» зникне й у Minerva. Фото, зроблені з ним, лишаються.", "🗑 Видалити") {
                     save(context, scope, JSONObject().put("action", "delete").put("id", p.id)) { onDone(null) }
                 }
             } }
@@ -108,6 +113,12 @@ object Dialogs {
     }
 
     private fun save(context: Context, scope: LifecycleCoroutineScope, body: JSONObject, onDone: (Int?) -> Unit) {
+        val id0 = body.optInt("id")
+        // 📱 без підключення (і пресет, ще не перенесений у Minerva) — на телефоні
+        if (!Prefs.paired || id0 <= Prefs.LOCAL_PRESET_FROM && body.has("id")) {
+            saveLocal(context, body, onDone)
+            return
+        }
         scope.launch {
             try {
                 val j = Api.savePreset(body)
@@ -117,9 +128,29 @@ object Dialogs {
                 context.toast("📌 Збережено в Minerva")
                 onDone(id)
             } catch (e: ApiException) {
-                context.alert("Не збережено", if (e.offline) "Немає інтернету — пресети живуть у Minerva (їх бачать і на комп'ютері). Спробуйте, коли буде зв'язок." else e.message.orEmpty())
+                if ((e.offline || e.unpaired) && !body.has("id") && body.optString("action") == "save") {
+                    saveLocal(context, body, onDone)          // новий пресет без зв'язку — на телефоні, перейде в Minerva пізніше
+                } else {
+                    context.alert("Не збережено", if (e.offline) "Немає інтернету — пресети живуть у Minerva (їх бачать і на комп'ютері). Спробуйте, коли буде зв'язок." else e.message.orEmpty())
+                }
             }
         }
+    }
+
+    private fun saveLocal(context: Context, body: JSONObject, onDone: (Int?) -> Unit) {
+        if (body.optString("action") == "delete") {
+            val id = body.optInt("id")
+            Prefs.removeLocalPreset(id)
+            if (Prefs.presetId == id) Prefs.presetId = -1
+            context.toast("🗑 Пресет видалено з телефона")
+            onDone(null)
+            return
+        }
+        if (body.optString("name").isBlank()) body.put("name", body.optString("event").ifBlank { "Пресет" })
+        val id = Prefs.saveLocalPreset(body)
+        if (body.optBoolean("make_default", true)) Prefs.presetId = id
+        context.toast("📌 Збережено на телефоні 📱 — перейде в Minerva після підключення")
+        onDone(id)
     }
 
     /** Вибір пресету для знімків: «без пресету», мої й спільні, ＋ новий, ✏️ правка вибраного. */
@@ -130,7 +161,7 @@ object Dialogs {
         val ids = mutableListOf(-1)
         meta.presets.forEach { p ->
             val star = if (meta.defaultPreset == p.id) "★ " else ""
-            val who = when { p.shared && !p.mine -> " · 👥 ${p.owner}"; p.shared -> " · 👥"; else -> "" }
+            val who = when { p.local -> " · 📱"; p.shared && !p.mine -> " · 👥 ${p.owner}"; p.shared -> " · 👥"; else -> "" }
             items.add("📌 $star${p.name}${if (p.event.isNotEmpty() && p.event != p.name) " — ${p.event}" else ""}$who")
             ids.add(p.id)
         }

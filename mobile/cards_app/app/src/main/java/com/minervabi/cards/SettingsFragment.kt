@@ -113,7 +113,7 @@ class SettingsFragment : Fragment() {
                 setOnClickListener {
                     Prefs.presetId = id
                     meta.preset(id)?.let { Prefs.kind = it.kind }
-                    ctx.toast(if (id > 0) "📌 Нові фото — з пресетом «$title»" else "Нові фото — без пресету")
+                    ctx.toast(if (id != -1) "📌 Нові фото — з пресетом «$title»" else "Нові фото — без пресету")
                     build()
                 }
             }
@@ -127,12 +127,12 @@ class SettingsFragment : Fragment() {
             val bits = listOfNotNull(
                 p.event.takeIf { it.isNotEmpty() && it != p.name }?.let { "🎪 $it" },
                 "★ за замовчуванням".takeIf { meta.defaultPreset == p.id },
-                when { p.shared && !p.mine -> "👥 ${p.owner}"; p.shared -> "👥 для всіх"; else -> null },
+                when { p.local -> "📱 лише на телефоні — перейде в Minerva після підключення"; p.shared && !p.mine -> "👥 ${p.owner}"; p.shared -> "👥 для всіх"; else -> null },
             )
             row(p.id, "📌 ${p.name}", bits.joinToString(" · "), if (p.mine) ({ Dialogs.preset(ctx, scope, p) { build() } }) else null)
         }
         row(-1, "— Без пресету", "", null)
-        if (Prefs.paired && meta.perms.upload) button(pre, "＋ Новий пресет", "outlined") { Dialogs.preset(ctx, scope, null) { build() } }
+        if (!Prefs.paired || meta.perms.upload) button(pre, "＋ Новий пресет", "outlined") { Dialogs.preset(ctx, scope, null) { build() } }
 
         val cats = card("🗂 Категорії постачальників")
         cats.addView(ctx.label("Ті самі, що в Minerva. Нова тут — одразу і в Minerva.", 13f, true))

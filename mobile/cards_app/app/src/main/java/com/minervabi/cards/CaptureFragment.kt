@@ -242,7 +242,7 @@ class CaptureFragment : Fragment() {
     private fun chips() {
         val bb = _b ?: return
         val meta = Prefs.meta()
-        val p = meta.preset(Prefs.presetId?.takeIf { it > 0 } ?: if (Prefs.presetId == null) meta.defaultPreset else null)
+        val p = meta.preset(Prefs.presetId?.takeIf { it != -1 } ?: if (Prefs.presetId == null) meta.defaultPreset else null)
         bb.chipPreset.text = if (p != null) "📌 ${p.name} ▾" else "📌 Без пресету ▾"
         bb.btnFlash.text = if (Prefs.flash) "🔦" else "⚡"
         bb.btnFlash.setBackgroundResource(if (Prefs.flash) R.drawable.round_on else R.drawable.round_scrim)

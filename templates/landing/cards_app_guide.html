@@ -1,0 +1,204 @@
+{% load static %}<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Інструкція · Minerva Візитки{% if company_name %} · {{ company_name }}{% endif %}</title>
+{# 📖 Публічна інструкція з картинками (без входу): suppliers/app_api.py guide_page. Картинки — static/suppliers/app_guide/ (вигадана фірма «Nordwind Elektronik GmbH», QR і адреси розмито) #}
+<style>
+:root { --bg:#f6f4ee; --fg:#1d1b16; --muted:#5b564a; --line:#ddd6c4; --accent:#7a5a0e; --btn:#2f6fd6; --shot:#e9e5da; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#0d1117; --fg:#efe8d4; --muted:#b3ab95; --line:#2c2a24; --accent:#e0c27a; --btn:#3f7fe6; --shot:#161b22; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width:860px; margin:0 auto; padding:28px 16px 64px; }
+h1 { font-size:1.6rem; margin:0 0 4px; }
+h2 { font-size:1.2rem; margin:34px 0 8px; color:var(--accent); scroll-margin-top:12px; }
+.meta { color:var(--muted); font-size:.92rem; }
+.toc { border:1px solid var(--line); border-radius:12px; padding:10px 16px; margin-top:16px; columns:2 260px; }
+.toc a { display:block; padding:2px 0; text-decoration:none; }
+.row { display:flex; gap:22px; flex-wrap:wrap; align-items:flex-start; }
+.row > .txt { flex:1 1 300px; min-width:0; }
+.shots { display:flex; gap:12px; flex-wrap:wrap; }
+figure { margin:0; flex:0 1 230px; }
+figure.wide { flex:1 1 100%; max-width:600px; }
+figure.strip { flex:1 1 100%; max-width:480px; }
+figure img { display:block; width:100%; height:auto; border:1px solid var(--line); border-radius:12px; background:var(--shot); }
+figcaption { color:var(--muted); font-size:.85rem; margin-top:4px; }
+.btn { display:inline-block; background:var(--btn); color:#fff; text-decoration:none; padding:10px 16px; border-radius:10px; font-weight:600; margin:3px 0; }
+.btn.light { background:transparent; color:var(--accent); border:1px solid var(--line); }
+ol, ul { padding-left:22px; margin:6px 0; }
+li { margin:5px 0; }
+a { color:var(--accent); }
+.note { border-left:3px solid var(--accent); padding:4px 12px; color:var(--muted); font-size:.92rem; margin:10px 0; }
+</style>
+</head>
+<body>
+<main>
+<h1>📖 Minerva Візитки — інструкція</h1>
+<p class="meta">Додаток для Android{% if company_name %} · {{ company_name }}{% endif %}: фото візиток, флаєрів і стендів на виставці чи зустрічі. На картинках — вигадана фірма.</p>
+<p><a class="btn" href="{{ download_url }}">⬇ Завантажити додаток</a> <a class="btn light" href="{{ apk_url }}" rel="noopener">⬇ APK з цієї Minerva</a></p>
+
+<nav class="toc" aria-label="Зміст">
+  <a href="#install">1. Встановити</a>
+  <a href="#pair">2. Підключити до Minerva</a>
+  <a href="#offline">3. Без Minerva — теж можна</a>
+  <a href="#shoot">4. Знімати візитку</a>
+  <a href="#extra">5. Ще фото до фірми</a>
+  <a href="#preset">6. Примітка, пресет, позначки</a>
+  <a href="#visibility">7. 👁 Хто бачить у Minerva</a>
+  <a href="#my">8. 📤 Мої знімки</a>
+  <a href="#minerva">9. 🪪 У Minerva: хто зняв і звідки</a>
+</nav>
+
+<h2 id="install">1. Встановити</h2>
+<div class="row">
+  <div class="txt">
+    <p>У Minerva: <b>🏭 Постачальники → 🪪 Візитки й флаєри → «📱 Додаток на телефон»</b>. Там два QR:</p>
+    <ul>
+      <li><b>Ⓐ З цієї Minerva</b> (рекомендовано) — APK зберігає ваша Minerva, тож він завантажується й у мережі фірми.</li>
+      <li><b>Ⓑ З GitHub</b> — якщо телефон не бачить Minerva (інша мережа, VPN). Завжди остання версія.</li>
+    </ul>
+    <ol>
+      <li>Відскануйте QR камерою телефона (або «⬇ Завантажити APK» на <a href="{{ download_url }}">сторінці додатка</a> — її можна дати колезі, вхід не потрібен).</li>
+      <li>Відкрийте <b translate="no">minerva-cards.apk</b>. Android спитає дозвіл «Встановлювати невідомі додатки» для Chrome / «Файли» — дозвольте.</li>
+      <li>Оновлення — так само, поверх старого: знімки й пресети на телефоні лишаються.</li>
+    </ol>
+  </div>
+  <figure class="wide"><img src="{% static 'suppliers/app_guide/install.webp' %}" width="592" height="507" loading="lazy" alt="Сторінка «Додаток на телефон» у Minerva: QR з цієї Minerva, QR з GitHub і QR підключення"><figcaption>«📱 Додаток на телефон» у Minerva (QR на картинці розмито)</figcaption></figure>
+</div>
+
+<h2 id="pair">2. Підключити до Minerva</h2>
+<div class="row">
+  <div class="txt">
+    <ol>
+      <li>Перший запуск — камера чекає QR підключення. На комп'ютері у «📱 Додаток на телефон» натисніть <b>«🔗 Показати QR для підключення»</b> і наведіть телефон. QR діє 10 хвилин і лише один раз.</li>
+      <li>Камера не читає QR — <b>«⌨ Ввести адресу й код вручну»</b>: адреса Minerva (https://…) і код, що під QR.</li>
+      <li>Перед підключенням телефон показує, <b>чий це акаунт</b>: ім'я, роль (🔑 Адміністратор, менеджер…), email і адресу Minerva. Знімки йтимуть від імені цієї людини, з її правами. Не той акаунт — «Скасувати».</li>
+      <li>У «⚙️ Налаштування» видно, до кого підключено. «🚪 Забути Minerva на цьому телефоні» — від'єднати.</li>
+    </ol>
+  </div>
+  <div class="shots">
+    <figure><img src="{% static 'suppliers/app_guide/first_start.webp' %}" width="480" height="928" loading="lazy" alt="Перший запуск: підключити QR, ввести вручну або пропустити"><figcaption>Перший запуск</figcaption></figure>
+    <figure><img src="{% static 'suppliers/app_guide/pair_manual.webp' %}" width="480" height="383" loading="lazy" alt="Підключити вручну: адреса й код"><figcaption>⌨ Вручну: адреса й код</figcaption></figure>
+    <figure><img src="{% static 'suppliers/app_guide/pair_confirm.webp' %}" width="480" height="381" loading="lazy" alt="Підключити цей телефон? Ім'я, роль, email"><figcaption>Чий акаунт і роль — до підключення</figcaption></figure>
+    <figure><img src="{% static 'suppliers/app_guide/settings_paired.webp' %}" width="480" height="837" loading="lazy" alt="Налаштування: підключено, людина й роль, пресети"><figcaption>⚙️ Налаштування після підключення</figcaption></figure>
+  </div>
+</div>
+
+<h2 id="offline">3. Без Minerva — теж можна</h2>
+<div class="row">
+  <div class="txt">
+    <ul>
+      <li><b>«Пропустити — знімати без Minerva»</b>: камера, обидва боки, ще фото, примітки, позначки й 📌 пресети працюють. Вгорі камери — «🔗 Не підключено».</li>
+      <li>Знімки чекають у «📤 Мої знімки» з позначкою <b>«📱 Лише на телефоні»</b>, пресети — «📱 лише на телефоні».</li>
+      <li>Після підключення телефон запитає: <b>«⬆ Надіслати всі»</b>, «Пізніше» або «☑ Вибрати…» — які саме. Пресети з телефона переходять у Minerva самі й лишаються вибраними.</li>
+      <li>Категорії постачальників живуть у Minerva — нову категорію додають після підключення.</li>
+    </ul>
+  </div>
+  <div class="shots">
+    <figure><img src="{% static 'suppliers/app_guide/settings_unpaired.webp' %}" width="480" height="771" loading="lazy" alt="Налаштування без Minerva: пресет лише на телефоні"><figcaption>📱 пресет — лише на телефоні</figcaption></figure>
+    <figure><img src="{% static 'suppliers/app_guide/my_shots_phone.webp' %}" width="480" height="415" loading="lazy" alt="Мої знімки: лише на телефоні"><figcaption>Знімок чекає на телефоні</figcaption></figure>
+    <figure><img src="{% static 'suppliers/app_guide/send_pending.webp' %}" width="480" height="443" loading="lazy" alt="Знімки без Minerva: надіслати всі, пізніше, вибрати"><figcaption>Після підключення — надіслати</figcaption></figure>
+  </div>
+</div>
+
+<h2 id="shoot">4. Знімати візитку</h2>
+<div class="row">
+  <div class="txt">
+    <ul>
+      <li>Вгорі — 📌 пресет, ⚡ світло, стан підключення. Внизу — що знімаєте: 🪪 Візитка, 📄 Флаєр, 🔳 QR, 📷 Фото.</li>
+      <li>Наведіть рамку на візитку й натисніть ⭕. З 📐 «по краях» додаток сам обріже фото по краях візитки.</li>
+      <li>Після лицьового боку: <b>«🔄 знову»</b> — переробити, <b>«↩ Зворот»</b> — зняти зворотний бік, <b>«✓ Готово»</b> — без звороту.</li>
+      <li><b>🖼 Галерея</b> — взяти вже зроблене фото з телефона (лицьовий бік, зворот чи ще фото).</li>
+      <li>QR-код на візитці (vCard) читається сам — контакти заповнюються з нього.</li>
+    </ul>
+  </div>
+  <div class="shots">
+    <figure><img src="{% static 'suppliers/app_guide/camera.webp' %}" width="480" height="928" loading="lazy" alt="Камера з рамкою на візитці"><figcaption>Рамка на візитці</figcaption></figure>
+    <figure class="strip"><img src="{% static 'suppliers/app_guide/front_strip.webp' %}" width="480" height="144" loading="lazy" alt="Лицьовий бік знято: знову, зворот, готово"><figcaption>Лицьовий бік знято</figcaption></figure>
+  </div>
+</div>
+
+<h2 id="extra">5. Ще фото до фірми</h2>
+<div class="row">
+  <div class="txt">
+    <ul>
+      <li>У вікні перевірки: «📷 Знову» для кожного боку, «↻» — повернути, 🗑 — прибрати зворот.</li>
+      <li><b>«＋ Ще фото»</b> — друга візитка тієї ж фірми, флаєр, каталог / прайс, продукт / зразок, стенд. AI прочитає все разом.</li>
+      <li>Пізніше теж можна: «🪪 У Minerva» → візитка → «📷 Фото: знову, зворотний бік, ще фото».</li>
+      <li>«💾 Зберегти й наступну» — одразу до наступної візитки.</li>
+    </ul>
+  </div>
+  <div class="shots">
+    <figure><img src="{% static 'suppliers/app_guide/review.webp' %}" width="480" height="682" loading="lazy" alt="Перевірка: лицьовий і зворотний бік, флаєр, примітка"><figcaption>Обидва боки + флаєр</figcaption></figure>
+    <figure><img src="{% static 'suppliers/app_guide/extra_kind.webp' %}" width="480" height="521" loading="lazy" alt="Що дознімати: ще візитка, флаєр, каталог"><figcaption>«＋ Ще фото» — що саме</figcaption></figure>
+  </div>
+</div>
+
+<h2 id="preset">6. Примітка, пресет, позначки</h2>
+<div class="row">
+  <div class="txt">
+    <ul>
+      <li><b>📝 Примітка</b> — текстом або 🎤 голосом. <b>🎪 Де взяли</b> — виставка, зустріч.</li>
+      <li><b>📌 Пресет</b> (вгорі камери або «⚙️ Налаштування»): назва, де взяли, що це, хто це для нас, позначки, категорії — підставляються в кожне нове фото. Наприклад, «electronica 2026, Halle B3».</li>
+      <li><b>👥 Хто це для нас</b>: 🏭 Постачальник, 👤 Клієнт, 🤝 Інше. Не вибрали — AI підкаже з візитки.</li>
+      <li><b>⭐ Позначки</b>: Важливий, З виставки, Зустрічались, Попросити зразки, Чекаємо ціни…</li>
+    </ul>
+  </div>
+  <div class="shots">
+    <figure><img src="{% static 'suppliers/app_guide/preset.webp' %}" width="480" height="874" loading="lazy" alt="Новий пресет: назва, де взяли, що це, хто це, позначки"><figcaption>📌 Пресет виставки</figcaption></figure>
+  </div>
+</div>
+
+<h2 id="visibility">7. 👁 Хто бачить у Minerva</h2>
+<div class="row">
+  <div class="txt">
+    <ul>
+      <li><b>👥 Бачать усі</b> — колеги, яким у Minerva відкрито постачальників.</li>
+      <li><b>🔒 Лише я</b> — бачите тільки ви, у додатку й у Minerva; інші, навіть адміністратор, — ні. Наприклад, особистий контакт.</li>
+      <li>Змінити може лише той, хто зняв, — у візитці в додатку чи в Minerva.</li>
+    </ul>
+  </div>
+  <div class="shots">
+    <figure><img src="{% static 'suppliers/app_guide/visibility.webp' %}" width="480" height="457" loading="lazy" alt="Хто це для нас, хто бачить: бачать усі або лише я, позначки"><figcaption>🔒 Лише я</figcaption></figure>
+  </div>
+</div>
+
+<h2 id="my">8. 📤 Мої знімки</h2>
+<div class="row">
+  <div class="txt">
+    <ul>
+      <li>⏳ — чекають, ✅ — у Minerva, ⚠️ — не вдалося. Без інтернету знімки чекають і підуть самі, щойно з'явиться зв'язок.</li>
+      <li><b>«⬆ Надіслати зараз»</b> — не чекати; <b>«🧹 Прибрати надіслані»</b> — звільнити місце на телефоні (у Minerva вони лишаються).</li>
+      <li>«🧠 AI ✓» — AI прочитав фірму, людину й контакти.</li>
+    </ul>
+  </div>
+  <div class="shots">
+    <figure><img src="{% static 'suppliers/app_guide/my_shots_sent.webp' %}" width="480" height="371" loading="lazy" alt="Мої знімки: у Minerva, AI прочитав"><figcaption>✅ У Minerva · 🧠 AI ✓</figcaption></figure>
+  </div>
+</div>
+
+<h2 id="minerva">9. 🪪 У Minerva: хто зняв і звідки</h2>
+<div class="row">
+  <div class="txt">
+    <ul>
+      <li>Візитки з Minerva — з пошуком і ⚙ фільтрами; 🔒 — приватна.</li>
+      <li>У візитці: фірма, людина, контакти (дотик — подзвонити, написати, сайт), адреса, що роблять, де взяли.</li>
+      <li><b>«👤 Зняв: …»</b> — хто зняв, з роллю, і звідки: 📱 телефон, 🌐 сторінка Minerva чи 🏭 картка постачальника.</li>
+      <li>Звідти ж — «🏭 У постачальники», «👤 У CRM», «🧠 Прочитати AI».</li>
+    </ul>
+  </div>
+  <div class="shots">
+    <figure><img src="{% static 'suppliers/app_guide/in_minerva.webp' %}" width="480" height="264" loading="lazy" alt="Візитки в Minerva: список"><figcaption>«🪪 У Minerva»</figcaption></figure>
+    <figure><img src="{% static 'suppliers/app_guide/card_detail.webp' %}" width="480" height="784" loading="lazy" alt="Візитка: контакти, хто зняв і звідки"><figcaption>Хто зняв і звідки</figcaption></figure>
+  </div>
+</div>
+
+<p class="note">Android 8.0 і новіше. Додаток не збирає даних для реклами; знімки йдуть лише в Minerva вашої фірми, і лише коли телефон підключено.</p>
+<p><a class="btn" href="{{ download_url }}">⬇ Завантажити додаток</a></p>
+</main>
+</body>
+</html>

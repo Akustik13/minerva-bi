@@ -32,13 +32,15 @@ data class Preset(
     val id: Int, val name: String, val event: String, val kind: String, val marks: List<String>, val note: String,
     val categories: List<Int>, val readAi: Boolean, val model: String, val shared: Boolean, val mine: Boolean,
     val owner: String, val role: String = "",
+    /** 📱 Лише на телефоні (створено без Minerva) — перейде в Minerva після підключення. */
+    val local: Boolean = false,
 ) {
     companion object {
         fun parse(o: JSONObject) = Preset(
             o.optInt("id"), o.str("name"), o.str("event"), o.str("kind").ifEmpty { "card" },
             o.optJSONArray("marks").strings(), o.str("note"), o.optJSONArray("categories").ints(),
             o.optBoolean("read_ai", true), o.str("model"), o.optBoolean("shared"), o.optBoolean("mine"),
-            o.str("owner"), o.str("role"),
+            o.str("owner"), o.str("role"), o.optBoolean("local"),
         )
     }
 }

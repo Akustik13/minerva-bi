@@ -120,23 +120,52 @@ def _user_json(u) -> dict:
     return {"name": u.get_full_name() or u.username, "email": u.email, "role": card_access.role_label(u)}
 
 
+def _public_context(request) -> dict:
+    """Спільне для публічних сторінок додатка: назва фірми, APK з цієї Minerva, GitHub."""
+    from django.urls import reverse
+    from config.models import SystemSettings
+    from suppliers.services import card_app
+    s = SystemSettings.objects.filter(pk=1).first()
+    return {
+        "company_name": s.company_name if s is not None else "",
+        # APK з цієї Minerva: адреса сайту з «Налаштувань системи» (за проксі NAS — https), інакше — як відкрили
+        "apk_url": ((s.site_url.rstrip("/") if s is not None and s.site_domain else
+                     request.build_absolute_uri("/").rstrip("/")) + reverse("cards_app_apk")),
+        "github_url": card_app.APP_URL, "releases_url": card_app.RELEASES_URL,
+        "download_url": reverse("cards_app_download"), "guide_url": reverse("cards_app_guide"),
+    }
+
+
 def download_page(request):
     """📱 Публічна сторінка (без входу) /suppliers/app/: встановити «Minerva Візитки» — QR, APK, кроки. Додаток
     працює й без акаунта Minerva; надіслати знімки — після підключення QR колеги з акаунтом."""
     from django.shortcuts import render
-    from config.models import SystemSettings
-    from suppliers.services import card_app
-    s = SystemSettings.objects.filter(pk=1).first()
-    return render(request, "landing/cards_app.html", {
-        "company_name": s.company_name if s is not None else "", "apk_url": card_app.APP_URL,
-        "releases_url": card_app.RELEASES_URL})
+    return render(request, "landing/cards_app.html", _public_context(request))
+
+
+def guide_page(request):
+    """📖 Публічна інструкція з картинками (без входу) /suppliers/app/guide/: встановити, підключити, без Minerva,
+    знімати, ще фото, пресет, 👁 хто бачить, «📤 Мої знімки», «🪪 У Minerva». Картинки — static/suppliers/app_guide/
+    (вигадана фірма, QR і адреси розмито)."""
+    from django.shortcuts import render
+    return render(request, "landing/cards_app_guide.html", _public_context(request))
 
 
 def download_apk(request):
-    """Коротка постійна адреса APK (/suppliers/app/minerva-cards.apk) → остання версія (card_app.APP_URL)."""
+    """⬇ APK з самої Minerva (/suppliers/app/minerva-cards.apk, без входу): остання версія, яку Minerva забрала з
+    GitHub і зберегла в себе (card_app.latest_apk); немає й не вдалося — перенаправлення на GitHub."""
     from django.http import HttpResponseRedirect
     from suppliers.services import card_app
-    return HttpResponseRedirect(card_app.APP_URL)
+    path, version = card_app.latest_apk()
+    if not path:
+        return HttpResponseRedirect(card_app.APP_URL)
+    resp = FileResponse(open(path, "rb"), content_type="application/vnd.android.package-archive")
+    resp["Content-Disposition"] = 'attachment; filename="minerva-cards.apk"'
+    resp["X-Content-Type-Options"] = "nosniff"
+    resp["Cache-Control"] = "no-cache"
+    if version:
+        resp["X-App-Version"] = version
+    return resp
 
 
 @csrf_exempt

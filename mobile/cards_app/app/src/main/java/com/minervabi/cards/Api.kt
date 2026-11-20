@@ -22,6 +22,12 @@ import java.util.concurrent.TimeUnit
 class ApiException(val status: Int, message: String) : Exception(message) {
     val offline get() = status == 0
     val unauthorized get() = status == 401
+    /** Телефон не підключено до Minerva (немає адреси) — не «немає інтернету». */
+    val unpaired get() = status == NOT_PAIRED
+
+    companion object {
+        const val NOT_PAIRED = -2
+    }
 }
 
 /** JSON API Minerva для додатка (suppliers/app_api.py): ключ телефону в «Authorization: Bearer …». */
@@ -49,7 +55,10 @@ object Api {
     private fun url(path: String, server: String = Prefs.server) = server.trimEnd('/') + BASE + path
 
     private fun request(path: String, server: String = Prefs.server): Request.Builder {
-        val b = Request.Builder().url(url(path, server))
+        // без адреси Minerva (не підключено) — зрозуміла помилка, а не падіння додатка (OkHttp: «no scheme»)
+        if (server.isBlank()) throw ApiException(ApiException.NOT_PAIRED, "Телефон не підключено до Minerva")
+        val u = url(path, server).toHttpUrlOrNull() ?: throw ApiException(400, "Неправильна адреса Minerva: $server")
+        val b = Request.Builder().url(u)
             .header("User-Agent", "MinervaCards/${BuildConfig.VERSION_NAME} (Android ${Build.VERSION.RELEASE})")
         if (Prefs.token.isNotEmpty()) b.header("Authorization", "Bearer ${Prefs.token}")
         return b
@@ -75,6 +84,7 @@ object Api {
     }
 
     suspend fun get(path: String, params: Map<String, String> = emptyMap()): JSONObject = withContext(Dispatchers.IO) {
+        if (Prefs.server.isBlank()) throw ApiException(ApiException.NOT_PAIRED, "Телефон не підключено до Minerva")
         val base = url(path).toHttpUrlOrNull() ?: throw ApiException(400, "Неправильна адреса Minerva")
         val u = base.newBuilder().apply { params.forEach { (k, v) -> if (v.isNotEmpty()) addQueryParameter(k, v) } }.build()
         run(request(path).url(u).get().build())
@@ -115,10 +125,33 @@ object Api {
     }
 
     suspend fun meta(): Meta {
-        val j = get("meta/")
+        var j = get("meta/")
         Prefs.metaJson = j.toString()
         j.str("role_label").takeIf { it.isNotEmpty() }?.let { Prefs.userRole = it }   // роль могли змінити в Minerva
-        return Meta.parse(j)
+        if (pushLocalPresets(Meta.parse(j))) {
+            j = get("meta/")
+            Prefs.metaJson = j.toString()
+        }
+        return Prefs.meta()
+    }
+
+    /** 📱 Пресети, створені без Minerva, — у Minerva (після підключення); вибраний пресет — уже з Minerva.
+     *  Не вийшло (немає права, зв'язку) — лишаються на телефоні й працюють як і були. */
+    private suspend fun pushLocalPresets(meta: Meta): Boolean {
+        val local = Prefs.localPresets()
+        if (local.isEmpty() || !meta.perms.upload) return false
+        var moved = false
+        for (o in local) {
+            val old = o.optInt("id")
+            val body = JSONObject(o.toString()).put("action", "save")
+            body.remove("id"); body.remove("local"); body.remove("mine"); body.remove("owner")
+            val j = runCatching { postJson("presets/", body) }.getOrNull() ?: continue
+            val id = if (j.isNull("id")) null else j.optInt("id")
+            Prefs.removeLocalPreset(old)
+            if (Prefs.presetId == old) Prefs.presetId = id ?: -1
+            moved = true
+        }
+        return moved
     }
 
     /** Знімок → нова візитка в Minerva (multipart). Той самий uuid удруге — та сама візитка (created = false). */
@@ -133,7 +166,7 @@ object Api {
             "uuid" to c.uuid, "kind" to c.kind, "role" to c.role, "event" to c.event, "note" to c.note,
             "marks" to c.marks.joinToString(","), "categories" to c.categories.joinToString(","),
             // є ще фото групи — AI прочитає все разом, коли їх дошлемо (Capture.reread)
-            "preset" to (c.presetId?.toString() ?: ""), "read_ai" to (if (c.readAi && c.extras.isEmpty()) "1" else ""),
+            "preset" to (c.presetId?.takeIf { it > 0 }?.toString() ?: ""),   // 📱 пресет лише на телефоні — без id "read_ai" to (if (c.readAi && c.extras.isEmpty()) "1" else ""),
             "model" to c.model, "qr_front" to c.qrFront, "qr_back" to c.qrBack, "visibility" to c.visibility,
         )
         fields.forEach { (k, v) -> if (v.isNotEmpty()) b.addFormDataPart(k, v) }

@@ -157,7 +157,8 @@ object ImageUtils {
     fun fromUri(context: Context, uri: Uri, out: File, maxPx: Int): Bitmap? {
         val cr = context.contentResolver
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        cr.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: return null
+        // лише розмір: decodeStream з inJustDecodeBounds завжди повертає null — це не помилка (раніше фото з галереї не відкривалось)
+        (cr.openInputStream(uri) ?: return null).use { BitmapFactory.decodeStream(it, null, bounds) }
         if (bounds.outWidth <= 0) return null
         var sample = 1
         while (max(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxPx) sample *= 2

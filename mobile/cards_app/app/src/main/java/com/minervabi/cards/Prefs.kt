@@ -112,10 +112,44 @@ object Prefs {
         get() = sp.getString("browse", "") ?: ""
         set(v) = sp.edit().putString("browse", v).apply()
 
-    fun meta(): Meta = Meta.parse(metaJson.takeIf { it.isNotBlank() }?.let { runCatching { JSONObject(it) }.getOrNull() })
+    /** Пресети Minerva (з /meta/) і 📱 створені без Minerva — разом. */
+    fun meta(): Meta {
+        val m = Meta.parse(metaJson.takeIf { it.isNotBlank() }?.let { runCatching { JSONObject(it) }.getOrNull() })
+        val local = localPresets().map { Preset.parse(it) }
+        return if (local.isEmpty()) m else m.copy(presets = m.presets + local)
+    }
+
+    /** 📱 Пресети, створені без підключення (id ≤ −1000; −1 — «без пресету»). Після підключення — у Minerva. */
+    fun localPresets(): List<JSONObject> {
+        val a = runCatching { org.json.JSONArray(sp.getString("local_presets", "[]")) }.getOrNull() ?: return emptyList()
+        return (0 until a.length()).mapNotNull { a.optJSONObject(it) }
+    }
+
+    private fun storeLocalPresets(items: List<JSONObject>) =
+        sp.edit().putString("local_presets", org.json.JSONArray(items).toString()).apply()
+
+    /** Зберегти 📱 пресет (новий — новий id). Повертає id. */
+    fun saveLocalPreset(body: JSONObject): Int {
+        val items = localPresets().toMutableList()
+        val id = body.optInt("id").takeIf { it <= LOCAL_PRESET_FROM } ?: ((items.minOfOrNull { it.optInt("id") } ?: (LOCAL_PRESET_FROM + 1)) - 1)
+            .coerceAtMost(LOCAL_PRESET_FROM)
+        val o = JSONObject(body.toString()).put("id", id).put("local", true).put("mine", true).put("shared", body.optBoolean("shared"))
+        o.remove("action"); o.remove("make_default")
+        items.removeAll { it.optInt("id") == id }
+        items.add(o)
+        storeLocalPresets(items)
+        return id
+    }
+
+    fun removeLocalPreset(id: Int) = storeLocalPresets(localPresets().filter { it.optInt("id") != id })
+
+    const val LOCAL_PRESET_FROM = -1000
 
     fun forget() {
+        // 📱 пресет з телефона лишається вибраним — після підключення він перейде в Minerva (Api.pushLocalPresets)
+        val keep = presetId?.takeIf { it <= LOCAL_PRESET_FROM && localPresets().any { p -> p.optInt("id") == it } }
         sp.edit().remove("token").remove("user_name").remove("user_email").remove("user_role").remove("needs_pairing")
             .remove("meta").remove("browse").remove("preset").apply()
+        if (keep != null) presetId = keep
     }
 }

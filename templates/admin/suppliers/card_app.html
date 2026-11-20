@@ -15,6 +15,12 @@
   .ca-grid { display: flex; flex-wrap: wrap; gap: 14px; }
   .ca-grid > .spf-card { flex: 1 1 340px; min-width: 300px; }
   .ca-public { margin: 6px 0; font-size: 13px; }
+  .ca-qrs { display: flex; flex-wrap: wrap; gap: 14px; }
+  .ca-qrf { margin: 0; flex: 1 1 240px; max-width: 300px; display: flex; flex-direction: column; gap: 4px; }
+  .ca-qrf figcaption { font-size: 14px; }
+  .ca-qrf .button { align-self: flex-start; }
+  .ca-qrs .ca-qr svg { width: 180px; height: 180px; }
+  .ca-tag { font-size: 11px; border: 1px solid var(--border-strong, #ccc); border-radius: 9px; padding: 0 6px; }
   .ca-qr { background: #fff; display: inline-block; padding: 10px; border-radius: 10px; line-height: 0; margin: 8px 0; }
   .ca-qr svg, .ca-qr img { width: 220px; height: 220px; display: block; }
   .ca-big { font-size: 15px; }
@@ -31,11 +37,22 @@
   <div class="ca-grid" style="margin-top:10px">
     <div class="spf-card">
       <div class="spf-h">1️⃣ Встановити додаток (Android)</div>
-      <div class="ca-qr" id="ca-dl-qr" translate="no"></div>
-      <div class="spf-row">
-        <a class="button default" href="{{ app_url }}" rel="noopener">⬇ Завантажити APK</a>
-        <a class="button" href="{{ releases_url }}" target="_blank" rel="noopener">Усі версії ↗</a>
+      <div class="ca-qrs">
+        <figure class="ca-qrf">
+          <figcaption><b>Ⓐ З цієї Minerva</b> <span class="ca-tag">рекомендовано</span></figcaption>
+          <div class="ca-qr" id="ca-dl-qr-m" translate="no"></div>
+          <div class="spf-muted">APK завантажується з <span translate="no">{{ base }}</span>{% if apk_version %} · версія <b translate="no">{{ apk_version }}</b>{% else %} (Minerva забере останню версію з GitHub при першому завантаженні){% endif %}.</div>
+          <a class="button default" href="{{ minerva_apk_url }}" rel="noopener">⬇ Завантажити з Minerva</a>
+        </figure>
+        <figure class="ca-qrf">
+          <figcaption><b>Ⓑ З GitHub</b></figcaption>
+          <div class="ca-qr" id="ca-dl-qr" translate="no"></div>
+          <div class="spf-muted">Напряму з GitHub — якщо телефон не бачить Minerva (інша мережа, VPN). Завжди остання версія.</div>
+          <a class="button" href="{{ app_url }}" rel="noopener">⬇ Завантажити з GitHub</a>
+        </figure>
       </div>
+      <div class="spf-row"><a class="button" href="{{ guide_url }}" target="_blank" rel="noopener">📖 Інструкція з картинками</a>
+        <a class="button" href="{{ releases_url }}" target="_blank" rel="noopener">Усі версії ↗</a></div>
       <div class="ca-public">🔗 Сторінка для всіх (без входу в Minerva) — QR, APK і як встановити:
         <a href="{{ public_url }}" target="_blank" rel="noopener" translate="no">{{ public_url }}</a>
         <button type="button" class="button" id="ca-copy" data-url="{{ public_url }}" title="Скопіювати — надіслати колегам чи надрукувати">📋</button></div>
@@ -87,6 +104,7 @@
   </div>
 </div>
 {{ app_url|json_script:"ca-app-url" }}
+{{ minerva_apk_url|json_script:"ca-apk-m" }}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script>
 (function(){
@@ -97,6 +115,7 @@
     box.innerHTML = q.createSvgTag({cellSize: 6, margin: 2, scalable: true});
   }
   drawQr(document.getElementById('ca-dl-qr'), JSON.parse(document.getElementById('ca-app-url').textContent));
+  drawQr(document.getElementById('ca-dl-qr-m'), JSON.parse(document.getElementById('ca-apk-m').textContent));
   var copy = document.getElementById('ca-copy');
   if (copy) copy.addEventListener('click', function(){
     var url = copy.getAttribute('data-url');

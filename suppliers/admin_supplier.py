@@ -1311,7 +1311,19 @@ class SupplierCardMixin:
             pair_ttl=card_app.PAIR_TTL // 60, active=sum(1 for d in devices if d.revoked_at is None),
             uploaded=SupplierMedia.objects.exclude(client_uuid="").filter(created_by=request.user).count(),
             CardAppDevice=CardAppDevice, me_role=card_access.role_label(request.user),
-            public_url=self._site_base(request) + reverse("cards_app_download")))
+            public_url=self._site_base(request) + reverse("cards_app_download"),
+            minerva_apk_url=self._site_base(request) + reverse("cards_app_apk"), apk_version=self._apk_version(),
+            guide_url=self._site_base(request) + reverse("cards_app_guide")))
+
+    @staticmethod
+    def _apk_version() -> str:
+        """Версія APK, уже збереженої в Minerva; немає — у фоні забрати з GitHub (сторінка не чекає)."""
+        from suppliers.services import card_app
+        _path, version = card_app.apk_cached()
+        if not version:
+            import threading
+            threading.Thread(target=card_app.latest_apk, daemon=True).start()
+        return version
 
     @staticmethod
     def _site_base(request) -> str:

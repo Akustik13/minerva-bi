@@ -110,11 +110,23 @@ class ReviewSheet : BottomSheetDialogFragment() {
 
         // 👥 хто це: що в Minerva (AI міг підказати) → знімок (пресет «наш стенд» — клієнти)
         initialRole = c.card?.role ?: c.role
-        meta.roles.forEach { (k, label) -> b.roles.addToggle(label, k == initialRole, k).isCheckedIconVisible = false }
-        if (c.card?.roleAi == true && initialRole.isNotEmpty()) {
-            b.roleHint.text = "🧠 Підказав AI" + (c.card?.roleWhy?.takeIf { it.isNotEmpty() }?.let { ": $it" } ?: "") +
-                ". Не так — виберіть інше."
+        val aiHint = if (c.card?.roleAi == true && initialRole.isNotEmpty())
+            "🧠 Підказав AI" + (c.card?.roleWhy?.takeIf { it.isNotEmpty() }?.let { ": $it" } ?: "") + ". Не так — виберіть інше."
+        else null
+        // підказка — за тим, що вибрано зараз (раніше «Не вибрано…» стояло й під вибраним з пресету)
+        fun roleHint() {
+            val sel = b.roles.checkedTags().filterIsInstance<String>().firstOrNull().orEmpty()
+            b.roleHint.text = when {
+                sel.isEmpty() -> "Не вибрано — AI підкаже з візитки. 👤 Клієнт — потім «👤 У CRM»."
+                sel == initialRole && aiHint != null -> aiHint
+                sel == "customer" -> "👤 Клієнт — у Minerva потім «👤 У CRM». Зніміть вибір — AI підкаже з візитки."
+                else -> "Зніміть вибір — AI підкаже з візитки."
+            }
         }
+        meta.roles.forEach { (k, label) ->
+            b.roles.addToggle(label, k == initialRole, k) { roleHint() }.isCheckedIconVisible = false
+        }
+        roleHint()
         // 👁 хто бачить у Minerva: свій знімок — вибір; чужа візитка з «🪪 У Minerva» — не змінити
         val canVis = c.status != Capture.UPLOADED || (c.card?.canSetVisibility ?: !c.adopted)
         val vis = c.card?.visibility?.takeIf { c.status == Capture.UPLOADED } ?: c.visibility

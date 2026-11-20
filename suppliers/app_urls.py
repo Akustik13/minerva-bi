@@ -7,6 +7,7 @@ urlpatterns = [
     path("api/pair/", app_api.pair, name="cards_app_pair"),
     path("api/pair/info/", app_api.pair_info, name="cards_app_pair_info"),
     path("", app_api.download_page, name="cards_app_download"),
+    path("guide/", app_api.guide_page, name="cards_app_guide"),
     path("minerva-cards.apk", app_api.download_apk, name="cards_app_apk"),
     path("api/me/", app_api.me, name="cards_app_me"),
     path("api/meta/", app_api.meta, name="cards_app_meta"),
