@@ -78,6 +78,14 @@
   .ap-ctx button:hover { background: rgba(59, 130, 246, .15); }
   .ap-ctx .t { padding: 4px 10px; font-size: 11px; opacity: .6; }
   #ap-root.ap-busy { opacity: .6; pointer-events: none; }
+  /* пошук розділу й розділи, яких людина ще не має */
+  .ap-find { width: 100%; box-sizing: border-box; margin: 0 0 8px; }
+  .ap-place { font-size: 11.5px; color: #3b82f6; font-weight: 400; }
+  .ap-pages { font-size: 11px; margin-top: 2px; }
+  .ap-closed-head { margin: 12px 0 4px; padding-top: 8px; border-top: 1px dashed var(--hairline-color, #2b3c52);
+                    font-weight: 600; font-size: 13px; }
+  .ap-closed { padding: 6px 0; border-bottom: 1px solid var(--hairline-color, #2b3c52); font-size: 12.5px; }
+  .ap-closed .ap-muted { font-size: 11.5px; }
   /* вікно #ap-apply — права цієї людини іншим */
   .ap-dlg { width: min(680px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 16px 18px; border-radius: 10px;
             border: 1px solid var(--border-strong, #243347); background: var(--bg-card, #1a2535);
@@ -170,12 +178,14 @@
   <div>
     <div class="ap-box ap-menu">
       <h3>🧭 Меню, яке вона бачить</h3>
+      <input type="search" id="ap-find" class="ap-find" placeholder="🔎 Знайти розділ або сторінку, напр. DigiKey" autocomplete="off">
+      <div class="ap-muted" id="ap-find-none" hidden>Нічого не знайдено — ні в її меню, ні серед розділів, яких вона ще не має.</div>
       {% if p.menu %}
         <div class="ap-muted" style="margin-bottom:6px">{{ p.models_count }} сторінок, змінювати може на {{ p.edit_count }}{% if p.overview.hidden_count %} · <span style="color:#e5484d">закреслені ({{ p.overview.hidden_count }}) — сховано, людина їх не бачить</span>{% endif %}.
           Значки: 👁 перегляд · ➕ створення · ✏️ зміна · 🗑 видалення.{% if editing %} Біля сторінки: «🚫 Сховати» / «👁 Показати».{% endif %}</div>
         {% for app in p.menu %}
-        <details{% if forloop.counter <= 3 or editing %} open{% endif %} data-ap-app="{% if app.editable %}{{ app.app }}{% endif %}">
-          <summary>{{ app.name }} <span class="ap-muted">({% if app.shown == app.models|length %}{{ app.shown }}{% elif app.shown %}видно {{ app.shown }} з {{ app.models|length }}{% else %}усі сховано{% endif %})</span>
+        <details{% if forloop.counter <= 3 or editing %} open{% endif %} data-ap-app="{% if app.editable %}{{ app.app }}{% endif %}" data-ap-find="{{ app.place }}">
+          <summary>{{ app.name }} <span class="ap-muted">({% if app.shown == app.models|length %}{{ app.shown }}{% elif app.shown %}видно {{ app.shown }} з {{ app.models|length }}{% else %}усі сховано{% endif %})</span>{% if app.place %} <span class="ap-place">у меню: {{ app.place }}</span>{% endif %}
             {% if editing and app.editable %}<span class="ap-seg small" style="float:right">{% for k, icon, label in levels %}<button type="button" data-ap-level="{{ k }}" data-app="{{ app.app }}" title="{{ label }}" class="{% if app.level == k %}on{% endif %}">{{ icon }}</button>{% endfor %}</span>{% endif %}
           </summary>
           <ul>
@@ -191,6 +201,19 @@
         </details>
         {% endfor %}
       {% else %}<div class="ap-muted">Меню порожнє.</div>{% endif %}
+      {% if p.closed %}
+      <div class="ap-closed-head">{% if editing %}➕ Ще не відкрито — увімкніть потрібне{% else %}🚫 Розділів немає в її доступі{% endif %} ({{ p.closed|length }})</div>
+      {% for m in p.closed %}
+      <div class="ap-closed" data-ap-app="{{ m.app }}" data-ap-find="{{ m.place }} {{ m.pages|join:' ' }}">
+        <div class="ap-row" style="justify-content:space-between">
+          <b>{{ m.name }}</b>
+          {% if editing %}<span class="ap-seg small">{% for k, icon, label in levels %}<button type="button" data-ap-level="{{ k }}" data-app="{{ m.app }}" title="{{ label }}" class="{% if m.level == k %}on{% endif %}">{{ icon }}</button>{% endfor %}</span>{% endif %}
+        </div>
+        {% if m.place %}<div class="ap-place">у меню: {{ m.place }}</div>{% endif %}
+        {% if m.pages %}<div class="ap-muted">{{ m.pages|join:" · " }}</div>{% endif %}
+      </div>
+      {% endfor %}
+      {% endif %}
     </div>
 
     <div class="ap-box">
@@ -243,7 +266,9 @@
         <thead><tr><th>Модуль</th><th>Доступ</th><th>{% if editing %}Рівень{% else %}Що можна{% endif %}</th></tr></thead>
         <tbody>
         {% for m in p.modules %}<tr class="{% if not m.allowed %}off{% endif %}" data-ap-app="{% if not m.fixed %}{{ m.app }}{% endif %}">
-          <td>{{ m.name }} <span class="ap-muted">{{ m.app }}</span></td>
+          <td>{{ m.name }} <span class="ap-muted">{{ m.app }}</span>
+            {% if m.place %}<div class="ap-place">у меню: {{ m.place }}</div>{% endif %}
+            {% if m.pages %}<div class="ap-muted ap-pages">{{ m.pages|join:" · " }}</div>{% endif %}</td>
           <td>{% if m.allowed %}✅{% else %}⛔{% endif %} <span class="ap-muted">{{ m.why }}</span></td>
           <td>{% if editing and not m.fixed and m.active %}
                 <span class="ap-seg">{% for k, icon, label in levels %}<button type="button" data-ap-level="{{ k }}" data-app="{{ m.app }}" class="{% if m.level == k %}on{% endif %}">{{ icon }} {{ label }}</button>{% endfor %}</span>
@@ -399,9 +424,26 @@
     post('preview', d).then(function (r) { return r.text(); }).then(function (html) {
       var doc = new DOMParser().parseFromString(html, 'text/html');
       var fresh = doc.getElementById('ap-root');
-      if (fresh) root().replaceWith(fresh);
+      if (fresh) { root().replaceWith(fresh); find(); }
     }).catch(function () { root().classList.remove('ap-busy'); alert('Не вдалося перерахувати — спробуйте ще раз.'); });
   }
+  // 🔎 пошук розділу або сторінки: меню людини, «Ще не відкрито» і таблиця модулів (лишається після перемальовки)
+  var findQ = '';
+  function find() {
+    var inp = document.getElementById('ap-find'); if (!inp) return;
+    if (inp.value !== findQ) inp.value = findQ;
+    var q = findQ.trim().toLowerCase(), menuHit = false, closedHit = false;
+    document.querySelectorAll('.ap-menu details, .ap-closed, .ap-table tbody tr[data-ap-app]').forEach(function (el) {
+      var ok = !q || (el.textContent + ' ' + (el.dataset.apFind || '')).toLowerCase().indexOf(q) >= 0;
+      el.hidden = !ok;
+      if (!ok || !q) return;
+      if (el.tagName === 'DETAILS') { el.open = true; menuHit = true; }
+      if (el.classList.contains('ap-closed')) closedHit = true;
+    });
+    var head = document.querySelector('.ap-closed-head'); if (head) head.hidden = !!q && !closedHit;
+    var none = document.getElementById('ap-find-none'); if (none) none.hidden = !q || menuHit || closedHit;
+  }
+  document.addEventListener('input', function (e) { if (e.target.id === 'ap-find') { findQ = e.target.value; find(); } });
   function change(fn) { var d = draft(); fn(d); refresh(d); }
   function setLevel(app, lvl) { change(function (d) { d.modules[app] = lvl; }); }
   function setPage(key, hide) { change(function (d) { d.pages[key] = hide; }); }

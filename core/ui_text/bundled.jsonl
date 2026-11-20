@@ -1081,6 +1081,9 @@
 {"uk": "API секрет", "en": "API secret", "de": "API-Secret"}
 {"uk": "API та скрипти", "en": "API and scripts", "de": "API und Skripte"}
 {"uk": "API та скрипти | Minerva", "en": "API and scripts | Minerva", "de": "API und Skripte | Minerva"}
+{"uk": "API та скрипти → JLCPCB", "en": "API and scripts → JLCPCB", "de": "API und Skripte → JLCPCB"}
+{"uk": "API та скрипти → REST API", "en": "API and scripts → REST API", "de": "API und Skripte → REST API"}
+{"uk": "API та скрипти → Scraper рахунків", "en": "API and scripts → Invoice scraper", "de": "API und Skripte → Rechnungs-Scraper"}
 {"uk": "API тестер", "en": "API tester", "de": "API-Tester"}
 {"uk": "API-ключ", "en": "API key", "de": "API-Schlüssel"}
 {"uk": "API-ключ RAG (Minerva → RAG)", "en": "RAG API key (Minerva → RAG)", "de": "RAG-API-Schlüssel (Minerva → RAG)"}
@@ -1348,6 +1351,7 @@
 {"uk": "DigiKey Marketplace: токен недійсний", "en": "DigiKey Marketplace: token invalid", "de": "DigiKey Marketplace: Token ungültig"}
 {"uk": "DigiKey Marketplace: у офера немає цін", "en": "DigiKey Marketplace: the offer has no prices", "de": "DigiKey Marketplace: Das Offer enthält keine Preise"}
 {"uk": "DigiKey PO Пошук | Minerva", "en": "DigiKey PO Search | Minerva", "de": "DigiKey-PO-Suche | Minerva"}
+{"uk": "DigiKey · 🤖 API та скрипти → Скрипти", "en": "DigiKey · 🤖 API and scripts → Scripts", "de": "DigiKey · 🤖 API und Skripte → Skripte"}
 {"uk": "DigiKey Каталог", "en": "DigiKey Catalog", "de": "DigiKey-Katalog"}
 {"uk": "DigiKey Компоненти | Minerva", "en": "DigiKey Components | Minerva", "de": "DigiKey-Komponenten | Minerva"}
 {"uk": "DigiKey Лістинги", "en": "DigiKey Listings", "de": "DigiKey-Listings"}
@@ -8943,6 +8947,7 @@
 {"uk": "Знайти про них в інтернеті (AI)…", "en": "Find them on the internet (AI)…", "de": "Im Internet über sie suchen (KI)…"}
 {"uk": "Знайти пропущені відповіді", "en": "Find missed replies", "de": "Verpasste Antworten finden"}
 {"uk": "Знайти прострочені й більше не актуальні дедлайни — події типу deadline або email_follow_up, дата яких вже минула і вони не виконані. Використовуй перш ніж пропонувати очищення.", "en": "Find overdue and no longer relevant deadlines — events of type deadline or email_follow_up whose date has passed and which are not done. Use before suggesting a cleanup.", "de": "Überfällige und nicht mehr aktuelle Fristen finden — Termine vom Typ deadline oder email_follow_up, deren Datum bereits verstrichen ist und die nicht erledigt sind. Vor einem Bereinigungsvorschlag verwenden."}
+{"uk": "Знайти розділ або сторінку, напр. DigiKey", "en": "Find a section or page, e.g. DigiKey", "de": "Bereich oder Seite suchen, z. B. DigiKey"}
 {"uk": "Знайти та синхронізувати один конкретний SKU (Supplier SKU DigiKey)", "en": "Find and sync one specific SKU (DigiKey Supplier SKU)", "de": "Eine bestimmte SKU (DigiKey Supplier SKU) suchen und synchronisieren"}
 {"uk": "Знайти товари складу за артикулом, назвою, виробником, категорією чи параметром. Повертає до 15 товарів (артикул, назва, доступно на складі).", "en": "Find stock products by SKU, name, manufacturer, category or parameter. Returns up to 15 products (SKU, name, available in stock).", "de": "Lagerartikel nach Artikelnummer, Name, Hersteller, Kategorie oder Parameter finden. Liefert bis zu 15 Artikel (Artikelnummer, Name, verfügbar im Lager)."}
 {"uk": "Знайти ще раз", "en": "Search again", "de": "Erneut suchen"}
@@ -12381,6 +12386,7 @@
 {"uk": "Нічого не знайдено", "en": "Nothing found", "de": "Nichts gefunden"}
 {"uk": "Нічого не знайдено для бекапу (БД порожня або недоступна).", "en": "Nothing found to back up (the DB is empty or unavailable).", "de": "Nichts zu sichern gefunden (die DB ist leer oder nicht erreichbar)."}
 {"uk": "Нічого не знайдено за запитом «{0}»", "en": "Nothing found for “{0}”", "de": "Keine Treffer für „{0}“"}
+{"uk": "Нічого не знайдено — ні в її меню, ні серед розділів, яких вона ще не має.", "en": "Nothing found — neither in their menu nor among the sections they do not have yet.", "de": "Nichts gefunden — weder im Menü dieser Person noch unter den Bereichen, die sie noch nicht hat."}
 {"uk": "Нічого не знайдено — спробуйте інші слова або перегляньте розділи нижче.", "en": "Nothing found — try other words or browse the sections below.", "de": "Nichts gefunden — versuchen Sie andere Begriffe oder sehen Sie sich die Bereiche unten an."}
 {"uk": "Нічого не знайдено.", "en": "Nothing found.", "de": "Nichts gefunden."}
 {"uk": "Нічого не знайшлося", "en": "Nothing found", "de": "Nichts gefunden"}
@@ -15780,6 +15786,7 @@
 {"uk": "Розділи…", "en": "Sections…", "de": "Bereiche…"}
 {"uk": "Розділяє готову продукцію від компонентів для збирання", "en": "Separates finished goods from components for assembly", "de": "Trennt Fertigprodukte von Komponenten für die Montage"}
 {"uk": "Розділі", "en": "Section", "de": "Bereich"}
+{"uk": "Розділів немає в її доступі", "en": "Sections not in their access", "de": "Bereiche ohne Zugriff"}
 {"uk": "Розділів немає — ⚙ або правий клік → «📑 Розділи».", "en": "No sections — ⚙ or right-click → “📑 Sections”.", "de": "Keine Bereiche — ⚙ oder Rechtsklick → „📑 Bereiche“."}
 {"uk": "Розкид", "en": "Spread", "de": "Spanne"}
 {"uk": "Розклад", "en": "Schedule", "de": "Zeitplan"}
@@ -19176,6 +19183,7 @@
 {"uk": "Ще не вирішено", "en": "Not decided yet", "de": "Noch nicht entschieden"}
 {"uk": "Ще не вказано", "en": "Not set yet", "de": "Noch nicht angegeben"}
 {"uk": "Ще не внесено", "en": "Not entered yet", "de": "Noch nicht erfasst"}
+{"uk": "Ще не відкрито — увімкніть потрібне", "en": "Not opened yet — switch on what is needed", "de": "Noch nicht freigegeben — Benötigtes einschalten"}
 {"uk": "Ще не відповів", "en": "No reply yet", "de": "Noch keine Antwort"}
 {"uk": "Ще не відправлено", "en": "Not shipped yet", "de": "Noch nicht versendet"}
 {"uk": "Ще не завантажено ({0}) — артикул і посилання, з якого качатиметься", "en": "Not downloaded yet ({0}) — SKU and the link it will be downloaded from", "de": "Noch nicht heruntergeladen ({0}) — Artikelnummer und Link, von dem heruntergeladen wird"}
@@ -23803,6 +23811,7 @@
 {"uk": "у магазинах показується: {0}", "en": "shown in shops: {0}", "de": "in Webshops sichtbar: {0}"}
 {"uk": "у магазині", "en": "in the shop", "de": "im Webshop"}
 {"uk": "у магазині змінилось після пропозиції — запустіть завдання ще раз", "en": "it changed in the shop after the proposal — run the task again", "de": "im Shop hat sich nach dem Vorschlag etwas geändert – starten Sie die Aufgabe erneut"}
+{"uk": "у меню: {0}", "en": "in the menu: {0}", "de": "im Menü: {0}"}
 {"uk": "у налаштуваннях вимкнено «Пішов» автоматично — без нього день не закриється", "en": "automatic “Clock out” is disabled in the settings — without it the day will not be closed", "de": "automatisches „Gehen“ ist in den Einstellungen deaktiviert — ohne es wird der Tag nicht abgeschlossen"}
 {"uk": "у новій вкладці", "en": "in a new tab", "de": "in einem neuen Tab"}
 {"uk": "у пам'яті", "en": "in memory", "de": "im Speicher"}

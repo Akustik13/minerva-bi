@@ -33,6 +33,23 @@ PAGES = [
     ("📚 Гід по Minerva", "/guide/", None),
 ]
 ALWAYS = frozenset({"core", "auth", "faq", "admin", "authtoken", "dashboard"})
+# Де модуль у бічному меню, коли група там зветься інакше, ніж модуль (MV_GROUPS у templates/admin/base_site.html):
+# сторінки DigiKey — у модулі «AI та Боти» (bots), а в меню — окрема група «🛒 DigiKey».
+MENU_PLACES = {
+    "bots": "🛒 DigiKey · 🤖 API та скрипти → Скрипти",
+    "api": "🤖 API та скрипти → REST API",
+    "jlcpcb": "🤖 API та скрипти → JLCPCB",
+    "scraper_hub": "🤖 API та скрипти → Scraper рахунків",
+    "dashboard": "📊 Аналітика",
+}
+
+
+def module_pages(app: str) -> list:
+    """Сторінки модуля в адмінці (назвами з меню) — щоб знайти, у якому модулі, напр., «DigiKey — лістинги»."""
+    from django.utils.text import capfirst
+    names = {capfirst(str(model._meta.verbose_name_plural))
+             for model in admin.site._registry if model._meta.app_label == app}
+    return sorted(names, key=str.lower)
 
 
 def _fresh(user, draft=None):
@@ -106,7 +123,8 @@ def module_rows(user) -> list:
             level = level_of(got) if in_role else "hidden"
             extra = [o for o in EXTRA_OPS if got == "__all__" or o in (got or [])] if in_role else []
         rows.append({"app": m.app_label, "name": m.name, "active": m.is_active, "allowed": ok, "why": why,
-                     "ops": ops, "fixed": m.app_label in ALWAYS, "level": level, "extra": extra})
+                     "ops": ops, "fixed": m.app_label in ALWAYS, "level": level, "extra": extra,
+                     "place": MENU_PLACES.get(m.app_label, ""), "pages": module_pages(m.app_label)})
     return rows
 
 
@@ -225,7 +243,8 @@ def overview(data) -> dict:
     modules = data.get("modules", [])
     return {
         "visible": visible,
-        "hidden_sections": [m["name"] for m in modules if m["active"] and not m["allowed"] and not m["fixed"]],
+        "hidden_sections": [f'{m["name"]} ({m["place"]})' if m["place"] else m["name"]
+                            for m in modules if m["active"] and not m["allowed"] and not m["fixed"]],
         "hidden_pages": hidden_pages,
         "pages_on": [p["label"] for p in data.get("pages", []) if p["allowed"]],
         "pages_off": [p["label"] for p in data.get("pages", []) if not p["allowed"]],
@@ -256,6 +275,9 @@ def preview(user, draft=None) -> dict:
         row = levels.get(app["app"])
         app["level"] = row["level"] if row else ""
         app["editable"] = bool(row) and not row["fixed"]
+        app["place"] = row["place"] if row else ""
+    # модулі, яких людина ще не має, — у меню редактора під «➕ Ще не відкрито» (там їх і вмикають)
+    data["closed"] = [m for m in data["modules"] if m["active"] and not m["allowed"] and not m["fixed"]]
     data["models_count"] = sum(a["shown"] for a in data["menu"])
     data["edit_count"] = sum(a["edit"] for a in data["menu"])
     data["overview"] = overview(data)
