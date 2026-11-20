@@ -11,6 +11,8 @@ email_assistant/attachments.py — вкладення для листа-відп
   - {file, name, content_type, size} — файл з комп'ютера, збережений у MEDIA_ROOT/email_outbox/<uuid>/;
   - {ref, name} — документ Minerva («order:…», «msg:…», «offer:…»), файл читається лише під час відправки.
 Файл чернетки у формі листа — посилання «draft:<pk>:<індекс>» (лише чернетки цієї скриньки).
+📎 Файл, доданий до запиту AI-відповіді, — «aifile:<pk>» (email_assistant/ai_files.py, лише файли цієї скриньки);
+у чернетку / запланований лист він потрапляє своєю копією — файли до запиту AI прибираються через KEEP_DAYS.
 """
 import logging
 import mimetypes
@@ -146,8 +148,8 @@ def can_attach(account, kind: str) -> bool:
 
 
 def load_ref(account, ref: str):
-    """«order:…» / «msg:…» / «offer:…» / «draft:…» → {name, content, content_type} або None (чуже/неіснуюче /
-    немає права бачити — None)."""
+    """«order:…» / «msg:…» / «offer:…» / «draft:…» / «aifile:…» → {name, content, content_type} або None (чуже /
+    неіснуюче / немає права бачити — None)."""
     from email_assistant.models import EmailMessage
     from sales.models import SalesOrder
 
@@ -156,6 +158,9 @@ def load_ref(account, ref: str):
         if kind in ('offer', 'offerint', 'order', 'invoice') and not can_attach(account, kind):
             logger.warning('attachment ref %s: no permission for %s', ref, getattr(account, 'user', None))
             return None
+        if kind == 'aifile':  # 📎 файл, доданий до запиту AI-відповіді, — лише цієї скриньки
+            from email_assistant.ai_files import load as ai_file
+            return ai_file(account, ref)
         if kind == 'draft':   # файл / документ, уже збережений у чернетці цієї скриньки
             found = draft_item(account, ref)
             if found is None or str(found[1].get('ref', '')).startswith('draft:'):
@@ -324,6 +329,12 @@ def from_form(account, refs, names, files, draft=None, check=False):
             src, item = found
             plan.append(('keep' if draft is not None and src.pk == draft.pk else 'copy', dict(item)))
             continue
+        if ref.startswith('aifile:'):   # 📎 файл до запиту AI — чернетка / запланований лист тримають свою копію
+            att = load_ref(account, ref)
+            if att is None:
+                return [], f'Вкладення недоступне: {name}'
+            plan.append(('store', att))
+            continue
         if check:
             att = load_ref(account, ref)
             if att is None:
@@ -332,7 +343,10 @@ def from_form(account, refs, names, files, draft=None, check=False):
         plan.append(('ref', {'ref': ref, 'name': os.path.basename(str(name))[:255] or 'attachment'}))
     out, copies = [], []
     for how, item in plan:
-        if how == 'copy' and item.get('file'):
+        if how == 'store':
+            item = store_file(item['name'], item['content'], item['content_type'])
+            copies.append(item)
+        elif how == 'copy' and item.get('file'):
             copy = copy_stored(item)
             if copy is None:
                 remove_stored(copies)

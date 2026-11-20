@@ -32,6 +32,9 @@ urlpatterns = [
     path('message/<int:message_pk>/ai-reply/',           views.ai_suggest_reply,     name='ai_reply'),
     # «📋 Підготувати відповідь»: бриф → лист у фоні (reply_brief.py)
     path('message/<int:message_pk>/ai-prepare/',         views.ai_prepare_view,      name='ai_prepare'),
+    path('message/<int:message_pk>/ai-files/',           views.ai_files_view,        name='ai_files'),
+    path('ai-file/<int:file_pk>/',                        views.ai_file_view,         name='ai_file'),
+    path('ai-file/<int:file_pk>/delete/',                 views.ai_file_delete_view,  name='ai_file_delete'),
     path('message/<int:message_pk>/brief/',              views.message_brief_view,   name='message_brief'),
     # «📜 Історія»: запитання про лист і «що обіцяли / зробили» — на тих самих зібраних даних
     path('message/<int:message_pk>/ai-ask/',             views.ai_ask_view,          name='ai_ask'),

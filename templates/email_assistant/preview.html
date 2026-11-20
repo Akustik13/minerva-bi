@@ -212,6 +212,25 @@
 /* Інструкція для AI — як поле чату: кілька рядків, росте з текстом; Enter — генерувати, Shift+Enter — новий рядок */
 textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;max-height:240px;resize:vertical;box-sizing:border-box}
 .em-ai-prompt-row{display:flex;gap:6px;align-items:flex-end}
+/* 📎 Файли до запиту AI (email_assistant/ai_files.py): чипи під полем інструкції, перетягнути, Ctrl+V */
+.em-ai-files{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:-2px 0 8px;font-size:12px}
+.em-ai-fadd{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:12px;cursor:pointer;
+  border:1px dashed var(--border-strong);color:var(--text-muted);background:none;font-size:12px}
+.em-ai-fadd:hover{border-color:#00d4aa;color:var(--text)}
+.em-ai-fchips{display:contents}
+.em-ai-fchip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:12px;max-width:260px;
+  background:var(--bg-card);border:1px solid var(--border-strong);color:var(--text)}
+.em-ai-fchip a{color:inherit;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.em-ai-fchip a:hover{text-decoration:underline}
+.em-ai-fchip .sz{color:var(--text-dim);font-size:11px;flex-shrink:0}
+.em-ai-fchip button{border:none;background:none;color:var(--text-dim);cursor:pointer;padding:0;font-size:12px}
+.em-ai-fchip button:hover{color:var(--err,#e53935)}
+.em-ai-fchip.up{opacity:.6}
+.em-ai-fattach{display:inline-flex;align-items:center;gap:4px;color:var(--text-muted);cursor:pointer}
+.em-ai-fattach[hidden]{display:none}
+.em-ai-fhint{color:var(--text-dim);font-size:11px}
+.em-ai-fhint.err{color:var(--err,#e53935)}
+.em-ai-box.em-ai-drop{outline:2px dashed #00d4aa;outline-offset:2px}
 .em-ai-btns{display:flex;flex-direction:column;gap:6px}
 /* «📋 Підготувати»: етапи, бриф під чернеткою */
 .em-brief-stages{font-size:12px;color:var(--text-muted);margin:2px 0 8px;line-height:1.7}
@@ -637,6 +656,16 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
             </div>
           </div>
         </div>
+        <div class="em-ai-files" id="pv-ai-files-{{ msg.pk }}">
+          <label class="em-ai-fadd" title="{% trans "Фото, PDF (даташит), DOCX, TXT або CSV — AI прочитає їх і використає в листі. Можна перетягнути сюди або вставити скріншот Ctrl+V" %}">📎 {% trans "Файли до запиту" %}
+            <input type="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,.pdf,.docx,.txt,.csv"
+                   onchange="pvAiFilesPick({{ msg.pk }}, this)"></label>
+          <span class="em-ai-fchips" id="pv-ai-fchips-{{ msg.pk }}"></span>
+          <label class="em-ai-fattach" id="pv-ai-fattach-{{ msg.pk }}" hidden
+                 title="{% trans "«Вставити у відповідь» і «↩ Відповісти» одразу додадуть ці файли у вкладення листа" %}">
+            <input type="checkbox" checked onchange="pvAiFilesAttach(this)"> 📎 {% trans "Вкласти ці файли в лист" %}</label>
+          <span class="em-ai-fhint" id="pv-ai-fhint-{{ msg.pk }}">{% trans "фото, PDF, DOCX, TXT · перетягніть сюди або Ctrl+V" %}</span>
+        </div>
         <div class="em-brief-stages" id="pv-brief-stages-{{ msg.pk }}"></div>
         <div class="em-ai-txt" id="pv-ai-txt-{{ msg.pk }}"></div>
         <div class="em-ai-used" id="pv-ai-used-{{ msg.pk }}"></div>
@@ -1046,7 +1075,10 @@ window.pvSendReply2 = async function() {
     var d = await r.json();
     status.textContent = d.ok ? '✓ {% trans "Відправлено" %}' + (d.via ? ' · {% trans "через" %} ' + d.via : '') : '✗ ' + d.error;
     status.style.color = d.ok ? 'var(--ok,#2e7d32)' : 'var(--err,#e53935)';
-    if (d.ok) { editor.innerHTML = ''; _pvAtt = []; _pvAttRender(); if (btn) { btn.disabled = false; btn.style.opacity = '1'; } }
+    if (d.ok) {
+      editor.innerHTML = ''; _pvAtt = []; _pvAttRender(); if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+      if (d.ai_files_gone && d.ai_files_gone.length) _pvAiFilesGone(d.ai_files_gone);   // уже в надісланому листі
+    }
     else if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
   } catch {
     status.textContent = '✗ {% trans "Помилка мережі" %}'; status.style.color = 'var(--err,#e53935)';
@@ -1160,9 +1192,13 @@ window.pvReplyAI = function(pk) {
 
 // AI-відповідь (email_assistant/views.ai_suggest_reply): інструкція — у тілі POST (довга в адресі не проходить
 // ліміт рядка запиту сервера); відповідь не JSON (збій, тайм-аут) — помилка з кодом відповіді
-async function _pvAiReplyFetch(pk, prompt) {
+async function _pvAiReplyFetch(pk, prompt, withFiles) {
   var fd = new FormData();
   fd.append('prompt', prompt || '');
+  if (withFiles) {   // 📎 файли до запиту: AI бачить фото й тексти документів
+    _pvAiFileList(pk).forEach(function(f) { fd.append('file', f.id); });
+    fd.append('attach', _pvAiAttachOn() ? '1' : '0');
+  }
   var r = await fetch('/email/message/' + pk + '/ai-reply/', {method: 'POST', headers: {'X-CSRFToken': CSRF}, body: fd});
   try { return await r.json(); }
   catch (e) { return {ok: false, error: '{% trans "Сервер не відповів як очікувалось" %} (HTTP ' + r.status + ')'}; }
@@ -1254,7 +1290,7 @@ function _pvAiOpen(pk, mode) {
   document.getElementById('pv-ai-lbl-' + pk).textContent = _PV_AI_LABELS[mode];
   document.getElementById('pv-ai-prompt-row-' + pk).style.display = mode === 'reply' ? 'flex' : 'none';
   document.getElementById('pv-ai-use-' + pk).style.display = mode === 'reply' ? '' : 'none';
-  ['pv-brief-stages-', 'pv-brief-', 'pv-data-', 'pv-brief-next-'].forEach(function(id) {   // лише для відповіді, не для перекладу
+  ['pv-brief-stages-', 'pv-brief-', 'pv-data-', 'pv-brief-next-', 'pv-ai-files-'].forEach(function(id) {   // лише для відповіді, не для перекладу
     var el = document.getElementById(id + pk);
     if (el) el.style.display = mode === 'reply' ? '' : 'none';
   });
@@ -1286,21 +1322,173 @@ window.pvAiReply = function(pk) {
   if (inp) { setTimeout(function(){ inp.focus({preventScroll: true}); }, 50); }
   _pvPrepModeLoad(pk);
   _pvBriefRestore(pk);
+  _pvAiFilesLoad(pk);
 };
 
 window.pvAiGenerate = async function(pk) {
   var txt   = document.getElementById('pv-ai-txt-' + pk);
   var inp   = document.getElementById('pv-ai-prompt-' + pk);
-  txt.textContent = '⏳ {% trans "Minerva думає..." %}';
+  txt.textContent = _pvAiFileList(pk).length ? '⏳ {% trans "Minerva читає ваші файли й думає..." %}' : '⏳ {% trans "Minerva думає..." %}';
   _pvUsed('pv-ai-used-' + pk, null);
   try {
-    var d = await _pvAiReplyFetch(pk, inp ? inp.value.trim() : '');
+    var d = await _pvAiReplyFetch(pk, inp ? inp.value.trim() : '', true);
     txt.textContent = d.ok ? d.reply : '⚠️ ' + d.error;
     var aiBox = document.getElementById('pv-ai-' + pk);
     if (aiBox) { aiBox._to = d.to || ''; aiBox._cc = (d.cc || []).join(', '); }
     _pvUsed('pv-ai-used-' + pk, (d.to ? ['{% trans "кому" %}: ' + d.to] : []).concat(d.used || []));
   } catch { txt.textContent = '⚠️ {% trans "Помилка" %}'; }
 };
+
+// ── 📎 Файли до запиту AI (email_assistant/ai_files.py): 📎 / перетягнути / Ctrl+V → сервер (лише своя скринька);
+// «Генерувати» і «📋 Підготувати» передають їхні id, «Вставити у відповідь» / «↩ Відповісти» — у вкладення (aifile:<id>)
+var _pvAiFiles = {};
+var _PV_AI_KIND_ICON = {image: '🖼', pdf: '📄', docx: '📝', text: '🧾'};
+
+function _pvAiFileList(pk) { return (_pvAiFiles[pk] || []).filter(function(f) { return f.id; }); }
+
+function _pvAiAttachOn() {
+  try { return localStorage.getItem('em-ai-attach') !== '0'; } catch (e) { return true; }
+}
+window.pvAiFilesAttach = function(cb) {
+  try { localStorage.setItem('em-ai-attach', cb.checked ? '1' : '0'); } catch (e) {}
+  document.querySelectorAll('.em-ai-fattach input').forEach(function(x) { x.checked = cb.checked; });
+};
+
+function _pvAiSize(n) {
+  return n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' МБ' : Math.max(1, Math.round(n / 1024)) + ' КБ';
+}
+
+function _pvAiHint(pk, text, err) {
+  var h = document.getElementById('pv-ai-fhint-' + pk);
+  if (!h) return;
+  h.textContent = text || (_pvAiFileList(pk).length ? '' : '{% trans "фото, PDF, DOCX, TXT · перетягніть сюди або Ctrl+V" %}');
+  h.classList.toggle('err', !!err);
+}
+
+function _pvAiFilesRender(pk) {
+  var box = document.getElementById('pv-ai-fchips-' + pk);
+  if (!box) return;
+  box.innerHTML = '';
+  (_pvAiFiles[pk] || []).forEach(function(f) {
+    var chip = document.createElement('span');
+    chip.className = 'em-ai-fchip' + (f.id ? '' : ' up');
+    var a = document.createElement(f.id ? 'a' : 'span');
+    // f.note — сервер (ai_files.note): що AI отримає з файлу без тексту (скан — сторінками, зламаний — лише назву)
+    a.textContent = (f.id ? (_PV_AI_KIND_ICON[f.kind] || '📎') : '⏳') + ' ' + f.name + (f.warn ? ' ⚠️' : '');
+    if (f.id) { a.href = f.url; a.target = '_blank'; a.rel = 'noopener'; }
+    a.title = f.name + (f.info ? ' · ' + f.info : '') + (f.note ? ' · ' + f.note : '');
+    chip.appendChild(a);
+    var sz = document.createElement('span');
+    sz.className = 'sz'; sz.textContent = _pvAiSize(f.size || 0);
+    chip.appendChild(sz);
+    if (f.id) {
+      var x = document.createElement('button');
+      x.type = 'button'; x.textContent = '✕'; x.title = '{% trans "Прибрати файл" %}';
+      x.onclick = function() { _pvAiFileDrop(pk, f); };
+      chip.appendChild(x);
+    }
+    box.appendChild(chip);
+  });
+  var att = document.getElementById('pv-ai-fattach-' + pk);
+  if (att) {
+    att.hidden = !_pvAiFileList(pk).length;
+    var cb = att.querySelector('input'); if (cb) cb.checked = _pvAiAttachOn();
+  }
+  _pvAiHint(pk);
+}
+
+function _pvAiFilesLoad(pk) {
+  if (_pvAiFiles[pk]) { _pvAiFilesRender(pk); return; }
+  _pvAiFiles[pk] = [];
+  fetch('/email/message/' + pk + '/ai-files/', {credentials: 'same-origin'})
+    .then(function(r) { return r.json(); })
+    .then(function(d) { if (d.ok) { _pvAiFiles[pk] = (d.files || []).concat(_pvAiFiles[pk]); _pvAiFilesRender(pk); } })
+    .catch(function() {});
+}
+
+async function _pvAiUpload(pk, files) {
+  _pvAiFiles[pk] = _pvAiFiles[pk] || [];
+  var list = Array.from(files || []), errors = [];
+  for (var i = 0; i < list.length; i++) {
+    var file = list[i];
+    var tmp = {name: file.name || 'screenshot.png', size: file.size};
+    _pvAiFiles[pk].push(tmp);
+    _pvAiFilesRender(pk);
+    var fd = new FormData();
+    fd.append('file', file, tmp.name);
+    var d;
+    try {
+      var r = await fetch('/email/message/' + pk + '/ai-files/', {method: 'POST', headers: {'X-CSRFToken': CSRF}, body: fd});
+      try { d = await r.json(); } catch (e) { d = {ok: false, error: '{% trans "Сервер не прийняв файл" %} (HTTP ' + r.status + ')'}; }
+    } catch (e) { d = {ok: false, error: '{% trans "Помилка мережі" %}'}; }
+    var at = _pvAiFiles[pk].indexOf(tmp);
+    if (d.ok) _pvAiFiles[pk][at] = d.file;
+    else { _pvAiFiles[pk].splice(at, 1); errors.push(d.error); }
+    _pvAiFilesRender(pk);
+    if (errors.length) _pvAiHint(pk, '⚠️ ' + errors.join(' · '), true);   // не стирається наступним файлом
+  }
+}
+
+window.pvAiFilesPick = function(pk, input) {
+  var files = Array.from(input.files || []);
+  input.value = '';
+  _pvAiFilesLoad(pk);
+  _pvAiUpload(pk, files);
+};
+
+async function _pvAiFileDrop(pk, f) {
+  try {
+    var r = await fetch('/email/ai-file/' + f.id + '/delete/', {method: 'POST', headers: {'X-CSRFToken': CSRF}});
+    var d = await r.json();
+    if (!d.ok && r.status !== 404) { _pvAiHint(pk, '⚠️ ' + d.error, true); return; }
+  } catch (e) { _pvAiHint(pk, '⚠️ {% trans "Помилка мережі" %}', true); return; }
+  _pvAiFilesGone([f.id]);
+}
+
+// Файли прибрано (✕ або лист із ними надіслано) — з чипів і з вкладень відповіді
+function _pvAiFilesGone(ids) {
+  Object.keys(_pvAiFiles).forEach(function(pk) {
+    _pvAiFiles[pk] = _pvAiFiles[pk].filter(function(f) { return !f.id || ids.indexOf(f.id) < 0; });
+    _pvAiFilesRender(pk);
+  });
+  var before = _pvAtt.length;
+  _pvAtt = _pvAtt.filter(function(a) { return !a.ai || ids.indexOf(a.ai) < 0; });
+  if (_pvAtt.length !== before) _pvAttRender();
+}
+
+// Перетягнути файли на AI-панель листа, вставити скріншот у поле «Що відповісти?»
+document.querySelectorAll('.em-ai-box[id^="pv-ai-"]').forEach(function(box) {
+  var pk = parseInt(box.id.slice(6), 10);
+  if (!pk) return;
+  function hasFiles(e) { return e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') >= 0; }
+  ['dragenter', 'dragover'].forEach(function(t) {
+    box.addEventListener(t, function(e) {
+      if (!hasFiles(e) || box.dataset.mode !== 'reply') return;
+      e.preventDefault(); e.stopPropagation(); box.classList.add('em-ai-drop');
+    });
+  });
+  box.addEventListener('dragleave', function(e) { if (!box.contains(e.relatedTarget)) box.classList.remove('em-ai-drop'); });
+  box.addEventListener('drop', function(e) {
+    box.classList.remove('em-ai-drop');
+    if (!hasFiles(e) || box.dataset.mode !== 'reply') return;
+    e.preventDefault(); e.stopPropagation();
+    _pvAiFilesLoad(pk);
+    _pvAiUpload(pk, e.dataTransfer.files);
+  });
+  var inp = document.getElementById('pv-ai-prompt-' + pk);
+  if (inp) inp.addEventListener('paste', function(e) {
+    var cd = e.clipboardData;
+    var files = cd && cd.files ? Array.from(cd.files) : [];
+    if (!files.length || (cd.getData('text/plain') || '').trim()) return;   // текст (і клітинка Excel) — як звичайно
+    e.preventDefault();
+    var stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
+    _pvAiFilesLoad(pk);
+    _pvAiUpload(pk, files.map(function(f, i) {
+      if (f.name && f.name !== 'image.png') return f;
+      try { return new File([f], 'screenshot-' + stamp + (i ? '-' + i : '') + '.png', {type: f.type}); } catch (x) { return f; }
+    }));
+  });
+});
 
 // «📋 Підготувати відповідь»: бриф → лист у фоні (email_assistant/reply_brief.py); етапи видно під полем,
 // бриф — згорнутий під чернеткою: його можна виправити й «↻ Переписати» лише лист
@@ -1316,6 +1504,7 @@ window.pvGrowBrief = function(el) {
 // Групи джерел — звідки дані (порядок показу); [група, назва, пояснення, етап, з якого причина «порожньо»]
 var _PV_SRC_GROUPS = [
   ['mail', '📨 {% trans "Ця гілка" %}', '{% trans "листи, на які відповідаємо" %}', 'thread'],
+  ['upload', '📎 {% trans "Ваші файли" %}', '{% trans "фото й документи, які ви додали до запиту: тексти — тут, фото й скани AI бачить зображеннями" %}', 'uploads'],
   ['history', '📜 {% trans "Історія" %}', '{% trans "те саме, що кнопка «📜 Історія»: стан і хронологія замовлень, відправлень, нотаток CRM" %}', 'minerva'],
   ['overview', '🧭 {% trans "Огляд проєкту" %}', '{% trans "збережений AI-огляд: обіцянки, відкриті питання" %}', 'minerva'],
   ['project', '📁 {% trans "Проєкт" %}', '{% trans "шапка й останні листи з інших гілок проєкту" %}', 'projects'],
@@ -1355,6 +1544,7 @@ function _pvDataRender(pk, b) {
   var d = b.dedup || {}, dedup = _pvDedupLine(d);
   list.innerHTML = (dedup ? '<div class="em-data-dedup">' + _pvEsc(dedup) + '</div>' : '') + _PV_SRC_GROUPS.map(function(g) {
     var items = b.sources.filter(function(s) { return s.kind === g[0]; });
+    if (g[0] === 'upload' && !items.length && !(b.stages || []).some(function(x) { return x.key === 'uploads'; })) return '';
     var note = g[0] === 'mail' && d.quote_letters ? ' · {% trans "без цитат попередніх листів" %}: ' + d.quote_letters :
                g[0] === 'rag' && d.rag_dropped ? ' · {% trans "відкинуто дублів" %}: ' + d.rag_dropped : '';
     var html = '<div class="em-data-grp">' + g[1] + ' (' + items.length + ') <span>· ' + g[2] + _pvEsc(note) + '</span></div>';
@@ -1466,8 +1656,11 @@ window.pvAiPrepare = async function(pk) {
   try {
     var r = await fetch('/email/message/' + pk + '/ai-prepare/', {method: 'POST',
       headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
-      body: JSON.stringify({wish: inp ? inp.value.trim() : '', mode: mode})});
-    _pvBriefPoll(pk, await r.json());
+      body: JSON.stringify({wish: inp ? inp.value.trim() : '', mode: mode,
+                            files: _pvAiFileList(pk).map(function(f) { return f.id; }), attach: _pvAiAttachOn()})});
+    var d = await r.json();
+    if (d.ok === false) { txt.textContent = '⚠️ ' + d.error; return; }
+    _pvBriefPoll(pk, d);
   } catch { txt.textContent = '⚠️ {% trans "Помилка" %}'; }
 };
 
@@ -2338,6 +2531,12 @@ window.pvUseAsReply = function(pk) {
   _pvEnsureReply((box && box._to) || _pvReplyDefaults.to,
                  (card && card.dataset.subject) || _pvReplyDefaults.subj, (box && box._cc) || '');
   ed.innerText = txt.textContent;
+  if (_pvAiAttachOn()) {   // 📎 файли до запиту — одразу у вкладеннях відповіді
+    _pvAiFileList(pk).forEach(function(f) {
+      if (!_pvAtt.some(function(a) { return a.ref === f.ref; })) _pvAtt.push({ref: f.ref, name: f.name, ai: f.id});
+    });
+    _pvAttRender();
+  }
   ed.scrollIntoView({behavior:'smooth'});
   ed.focus();
 };
@@ -2352,6 +2551,7 @@ window.pvReplyFull = function(pk) {
   if (text) q.set('body', text.slice(0, 6000));
   if (box && box._to) q.set('to', box._to);
   if (box && box._cc) q.set('cc', box._cc);
+  if (_pvAiAttachOn()) _pvAiFileList(pk).forEach(function(f) { q.append('att', f.ref); });   // 📎 у вкладеннях
   location.href = '/email/compose/?' + q.toString();
 };
 

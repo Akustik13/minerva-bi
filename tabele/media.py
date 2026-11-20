@@ -27,7 +27,8 @@ MODULES = (                          # тека → розділ Minerva (пер
     ("suppliers/", "inventory"), ("supplier_requests/", "suppliers"), ("customers/", "crm"),
 )
 ADMIN_ONLY = ("knowledge/", "knowledge_sources/")
-NOBODY = ("meetings/",)              # 🎙 наради — лише власник і лише через сторінку наради, не через /media/
+NOBODY = ("meetings/", "email_ai/")  # 🎙 наради, 📎 файли до запиту AI в пошті — лише власник і лише через свою
+                                     # сторінку (нарада, /email/ai-file/<pk>/), не через /media/
 UNSAFE_TYPES = ("text/html", "image/svg+xml", "application/xhtml+xml", "text/xml", "application/xml",
                 "text/javascript", "application/javascript", "application/x-javascript")
 

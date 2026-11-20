@@ -4,6 +4,8 @@
 
 1. gather() — БЕЗ AI (0 токенів), у момент натискання; кожне джерело отримує номер [#N] і групу походження:
    - mail       — листи цієї гілки до листа, на який відповідаємо;
+   - upload     — 📎 файли, які менеджер додав до запиту (ai_files.py): текст PDF / DOCX / TXT / CSV, а картинки й
+                  скани PDF — у виклик брифу зображеннями з тим самим [#N] (ai_files.source_blocks, ref «aifile:<pk>»);
    - history    — стан і хронологія, те саме, що в «📜 Історії» (замовлення, відправлення, нотатки CRM);
    - overview   — збережений AI-огляд проєкту (обіцянки, відкриті питання);
    - project    — шапка проєкту й останні листи з інших його гілок;
@@ -55,6 +57,7 @@ QUOTE_NOTE = '[… цитату попередніх листів прибран
 
 STAGES = [
     ('thread', '📨 Ця гілка'),
+    ('uploads', '📎 Ваші файли до запиту'),
     ('minerva', '📜 Історія (як у «📜 Історії»), огляд проєкту, інші листування з клієнтом'),
     ('projects', '📁 Проєкт: інші гілки'),
     ('offers', '📝 Angebote'),
@@ -77,9 +80,11 @@ class Sources:
     def __init__(self, items=None):
         self.items = list(items or [])
 
-    def add(self, kind, label, text, url=''):
-        self.items.append({'n': len(self.items) + 1, 'kind': kind, 'label': label[:200], 'url': url,
-                           'text': (text or '').strip()})
+    def add(self, kind, label, text, url='', ref=''):
+        item = {'n': len(self.items) + 1, 'kind': kind, 'label': label[:200], 'url': url, 'text': (text or '').strip()}
+        if ref:      # «aifile:<pk>» — 📎 файл менеджера: бриф бачить його картинкою (ai_files.source_blocks)
+            item['ref'] = ref
+        self.items.append(item)
         return len(self.items)
 
     def text(self) -> str:
@@ -87,7 +92,8 @@ class Sources:
 
     def public(self, texts=True) -> list:
         keys = ('n', 'kind', 'label', 'url', 'text') if texts else ('n', 'kind', 'label', 'url')
-        return [{k: i.get(k, '') for k in keys} for i in self.items]
+        return [dict({k: i.get(k, '') for k in keys}, **({'ref': i['ref']} if i.get('ref') else {}))
+                for i in self.items]
 
 
 def _dt(value) -> str:
@@ -177,8 +183,9 @@ def read_attachment_text(att, limit=ATTACHMENT_CHARS, path=None):
 
 # ── Збір джерел (без AI) ─────────────────────────────────────────────────────
 
-def gather(brief, on_stage=None) -> tuple:
-    """(Sources, листи гілки, мітка листа-адресата). on_stage(key, status, detail) — для показу етапів."""
+def gather(brief, on_stage=None, files=(), attach=False) -> tuple:
+    """(Sources, листи гілки, мітка листа-адресата). on_stage(key, status, detail) — для показу етапів.
+    files — 📎 файли менеджера до запиту (AIFile, уже перевірені — свої), attach — їх буде вкладено в лист."""
     from email_assistant.context import build_context
     on_stage = on_stage or (lambda *a: None)
     msg, user, wish = brief.message, brief.user, brief.wish
@@ -199,6 +206,12 @@ def gather(brief, on_stage=None) -> tuple:
     on_stage('thread', 'done', f'{len(msgs)} лист.'
              + (f' · цитати прибрано в {dedup["quote_letters"]}' if dedup['quote_letters'] else ''))
     seen = {m.pk for m in msgs}                     # листи, що вже є в джерелах, — RAG їх не дублює
+
+    on_stage('uploads', 'running')
+    names = _uploads(src, files, attach)
+    if names:
+        used.append(f'ваші файли: {len(names)}')
+    on_stage('uploads', 'done' if names else 'skipped', ', '.join(names) or 'файлів до запиту не додано')
 
     on_stage('minerva', 'running')
     ctx = build_context(msg)
@@ -358,6 +371,27 @@ def _offers(src, msg, customer, projects) -> list:
     return numbers
 
 
+def _uploads(src, files, attach=False) -> list:
+    """📎 Файли менеджера → джерела «upload»: текст документа; картинка / скан — підпис (саме зображення бриф
+    отримує окремо, ai_files.source_blocks за ref)."""
+    from email_assistant import ai_files
+    from email_assistant.ai_helper import UPLOAD_MARK
+    names, budget = [], ai_files.TEXT_TOTAL
+    for f in files or ():
+        label = (f'Файл «{f.name}» · {ai_files.KINDS_TEXT.get(f.kind, f.kind)}' + (f' · {f.info}' if f.info else '')
+                 + f' {UPLOAD_MARK}' + (' · буде вкладено в лист' if attach else ''))
+        if f.kind == 'image':
+            text = '[Зображення — AI бачить його картинкою з цим самим номером [#N]]'
+        elif f.kind == 'pdf' and not f.text:
+            text = '[PDF без текстового шару (скан) — AI бачить його сторінки з цим самим номером [#N]]'
+        else:
+            text = f.text[:budget] or '[тексту в файлі немає]'
+            budget -= len(text)
+        src.add('upload', label, text, f'/email/ai-file/{f.pk}/', ref=f'aifile:{f.pk}')
+        names.append(f.name)
+    return names
+
+
 def _attachments(src, msgs) -> list:
     names, total = [], 0
     for m in reversed(msgs):                       # найновіші листи — першими
@@ -496,17 +530,19 @@ def _in_background(fn):
     _start_background(run)
 
 
-def start(user, msg, *, wish='', recipient='', to_email='', cc=(), mode='letter'):
-    """Нова підготовка для листа msg у фоні до кроку mode (data / brief / letter). → ReplyBrief (running)."""
+def start(user, msg, *, wish='', recipient='', to_email='', cc=(), mode='letter', files=(), attach=False):
+    """Нова підготовка для листа msg у фоні до кроку mode (data / brief / letter). → ReplyBrief (running).
+    files — 📎 файли менеджера до запиту (AIFile, уже перевірені — свої), attach — їх буде вкладено в лист."""
     from email_assistant.models import ReplyBrief
     mode = mode if mode in dict(ReplyBrief.MODE_CHOICES) else ReplyBrief.MODE_LETTER
     skip = {'data': ('brief', 'letter'), 'brief': ('letter',)}.get(mode, ())
-    keys = GATHER_STAGES + MODE_STEPS[mode]
+    keys = [k for k in GATHER_STAGES if k != 'uploads' or mode in REPLY_MODES] + MODE_STEPS[mode]   # 📎 — лише для листа
     brief = ReplyBrief.objects.create(
         user=user, message=msg, thread=msg.thread if msg.thread_id else None, wish=(wish or '')[:2000], mode=mode,
         recipient=recipient[:300], to_email=to_email[:254], cc=list(cc), stages=_stages(keys, skip=skip),
         last_message_id=latest_message_id(msg))
-    _in_background(lambda: _prepare(brief.pk))
+    file_ids = [f.pk for f in files or ()]
+    _in_background(lambda: _prepare(brief.pk, file_ids, attach))
     return brief
 
 
@@ -552,12 +588,14 @@ def _model_label(model) -> str:
     return label(model) if model else '—'
 
 
-def _prepare(pk):
+def _prepare(pk, file_ids=(), attach=False):
+    from email_assistant import ai_files
     from email_assistant.models import ReplyBrief
     brief = _load(pk)
     set_stage = _stage_setter(brief)
     try:
-        src, msgs, target = gather(brief, set_stage)
+        files = ai_files.for_request(brief.message.account, brief.user, file_ids)
+        src, msgs, target = gather(brief, set_stage, files=files, attach=attach)
         brief.sources, brief.target = src.public(), target
         brief.save(update_fields=['sources', 'target', 'used', 'dedup', 'updated_at'])
         if brief.mode == ReplyBrief.MODE_ANSWER:
@@ -602,10 +640,15 @@ def _rewrite(pk):
 
 
 def _make_brief(brief, src, set_stage):
-    from email_assistant import ai_helper
+    from email_assistant import ai_files, ai_helper
     set_stage('brief', 'running')
     profile = getattr(brief.user, 'profile', None)
-    text = ai_helper.make_reply_brief(src.text(), brief.wish, brief.target, brief.message.account, profile)
+    blocks = ai_files.source_blocks(brief.message.account, src.items)   # 📎 фото / скани менеджера — зображеннями
+    refused = ai_files.budget_error(brief.user) if blocks else ''
+    if refused:
+        raise RuntimeError(refused)
+    text = ai_helper.make_reply_brief(src.text(), brief.wish, brief.target, brief.message.account, profile,
+                                      **({'blocks': blocks} if blocks else {}))
     if not text:
         raise RuntimeError('AI не повернув бриф — перевірте ключ AI або спробуйте ще раз')
     brief.brief, brief.brief_model, brief.draft = text, ai_helper.last_model(), ''

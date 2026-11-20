@@ -1414,6 +1414,10 @@ def compose_view(request):
             value = (request.GET.get(key) or '').strip()[:1000]
             if value:
                 initial[key] = value
+        # 📎 файли, додані до запиту AI, — одразу у вкладеннях (лише свої, email_assistant/ai_files.py)
+        from email_assistant import ai_files
+        initial['att_refs'] = [{'ref': f'aifile:{f.pk}', 'name': f.name}
+                               for f in ai_files.for_request(account, request.user, request.GET.getlist('att'))]
     elif forward_pk:
         from email_assistant.models import EmailMessage
         fwd  = get_object_or_404(EmailMessage, pk=forward_pk, account=account)
@@ -1580,6 +1584,10 @@ def _handle_send(request, account, reply_to=None):
         if invoice_refs:   # 🧾 рахунок надіслано → «✉️ надіслано» в рахунку
             from sales.invoice_service import mark_sent_refs as invoice_sent
             invoice_sent(invoice_refs, ', '.join(to_list), user=request.user)
+        ai_refs = [r for r in refs if r.startswith('aifile:')]
+        if ai_refs:   # 📎 файли до запиту AI вже в надісланому листі — у Minerva більше не потрібні
+            from email_assistant import ai_files
+            result['ai_files_gone'] = ai_files.forget_sent(account, ai_refs)
         if request.POST.get('draft_pk'):   # лист із чернетки пішов — чернетка (і її файли) більше не потрібна
             from email_assistant import drafts as _drafts
             _drafts.discard(account, request.POST['draft_pk'], how='sent', text=body,
@@ -1723,14 +1731,22 @@ def ai_suggest_reply(request, message_pk):
     # інструкція — у тілі POST: довга (сотні слів кирилицею) в адресі не проходить ліміт рядка запиту gunicorn
     # (4094 байти → 400 не-JSON); ?prompt= — для старих сторінок
     instruction = (request.POST.get('prompt') or request.GET.get('prompt', ''))[:AI_PROMPT_MAX]
+    # 📎 файли до запиту (фото, даташит…): лише свої; AI бачить картинки й тексти (email_assistant/ai_files.py)
+    from email_assistant import ai_files
+    files = ai_files.for_request(account, request.user, request.POST.getlist('file'))
+    refused = ai_files.budget_error(request.user) if files else ''
+    if refused:
+        return JsonResponse({'ok': False, 'error': refused})
+    material = ai_files.materials(files, attach=request.POST.get('attach') == '1')
     rag = _rag_for_ai(request.user, ctx, 'reply', instruction)
     facts = context_text(ctx) + (('\n\n' + rag['facts']) if rag['facts'] else '')
     reply = generate_reply(thread_messages, account, profile,
-                           instruction=instruction, facts=facts, recipient=to_label)
+                           instruction=instruction, facts=facts, recipient=to_label,
+                           **({'files': material} if files else {}))   # без файлів — виклик як і раніше
     msg.ai_reply_draft = reply
     msg.save(update_fields=['ai_reply_draft'])
     from email_assistant.ai_helper import last_model
-    used = used_summary(ctx) + ([rag['note']] if rag['note'] else []) + \
+    used = used_summary(ctx) + material.used + ([rag['note']] if rag['note'] else []) + \
         ([f'модель {_model_label(last_model())}'] if last_model() else [])
     _to, reply_cc = _reply_addresses(account, thread_messages[-1])
     if (to_email or '').lower() != (_to or '').lower():
@@ -1763,9 +1779,56 @@ def ai_prepare_view(request, message_pk):
     if (to_email or '').lower() != (_to or '').lower():
         cc = []   # внутрішнє пересилання → пишемо клієнту, колег у копію не тягнемо
     body = _json_body(request)
+    from email_assistant import ai_files
+    files = ai_files.for_request(account, request.user, body.get('files') if isinstance(body.get('files'), list) else [])
+    mode = str(body.get('mode') or 'letter')
+    refused = ai_files.budget_error(request.user) if files and mode != 'data' else ''
+    if refused:
+        return JsonResponse({'ok': False, 'error': refused})
     brief = reply_brief.start(request.user, msg, wish=str(body.get('wish') or ''), recipient=to_label or '',
-                              to_email=to_email or '', cc=cc, mode=str(body.get('mode') or 'letter'))
+                              to_email=to_email or '', cc=cc, mode=mode, files=files, attach=bool(body.get('attach')))
     return JsonResponse(reply_brief.as_json(brief))
+
+
+@staff_member_required
+def ai_files_view(request, message_pk):
+    """📎 Файли до запиту AI-відповіді на лист: GET — свої файли для цього листа, POST (multipart «file») — додати
+    один (email_assistant/ai_files.py: тип за першими байтами, ліміти). Лише свій лист і своя скринька."""
+    from email_assistant import ai_files
+    from email_assistant.models import EmailMessage
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    if request.method == 'POST':
+        try:
+            f = ai_files.store(account, request.user, msg, request.FILES.get('file'))
+        except ai_files.FileError as e:
+            return JsonResponse({'ok': False, 'error': str(e)}, status=400)
+        return JsonResponse({'ok': True, 'file': ai_files.as_json(f)})
+    return JsonResponse({'ok': True, 'files': [ai_files.as_json(f) for f in ai_files.listing(account, request.user, msg)],
+                         'max': ai_files.MAX_FILES})
+
+
+@staff_member_required
+def ai_file_view(request, file_pk):
+    """Показати / завантажити свій 📎 файл до запиту AI (картинка й PDF — у браузері; чужий → 404)."""
+    from email_assistant import ai_files
+    f = ai_files.get(_get_account(request), request.user, file_pk)
+    data = ai_files.read_bytes(f) if f else None
+    if data is None:
+        return HttpResponse('Файл не знайдено', status=404)
+    return _attachment_response(data, f.name, f.content_type, force_download=request.GET.get('download') == '1')
+
+
+@staff_member_required
+@require_POST
+def ai_file_delete_view(request, file_pk):
+    """✕ у чипі файлу до запиту AI — лише свій."""
+    from email_assistant import ai_files
+    f = ai_files.get(_get_account(request), request.user, file_pk)
+    if f is None:
+        return JsonResponse({'ok': False, 'error': 'Файл не знайдено'}, status=404)
+    ai_files.remove(f)
+    return JsonResponse({'ok': True})
 
 
 @staff_member_required

@@ -3164,3 +3164,34 @@ msgstr "Angezeigt"
 
 msgid "Завантаження карток…"
 msgstr "Karten werden geladen…"
+
+# 📎 Файли до запиту AI (email_assistant/ai_files.py)
+msgid "Файли до запиту"
+msgstr "Dateien zur Anfrage"
+
+msgid "Фото, PDF (даташит), DOCX, TXT або CSV — AI прочитає їх і використає в листі. Можна перетягнути сюди або вставити скріншот Ctrl+V"
+msgstr "Fotos, PDF (Datenblatt), DOCX, TXT oder CSV — die KI liest sie und nutzt sie im Brief. Hierher ziehen oder Screenshot mit Strg+V einfügen"
+
+msgid "«Вставити у відповідь» і «↩ Відповісти» одразу додадуть ці файли у вкладення листа"
+msgstr "„In Antwort einfügen“ und „↩ Antworten“ fügen diese Dateien gleich als Anhänge des Briefs hinzu"
+
+msgid "Вкласти ці файли в лист"
+msgstr "Diese Dateien an den Brief anhängen"
+
+msgid "фото, PDF, DOCX, TXT · перетягніть сюди або Ctrl+V"
+msgstr "Fotos, PDF, DOCX, TXT · hierher ziehen oder Strg+V"
+
+msgid "Minerva читає ваші файли й думає..."
+msgstr "Minerva liest Ihre Dateien und denkt nach..."
+
+msgid "Ваші файли"
+msgstr "Ihre Dateien"
+
+msgid "фото й документи, які ви додали до запиту: тексти — тут, фото й скани AI бачить зображеннями"
+msgstr "Fotos und Dokumente, die Sie der Anfrage hinzugefügt haben: Texte stehen hier, Fotos und Scans sieht die KI als Bilder"
+
+msgid "Прибрати файл"
+msgstr "Datei entfernen"
+
+msgid "Сервер не прийняв файл"
+msgstr "Der Server hat die Datei nicht angenommen"

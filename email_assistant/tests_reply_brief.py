@@ -99,8 +99,9 @@ class PrepareTests(ReplyBriefBase):
         b = self.prepare(question, wish='назви ціну й строк')
         self.assertEqual(b['status'], 'done', b)
         stages = {s['key']: s['status'] for s in b['stages']}
-        self.assertEqual(stages, {'thread': 'done', 'minerva': 'done', 'projects': 'done', 'offers': 'done',
-                                  'attachments': 'done', 'rag': 'skipped', 'brief': 'done', 'letter': 'done'})
+        self.assertEqual(stages, {'thread': 'done', 'uploads': 'skipped', 'minerva': 'done', 'projects': 'done',
+                                  'offers': 'done', 'attachments': 'done', 'rag': 'skipped', 'brief': 'done',
+                                  'letter': 'done'})
         kinds = {s['kind'] for s in b['sources']}
         self.assertTrue({'mail', 'project', 'offer', 'attachment'} <= kinds, kinds)
         brief_prompt = self.ai.prompt('brief')

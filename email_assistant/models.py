@@ -848,3 +848,35 @@ class MailAppDevice(models.Model):
 
     def __str__(self):
         return self.name or f'📱 #{self.pk}'
+
+
+class AIFile(models.Model):
+    """📎 Файл до запиту AI-відповіді: прев'ю листа → поле «Що відповісти?» → «📎 Файли» / перетягнути / Ctrl+V.
+    Фото, PDF, DOCX, TXT / CSV (тип — за першими байтами). AI бачить його («Генерувати» і «📋 Підготувати»: картинки —
+    як зображення, документи — текстом, скан PDF — сторінками), «Вставити у відповідь» / «↩ Відповісти» кладуть його у
+    вкладення листа (посилання «aifile:<pk>»). Лише власник скриньки — ні колеги, ні адміністратор: файл віддає
+    /email/ai-file/<pk>/, тека media/email_ai/ закрита для /media/ (tabele/media.NOBODY). Логіка — лише
+    email_assistant/ai_files.py; надіслані листом і старші за ai_files.KEEP_DAYS — прибираються."""
+    IMAGE, PDF, DOCX, TEXT = 'image', 'pdf', 'docx', 'text'
+    KIND_CHOICES = [(IMAGE, 'Зображення'), (PDF, 'PDF'), (DOCX, 'Word (DOCX)'), (TEXT, 'Текст (TXT / CSV)')]
+
+    account      = models.ForeignKey(EmailAccount, on_delete=models.CASCADE, related_name='+', verbose_name='Скринька')
+    user         = models.ForeignKey(User, on_delete=models.CASCADE, related_name='+', verbose_name='Хто додав')
+    message      = models.ForeignKey(EmailMessage, null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+                                     verbose_name='Лист, на який відповідали')
+    file         = models.CharField(max_length=300, help_text='Шлях відносно MEDIA_ROOT (email_ai/<скринька>/…)')
+    name         = models.CharField('Назва', max_length=255)
+    content_type = models.CharField(max_length=100, default='application/octet-stream')
+    kind         = models.CharField(max_length=10, choices=KIND_CHOICES)
+    size         = models.PositiveIntegerField(default=0)
+    text         = models.TextField(blank=True, default='', help_text='Текст PDF / DOCX / TXT / CSV для AI')
+    info         = models.CharField(max_length=120, blank=True, default='', help_text='«12 стор.», «1200×900»')
+    created_at   = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['created_at', 'pk']
+        verbose_name = 'Файл до запиту AI'
+        verbose_name_plural = '📎 Файли до запитів AI'
+
+    def __str__(self):
+        return self.name

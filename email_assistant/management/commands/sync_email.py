@@ -46,6 +46,11 @@ class Command(BaseCommand):
                 self.stdout.write(f'  ERROR: {e}')
 
         self.stdout.write(f'\nРезультат: +{total_new} нових листів, {total_err} помилок')
+        try:   # 📎 файли до запиту AI, старші за ai_files.KEEP_DAYS, — геть
+            from email_assistant import ai_files
+            ai_files.cleanup()
+        except Exception as e:  # noqa: BLE001
+            logger.warning('ai files cleanup: %s', e)
 
     def _sync_account(self, account, dry_run: bool, sync_all: bool = False, with_folders: bool = False):
         from email_assistant.imap_client import IMAPClient
