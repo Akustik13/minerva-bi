@@ -196,7 +196,7 @@ class QuoteReadingTests(Base):
         self.assertIn("Quotation.xlsx", sent)
         self.assertIn("246.2", sent)                                            # таблицю xlsx прочитано
         self.assertIn("БЕЗ разових", call.call_args[0][0])
-        self.assertEqual(data["v"], 2)
+        self.assertEqual(data["v"], ai.QUOTE_VERSION)
         self.assertEqual(data["includes"], ["pcb", "assembly"])
         rfq.apply_ai(r, data)
         r.refresh_from_db()

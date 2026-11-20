@@ -23,7 +23,7 @@
       <td>{% if p.one %}—{% else %}{{ p.max }} {{ st.home }} <span class="spf-muted" translate="no">{{ p.max_who }}</span>{% endif %}</td>
       <td>{{ p.spread|default:"—" }}</td></tr>{% endfor %}
   </table></div>
-  <div class="spf-muted">Ціна за 1 шт. разом з разовими витратами, у {{ st.home }}; лише повні пропозиції (як 🥇), немає повних — з неповних.</div>
+  <div class="spf-muted">Ціна за 1 шт. разом з разовими витратами, у {{ st.home }}; лише ціни з усім, що просили, для цієї кількості (як 🥇) — ціни лише за плати не порівнюються з PCBA; немає повних — з неповних.</div>
   {% endif %}
 </details>
 {% endif %}

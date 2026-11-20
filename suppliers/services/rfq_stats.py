@@ -80,7 +80,8 @@ def stats(req, table) -> dict:
     # 💶 ціни по кількостях — повні пропозиції (як 🥇); немає повних — з неповних, з позначкою
     per_qty = []
     for i, q in enumerate(table["qtys"]):
-        pool = [row for row in rows if row["comparable"] and row["cells"][i].get("eff_home") is not None]
+        pool = [row for row in rows if row["comparable"] and row["cells"][i].get("ok")
+                and row["cells"][i].get("eff_home") is not None]
         partial = False
         if not pool:
             pool = [row for row in rows if row["priced"] and row["cells"] and row["cells"][i].get("eff_home") is not None]

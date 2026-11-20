@@ -711,6 +711,29 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                                      else None)
                 return JsonResponse(out)
             rids = P.getlist("rid") or str(P.get("rids") or "").split(",")
+            if do == "each_compose":                 # ✉️ лист кожному — складаємо у фоні (AI по черзі)
+                mode = "template" if P.get("mode") == "template" else "ai"
+                model, wish = ai.model_of(P.get("model")), P.get("wish", "")
+                if not wish.strip():
+                    return JsonResponse({"error": "Напишіть, що сказати постачальникам."}, status=400)
+
+                def run(report):
+                    out = rfq_talk.compose_each(req, rids, user, wish, mode=mode, model=model, report=report)
+                    return {"letters": out, "message": f"✍️ Листів: {len(out)}"}
+                return JsonResponse({"job": jobs.start(user, f"each {req.pk}", run, progress=True)})
+            if do == "each_send":                    # 📤 кожному окремо, у його гілку
+                import json as _json
+                try:
+                    items = _json.loads(P.get("letters") or "[]")
+                except ValueError:
+                    return JsonResponse({"error": "Незрозумілі листи — складіть знову."}, status=400)
+                if not isinstance(items, list) or not items:
+                    return JsonResponse({"error": "Немає листів для надсилання."}, status=400)
+
+                def run(report):
+                    out = rfq_talk.send_each(req, user, items, report=report)
+                    return {**out, "message": f"📤 Надіслано: {len(out['sent'])}"}
+                return JsonResponse({"job": jobs.start(user, f"each-send {req.pk}", run, progress=True)})
             if do == "forward_plan":
                 return JsonResponse(rfq_talk.forward_plan(req, rids, user))
             out = rfq_talk.forward(req, rids, user, P.get("to", ""), P.get("cc", ""), P.get("subject", ""),
@@ -723,10 +746,11 @@ class SupplierRequestAdmin(admin.ModelAdmin):
     def _to_parse(req, overwrite) -> list:
         """🧠 Кого розібрати разом: є відповідь, ще не розібрано (або розібрано до разових витрат і «що входить»);
         overwrite — усіх, хто відповів."""
+        from suppliers.services import ai
         R = SupplierRequestRecipient
         out = []
         for r in req.recipients.exclude(thread=None, reply_message=None).filter(state__in=[R.REPLIED, R.QUOTED]):
-            if overwrite or not (r.ai or {}).get("summary") or (r.ai or {}).get("v") != 2 or _new_mail(r):
+            if overwrite or not (r.ai or {}).get("summary") or (r.ai or {}).get("v") != ai.QUOTE_VERSION or _new_mail(r):
                 out.append(r.pk)
         return out
 
@@ -828,7 +852,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                         msg += " · не вдалося: " + "; ".join(failed)
                     return {"url": back, "message": msg}
                 return JsonResponse({"job": jobs.start(user, f"quotes {req.pk}", run, progress=True)})
-            elif do in ("chat_brief", "chat_send", "forward_plan", "forward_send"):
+            elif do in ("chat_brief", "chat_send", "forward_plan", "forward_send", "each_compose", "each_send"):
                 return self._talk(request, req, r, do)
             elif do == "compare_ai":
                 from suppliers.services import rfq_compare

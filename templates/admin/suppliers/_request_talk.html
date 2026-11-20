@@ -11,6 +11,7 @@
 
 <div class="rw-selbar" id="rw-selbar" hidden>
   <b id="rw-sel-n"></b>
+  <button type="button" class="button default" id="rw-each-btn" title="Кожному вибраному — свій лист, відповіддю в його гілці листування, з вашої скриньки; інші постачальники його не бачать">✉️ Написати кожному</button>
   <button type="button" class="button default" id="rw-fwd-btn" title="Таблиця пропозицій, листування й файли вибраних постачальників — одним листом колезі">↪ Переслати колезі</button>
   <button type="button" class="button" id="rw-sel-none">✕ Зняти вибір</button>
 </div>
@@ -38,7 +39,37 @@
 </dialog>
 {% endif %}
 
+{% if can_change %}<dialog id="rw-each" class="rw-pv rwe-dlg" aria-labelledby="rw-each-h">
+  <div class="rw-pv-head"><b id="rw-each-h">✉️ Написати кожному</b><button type="button" class="button" data-each-close aria-label="Закрити">✕</button></div>
+  <div class="rw-pv-mail" id="rwe-step1">
+    <div class="spf-muted">Кожен вибраний постачальник отримає свій окремий лист — відповіддю в його гілці листування (автору останнього листа), з вашої скриньки й з підписом. Інші постачальники цього листа не бачать. Перед надсиланням кожен лист можна переглянути й виправити.</div>
+    <label class="rwc-subjf rwe-wishl">Що написати <textarea id="rwe-wish" rows="4" placeholder="Напр.: подякуй за пропозицію й запитай, скільки коштуватиме плата з позолотою контактів (ENIG / hard gold) для тих самих кількостей"></textarea></label>
+    <div class="rw-fwd-parts">
+      <label><input type="radio" name="rwe-mode" value="ai" checked> 🧠 AI пише кожному окремо — мовою його листування, на ім'я, з урахуванням його пропозиції; лише те, що ви написали</label>
+      <label><input type="radio" name="rwe-mode" value="template"> 📝 Один текст для всіх, з підстановками: привітання на ім'я, ім'я, фірма, номер запиту</label>
+      <div class="spf-muted" translate="no" style="margin-left:22px">{greeting} · {name} · {company} · {code}</div>
+    </div>
+    <div class="rwc-row"><button type="button" class="button default" id="rwe-compose">✍️ Скласти листи</button><span class="spf-job" id="rwe-job"></span></div>
+  </div>
+  <div id="rwe-step2" hidden>
+    <div class="rw-pv-who" id="rwe-who"></div>
+    <div class="rw-pv-mail" id="rwe-mail"></div>
+  </div>
+  <div class="rw-pv-foot"><span class="spf-muted" id="rwe-note"></span>
+    <button type="button" class="button" id="rwe-back" hidden>↺ Скласти заново</button>
+    <button type="button" class="button" data-each-close>Скасувати</button>
+    <button type="button" class="button default" id="rwe-send" hidden>📤 Надіслати</button></div>
+</dialog>{% endif %}
+
 <style>
+  .rwe-dlg { width: min(980px, 96vw); }
+  .rwe-wishl { flex-direction: column; align-items: stretch; margin: 8px 0; }
+  .rwe-wishl textarea { width: 100%; box-sizing: border-box; }
+  .rwe-tab.off { opacity: .45; text-decoration: line-through; }
+  .rwe-tab.bad::after { content: " ⚠️"; }
+  .rwe-tab.ok::after { content: " ✓"; }
+  .rwe-body { width: 100%; box-sizing: border-box; min-height: 260px; resize: vertical; font-family: inherit; }
+  .rwe-form { display: flex; flex-direction: column; gap: 6px; }
   .rw-cmp .rw-n { white-space: nowrap; width: 1%; color: var(--text-muted, #888); }
   .rw-cmp .rw-n label { cursor: pointer; display: inline-flex; gap: 4px; align-items: center; }
   .rw-cmp tr.rw-picked > td { background: rgba(91, 141, 239, .12) !important; }
@@ -187,6 +218,91 @@
       if (ta && ta.value.trim() && !confirm('Написане не надіслано — закрити?')) e.preventDefault();
     });
     dlg.addEventListener('close', function(){ if (changed) location.reload(); });
+  }
+
+  /* ── ✉️ написати кожному: свій лист кожному вибраному, у його гілку ── */
+  var each = document.getElementById('rw-each'), ebtn = document.getElementById('rw-each-btn');
+  if (each && ebtn && typeof each.showModal === 'function') {
+    var st1 = document.getElementById('rwe-step1'), st2 = document.getElementById('rwe-step2'),
+        who = document.getElementById('rwe-who'), mailBox = document.getElementById('rwe-mail'),
+        enote = document.getElementById('rwe-note'), esend = document.getElementById('rwe-send'),
+        eback = document.getElementById('rwe-back'), letters = [], cur = 0, sentDone = false;
+    function step(n) { st1.hidden = n !== 1; st2.hidden = n !== 2; eback.hidden = n !== 2; esend.hidden = n !== 2; }
+    function count() { var n = letters.filter(function(L){ return L.on; }).length; esend.textContent = '📤 Надіслати: ' + n; esend.disabled = !n; return n; }
+    function tabs() {
+      who.innerHTML = '';
+      letters.forEach(function(L, i){
+        var b = el('button', 'button rwe-tab' + (i === cur ? ' on' : '') + (L.on ? '' : ' off') + (L.error ? ' bad' : '') + (L.sent ? ' ok' : ''), (i + 1) + '. ' + L.name);
+        b.type = 'button'; b.setAttribute('translate', 'no');
+        b.addEventListener('click', function(){ show(i); });
+        who.appendChild(b);
+      });
+    }
+    function field(label, key, L) {
+      var lab = el('label', 'rwc-subjf'); lab.appendChild(document.createTextNode(label + ' '));
+      var inp = el('input'); inp.value = L[key] || ''; inp.setAttribute('translate', 'no');
+      if (key === 'cc') inp.setAttribute('list', 'rwc-colleagues');
+      inp.addEventListener('input', function(){ L[key] = inp.value; });
+      lab.appendChild(inp); return lab;
+    }
+    function show(i) {
+      cur = i; tabs();
+      var L = letters[i]; mailBox.innerHTML = '';
+      var f = el('div', 'rwe-form');
+      var on = el('label'); var cb = el('input'); cb.type = 'checkbox'; cb.checked = L.on;
+      cb.addEventListener('change', function(){ L.on = cb.checked; tabs(); count(); });
+      on.appendChild(cb); on.appendChild(document.createTextNode(' Надіслати цьому постачальнику')); f.appendChild(on);
+      if (L.error) f.appendChild(el('div', 'spf-bad', '⚠️ ' + L.error));
+      if (L.note) f.appendChild(el('div', 'spf-warn', L.note));
+      if (L.result) f.appendChild(el('div', L.sent ? 'spf-ok' : 'spf-bad', L.result));
+      var to = el('div', 'rwc-to'); to.appendChild(field('Кому', 'to', L)); to.appendChild(field('Копія', 'cc', L)); f.appendChild(to);
+      f.appendChild(field('Тема', 'subject', L));
+      var ta = el('textarea', 'rwe-body'); ta.value = L.body || ''; ta.setAttribute('translate', 'no');
+      ta.addEventListener('input', function(){ L.body = ta.value; });
+      f.appendChild(ta);
+      f.appendChild(el('div', 'spf-muted', (L.from ? 'з ' + L.from + ' · ' : '') + (L.reply ? 'відповідь у його гілці, з цитатою останнього листа' : 'нова гілка — листування у вас немає') + ' · підпис скриньки додасться сам'));
+      mailBox.appendChild(f);
+    }
+    ebtn.addEventListener('click', function(){
+      sentDone = false; letters = []; step(1); enote.textContent = 'Вибрано: ' + ids().length; each.showModal();
+      document.getElementById('rwe-wish').focus();
+    });
+    document.getElementById('rwe-compose').addEventListener('click', function(){
+      var wish = document.getElementById('rwe-wish').value.trim(), job = document.getElementById('rwe-job');
+      if (!wish) { job.textContent = 'Напишіть, що сказати постачальникам.'; return; }
+      var mode = (each.querySelector('input[name=rwe-mode]:checked') || {}).value || 'ai', m = document.getElementById('rw-model');
+      var btn = this; btn.disabled = true;
+      spJob(act, {do: 'each_compose', rids: ids().join(','), wish: wish, mode: mode, model: m ? m.value : ''}, job, function(res){
+        btn.disabled = false; job.textContent = '';
+        letters = (res.letters || []).map(function(L){ return Object.assign({on: !L.error || !!L.body}, L); });
+        if (!letters.length) { job.textContent = '⚠️ Нікому писати.'; return; }
+        cur = 0; step(2); show(0); count();
+        enote.textContent = 'Перегляньте кожен лист (вкладки вгорі) — можна виправити або зняти галочку.';
+      });
+    });
+    eback.addEventListener('click', function(){ if (!letters.length || confirm('Складені листи й ваші правки пропадуть — скласти заново?')) step(1); });
+    esend.addEventListener('click', function(){
+      var go = letters.filter(function(L){ return L.on && !L.sent; });
+      var empty = go.filter(function(L){ return !(L.body || '').trim() || !(L.to || '').trim(); });
+      if (empty.length) { enote.textContent = '⚠️ Порожній лист або «Кому»: ' + empty.map(function(L){ return L.name; }).join(', '); return; }
+      if (!go.length || !confirm('Надіслати окремі листи — кожен у гілку свого постачальника? Листів: ' + go.length)) return;
+      esend.disabled = true;
+      spJob(act, {do: 'each_send', letters: JSON.stringify(go.map(function(L){ return {rid: L.rid, to: L.to, cc: L.cc, subject: L.subject, body: L.body, reply: L.reply}; }))}, enote, function(res){
+        sentDone = true;
+        var bad = {}; (res.failed || []).forEach(function(f){ bad[f[0]] = f[1]; });
+        go.forEach(function(L){
+          if (bad[L.name] !== undefined) { L.result = '⚠️ ' + bad[L.name]; L.error = bad[L.name]; }
+          else { L.sent = true; L.on = false; L.result = '✓ Надіслано'; L.error = ''; }
+        });
+        show(cur); count();
+        enote.textContent = '📤 Надіслано: ' + (res.sent || []).length + ((res.failed || []).length ? ' · ⚠️ не вдалося (вкладки з ⚠️): ' + res.failed.length : '');
+      });
+    });
+    each.querySelectorAll('[data-each-close]').forEach(function(b){ b.addEventListener('click', function(){ each.close(); }); });
+    each.addEventListener('cancel', function(e){
+      if (letters.some(function(L){ return L.on && !L.sent; }) && !sentDone && !confirm('Листи не надіслано — закрити?')) e.preventDefault();
+    });
+    each.addEventListener('close', function(){ if (sentDone) location.reload(); });
   }
 
   /* ── ☑ вибір рядків і ↪ переслати колезі ── */

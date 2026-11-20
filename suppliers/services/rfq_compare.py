@@ -185,7 +185,11 @@ def _tiers(r, qtys) -> list:
             lead = t.get("lead_days")
             out.append({"qty": qty, "unit": unit, "lead": lead if isinstance(lead, int) and lead >= 0 else None,
                         # 💶 сума, як її написав постачальник (AI), і чи в ній разові — для перевірки «разом»
-                        "total": dec(t.get("total")), "total_ot": bool(t.get("total_ot")), "fixed": bool(t.get("fixed"))})
+                        "total": dec(t.get("total")), "total_ot": bool(t.get("total_ot")), "fixed": bool(t.get("fixed")),
+                        # 🧩 що входить саме в цю ціну (None — як у всього рядка) і складові за шт.
+                        "includes": clean_includes(t["includes"]) if isinstance(t.get("includes"), list) else None,
+                        "parts": {k: dec(v) for k, v in (t.get("parts") or {}).items()
+                                  if k in SCOPE_KEYS and dec(v) is not None} if isinstance(t.get("parts"), dict) else {}})
     if not out and (r.price is not None or r.total is not None):    # лише «ціна за шт.» / «сума» — на першу кількість
         q = qtys[0] if qtys else 1
         unit = r.price if r.price is not None else (r.total / q)
@@ -224,6 +228,7 @@ def table(req) -> dict:
         items = clean_one_time(r.one_time)
         priced = bool(tiers) and r.state != R.DECLINED
         rate = fx.rate(r.currency) if priced else None
+        includes = clean_includes(r.includes)
         cells, missing, approx = [], [], []
         for q in qtys:
             t = _tier_for(tiers, q) if priced else None
@@ -250,18 +255,35 @@ def table(req) -> dict:
                 cell["sup_total_ot"] = t["total_ot"]
                 cell["sum_mismatch"] = abs(theirs - total) > max(CENT, total * Decimal("0.01"))
                 cell["fixed"] = t["fixed"]
+            # 🧩 що входить саме в цю ціну (лише плати для 2500 шт, PCBA — для 5 шт) — у 🥇 і статистиці лише повні
+            tin = t["includes"] if t.get("includes") is not None else includes
+            cell["lacks"] = [n for k, _i, n in SCOPE if k in need and tin and k not in tin]
+            cell["unknown"] = bool(need) and not tin
+            cell["ok"] = not cell["lacks"] and not cell["unknown"] and rate is not None
+            if t.get("includes") is not None and tin != includes:
+                cell["scope_text"] = scope_text(tin)
+            if t.get("parts"):
+                cell["parts_text"] = " + ".join(f"{i} {price(t['parts'][k])}" for k, i, _n in SCOPE if k in t["parts"])
             if not cell["exact"]:
                 approx.append(f"ціна на {t['qty']} шт замість {q}")
             cells.append(cell)
-        includes = clean_includes(r.includes)
-        lacks = [n for k, _i, n in SCOPE if k in need and includes and k not in includes]
+        priced_cells = [c for c in cells if not c.get("missing")]
+        lacks = [n for k, _i, n in SCOPE if priced_cells and all(n in c["lacks"] for c in priced_cells)]
         gaps, notes = [], []
         if priced:
             if missing and len(missing) < len(qtys):
                 gaps.append("немає ціни на " + ", ".join(f"{q:,}".replace(",", " ") for q in missing) + " шт")
             if lacks:
                 gaps.append("у ціні немає: " + ", ".join(lacks))
-            elif need and not includes:      # не знаємо, чи це те саме — у 🥇 не беремо (голі плати проти PCBA)
+            part = {}                       # для частини кількостей у ціні немає того, що просили
+            for c in priced_cells:
+                for n in c["lacks"]:
+                    if n not in lacks:
+                        part.setdefault(n, []).append(c["qty"])
+            for n, qs in part.items():
+                gaps.append(f"у ціні немає: {n} — для " + ", ".join(f"{q:,}".replace(",", " ") for q in qs) + " шт")
+            if not lacks and need and any(c["unknown"] for c in priced_cells):
+                # не знаємо, чи це те саме — у 🥇 не беремо (голі плати проти PCBA)
                 gaps.append("не сказано, що входить у ціну (просили: " + scope_text(need) + ")")
             if rate is None:
                 gaps.append(f"немає курсу {(r.currency or home).upper()} → {home}")
@@ -272,8 +294,7 @@ def table(req) -> dict:
                 notes.append("доставка")
             if r.valid_until is None:
                 notes.append("термін дії")
-        unknown_scope = bool(need) and not includes
-        comparable = priced and not lacks and not unknown_scope and rate is not None and len(missing) < len(qtys)
+        comparable = priced and rate is not None and any(c.get("ok") for c in priced_cells)
         ship_home = (r.shipping * rate).quantize(CENT) if r.shipping is not None and rate is not None else None
         first = next((c for c in cells if not c.get("missing")), None)
         try:
@@ -304,7 +325,8 @@ def table(req) -> dict:
         })
     # 🥇 по кожній кількості — серед порівнюваних
     for i, q in enumerate(qtys):
-        ok = [row for row in rows if row["comparable"] and row["cells"][i].get("total_home") is not None]
+        ok = [row for row in rows if row["comparable"] and row["cells"][i].get("ok")
+              and row["cells"][i].get("total_home") is not None]
         if not ok:
             continue
         best = min(row["cells"][i]["total_home"] for row in ok)
@@ -400,6 +422,7 @@ def ai_lines(req) -> tuple:
                 cells.append(f"{c['qty']} шт: {c.get('eff_home_text', '?')} {home}/шт з разовими "
                              f"(ціна {c['unit_text']} {r.currency}/шт" + (f" + разово {c['one_time_text']}" if
                                                                            c["one_time_text"] else "") +
+                             (f", ⚠️ у ціні немає: {', '.join(c['lacks'])} — не порівнювати" if c.get("lacks") else "") +
                              (f", ≈ на {c['tier_qty']} шт" if not c["exact"] else "") +
                              (f", строк {c['lead']} дн" if c.get("lead") is not None else "") + ")")
         lines.append(head + f"; у ціні: {row['includes_text'] or 'не сказано'}; " + "; ".join(cells) +

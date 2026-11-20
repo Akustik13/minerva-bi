@@ -14,10 +14,16 @@
                               рядок, діє, поки листування не змінилось (fingerprint);
   reply(...)                — лист у гілку (In-Reply-To), підпис скриньки, копія в Minerva (rfq.store_sent), подія;
   forward_plan / forward    — вибрані рядки: таблиця пропозицій, листування (лише ваші скриньки), файли
-                              постачальників до rfq.ATTACH_MAX_MB (решта — назвами) → один лист колезі.
+                              постачальників до rfq.ATTACH_MAX_MB (решта — назвами) → один лист колезі;
+  compose_each / send_each  — ✉️ «Написати кожному»: вибраним постачальникам — кожному свій лист відповіддю в його
+                              гілці (target: автор останнього листа, копія — лише адреса цієї ж фірми), з вашої
+                              скриньки; текст — AI за побажанням людини (ai.each_letter, мовою листування, на ім'я)
+                              або один шаблон ({greeting} {name} {company} {code} — fill); людина бачить і правит
+                              кожен лист до надсилання, інші постачальники його не бачать.
 """
 import hashlib
 import logging
+import re
 
 from django.utils import timezone
 from django.utils.html import escape
@@ -29,6 +35,7 @@ BRIEF_MAILS = 12             # найновіших листів у «🧭 Ко�
 LETTER_CHARS = 6000          # тексту одного листа у вікні / пересиланні
 FORWARD_MAILS = 30           # листів одного постачальника в пересиланні
 FORWARD_MAX_ROWS = 30
+EACH_MAX = 30                # листів «✉️ Написати кожному» за раз
 
 
 class TalkError(Exception):
@@ -147,14 +154,17 @@ def brief(req, r, user, model=None) -> dict:
     if not mine:
         raise TalkError("Листування з цим постачальником у ваших скриньках немає.")
     row = next((x for x in rfq_compare.table(req)["rows"] if x["recipient"].pk == r.pk), None)
-    offer = ""
-    if row and row["priced"]:
-        offer = "; ".join(f"{c['qty']} шт: {c['unit_text']} {r.currency}/шт" for c in row["cells"]
-                          if not c.get("missing"))
-    data = ai.chat_brief(req, r, mine[-BRIEF_MAILS:], offer, user=user, model=model)
+    data = ai.chat_brief(req, r, mine[-BRIEF_MAILS:], _offer(row, r), user=user, model=model)
     value = {"data": data, "fp": fingerprint(items), "at": timezone.now().isoformat(), "model": ai.model_of(model)}
     cache.set(_key(user, r), value, BRIEF_TTL)
     return {**value, "fresh": True, "at_dt": _when(value["at"])}
+
+
+def _offer(row, r) -> str:
+    """Ціни постачальника з таблиці одним рядком (для AI) — «5 шт: 1,92 USD/шт; 2500 шт: …»."""
+    if not row or not row["priced"]:
+        return ""
+    return "; ".join(f"{c['qty']} шт: {c['unit_text']} {r.currency}/шт" for c in row["cells"] if not c.get("missing"))
 
 
 # ── ✉️ відповідь у гілку ──
@@ -208,6 +218,96 @@ def reply(req, r, user, to, cc, subject, body, reply_pk=None) -> dict:
     SupplierEvent.objects.create(supplier=r.supplier, request=req, kind=SupplierEvent.MAIL, user=user, message=msg,
                                  text=f"✉️ Відповіли постачальнику → {', '.join(to_list)}")
     return {"ok": True, "to": to_list, "cc": cc_list, "subject": subject}
+
+
+# ── ✉️ написати кожному ──
+
+def _person(r, items) -> str:
+    """До кого звертаємось: автор останнього листа постачальника (ім'я без посади), інакше контакт запиту."""
+    from suppliers.services import rfq
+    last_in = next((x for x in reversed(items) if not x["ours"] and x["readable"]), None)
+    if last_in is not None:
+        n = (last_in["m"].from_name or "").strip()
+        if n and "@" not in n:
+            p = rfq.person_name(n)
+            if p:
+                return p.title() if p.islower() else p        # «frank» → «Frank»
+    return rfq.contact_name(r)
+
+
+def fill(req, r, items, text) -> str:
+    """Шаблон одного тексту для всіх: {greeting} — привітання на ім'я мовою запиту, {name}, {company}, {code}."""
+    from suppliers.services import rfq
+    t = rfq.TEXTS.get(req.language, rfq.TEXTS["en"])
+    name = _person(r, items)
+    values = {"greeting": t["hello"].format(name=name) if name else t["hello_all"], "name": name or r.supplier.name,
+              "company": r.supplier.name, "code": req.code or ""}
+    return re.sub(r"\{(greeting|name|company|code)\}", lambda m: values[m.group(1)], text or "")
+
+
+def compose_each(req, rids, user, wish, mode="ai", model=None, report=None) -> list:
+    """Лист кожному вибраному (ще нічого не надсилає) → [{rid, name, to, cc, subject, reply, from, body, note,
+    error}]. Невідправлені рядки (запит ще не пішов) пропускаються."""
+    from suppliers.models import SupplierRequestRecipient as R
+    from suppliers.services import ai
+    wish = (wish or "").strip()
+    if not wish:
+        raise TalkError("Напишіть, що сказати постачальникам.")
+    _t, rows = _rows(req, rids)
+    rows = [row for row in rows if row["recipient"].state not in (R.PLANNED, R.FAILED)][:EACH_MAX]
+    if not rows:
+        raise TalkError("Вибраним ще не надсилали запит — спершу «📤 Надіслати».")
+    out = []
+    for i, row in enumerate(rows, 1):
+        r = row["recipient"]
+        if report:
+            report(f"✍️ {i} / {len(rows)} · {r.supplier.name}")
+        items = letters(r, user)
+        tg = target(req, r, items, user)
+        mine = [x for x in items if x["readable"]]
+        item = {"rid": r.pk, "name": r.supplier.name, "to": tg["to"], "cc": tg["cc"], "subject": tg["subject"],
+                "reply": tg["reply_pk"] or "", "from": tg["from"], "body": "", "note": "", "error": ""}
+        if not items:
+            item["note"] = "Листів з ним у Minerva немає — лист піде новою гілкою, без цитати."
+        elif not mine:
+            item["note"] = "🔒 Листування — у скриньці колеги: лист піде новою гілкою, без цитати."
+        if mode == "template":
+            item["body"] = fill(req, r, items, wish)
+        else:
+            try:
+                item["body"] = ai.each_letter(req, r, mine[-BRIEF_MAILS:], _offer(row, r), wish, _person(r, items),
+                                              user=user, model=model)["body"]
+            except ai.AIError as e:
+                item["error"] = str(e)[:300]
+            if not item["body"]:
+                item["error"] = item["error"] or "AI не склав лист — напишіть самі."
+        out.append(item)
+    return out
+
+
+def send_each(req, user, items, report=None) -> dict:
+    """Надіслати складені (і, можливо, виправлені людиною) листи — кожен окремо, відповіддю в гілці свого
+    постачальника (reply). → {sent: [назви], failed: [[назва, причина]]}."""
+    rows = {r.pk: r for r in req.recipients.select_related("supplier", "contact")}
+    sent, failed = [], []
+    items = [it for it in items if isinstance(it, dict)][:EACH_MAX]
+    if not items:
+        raise TalkError("Немає листів для надсилання.")
+    for i, it in enumerate(items, 1):
+        rid = int(it["rid"]) if str(it.get("rid") or "").isdigit() else 0
+        r = rows.get(rid)
+        if r is None:
+            failed.append(["?", "постачальника немає в цьому запиті"])
+            continue
+        if report:
+            report(f"📤 {i} / {len(items)} · {r.supplier.name}")
+        try:
+            reply(req, r, user, str(it.get("to") or ""), str(it.get("cc") or ""), str(it.get("subject") or ""),
+                  str(it.get("body") or ""), reply_pk=it.get("reply") if str(it.get("reply") or "").isdigit() else None)
+            sent.append(r.supplier.name)
+        except TalkError as e:
+            failed.append([r.supplier.name, str(e)])
+    return {"sent": sent, "failed": failed}
 
 
 # ── ↪ переслати колезі ──

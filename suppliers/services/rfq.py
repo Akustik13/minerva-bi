@@ -667,17 +667,22 @@ def apply_ai(recipient, data: dict, overwrite=False):
     """Результат ai.quote → поля пропозиції (лише порожні, якщо не overwrite) + стан."""
     from suppliers.models import SupplierRequestRecipient as R
     from suppliers.services import rfq_compare
+    old = recipient.ai or {}
+    # поле, яке вніс попередній розбір AI (і людина його не міняла), оновлюємо новим розбором; внесене вручну — ні
+    ai_tiers = bool(recipient.tiers) and recipient.tiers == old.get("tiers")
     recipient.ai = data
     tiers = data.get("tiers") or []
-    if tiers and (overwrite or not recipient.tiers):
+    if tiers and (overwrite or not recipient.tiers or ai_tiers):
         recipient.tiers = tiers
-    if data.get("one_time") and (overwrite or not recipient.one_time):
+    if data.get("one_time") and (overwrite or not recipient.one_time or (
+            ai_tiers and recipient.one_time == rfq_compare.clean_one_time(old.get("one_time")))):
         recipient.one_time = rfq_compare.clean_one_time(data["one_time"])
-    if data.get("includes") and (overwrite or not recipient.includes):
+    if data.get("includes") and (overwrite or not recipient.includes or (
+            ai_tiers and recipient.includes == rfq_compare.clean_includes(old.get("includes")))):
         recipient.includes = rfq_compare.clean_includes(data["includes"])
     qty = parse_quantities(recipient.request.quantities)
     first = next((t for t in tiers if qty and t["qty"] == qty[0]), tiers[0] if tiers else None)
-    if first and (overwrite or recipient.price is None):
+    if first and (overwrite or recipient.price is None or ai_tiers):
         recipient.price = Decimal(first["unit_price"])
         recipient.total = (Decimal(first["unit_price"]) * first["qty"] + sum(
             (Decimal(it["amount"]) for it in rfq_compare.clean_one_time(recipient.one_time)

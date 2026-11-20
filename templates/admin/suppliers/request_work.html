@@ -73,6 +73,8 @@
   .rw-cell .rw-eff, .rw-cell .rw-tot { white-space: nowrap; }
   .rw-cell .rw-eff { font-weight: 700; font-size: 14px; }
   .rw-cmp tr > td.rw-cell-best { background: rgba(76, 175, 80, .18); }
+  .rw-cmp tr > td.rw-cell-part { background: rgba(224, 168, 0, .10); }
+  .rw-gapc { font-size: 11px; color: var(--message-warning-fg, #b26a00); font-weight: 600; }
   .rw-cmp tr.rw-row > td:first-child { min-width: 230px; max-width: 320px; }
   .rw-cell-none { text-align: center; }
   .rw-over { font-size: 11px; font-weight: normal; color: var(--text-muted, #888); }
@@ -172,12 +174,14 @@
           {% if r.error %}<div class="spf-bad">{{ r.error|truncatechars:160 }}</div>{% endif %}</td>
         {% if row.priced %}
           {% for c in row.cells %}
-          <td class="rw-cell{% if forloop.first %} rw-qfirst{% endif %}{% if c.best %} rw-cell-best{% endif %}{% if c.missing %} rw-cell-none{% endif %}">
+          <td class="rw-cell{% if forloop.first %} rw-qfirst{% endif %}{% if c.best %} rw-cell-best{% endif %}{% if c.missing %} rw-cell-none{% endif %}{% if c.lacks or c.unknown %} rw-cell-part{% endif %}">
             {% if c.missing %}<span class="spf-warn" title="Постачальник не назвав ціну на {{ c.qty }} шт">— немає ціни</span>
             {% else %}
               <div class="rw-eff">{% if c.eff_home_text %}{{ c.eff_home_text }} {{ row.home }}{% else %}{{ c.eff_text }} {{ r.currency }}{% endif %}{% if c.best %} <span class="rw-medal" title="Найдешевше для {{ c.qty }} шт серед повних пропозицій">🥇</span>{% elif c.over_text %} <span class="rw-over" title="Дорожче за найдешевше для {{ c.qty }} шт">{{ c.over_text }}</span>{% endif %}</div>
               <div class="spf-muted rw-tot">разом {% if c.total_home_text %}{{ c.total_home_text }} {{ row.home }}{% else %}{{ c.total_text }} {{ r.currency }}{% endif %}</div>
               <div class="spf-muted rw-src" translate="no" title="Як у постачальника">{{ c.unit_text }} {{ r.currency|default:row.home }}/шт{% if c.one_time_text %} + {{ c.one_time_text }} разово{% endif %}{% if not c.exact %} · ≈ ціна на {{ c.tier_qty }} шт{% endif %}{% if c.lead is not None %} · {{ c.lead }} дн.{% endif %}</div>
+              {% if c.parts_text %}<div class="spf-muted rw-src" translate="no" title="Складові ціни за шт., як назвав постачальник (🟩 плата · 🔧 монтаж · 🔩 компоненти) — Minerva їх додала">{{ c.parts_text }}</div>{% endif %}
+              {% if c.lacks %}<div class="rw-gapc" title="Для цієї кількості в ціні немає того, що просили — у 🥇 і статистиці не бере участі">⚠️ немає: {{ c.lacks|join:", " }}{% if c.scope_text %} · лише {{ c.scope_text }}{% endif %}</div>{% elif c.unknown %}<div class="rw-gapc" title="Не сказано, що входить у цю ціну — у 🥇 не бере участі">⚠️ не сказано, що в ціні</div>{% elif c.scope_text %}<div class="spf-muted rw-src">у ціні: {{ c.scope_text }}</div>{% endif %}
               {% if c.sup_total_text %}<div class="rw-sup{% if c.sum_mismatch %} bad{% else %} spf-muted{% endif %}" title="{% if c.sum_mismatch %}Наше «разом» (ціна за шт. × кількість + разові) не сходиться з сумою, яку написав постачальник — перевірте лист і ✏️ виправте{% else %}Сума постачальника сходиться з нашим «разом»{% endif %}{% if c.fixed %} · ціну за шт. Minerva перерахувала з цієї суми{% endif %}">у постачальника {{ c.sup_total_text }} {{ r.currency }} {% if c.sup_total_ot %}з разовими{% else %}без разових{% endif %}{% if c.sum_mismatch %} ⚠️ не сходиться{% else %} ✓{% endif %}</div>{% endif %}
             {% endif %}</td>
           {% empty %}<td class="rw-qfirst">—</td>{% endfor %}

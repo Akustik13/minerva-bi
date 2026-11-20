@@ -235,3 +235,130 @@ class MailPreviewTests(TalkBase):
         out = mail_link.for_messages([frank], frank.thread, self.user)
         jy = next(x for x in out if x["name"] == "JY Electronics")
         self.assertEqual(jy["rfq"][0]["code"], self.req.code)
+
+
+class EachTests(TalkBase):
+    """✉️ Написати кожному: свій лист кожному вибраному, відповіддю в його гілці, інші не бачать."""
+
+    def test_template_fills_greeting_and_skips_not_sent(self):
+        frank = self.frank()
+        planned = R.objects.create(request=self.req, supplier=Supplier.objects.create(name="Later Ltd", email="a@later.example"),
+                                   email="a@later.example", state=R.PLANNED)
+        out = rfq_talk.compose_each(self.req, [self.r.pk, self.r2.pk, planned.pk], self.user,
+                                    "{greeting}\n\nThank you, {company}! Price with ENIG for {code}?", mode="template")
+        self.assertEqual([x["name"] for x in out], ["JY Electronics", "HITECH CIRCUITS"])   # не надісланим — ні
+        jy, hi = out
+        self.assertEqual((jy["to"], jy["cc"], jy["reply"]), ("frank@bld-pcb.com", "charles@jypcba.com", frank.pk))
+        self.assertTrue(jy["body"].startswith("Dear Frank,\n\nThank you, JY Electronics! Price with ENIG for RFQ-"))
+        self.assertTrue(hi["body"].startswith("Dear Sir or Madam,"))                 # листів немає — без імені
+        self.assertEqual((hi["to"], hi["cc"]), ("sales8@hitechpcb.com", ""))
+        self.assertIn("новою гілкою", hi["note"])
+        self.assertNotIn("колеги", hi["note"])
+
+    def test_ai_letter_per_supplier_from_own_letters_only(self):
+        oth = EmailThread.objects.create(account=self.other_account, subject="JY private")
+        self.mail(frm="charles@jypcba.com", body="SECRET 99", thread=oth, account=self.other_account)
+        self.r.extra_threads.add(oth)
+        answer = json.dumps({"body": "Dear Charles,\n\nthank you. What is the price with ENIG?\n\nBest regards,"})
+        with mock.patch.object(ai, "call", return_value=(answer, Decimal("0.01"))) as call:
+            j = self.client.post(self.act, {"do": "each_compose", "rids": f"{self.r.pk},{self.r2.pk}",
+                                            "wish": "подякуй і запитай ціну з позолотою контактів", "mode": "ai"}).json()
+        res = self.client.get(f"/admin/inventory/supplier/job/{j['job']}/").json()["result"]
+        self.assertEqual(len(res["letters"]), 2)
+        self.assertIn("What is the price with ENIG?", res["letters"][0]["body"])
+        first = call.call_args_list[0][0][1]
+        self.assertTrue(first.startswith("ПОБАЖАННЯ МЕНЕДЖЕРА — що написати: подякуй"))   # довірене — поза ДАНИМИ
+        self.assertIn("Can you share the BOM?", first)
+        self.assertNotIn("SECRET 99", first)
+        self.assertNotIn("<<<ДАНІ", call.call_args_list[1][0][1])                   # HITECH: листів немає
+        empty = self.client.post(self.act, {"do": "each_compose", "rids": str(self.r.pk), "wish": " "})
+        self.assertEqual(empty.status_code, 400)
+
+    def test_send_each_isolated_into_own_threads(self):
+        frank = self.frank()
+        calls = []
+
+        def fake_send(client, to_emails, subject, body_text, body_html="", **kw):
+            calls.append({"to": to_emails, "cc": kw.get("cc_emails"), "reply": kw.get("reply_to_message"),
+                          "text": body_text})
+            return {"ok": True, "message_id": f"<each{len(calls)}@sevskiy.de>"}
+        other_req = SupplierRequest.objects.create(title="Other", owner=self.user, account=self.account)
+        foreign_row = R.objects.create(request=other_req, supplier=self.quiet, email="x@quiet.example", state=R.SENT)
+        letters = [
+            {"rid": self.r.pk, "to": "frank@bld-pcb.com", "cc": "charles@jypcba.com", "subject": "Re: TM270402-04H",
+             "body": "Dear Frank, ENIG price please.", "reply": frank.pk},
+            {"rid": self.r2.pk, "to": "sales8@hitechpcb.com", "cc": "", "subject": "Re: RFQ",
+             "body": "Dear Sir or Madam, ENIG price please.", "reply": ""},
+            {"rid": foreign_row.pk, "to": "x@quiet.example", "body": "Hi"},
+        ]
+        with mock.patch("email_assistant.smtp_client.SMTPClient.send", fake_send):
+            j = self.client.post(self.act, {"do": "each_send", "letters": json.dumps(letters)}).json()
+        res = self.client.get(f"/admin/inventory/supplier/job/{j['job']}/").json()["result"]
+        self.assertEqual(res["sent"], ["JY Electronics", "HITECH CIRCUITS"])
+        self.assertEqual(res["failed"], [["?", "постачальника немає в цьому запиті"]])
+        self.assertEqual(len(calls), 2)                                              # кожному — окремий лист
+        self.assertEqual((calls[0]["to"], calls[0]["cc"]), (["frank@bld-pcb.com"], ["charles@jypcba.com"]))
+        self.assertEqual(calls[0]["reply"].pk, frank.pk)                             # у його гілку
+        self.assertEqual((calls[1]["to"], calls[1]["cc"]), (["sales8@hitechpcb.com"], []))
+        self.assertNotIn("frank", calls[1]["text"])                                  # інші не бачать
+        self.assertEqual(EmailMessage.objects.get(message_id="<each1@sevskiy.de>").thread_id, frank.thread_id)
+        self.assertEqual(SupplierEvent.objects.filter(request=self.req, text__contains="Відповіли").count(), 2)
+
+
+class ScopePerQuantityTests(TalkBase):
+    """🧩 Ціна лише за плати для частини кількостей не змагається з PCBA: що входить — для кожної кількості."""
+
+    def test_parts_from_ai_decide_scope_and_sum(self):
+        # HK Victory: PCBA лише на 5 шт (компоненти + плата + складання 0), на решту — лише голі плати
+        pcba = ai.tier_from_ai({"qty": 5, "unit_price": 53.584, "includes": ["pcb", "assembly", "components"],
+                                "parts": {"pcb": 0.574, "assembly": 0, "components": 53.01}}, [])
+        self.assertEqual((pcba["unit_price"], pcba["includes"]), ("53.5840", ["pcb", "assembly", "components"]))
+        bare = ai.tier_from_ai({"qty": 2500, "unit_price": 0.455, "includes": ["pcb", "assembly", "components"],
+                                "parts": {"pcb": 0.455}}, [])
+        self.assertEqual(bare["includes"], ["pcb"])                     # AI сказав «усе», а ціна — лише плата
+        summed = ai.tier_from_ai({"qty": 10000, "parts": {"pcb": 0.4, "assembly": 0.3, "components": 1.2}}, [])
+        self.assertEqual((summed["unit_price"], summed["includes"]), ("1.9000", ["pcb", "assembly", "components"]))
+        bundled = ai.tier_from_ai({"qty": 20000, "unit_price": 5, "includes": ["pcb", "assembly"],
+                                   "parts": {"pcb": 0.4}}, [])          # складова лише частина ціни — includes AI
+        self.assertEqual(bundled["includes"], ["pcb", "assembly"])
+
+    def test_bare_board_cells_excluded_from_medal_and_stats(self):
+        # запит PCBA (needed: монтаж); JY — PCBA для обох кількостей, HITECH — PCBA лише на 5 шт, на 2500 — плати
+        R.objects.filter(pk=self.r2.pk).update(
+            includes=["pcb", "assembly", "components"],
+            tiers=[{"qty": 5, "unit_price": "100", "includes": ["pcb", "assembly", "components"]},
+                   {"qty": 2500, "unit_price": "0.5", "includes": ["pcb"]}])
+        t = rfq_compare.table(self.req)
+        hi = next(x for x in t["rows"] if x["recipient"].pk == self.r2.pk)
+        jy = next(x for x in t["rows"] if x["recipient"].pk == self.r.pk)
+        self.assertTrue(hi["comparable"])                              # 5 шт — повна
+        self.assertTrue(hi["cells"][0]["ok"])
+        self.assertEqual(hi["cells"][1]["lacks"], ["монтаж"])
+        self.assertFalse(hi["cells"][1].get("best"))                   # 0,5 € за голу плату — не 🥇
+        self.assertTrue(jy["cells"][1]["best"])                        # 10 € PCBA — найдешевше з повних
+        self.assertIn("у ціні немає: монтаж — для 2 500 шт", hi["gaps"])
+        for row in t["rows"]:
+            row["timing"] = rfq_stats.timing(row["recipient"])
+        st = rfq_stats.stats(self.req, t)
+        q2500 = next(p for p in st["per_qty"] if p["qty"] == 2500)
+        self.assertEqual((q2500["n"], q2500["min_who"]), (1, "JY Electronics"))
+        page = self.client.get(reverse("admin:suppliers_supplierrequest_work", args=[self.req.pk])).content.decode()
+        self.assertIn("⚠️ немає: монтаж", page)
+
+    def test_reparse_refreshes_ai_fields_keeps_manual(self):
+        old_ai = {"v": 2, "summary": "old", "tiers": [{"qty": 5, "unit_price": "0.5"}], "includes": ["pcb"]}
+        R.objects.filter(pk=self.r2.pk).update(ai=old_ai, tiers=old_ai["tiers"], includes=["pcb"])
+        self.r2.refresh_from_db()
+        new = {"v": ai.QUOTE_VERSION, "summary": "new", "currency": "EUR", "includes": ["pcb", "assembly"],
+               "tiers": [{"qty": 5, "unit_price": "90.0000", "includes": ["pcb", "assembly"]}], "one_time": []}
+        from suppliers.services import rfq
+        rfq.apply_ai(self.r2, new)                                     # без «перезаписати»: поле AI — оновлюється
+        self.r2.refresh_from_db()
+        self.assertEqual((self.r2.tiers, self.r2.includes, self.r2.price), (new["tiers"], ["pcb", "assembly"],
+                                                                             Decimal("90.0000")))
+        manual = [{"qty": 5, "unit_price": "77"}]                      # людина виправила ✏️ — не чіпаємо
+        R.objects.filter(pk=self.r2.pk).update(tiers=manual)
+        self.r2.refresh_from_db()
+        rfq.apply_ai(self.r2, {**new, "tiers": [{"qty": 5, "unit_price": "95.0000"}]})
+        self.r2.refresh_from_db()
+        self.assertEqual(self.r2.tiers, manual)
