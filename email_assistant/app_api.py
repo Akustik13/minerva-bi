@@ -16,7 +16,9 @@ offers/views.py) — логіка й перевірки однакові, тут
   POST translate-text/ {text, lang}  — переклад тексту (🎤 надиктоване в «Написати»), як «🌐» у формі відповіді;
   GET  messages/                     — список: folder, q, cat, wcat, customer, project, quote, fu, grouped, page;
   GET  messages/<pk>/                — гілка листа (позначає прочитаним); html/ — HTML листа для перегляду;
-  GET  messages/<pk>/attachments/<i>/ — вкладення; compose/?mode=reply|all|forward — поля форми;
+  GET  messages/<pk>/attachments/<i>/ — вкладення; …/thumb/?w= — картинка зменшена (рядок «🖼 Картинки»);
+       messages/<pk>/inline/<i>/?s=… — картинка для «🌐 Оригінал листа» за підписаним посиланням (без ключа);
+       compose/?mode=reply|all|forward — поля форми;
   POST messages/<pk>/read|unread|star|importance|spam|delete|restore|category|followup/ — як у скриньці;
   POST messages/<pk>/ai-reply|ai-prepare|ai-ask|ai-review/, GET brief/ | history/ | translate/ — AI листа;
   GET  messages/<pk>/agent/, POST agent/try/ | agent/save/ — «🤖 Доручити агенту»;
@@ -185,10 +187,54 @@ def message_detail(request, pk):
 def message_html(request, pk):
     from email_assistant.views import _email_response
     msg = _message(request, pk)
-    html = mail_app.app_html(request.account, msg)
+    html = mail_app.app_html(request.account, msg, request.device)
     if not html:
         raise Http404
     return _email_response(html)
+
+
+def _image_response(found):
+    from django.http import HttpResponse
+    from email_assistant.views import ATTACHMENT_CSP
+    data, ctype = found
+    resp = HttpResponse(data, content_type=ctype)
+    resp['X-Content-Type-Options'] = 'nosniff'
+    resp['Content-Security-Policy'] = ATTACHMENT_CSP
+    resp['Cache-Control'] = 'private, max-age=3600'
+    resp['Referrer-Policy'] = 'no-referrer'
+    return resp
+
+
+def _width(request, default):
+    raw = str(request.GET.get('w', default))
+    return int(raw) if raw.isdigit() else default
+
+
+def inline_image(request, message_pk, index):
+    """Картинка листа для «🌐 Оригінал листа» (WebView не шле ключа телефону): лише за підписаним посиланням
+    mail_app.inline_url — той самий телефон, лист і вкладення, не старше INLINE_MAX_AGE, телефон не відключено."""
+    from email_assistant.models import EmailMessage
+    if request.method != 'GET':
+        return _err('Метод не дозволено', 405)
+    signed = mail_app.inline_signed(request.GET.get('s'), message_pk, index)
+    if signed is None:
+        raise Http404
+    _device, account = signed
+    msg = EmailMessage.objects.filter(pk=message_pk, account=account).first()
+    found = mail_app.image_bytes(account, msg, index, _width(request, mail_app.HTML_IMAGE_WIDTH)) if msg else None
+    if found is None:
+        raise Http404
+    return _image_response(found)
+
+
+@api()
+def attachment_thumb(request, message_pk, index):
+    """Мініатюра картинки-вкладення (рядок «🖼 Картинки» в листі; ?w= — ширина, для перегляду на весь екран)."""
+    msg = _message(request, message_pk)
+    found = mail_app.image_bytes(request.account, msg, index, _width(request, mail_app.THUMB_WIDTH))
+    if found is None:
+        return _err('Цю картинку телефон показати не може — відкрийте її як файл.', 415)
+    return _image_response(found)
 
 
 @api()

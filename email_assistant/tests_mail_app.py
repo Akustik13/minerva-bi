@@ -4,7 +4,9 @@ python manage.py test email_assistant.tests_mail_app --settings=tabele.settings_
 Пошта не надсилається (SMTPClient.send підмінено), IMAP не викликається (_imap_bg підмінено)."""
 import base64
 import datetime
+import io
 import json
+import re
 import shutil
 import tempfile
 from unittest.mock import patch
@@ -12,6 +14,7 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
+from django.utils import timezone
 
 from email_assistant import mail_app
 from email_assistant.models import EmailAccount, EmailDraft, EmailMessage, EmailThread, MailAppDevice, MailCategory
@@ -20,6 +23,14 @@ ME = 'sales@sevskiy.example'
 SEND = 'email_assistant.smtp_client.SMTPClient.send'
 IMAP_BG = 'email_assistant.views._imap_bg'
 PNG = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==')
+
+
+def jpeg(w, h):
+    """Фото з телефона — великий JPEG."""
+    from PIL import Image
+    out = io.BytesIO()
+    Image.new('RGB', (w, h), (200, 120, 40)).save(out, 'JPEG', quality=70)
+    return out.getvalue()
 
 
 class Base(TestCase):
@@ -287,19 +298,63 @@ class ApiTests(Base):
         self.assertTrue(self.call('post', f'drafts/{pk}/delete/', self.tok).json()['ok'])
         self.assertFalse(EmailDraft.objects.filter(pk=pk).exists())
 
-    def test_html_inlines_cid_images(self):
-        m = self.message(body_html='<html><head></head><body><img src="cid:logo1"> Hallo</body></html>',
-                         attachments=[{'name': 'logo.png', 'content_type': 'image/png', 'content_id': '<logo1>',
-                                       'is_inline': True}])
-        with patch('email_assistant.attachments.attachment_bytes', return_value=PNG):
-            r = self.call('get', f'messages/{m.pk}/html/', self.tok)
+    def _inline_urls(self, m):
+        import html as _html
+        r = self.call('get', f'messages/{m.pk}/html/', self.tok)
         self.assertEqual(r.status_code, 200)
         self.assertIn("script-src 'none'", r['Content-Security-Policy'])
         body = r.content.decode()
-        self.assertIn('data:image/png;base64,', body)
         self.assertNotIn('/email/message/', body)
-        plain = self.message(body_text='Nur Text')
-        self.assertEqual(self.call('get', f'messages/{plain.pk}/html/', self.tok).status_code, 404)
+        self.assertNotIn('cid:', body)
+        return body, [_html.unescape(u) for u in re.findall(r'src="(/email/phone/api/messages/[^"]+)"', body)]
+
+    def test_html_inline_images_by_signed_links(self):
+        """Вставлені картинки (cid:) — підписаними посиланнями, без ліміту 3 МБ і без ключа телефону у WebView."""
+        big = jpeg(3000, 2000)
+        m = self.message(
+            body_html='<html><head></head><body><img src="cid:logo1"> Hallo <img src="CID:shot@x">'
+                      '<img src="cid:image001.png@01DB2C"><img src="http://cdn.example/a.png"></body></html>',
+            attachments=[
+                {'name': 'logo.png', 'content_type': 'image/png', 'content_id': '<logo1>', 'is_inline': True},
+                {'name': 'screen.jpg', 'content_type': 'application/octet-stream', 'content_id': '<shot@x>'},
+                {'name': 'image001.png', 'content_type': 'image/png'},   # старий лист: Content-ID не збережено
+                {'name': 'Angebot.pdf', 'content_type': 'application/pdf'}])
+        files = {0: PNG, 1: big, 2: PNG}
+        with patch('email_assistant.attachments.attachment_bytes', side_effect=lambda a, msg, i: files.get(i)):
+            body, urls = self._inline_urls(m)
+            self.assertEqual(len(urls), 3)
+            self.assertIn('src="https://cdn.example/a.png"', body)          # змішаний вміст WebView не вантажить
+            anon = Client()                                                   # WebView — без ключа телефону
+            r = anon.get(urls[1])
+            self.assertEqual((r.status_code, r['Content-Type']), (200, 'image/jpeg'))
+            from PIL import Image
+            self.assertEqual(Image.open(io.BytesIO(r.content)).width, mail_app.HTML_IMAGE_WIDTH)  # 3000 px → 1600
+            self.assertEqual(anon.get(urls[2])['Content-Type'], 'image/png')
+            self.assertEqual(anon.get(urls[1].replace('s=', 's=x')).status_code, 404)        # підпис підроблено
+            self.assertEqual(anon.get(urls[1].replace('/inline/1/', '/inline/3/')).status_code, 404)  # PDF — ні
+            plain = self.message(body_text='Nur Text')
+            self.assertEqual(self.call('get', f'messages/{plain.pk}/html/', self.tok).status_code, 404)
+            MailAppDevice.objects.update(revoked_at=timezone.now())
+            self.assertEqual(anon.get(urls[0]).status_code, 404)            # телефон відключили
+
+    def test_images_in_conversation_and_thumbs(self):
+        """«🖼 Картинки» в листі: прапорець image (і для octet-stream з розширенням картинки), мініатюра — зменшена."""
+        m = self.message(attachments=[
+            {'name': 'IMG_0012.JPG', 'content_type': 'application/octet-stream', 'content_id': '<a@b>',
+             'is_inline': True, 'size': 900000},
+            {'name': 'logo.svg', 'content_type': 'image/svg+xml'},
+            {'name': 'Angebot.pdf', 'content_type': 'application/pdf'}])
+        atts = self.call('get', f'messages/{m.pk}/', self.tok).json()['messages'][0]['attachments']
+        self.assertEqual([(a['image'], a['inline']) for a in atts], [(True, True), (False, False), (False, False)])
+        with patch('email_assistant.attachments.attachment_bytes', return_value=jpeg(2000, 1500)):
+            r = self.call('get', f'messages/{m.pk}/attachments/0/thumb/', self.tok)
+            self.assertEqual((r.status_code, r['Content-Type']), (200, 'image/jpeg'))
+            from PIL import Image
+            self.assertEqual(Image.open(io.BytesIO(r.content)).width, mail_app.THUMB_WIDTH)
+            self.assertEqual(self.call('get', f'messages/{m.pk}/attachments/2/thumb/', self.tok).status_code, 415)
+        with patch('email_assistant.attachments.attachment_bytes', return_value=b'\x00\x00\x00 ftypheic broken'):
+            self.assertEqual(self.call('get', f'messages/{m.pk}/attachments/0/thumb/', self.tok).status_code, 415)
+        self.assertEqual(Client().get(f'/email/phone/api/messages/{m.pk}/attachments/0/thumb/').status_code, 401)
 
     def test_nav_counts(self):
         self.message()

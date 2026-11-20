@@ -5,7 +5,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
-const appVersion = '1.0.2';
+const appVersion = '1.0.3';
 
 class ApiException implements Exception {
   ApiException(this.status, this.message);
@@ -113,7 +113,9 @@ class Api {
       final decoded = jsonDecode(utf8.decode(r.bodyBytes));
       body = decoded is Map<String, dynamic> ? decoded : {'data': decoded};
     } catch (_) {
-      body = {};
+      // не JSON: коротке пояснення сервера текстом («Файл не знайдено. Пересинхронізуйте пошту.») — його й показати
+      final text = utf8.decode(r.bodyBytes, allowMalformed: true).trim();
+      body = r.statusCode >= 400 && text.isNotEmpty && text.length < 300 && !text.startsWith('<') ? {'error': text} : {};
     }
     if (r.statusCode >= 400) {
       throw ApiException(r.statusCode, (body['error'] ?? 'HTTP ${r.statusCode}').toString());

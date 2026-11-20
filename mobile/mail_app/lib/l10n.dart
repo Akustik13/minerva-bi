@@ -133,6 +133,12 @@ const Map<String, Map<String, String>> _s = {
   'attachments': {'uk': 'Вкладення', 'en': 'Attachments', 'de': 'Anhänge'},
   'downloading': {'uk': 'Завантажую', 'en': 'Downloading', 'de': 'Lade'},
   'no_app_for_file': {'uk': 'Немає програми, щоб відкрити цей файл', 'en': 'No app can open this file', 'de': 'Keine App kann diese Datei öffnen'},
+  'open_file': {'uk': 'Відкрити файл', 'en': 'Open file', 'de': 'Datei öffnen'},
+  'image_unavailable': {
+    'uk': 'Цю картинку тут показати не вдалося — відкрийте її як файл (програмою «Галерея» чи «Фото»).',
+    'en': 'This picture cannot be shown here — open it as a file (in Gallery or Photos).',
+    'de': 'Dieses Bild kann hier nicht angezeigt werden — als Datei öffnen (Galerie oder Fotos).',
+  },
   'order': {'uk': 'Замовлення', 'en': 'Order', 'de': 'Auftrag'},
   'quote_banner': {'uk': 'Схоже на запит пропозиції', 'en': 'Looks like a quote request', 'de': 'Sieht aus wie eine Angebotsanfrage'},
   'quote_create': {'uk': 'Angebot у Minerva', 'en': 'Quote in Minerva', 'de': 'Angebot in Minerva'},

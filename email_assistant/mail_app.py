@@ -16,9 +16,9 @@ QR-кодом, ключ телефону й дані для екранів до�
   messages(account, params)    — список листів (або гілок) з фільтрами й сторінками; drafts(account, params);
   conversation(account, msg, user) — гілка листа для екрана листа: тексти без цитат, вкладення, зв'язки, агент…;
   compose(account, msg, mode)  — поля відповіді / пересилання (reply | all | forward);
-  app_html(account, msg)       — HTML листа для перегляду в додатку (картинки cid: усередині, до HTML_INLINE_MAX).
+  app_html(account, msg, device) — HTML листа для перегляду в додатку (вставлені картинки — підписаними
+                                 посиланнями inline_url / inline_signed); image_bytes — картинка-вкладення (зменшена).
 """
-import base64
 import hashlib
 import json
 import logging
@@ -35,8 +35,7 @@ PAIR_TTL = 600                 # QR підключення діє 10 хв
 PAIR_PER_HOUR = 20             # спроб підключення з однієї адреси за годину
 SEEN_EVERY = 60                # «востаннє на зв'язку» — не частіше
 PAGE = 30                      # листів на сторінку (як у скриньці)
-HTML_INLINE_MAX = 3 * 1024 * 1024   # картинки cid: усередині HTML листа для додатка — разом не більше
-APP_VERSION = '1.0.2'          # остання версія додатка — сторінка підключення й «є нова версія» в додатку
+APP_VERSION = '1.0.3'          # остання версія додатка — сторінка підключення й «є нова версія» в додатку
 APP_TAG = f'mail-app-v{APP_VERSION}'
 APP_URL = getattr(settings, 'MINERVA_MAIL_APP_URL',
                   f'https://github.com/Akustik13/minerva-bi/releases/download/{APP_TAG}/minerva-mail.apk')
@@ -416,7 +415,20 @@ def draft_full(account, d) -> dict:
             'attachments': _drafts.chips(d), 'options': dict(d.send_options or {})}
 
 
+IMAGE_EXT_RE = re.compile(r'\.(png|jpe?g|gif|webp|bmp|heic|heif|tiff?)$', re.IGNORECASE)
+
+
+def is_image(a) -> bool:
+    """Вкладення-картинка: тип image/* (крім SVG) або розширення картинки (тип відправника буває octet-stream)."""
+    ctype = str(a.get('content_type') or '').lower()
+    if ctype.startswith('image/'):
+        return 'svg' not in ctype
+    return bool(IMAGE_EXT_RE.search(str(a.get('name') or '')))
+
+
 def _attachments(m) -> list:
+    """Вкладення листа для додатка: inline — вставлене в текст (cid:, підпис, логотип, фото iPhone); image —
+    картинка (додаток показує їх мініатюрами, вставлені дрібні логотипи — ні)."""
     out = []
     for i, a in enumerate(m.attachments or []):
         if not isinstance(a, dict):
@@ -424,7 +436,7 @@ def _attachments(m) -> list:
         inline = bool(a.get('is_inline') or (a.get('content_id') and
                                              str(a.get('content_type') or '').startswith('image/')))
         out.append({'i': i, 'name': a.get('name') or 'file', 'size': a.get('size') or 0,
-                    'type': a.get('content_type') or '', 'inline': inline})
+                    'type': a.get('content_type') or '', 'inline': inline, 'image': is_image(a)})
     return out
 
 
@@ -558,37 +570,129 @@ def letter_lang(msg) -> str:
     return guess_language(text, '')
 
 
-def app_html(account, msg) -> str:
-    """HTML листа для перегляду в додатку: той самий, що віконце листа у скриньці (views.message_html_view), але
-    картинки cid: (підпис, логотип) — data: усередині (до HTML_INLINE_MAX разом), бо WebView додатка не має сесії
-    Minerva. Скрипти листа не діють (CSP відповіді і вимкнений JavaScript у WebView)."""
-    from email_assistant import views as V
+INLINE_SALT = 'email_assistant.mail_app.inline'
+INLINE_MAX_AGE = 12 * 3600     # підписане посилання на картинку листа діє, поки відкрито «🌐 Оригінал листа»
+HTML_IMAGE_WIDTH = 1600        # картинки в «Оригіналі листа» — не ширші (фото з телефона по 4000 px — зайві МБ)
+THUMB_WIDTH = 480              # мініатюри «🖼 Картинки» в листі
+THUMB_MAX = 2400
+_CID_RE = re.compile(r'cid:([^\s"\'<>&)]+)', re.IGNORECASE)
+_HTTP_IMG_RE = re.compile(r'(<img\b[^>]*?\bsrc\s*=\s*["\']?)http://', re.IGNORECASE)
+
+
+def inline_url(device, msg, index, width=HTML_IMAGE_WIDTH) -> str:
+    """Посилання на картинку листа для WebView «Оригінал листа»: ключа телефону WebView до картинок не шле, тож
+    посилання підписане (телефон, лист, номер вкладення) і діє INLINE_MAX_AGE."""
+    from urllib.parse import urlencode
+    from django.core.signing import TimestampSigner
+    sig = TimestampSigner(salt=INLINE_SALT).sign(f'{device.pk}:{msg.pk}:{index}')
+    return f'/email/phone/api/messages/{msg.pk}/inline/{index}/?' + urlencode({'s': sig, 'w': width})
+
+
+def inline_signed(sig, pk, index):
+    """Підпис посилання → (телефон, скринька) або None: прострочено, чужий лист чи вкладення, телефон відключили."""
+    from django.core.signing import BadSignature, TimestampSigner
+    from email_assistant.models import MailAppDevice
+    try:
+        value = TimestampSigner(salt=INLINE_SALT).unsign(str(sig or ''), max_age=INLINE_MAX_AGE)
+    except BadSignature:
+        return None
+    parts = value.split(':')
+    if len(parts) != 3 or not all(p.isdigit() for p in parts) or parts[1:] != [str(pk), str(index)]:
+        return None
+    device = MailAppDevice.objects.select_related('user').filter(pk=int(parts[0]), revoked_at=None).first()
+    if device is None or not device.user.is_active or not device.user.is_staff:
+        return None
+    account = account_for(device.user)
+    return (device, account) if account else None
+
+
+def image_bytes(account, msg, index, width=0):
+    """Картинка-вкладення листа → (байти, тип) або None (не картинка / не прочитали). width — зменшити до цієї
+    ширини (з поворотом за EXIF) у JPEG / PNG; формат, якого Pillow не читає (HEIC), — None, якщо треба зменшити."""
     from email_assistant.attachments import attachment_bytes
+    from email_assistant.imap_client import sniff_content_type
+    atts = msg.attachments or []
+    if not 0 <= index < len(atts) or not isinstance(atts[index], dict) or not is_image(atts[index]):
+        return None
+    try:
+        data = attachment_bytes(account, msg, index)
+    except Exception:  # noqa: BLE001
+        logger.warning('mail app image msg=%s idx=%s', msg.pk, index, exc_info=True)
+        data = None
+    if not data:
+        return None
+    ctype = sniff_content_type(data)
+    if not ctype.startswith('image/'):
+        declared = str(atts[index].get('content_type') or '').split(';')[0].strip().lower()
+        ctype = declared if declared.startswith('image/') and 'svg' not in declared else ''
+    if not width:
+        return (data, ctype or 'application/octet-stream')
+    try:
+        return _resized(data, min(max(int(width), 64), THUMB_MAX))
+    except Exception:  # noqa: BLE001 — HEIC, пошкоджений файл
+        return (data, ctype) if ctype in ('image/png', 'image/jpeg', 'image/gif', 'image/webp') else None
+
+
+def _resized(data, width):
+    import io
+    from PIL import Image, ImageOps
+    Image.MAX_IMAGE_PIXELS = 80_000_000
+    with Image.open(io.BytesIO(data)) as im:
+        if im.format == 'GIF' and getattr(im, 'is_animated', False):
+            return (data, 'image/gif')           # анімацію не ламаємо
+        im = ImageOps.exif_transpose(im)
+        if im.width > width:
+            im = im.resize((width, max(1, round(im.height * width / im.width))), Image.LANCZOS)
+        out = io.BytesIO()
+        if im.mode in ('RGBA', 'LA', 'P'):
+            im.save(out, 'PNG', optimize=True)
+            return (out.getvalue(), 'image/png')
+        im.convert('RGB').save(out, 'JPEG', quality=85, optimize=True)
+        return (out.getvalue(), 'image/jpeg')
+
+
+def _cid_by_name(msg, html):
+    """cid:image001.png@01DB… без Content-ID у збереженому вкладенні (старі листи) — за назвою файлу, щоб не
+    ходити на IMAP-сервер по весь лист."""
+    names = {}
+    for i, a in enumerate(msg.attachments or []):
+        if isinstance(a, dict) and a.get('name'):
+            names.setdefault(str(a['name']).lower(), i)
+    known = {str(a.get('content_id') or '').strip('<>').lower()
+             for a in (msg.attachments or []) if isinstance(a, dict)}
+
+    def repl(m):
+        cid = m.group(1)
+        if cid.lower() in known:
+            return m.group(0)
+        i = names.get(cid.split('@')[0].lower())
+        return f'/email/message/{msg.pk}/attachment/{i}/' if i is not None else m.group(0)
+    return _CID_RE.sub(repl, html)
+
+
+def app_html(account, msg, device=None) -> str:
+    """HTML листа для перегляду в додатку: той самий, що віконце листа у скриньці (views.message_html_view), але
+    вставлені картинки (cid:) — підписаними посиланнями inline_url (WebView додатка не має сесії Minerva; раніше —
+    data: до 3 МБ разом, решта не показувалась), http-картинки — через https (сторінка https, змішаний вміст
+    WebView не вантажить). Скрипти листа не діють (CSP відповіді і вимкнений JavaScript у WebView)."""
+    from email_assistant import views as V
     msg.fix_html_body()
     if not msg.body_html:
         return ''
     html = msg.body_html
     if 'cid:' in html.lower():
-        html = V._resolve_cid_images(msg, html)
-    budget = [HTML_INLINE_MAX]
+        html = _cid_by_name(msg, html)
+        if 'cid:' in html.lower():
+            html = V._resolve_cid_images(msg, html)
 
-    def inline(match):
+    def signed(match):
         url = match.group(0)
         m = ATT_REF_RE.match(url)
-        if not m or int(m.group(1)) != msg.pk:
+        if not m or int(m.group(1)) != msg.pk or device is None:
             return url
-        index = int(m.group(2))
-        try:
-            data = attachment_bytes(account, msg, index)
-        except Exception:  # noqa: BLE001
-            data = None
-        att = (msg.attachments or [])[index] if index < len(msg.attachments or []) else {}
-        ctype = str(att.get('content_type') or '')
-        if not data or not ctype.startswith('image/') or len(data) > budget[0]:
-            return url
-        budget[0] -= len(data)
-        return f'data:{ctype};base64,{base64.b64encode(data).decode()}'
-    html = re.sub(r'/email/message/\d+/attachment/\d+/', inline, html)
+        return inline_url(device, msg, int(m.group(2)))
+    html = re.sub(r'/email/message/\d+/attachment/\d+/', signed, html)
+    html = _HTTP_IMG_RE.sub(r'\1https://', html)
     return V._inject_email_css(html).replace('<base target="_blank">', '<base target="_blank">' + PHONE_FIT, 1)
 
 

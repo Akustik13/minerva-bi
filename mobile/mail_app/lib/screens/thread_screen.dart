@@ -17,6 +17,7 @@ import 'agent_sheet.dart';
 import 'ai_sheet.dart';
 import 'compose_screen.dart';
 import 'html_screen.dart';
+import 'images.dart';
 
 class ThreadScreen extends StatefulWidget {
   const ThreadScreen({super.key, required this.messageId, this.title = ''});
@@ -211,8 +212,10 @@ class _ThreadScreenState extends State<ThreadScreen> {
     try {
       final r = await api.raw('messages/${m['id']}/attachments/${a['i']}/', query: {'download': '1'});
       final dir = await getTemporaryDirectory();
-      final safe = (a['name'] as String? ?? 'file').replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-      final folder = Directory('${dir.path}/att_${m['id']}');
+      // без розширення («Angebot», переслане «.eml») програма телефона файл не відкриє — додаємо за типом;
+      // окрема тека на кожне вкладення — однакові назви в листі не перезаписують одна одну
+      final safe = attachmentFileName(a['name'] as String? ?? '', a['type'] as String? ?? '');
+      final folder = Directory('${dir.path}/att_${m['id']}_${a['i']}');
       await folder.create(recursive: true);
       final file = File('${folder.path}/$safe');
       await file.writeAsBytes(r.bodyBytes);
@@ -462,7 +465,9 @@ class _ThreadScreenState extends State<ThreadScreen> {
     final own = m['own'] == true;
     final to = ((m['to'] as List?) ?? []).cast<String>();
     final cc = ((m['cc'] as List?) ?? []).cast<String>();
-    final atts = ((m['attachments'] as List?) ?? []).cast<Map<String, dynamic>>().where((a) => a['inline'] != true).toList();
+    final all = ((m['attachments'] as List?) ?? []).cast<Map<String, dynamic>>();
+    final images = all.where(galleryImage).toList();
+    final atts = all.where(fileAttachment).toList();
     final name = (m['from'] as String? ?? '').isEmpty ? m['from_email'] as String? ?? '' : m['from'] as String;
     final head = InkWell(
       onTap: () => setState(() => open ? expanded.remove(id) : expanded.add(id)),
@@ -547,6 +552,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
             decoration: BoxDecoration(border: Border(left: BorderSide(color: scheme.outlineVariant, width: 3))),
             child: SelectableText(quote, style: TextStyle(fontSize: 13.5, color: scheme.onSurfaceVariant, height: 1.4)),
           ),
+        if (images.isNotEmpty) ImageStrip(api: api, messageId: id, images: images, onOpenFile: (a) => _openAttachment(m, a)),
         if (atts.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),

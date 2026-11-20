@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:minerva_mail/api.dart';
 import 'package:minerva_mail/l10n.dart';
+import 'package:minerva_mail/screens/images.dart';
 import 'package:minerva_mail/screens/mail_list.dart';
 import 'package:minerva_mail/util.dart';
 import 'package:minerva_mail/voice.dart';
@@ -32,6 +33,19 @@ void main() {
     expect(c.text, 'Hallo Anna, Дякую за запит. Wir melden uns');
     expect(replaceInserted(c, r, 'щось інше', 'x'), isFalse); // змінили руками — не чіпаємо
     expect(insertAtCursor(c, '   '), isNull);
+  });
+
+  test('🖼 картинки листа й файли', () {
+    final photo = {'image': true, 'inline': true, 'size': 900000}; // фото з iPhone / вставлений скріншот
+    final logo = {'image': true, 'inline': true, 'size': 4000}; // логотип у підписі
+    final attached = {'image': true, 'inline': false, 'size': 3000};
+    final inlinePdf = {'image': false, 'inline': true, 'size': 50000}; // PDF, вставлений у текст (Apple Mail)
+    expect([photo, logo, attached, inlinePdf].map(galleryImage), [true, false, true, false]);
+    expect([photo, logo, attached, inlinePdf].map(fileAttachment), [false, false, false, true]);
+    expect(attachmentFileName('Angebot', 'application/pdf'), 'Angebot.pdf');
+    expect(attachmentFileName('Re: Anfrage', 'message/rfc822'), 'Re_ Anfrage.eml');
+    expect(attachmentFileName('Bericht.docx', 'application/octet-stream'), 'Bericht.docx');
+    expect(attachmentFileName('', ''), 'file');
   });
 
   test('🔔 написи сповіщень без BuildContext', () {
