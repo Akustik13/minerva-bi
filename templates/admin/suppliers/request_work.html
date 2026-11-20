@@ -146,6 +146,7 @@
       </div>
     </div>
     {% endif %}
+    {% if letters_pending and can_change %}<div class="spf-warn rw-saved-line">📝 Збережені листи «Написати кожному» — не надіслано: <b>{{ letters_pending }}</b> <button type="button" class="button" id="rw-saved-open" title="Відкрити складені раніше листи — надіслати без нового складання AI">📝 Відкрити й дослати</button></div>{% endif %}
     {% include "admin/suppliers/_request_stats.html" %}
     <div class="rw-scroll">
     <table class="spf-table rw-cmp">

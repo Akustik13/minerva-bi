@@ -6,6 +6,12 @@ import ssl
 from email.message import EmailMessage
 from email.policy import SMTP as SMTP_POLICY
 
+
+def one_line(value) -> str:
+    """Значення заголовка без переносів рядка: тема чи Message-ID з чужої пошти бувають «Re:\n RFQ…», а
+    email.message тоді не надсилає («Header values may not contain linefeed or carriage return characters»)."""
+    return " ".join(str(value or "").split())
+
 logger = logging.getLogger('email_assistant')
 
 
@@ -81,14 +87,14 @@ class SMTPClient:
             msg['From'] = email.utils.formataddr(
                 (self.account.display_name or '', self.account.email_address)
             )
-            msg['To']      = ', '.join(to_emails)
-            msg['Subject'] = subject
+            msg['To']      = one_line(', '.join(to_emails))
+            msg['Subject'] = one_line(subject)
             # Власний Message-ID: копія в «Надісланих» і запис у Minerva — один і той самий лист
             message_id = email.utils.make_msgid(
                 domain=self.account.email_address.rpartition('@')[2] or None)
             msg['Message-ID'] = message_id
             if cc_emails:
-                msg['Cc'] = ', '.join(cc_emails)
+                msg['Cc'] = one_line(', '.join(cc_emails))
             from email_assistant.importance import outgoing_headers
             for name, value in outgoing_headers(importance).items():
                 msg[name] = value
@@ -99,13 +105,13 @@ class SMTPClient:
             if reply_to_message and reply_to_message.message_id:
                 # Відповідь, а не новий лист: поштові програми клієнта ставлять її в ту саму гілку.
                 # References — усі листи гілки до цього (email_assistant/reply_quote.py)
-                msg['In-Reply-To'] = reply_to_message.message_id
+                msg['In-Reply-To'] = one_line(reply_to_message.message_id)
                 try:
                     from email_assistant.reply_quote import references
                     refs = references(reply_to_message)
                 except Exception:  # noqa: BLE001 — без бази гілки: лист і той, на який він відповідав
                     refs = ' '.join(r for r in [reply_to_message.in_reply_to, reply_to_message.message_id] if r)
-                msg['References'] = refs
+                msg['References'] = one_line(refs)
 
             # Account signature > UserProfile.smtp_signature ({name} placeholder)
             # Appended to plain-text body only (HTML body already contains sig from frontend)

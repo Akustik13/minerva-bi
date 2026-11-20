@@ -19,11 +19,15 @@
                               гілці (target: автор останнього листа, копія — лише адреса цієї ж фірми), з вашої
                               скриньки; текст — AI за побажанням людини (ai.each_letter, мовою листування, на ім'я)
                               або один шаблон ({greeting} {name} {company} {code} — fill); людина бачить і правит
-                              кожен лист до надсилання, інші постачальники його не бачать.
+                              кожен лист до надсилання, інші постачальники його не бачать;
+  save_letters / update_letters / saved_letters — 📝 складені листи зберігаються (SupplierRequestLetter, своє в
+                              кожної людини): правки — автозбереженням, надіслане позначається (reply), невідправлене
+                              відкривається знову без нового складання AI («📝 Збережені листи» над таблицею, 💬).
 """
 import hashlib
 import logging
 import re
+import time
 
 from django.utils import timezone
 from django.utils.html import escape
@@ -36,6 +40,11 @@ LETTER_CHARS = 6000          # тексту одного листа у вікн�
 FORWARD_MAILS = 30           # листів одного постачальника в пересиланні
 FORWARD_MAX_ROWS = 30
 EACH_MAX = 30                # листів «✉️ Написати кожному» за раз
+EACH_PAUSE = 2               # с між листами: кожен лист — окремий вхід на SMTP, 13 підряд сервер може відкинути
+EACH_RETRY = (20, 60)        # тимчасова відмова сервера пошти (4xx, «too many», «try again») — повтор через N с
+_TRANSIENT_RE = re.compile(r"\b4\d\d\b|too many|rate.?limit|limit exceeded|try again|temporar|throttl|"
+                           r"timed? ?out|connection (?:reset|closed|refused)|unexpectedly closed|"
+                           r"Не вдалось підключитись", re.I)
 
 
 class TalkError(Exception):
@@ -67,7 +76,7 @@ def letters(r, user) -> list:
 
 
 def _re(subject) -> str:
-    s = (subject or "").strip()
+    s = " ".join(str(subject or "").split())          # тема з чужої пошти буває з переносом рядка
     return s if s.lower().startswith(("re:", "aw:", "antw:")) else f"Re: {s}"
 
 
@@ -194,7 +203,7 @@ def reply(req, r, user, to, cc, subject, body, reply_pk=None) -> dict:
         head = f"{prev.sent_at:%d.%m.%Y %H:%M}, {prev.from_name or prev.from_email}:" if prev.sent_at else ""
         quote = head + "\n" + "\n".join("> " + ln for ln in new_text(prev.body_text or "").splitlines()[:60])
     text, html = rfq.letter(account, body, quote)
-    subject = (subject or "").strip() or _re(prev.subject if prev else rfq.render(req, r)[0])
+    subject = " ".join(str(subject or "").split()) or _re(prev.subject if prev else rfq.render(req, r)[0])
     try:
         result = SMTPClient(account).send(to_emails=to_list, cc_emails=cc_list, subject=subject, body_text=text,
                                           body_html=html, reply_to_message=prev, signature=False)
@@ -217,6 +226,8 @@ def reply(req, r, user, to, cc, subject, body, reply_pk=None) -> dict:
             r.extra_threads.add(msg.thread)
     SupplierEvent.objects.create(supplier=r.supplier, request=req, kind=SupplierEvent.MAIL, user=user, message=msg,
                                  text=f"✉️ Відповіли постачальнику → {', '.join(to_list)}")
+    from suppliers.models import SupplierRequestLetter
+    SupplierRequestLetter.objects.filter(recipient=r, user=user, sent_at=None).update(sent_at=timezone.now(), error="")
     return {"ok": True, "to": to_list, "cc": cc_list, "subject": subject}
 
 
@@ -282,7 +293,58 @@ def compose_each(req, rids, user, wish, mode="ai", model=None, report=None) -> l
             if not item["body"]:
                 item["error"] = item["error"] or "AI не склав лист — напишіть самі."
         out.append(item)
+    save_letters(req, user, out, wish=wish, mode=mode)     # 📝 складене не губиться — дослати можна пізніше
     return out
+
+
+def _letter_item(x) -> dict:
+    return {"rid": x.recipient_id, "name": x.recipient.supplier.name, "to": x.to, "cc": x.cc, "subject": x.subject,
+            "body": x.body, "reply": x.reply_message_id or "", "from": "", "note": x.note, "error": x.error,
+            "on": x.send, "sent": bool(x.sent_at)}
+
+
+def save_letters(req, user, items, wish="", mode=""):
+    """Складені листи → SupplierRequestLetter (по одному на рядок і людину; новий склад замінює старий)."""
+    from email_assistant.models import EmailMessage
+    from suppliers.models import SupplierRequestLetter
+    rows = {r.pk: r for r in req.recipients.all()}
+    for it in items:
+        r = rows.get(int(it["rid"]) if str(it.get("rid") or "").isdigit() else 0)
+        if r is None:
+            continue
+        rp = int(it["reply"]) if str(it.get("reply") or "").isdigit() else None
+        reply = EmailMessage.objects.filter(pk=rp, account__user=user).first() if rp else None   # лише свої листи
+        SupplierRequestLetter.objects.update_or_create(recipient=r, user=user, defaults={
+            "request": req, "to": str(it.get("to") or "")[:500], "cc": str(it.get("cc") or "")[:500],
+            "subject": " ".join(str(it.get("subject") or "").split())[:500], "body": str(it.get("body") or ""),
+            "reply_message": reply, "wish": wish[:4000], "mode": mode[:10], "send": not it.get("error") or
+            bool(it.get("body")), "note": str(it.get("note") or "")[:300], "error": str(it.get("error") or ""),
+            "sent_at": None})
+
+
+def update_letters(req, user, items) -> int:
+    """✏️ Правки у вікні (автозбереження): Кому, Копія, Тема, Текст, «Надіслати цьому» — лише ще не надіслані."""
+    from suppliers.models import SupplierRequestLetter
+    n = 0
+    for it in items:
+        if not isinstance(it, dict) or not str(it.get("rid") or "").isdigit():
+            continue
+        n += SupplierRequestLetter.objects.filter(request=req, user=user, recipient_id=int(it["rid"]),
+                                                  sent_at=None).update(
+            to=str(it.get("to") or "")[:500], cc=str(it.get("cc") or "")[:500],
+            subject=" ".join(str(it.get("subject") or "").split())[:500], body=str(it.get("body") or ""),
+            send=bool(it.get("on", True)))
+    return n
+
+
+def saved_letters(req, user) -> dict:
+    """📝 Невідправлені збережені листи людини в цьому запиті → {letters, at, wish}."""
+    from suppliers.models import SupplierRequestLetter
+    qs = list(SupplierRequestLetter.objects.filter(request=req, user=user, sent_at=None)
+              .select_related("recipient__supplier"))
+    at = max((x.updated_at for x in qs), default=None)
+    return {"letters": [_letter_item(x) for x in qs], "at": timezone.localtime(at).strftime("%d.%m.%Y %H:%M") if at
+            else "", "wish": qs[0].wish if qs else ""}
 
 
 def send_each(req, user, items, report=None) -> dict:
@@ -299,14 +361,29 @@ def send_each(req, user, items, report=None) -> dict:
         if r is None:
             failed.append(["?", "постачальника немає в цьому запиті"])
             continue
-        if report:
-            report(f"📤 {i} / {len(items)} · {r.supplier.name}")
-        try:
-            reply(req, r, user, str(it.get("to") or ""), str(it.get("cc") or ""), str(it.get("subject") or ""),
-                  str(it.get("body") or ""), reply_pk=it.get("reply") if str(it.get("reply") or "").isdigit() else None)
-            sent.append(r.supplier.name)
-        except TalkError as e:
-            failed.append([r.supplier.name, str(e)])
+        if i > 1 and EACH_PAUSE:
+            time.sleep(EACH_PAUSE)
+        for attempt, wait in enumerate((0,) + tuple(EACH_RETRY)):
+            if report:
+                report(f"📤 {i} / {len(items)} · {r.supplier.name}" + (
+                    f" · ⏳ сервер пошти просить зачекати — повтор через {wait} с" if wait else ""))
+            if wait:
+                time.sleep(wait)
+            try:
+                reply(req, r, user, str(it.get("to") or ""), str(it.get("cc") or ""), str(it.get("subject") or ""),
+                      str(it.get("body") or ""),
+                      reply_pk=it.get("reply") if str(it.get("reply") or "").isdigit() else None)
+                sent.append(r.supplier.name)
+                break
+            except TalkError as e:
+                err = str(e)
+                if attempt < len(EACH_RETRY) and _TRANSIENT_RE.search(err):
+                    continue                     # тимчасово — ще раз після паузи
+                logger.warning("rfq each: %s → %s: %s", req.code, r.supplier.name, err)
+                failed.append([r.supplier.name, err])
+                from suppliers.models import SupplierRequestLetter
+                SupplierRequestLetter.objects.filter(recipient=r, user=user, sent_at=None).update(error=err[:2000])
+                break
     return {"sent": sent, "failed": failed}
 
 

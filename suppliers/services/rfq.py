@@ -596,7 +596,7 @@ def remind(recipient, user) -> dict:
         raise RFQError("Нагадувати можна лише тим, хто ще не відповів.")
     t = TEXTS.get(req.language, TEXTS["en"])
     prev = recipient.sent_message
-    subject = prev.subject if prev is not None and prev.subject else render(req, recipient)[0]
+    subject = " ".join((prev.subject if prev is not None and prev.subject else render(req, recipient)[0]).split())
     subject = subject if subject.lower().startswith(("re:", "aw:")) else f"Re: {subject}"
     quote = "\n".join("> " + ln for ln in ((prev.body_text if prev else req.body) or "").splitlines()[:60])
     body, html = letter(account, f"{greeting(req, recipient)}\n\n{t['remind'].format(code=req.code)}\n\n{t['bye']}",

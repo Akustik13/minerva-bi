@@ -454,6 +454,38 @@ def _reply_path(instance, filename):
             f"{uuid.uuid4().hex[:8]}_{safe_name(filename)}")
 
 
+class SupplierRequestLetter(models.Model):
+    """✉️ «Написати кожному»: складений (AI чи шаблоном) лист одному постачальнику запиту — зберігається, щоб
+    надіслати пізніше без нового складання (і без нових токенів AI); правки людини — сюди ж. Свій у кожної людини:
+    текст зібрано з її листів, бачить і надсилає лише вона. sent_at — коли пішов."""
+    request = models.ForeignKey(SupplierRequest, on_delete=models.CASCADE, related_name="rfq_letters")
+    recipient = models.ForeignKey(SupplierRequestRecipient, on_delete=models.CASCADE, related_name="+")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    to = models.CharField("Кому", max_length=500, blank=True, default="")
+    cc = models.CharField("Копія", max_length=500, blank=True, default="")
+    subject = models.CharField("Тема", max_length=500, blank=True, default="")
+    body = models.TextField("Текст", blank=True, default="")
+    reply_message = models.ForeignKey("email_assistant.EmailMessage", null=True, blank=True,
+                                      on_delete=models.SET_NULL, related_name="+")
+    wish = models.TextField("Що просили написати", blank=True, default="")
+    mode = models.CharField(max_length=10, blank=True, default="")
+    send = models.BooleanField("Надіслати", default=True)
+    note = models.CharField(max_length=300, blank=True, default="")
+    error = models.TextField(blank=True, default="")
+    sent_at = models.DateTimeField("Надіслано", null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["pk"]
+        constraints = [models.UniqueConstraint(fields=["recipient", "user"], name="rfq_letter_one_per_user")]
+        verbose_name = "Лист постачальнику (Написати кожному)"
+        verbose_name_plural = "Листи постачальникам (Написати кожному)"
+
+    def __str__(self):
+        return f"{self.recipient_id} · {self.subject[:60]}"
+
+
 class SupplierReplyFile(models.Model):
     """📎 Вкладення з листа постачальника у відповідь на запит (пропозиція, прайс, креслення…) — лежить у запиті.
     Окремо від SupplierRequestFile: ті йдуть вкладенням кожному отримувачу, ці — ні. Той самий файл двічі

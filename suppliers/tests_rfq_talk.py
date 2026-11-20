@@ -87,6 +87,8 @@ class StatsTests(TalkBase):
         self.assertIn("↓ останній", page)                            # лист frank новіший за першу відповідь
         self.assertIn('data-rw-chat="%d"' % self.r.pk, page)
         self.assertIn("↪ Переслати колезі", page)
+        self.assertIn("✉️ Написати кожному", page)
+        self.assertIn('id="rwe-ccall"', page)                         # 👥 копія всім листам
 
     def test_human(self):
         self.assertEqual(rfq_stats.human(30), "1 хв")
@@ -362,3 +364,109 @@ class ScopePerQuantityTests(TalkBase):
         rfq.apply_ai(self.r2, {**new, "tiers": [{"qty": 5, "unit_price": "95.0000"}]})
         self.r2.refresh_from_db()
         self.assertEqual(self.r2.tiers, manual)
+
+
+class EachRetryTests(TalkBase):
+    def setUp(self):
+        super().setUp()
+        self.addCleanup(setattr, rfq_talk, "EACH_PAUSE", rfq_talk.EACH_PAUSE)
+        self.addCleanup(setattr, rfq_talk, "EACH_RETRY", rfq_talk.EACH_RETRY)
+        rfq_talk.EACH_PAUSE, rfq_talk.EACH_RETRY = 0, (0, 0)
+
+    def test_temporary_smtp_refusal_is_retried_permanent_reported(self):
+        calls = []
+
+        def fake_send(client, to_emails, subject, body_text, body_html="", **kw):
+            calls.append(to_emails[0])
+            if to_emails[0] == "sales8@hitechpcb.com" and calls.count("sales8@hitechpcb.com") == 1:
+                return {"ok": False, "error": "(421, b'4.7.0 Too many connections, try again later')"}
+            if to_emails[0] == "info@quiet.example":
+                return {"ok": False, "error": "(550, b'5.1.1 Mailbox unavailable')"}
+            return {"ok": True, "message_id": f"<retry{len(calls)}@sevskiy.de>"}
+        letters = [{"rid": self.r2.pk, "to": "sales8@hitechpcb.com", "body": "ENIG?"},
+                   {"rid": self.r3.pk, "to": "info@quiet.example", "body": "ENIG?"}]
+        with mock.patch("email_assistant.smtp_client.SMTPClient.send", fake_send):
+            out = rfq_talk.send_each(self.req, self.user, letters)
+        self.assertEqual(out["sent"], ["HITECH CIRCUITS"])                    # 421 — повтор, пішло
+        self.assertEqual(calls.count("sales8@hitechpcb.com"), 2)
+        self.assertEqual(calls.count("info@quiet.example"), 1)                # 550 — без повтору
+        self.assertEqual(out["failed"][0][0], "Quiet PCB")
+        self.assertIn("Mailbox unavailable", out["failed"][0][1])
+
+
+class FoldedHeaderTests(TalkBase):
+    """Тема / Message-ID з чужої пошти з переносом рядка («Re:\n RFQ…») — лист однаково йде (раніше: «Header values
+    may not contain linefeed or carriage return characters» у трьох постачальників із тринадцяти)."""
+
+    def test_reply_with_folded_subject_and_message_id_goes_out(self):
+        hr = Supplier.objects.create(name="HongRong (shenzhen) Electronics Co.,Ltd", email="anduin@hrpcba.com")
+        th = EmailThread.objects.create(account=self.account, subject="RFQ hr")
+        r = R.objects.create(request=self.req, supplier=hr, email="anduin@hrpcba.com", state=R.REPLIED, thread=th,
+                             sent_at=self.t0)
+        last = self.mail(frm="anduin@hrpcba.com", name="Anduin", thread=th, body="We are working on it.",
+                         subject="Re:\r\n RFQ RFQ-2026-001: PCBA manufacturing")
+        type(last).objects.filter(pk=last.pk).update(message_id="<abc123@hrpcba.com>\r\n")
+        items = rfq_talk.letters(r, self.user)
+        tg = rfq_talk.target(self.req, r, items, self.user)
+        self.assertEqual(tg["subject"], "Re: RFQ RFQ-2026-001: PCBA manufacturing")
+        sent = []
+
+        class Conn:
+            def sendmail(self, frm, rcpt, data):
+                sent.append((rcpt, data))
+
+            def quit(self):
+                pass
+        with mock.patch("email_assistant.smtp_client.SMTPClient._open", return_value=Conn()), \
+                mock.patch("core.smtp_utf8.smtp_login"), \
+                mock.patch("email_assistant.imap_client.IMAPClient", side_effect=OSError("no imap")):
+            out = rfq_talk.send_each(self.req, self.user, [{
+                "rid": r.pk, "to": "anduin@hrpcba.com", "cc": "sergey@sevskiy.de",
+                "subject": "Re:\n RFQ RFQ-2026-001: PCBA manufacturing", "body": "Dear Anduin, ENIG?", "reply": last.pk}])
+        self.assertEqual((out["sent"], out["failed"]), (["HongRong (shenzhen) Electronics Co.,Ltd"], []))
+        rcpt, data = sent[0]
+        self.assertEqual(rcpt, ["anduin@hrpcba.com", "sergey@sevskiy.de"])
+        self.assertIn(b"Subject: Re: RFQ RFQ-2026-001: PCBA manufacturing\r\n", data)
+        self.assertIn(b"In-Reply-To: <abc123@hrpcba.com>\r\n", data)
+
+
+class SavedLettersTests(TalkBase):
+    """📝 Складені листи зберігаються: відкрити й дослати невідправлене — без нового складання AI."""
+
+    def setUp(self):
+        super().setUp()
+        self.addCleanup(setattr, rfq_talk, "EACH_PAUSE", rfq_talk.EACH_PAUSE)
+        rfq_talk.EACH_PAUSE = 0
+
+    def test_compose_saves_edit_resume_send(self):
+        from suppliers.models import SupplierRequestLetter
+        rfq_talk.compose_each(self.req, [self.r.pk, self.r2.pk], self.user, "{greeting}\n\nENIG price?", mode="template")
+        self.assertEqual(SupplierRequestLetter.objects.filter(request=self.req, user=self.user, sent_at=None).count(), 2)
+        page = self.client.get(reverse("admin:suppliers_supplierrequest_work", args=[self.req.pk])).content.decode()
+        self.assertIn("📝 Збережені листи «Написати кожному» — не надіслано: <b>2</b>", page)
+        # ✏️ правка — автозбереження; «відкрити» — уже виправлене
+        self.client.post(self.act, {"do": "each_save", "letters": json.dumps([
+            {"rid": self.r2.pk, "to": "sales8@hitechpcb.com", "cc": "sergey@sevskiy.de", "subject": "Re: RFQ",
+             "body": "Dear Susie, ENIG price please.", "on": True}])})
+        saved = self.client.post(self.act, {"do": "each_load"}).json()
+        hi = next(x for x in saved["letters"] if x["rid"] == self.r2.pk)
+        self.assertEqual((hi["body"], hi["cc"]), ("Dear Susie, ENIG price please.", "sergey@sevskiy.de"))
+        self.assertIn("Dear Susie, ENIG price please.", self.chat(self.r2).content.decode())   # 💬 — та сама чернетка
+        # чужі збережені листи не видно
+        self.assertEqual(rfq_talk.saved_letters(self.req, self.other)["letters"], [])
+
+        def fake_send(client, to_emails, subject, body_text, body_html="", **kw):
+            if to_emails[0] == "sales8@hitechpcb.com":
+                return {"ok": False, "error": "(550, b'Mailbox unavailable')"}
+            return {"ok": True, "message_id": f"<saved{to_emails[0]}>"}
+        with mock.patch("email_assistant.smtp_client.SMTPClient.send", fake_send):
+            out = rfq_talk.send_each(self.req, self.user, saved["letters"])
+        self.assertEqual(out["sent"], ["JY Electronics"])
+        left = rfq_talk.saved_letters(self.req, self.user)["letters"]
+        self.assertEqual([x["rid"] for x in left], [self.r2.pk])               # невдалий — лишився, з причиною
+        self.assertIn("Mailbox unavailable", left[0]["error"])
+        with mock.patch("email_assistant.smtp_client.SMTPClient.send",
+                        lambda *a, **k: {"ok": True, "message_id": "<chat1@x>"}):
+            self.client.post(self.act, {"do": "chat_send", "rid": self.r2.pk, "to": "sales8@hitechpcb.com",
+                                        "body": "Dear Susie, ENIG price please."})
+        self.assertEqual(rfq_talk.saved_letters(self.req, self.user)["letters"], [])   # 💬 надіслали — позначено

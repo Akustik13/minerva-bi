@@ -22,7 +22,8 @@
         <label>Копія <input name="cc" value="{{ target.cc }}" translate="no" list="rwc-colleagues"></label>
       </div>
       <label class="rwc-subjf">Тема <input name="subject" value="{{ target.subject }}" translate="no"></label>
-      <textarea name="body" rows="6" placeholder="Відповідь постачальнику — піде в ту саму гілку листування, з підписом скриньки (Ctrl + Enter — надіслати)"></textarea>
+      {% if draft and draft.body %}<div class="spf-warn">📝 Ваш збережений лист «Написати кожному» (ще не надіслано) — перевірте й надішліть.</div>{% endif %}
+      <textarea name="body" rows="6" placeholder="Відповідь постачальнику — піде в ту саму гілку листування, з підписом скриньки (Ctrl + Enter — надіслати)">{% if draft %}{{ draft.body }}{% endif %}</textarea>
       <input type="hidden" name="reply" value="{{ target.reply_pk|default:'' }}">
       <div class="rwc-act">
         <span class="spf-muted">{% if target.from %}з <span translate="no">{{ target.from }}</span>{% endif %}{% if target.reply_pk %} · відповідь на останній лист, з цитатою{% endif %}</span>

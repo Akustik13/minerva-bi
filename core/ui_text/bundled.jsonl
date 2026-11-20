@@ -4987,6 +4987,7 @@
 {"uk": "Ваш акаунт активовано. Пробний період: до {0}.", "en": "Your account has been activated. Trial period: until {0}.", "de": "Ihr Konto wurde aktiviert. Testzeitraum: bis {0}."}
 {"uk": "Ваш денний ліміт AI вичерпано — спробуйте завтра.", "en": "Your daily AI limit has been reached — try again tomorrow.", "de": "Ihr tägliches KI-Limit ist erschöpft — versuchen Sie es morgen erneut."}
 {"uk": "Ваш денний ліміт AI вичерпано — файли до запиту AI зараз не можна", "en": "Your daily AI limit is used up — files for the AI request are not possible right now", "de": "Ihr tägliches KI-Limit ist aufgebraucht — Dateien zur KI-Anfrage sind gerade nicht möglich"}
+{"uk": "Ваш збережений лист «Написати кожному» (ще не надіслано) — перевірте й надішліть.", "en": "Your saved «Написати кожному» letter (not sent yet) — check it and send.", "de": "Ihr gespeicherter Brief «Написати кожному» (noch nicht gesendet) — prüfen und senden."}
 {"uk": "Ваш календар — сьогодні подій: {0}", "en": "Your calendar — events today: {0}", "de": "Ihr Kalender — Termine heute: {0}"}
 {"uk": "Ваш календар: події й дедлайни на сьогодні й наступні days днів, невиконані прострочені дедлайни, запрошення на зустрічі, що чекають вашої відповіді.", "en": "Ваш календар: події й дедлайни на сьогодні й наступні days днів, невиконані прострочені дедлайни, запрошення на зустрічі, що чекають вашої відповіді.", "de": "Ваш календар: події й дедлайни на сьогодні й наступні days днів, невиконані прострочені дедлайни, запрошення на зустрічі, що чекають вашої відповіді."}
 {"uk": "Ваш результат", "en": "Your result", "de": "Ihr Ergebnis"}
@@ -5665,6 +5666,7 @@
 {"uk": "Вписати у «Вартість доставки»", "en": "Enter in “Shipping cost”", "de": "In „Versandkosten“ eintragen"}
 {"uk": "Впиши його в «Мої налаштування» → «Telegram ID» або попроси адміністратора додати цей ID до твого профілю. /myid — показати ID ще раз.", "en": "Enter it in “My settings” → “Telegram ID” or ask the administrator to add this ID to your profile. /myid — show the ID again.", "de": "Trage sie unter „Meine Einstellungen“ → „Telegram-ID“ ein oder bitte den Administrator, diese ID zu deinem Profil hinzuzufügen. /myid – zeigt die ID noch einmal an."}
 {"uk": "Впишіть ID у «Мої налаштування» → «Telegram ID» або передайте його адміністратору.", "en": "Enter the ID in “My settings” → “Telegram ID” or pass it on to the administrator.", "de": "Tragen Sie die ID unter „Meine Einstellungen“ → „Telegram-ID“ ein oder geben Sie sie an den Administrator weiter."}
+{"uk": "Впишіть адресу колеги.", "en": "Enter your colleague's address.", "de": "Adresse des Kollegen eingeben."}
 {"uk": "Вплив", "en": "Impact", "de": "Auswirkung"}
 {"uk": "Вплив на строк і гроші", "en": "Impact on deadline and money", "de": "Auswirkung auf Termin und Geld"}
 {"uk": "Впливає на склад", "en": "Affects stock", "de": "Wirkt sich auf das Lager aus"}
@@ -5919,9 +5921,11 @@
 {"uk": "Відкрити завдання: {0}", "en": "Open task: {0}", "de": "Aufgabe öffnen: {0}"}
 {"uk": "Відкрити закупівлю", "en": "Open purchase order", "de": "Bestellung öffnen"}
 {"uk": "Відкрити замовлення", "en": "Open order", "de": "Auftrag öffnen"}
+{"uk": "Відкрити збережені", "en": "Open saved", "de": "Gespeicherte öffnen"}
 {"uk": "Відкрити звіт", "en": "Open report", "de": "Bericht öffnen"}
 {"uk": "Відкрити звіт у Minerva", "en": "Open the report in Minerva", "de": "Bericht in Minerva öffnen"}
 {"uk": "Відкрити знову", "en": "Reopen", "de": "Wieder öffnen"}
+{"uk": "Відкрити й дослати", "en": "Open and send the rest", "de": "Öffnen und Rest senden"}
 {"uk": "Відкрити календар робочого часу", "en": "Open working time calendar", "de": "Arbeitszeitkalender öffnen"}
 {"uk": "Відкрити канвас", "en": "Open canvas", "de": "Canvas öffnen"}
 {"uk": "Відкрити картку", "en": "Open card", "de": "Karte öffnen"}
@@ -5942,6 +5946,7 @@
 {"uk": "Відкрити проєкт", "en": "Open project", "de": "Projekt öffnen"}
 {"uk": "Відкрити рахунок", "en": "Open invoice", "de": "Rechnung öffnen"}
 {"uk": "Відкрити рахунок · правий клік — PDF, лист, ще один рахунок", "en": "Open invoice · right-click — PDF, email, one more invoice", "de": "Rechnung öffnen · Rechtsklick — PDF, E-Mail, noch eine Rechnung"}
+{"uk": "Відкрити складені раніше листи — надіслати без нового складання AI", "en": "Open letters composed earlier — send without composing again with AI", "de": "Früher erstellte Briefe öffnen — ohne neue AI-Erstellung senden"}
 {"uk": "Відкрити службу DYMO", "en": "Open the DYMO service", "de": "DYMO-Dienst öffnen"}
 {"uk": "Відкрити список відправлень на Jumingo — знайдіть за скопійованим ID", "en": "Open the shipment list on Jumingo — find it by the copied ID", "de": "Sendungsliste bei Jumingo öffnen — mit der kopierten ID suchen"}
 {"uk": "Відкрити сторінку й підсвітити «", "en": "Open the page and highlight “", "de": "Seite öffnen und hervorheben: „"}
@@ -6911,6 +6916,7 @@
 {"uk": "Додано автоматично (етап 3): Minerva сама оновлює й прибирає", "en": "Added automatically (stage 3): Minerva updates and removes it by itself", "de": "Automatisch hinzugefügt (Stufe 3): Minerva aktualisiert und entfernt es selbst"}
 {"uk": "Додано в «{0}»: {1}, вже були в магазині: {2}", "en": "Added to “{0}”: {1}, already in the shop: {2}", "de": "Zu „{0}“ hinzugefügt: {1}, bereits im Shop vorhanden: {2}"}
 {"uk": "Додано в базу знань", "en": "Added to the knowledge base", "de": "Zur Wissensdatenbank hinzugefügt"}
+{"uk": "Додано в копію листів", "en": "Added to CC of letters", "de": "In CC der Briefe hinzugefügt"}
 {"uk": "Додано вручну для всієї гілки — разом із категоріями за правилами (work_categories.py)", "en": "Added manually for the whole thread — together with categories by rules (work_categories.py)", "de": "Manuell für den gesamten Verlauf hinzugefügt — zusammen mit den Kategorien nach Regeln (work_categories.py)"}
 {"uk": "Додано до клієнта CRM", "en": "Added to CRM customer", "de": "Zum CRM-Kunden hinzugefügt"}
 {"uk": "Додано документів: {0}", "en": "Documents added: {0}", "de": "Dokumente hinzugefügt: {0}"}
@@ -6941,6 +6947,7 @@
 {"uk": "Додати вибрані до закупівлі", "en": "Add the selected to the purchase order", "de": "Ausgewählte zur Bestellung hinzufügen"}
 {"uk": "Додати вручну", "en": "Add manually", "de": "Manuell hinzufügen"}
 {"uk": "Додати всі ({0})", "en": "Add all ({0})", "de": "Alle hinzufügen ({0})"}
+{"uk": "Додати всім", "en": "Add to all", "de": "Allen hinzufügen"}
 {"uk": "Додати до PO (чернетка)", "en": "Add to PO (draft)", "de": "Zu PO hinzufügen (Entwurf)"}
 {"uk": "Додати до запасу після «Зберегти».", "en": "Added to the stock on «Save».", "de": "Wird beim «Speichern» zum Bestand addiert."}
 {"uk": "Додати до клієнта", "en": "Add to customer", "de": "Zum Kunden hinzufügen"}
@@ -7089,6 +7096,7 @@
 {"uk": "Домініканська Республіка", "en": "Dominican Republic", "de": "Dominikanische Republik"}
 {"uk": "Дописано в поля нижче (позначені 🌐): {0}.", "en": "Filled into the fields below (marked 🌐): {0}.", "de": "In die Felder unten eingetragen (mit 🌐 markiert): {0}."}
 {"uk": "Дописано полів: {0}", "en": "Fields filled: {0}", "de": "Felder ergänzt: {0}"}
+{"uk": "Дописати ці адреси в «Копія» кожного листа (ще не надісланого)", "en": "Add these addresses to «CC» of every letter (not sent yet)", "de": "Diese Adressen in «CC» jedes Briefs eintragen (noch nicht gesendet)"}
 {"uk": "Доповнення — у відповіді на цей лист.", "en": "Additions — in a reply to this e-mail.", "de": "Ergänzungen — als Antwort auf diese E-Mail."}
 {"uk": "Доповнено {0}", "en": "Completed {0}", "de": "Ergänzt {0}"}
 {"uk": "Доповнено закупівель: {0}", "en": "Purchase orders updated: {0}", "de": "Bestellungen ergänzt: {0}"}
@@ -8491,6 +8499,7 @@
 {"uk": "Зберегти і продовжити публікацію", "en": "Save and continue publishing", "de": "Speichern und Veröffentlichung fortsetzen"}
 {"uk": "Збережений ключ", "en": "Saved key", "de": "Gespeicherter Schlüssel"}
 {"uk": "Збережений ключ RAG", "en": "Saved RAG key", "de": "Gespeicherter RAG-Schlüssel"}
+{"uk": "Збережених листів немає.", "en": "No saved letters.", "de": "Keine gespeicherten Briefe."}
 {"uk": "Збереження змін, нові дані, синхронізація, API-запити.", "en": "Saving changes, new data, sync, API requests.", "de": "Speichern von Änderungen, neue Daten, Synchronisierung, API-Anfragen."}
 {"uk": "Збереження зупинилось — мабуть, сервер перезапускався. Запустіть ще раз.", "en": "Saving stopped — the server was probably restarted. Run it again.", "de": "Das Speichern wurde angehalten — vermutlich wurde der Server neu gestartet. Starten Sie es erneut."}
 {"uk": "Збереження локально...", "en": "Saving locally...", "de": "Wird lokal gespeichert..."}
@@ -8513,6 +8522,9 @@
 {"uk": "Збережено, але помилка публікації: {0}", "en": "Saved, but a publishing error occurred: {0}", "de": "Gespeichert, aber Fehler beim Veröffentlichen: {0}"}
 {"uk": "Збережено, але помилка: {0}", "en": "Saved, but an error occurred: {0}", "de": "Gespeichert, aber Fehler: {0}"}
 {"uk": "Збережено: {0}", "en": "Saved: {0}", "de": "Gespeichert: {0}"}
+{"uk": "Збережені листи «Написати кожному» — не надіслано", "en": "Saved «Написати кожному» letters — not sent", "de": "Gespeicherte Briefe «Написати кожному» — nicht gesendet"}
+{"uk": "Збережені листи — не надіслано", "en": "Saved letters — not sent", "de": "Gespeicherte Briefe — nicht gesendet"}
+{"uk": "Збережені листи — перегляньте й надішліть.", "en": "Saved letters — review and send.", "de": "Gespeicherte Briefe — prüfen und senden."}
 {"uk": "Збережи — ключ згенерується автоматично, скопіюй одразу", "en": "Save — the key is generated automatically, copy it right away", "de": "Speichern — der Schlüssel wird automatisch erzeugt, kopieren Sie ihn sofort"}
 {"uk": "Збережіть відправлення (статус", "en": "Save the shipment (status", "de": "Speichern Sie die Sendung (Status"}
 {"uk": "Збережіть замовлення", "en": "Save the order", "de": "Speichern Sie den Auftrag"}
@@ -9725,6 +9737,7 @@
 {"uk": "Копія", "en": "Copy", "de": "Kopie"}
 {"uk": "Копія (CC)", "en": "CC", "de": "Kopie (CC)"}
 {"uk": "Копія (CC) кожному листу", "en": "Copy (CC) for every e-mail", "de": "Kopie (CC) für jede E-Mail"}
+{"uk": "Копія всім листам", "en": "CC for all letters", "de": "CC für alle Briefe"}
 {"uk": "Копія з DigiKey", "en": "Copy from DigiKey", "de": "Kopie von DigiKey"}
 {"uk": "Копія запиту", "en": "Copy of request", "de": "Kopie der Anfrage"}
 {"uk": "Копія збережена в «Документи замовлення».", "en": "A copy has been saved in “Order documents”.", "de": "Eine Kopie wurde unter „Auftragsdokumente“ gespeichert."}
@@ -14744,6 +14757,7 @@
 {"uk": "Прибираю з календаря…", "en": "Removing from the calendar…", "de": "Wird aus dem Kalender entfernt…"}
 {"uk": "Прибрали з календаря", "en": "Removed from the calendar", "de": "Aus dem Kalender entfernt"}
 {"uk": "Прибрано з календаря", "en": "Removed from the calendar", "de": "Aus dem Kalender entfernt"}
+{"uk": "Прибрано з копії листів", "en": "Removed from CC of letters", "de": "Aus CC der Briefe entfernt"}
 {"uk": "Прибрано зі списку", "en": "Removed from the list", "de": "Aus der Liste entfernt"}
 {"uk": "Прибрано: {0}", "en": "Removed: {0}", "de": "Entfernt: {0}"}
 {"uk": "Прибрати", "en": "Remove", "de": "Entfernen"}
@@ -14757,6 +14771,7 @@
 {"uk": "Прибрати з календаря", "en": "Remove from the calendar", "de": "Aus dem Kalender entfernen"}
 {"uk": "Прибрати з нижньої панелі", "en": "Remove from the bottom bar", "de": "Aus der unteren Leiste entfernen"}
 {"uk": "Прибрати з проєкту", "en": "Remove from the project", "de": "Aus dem Projekt entfernen"}
+{"uk": "Прибрати з усіх", "en": "Remove from all", "de": "Aus allen entfernen"}
 {"uk": "Прибрати й більше не заносити", "en": "Remove and do not add again", "de": "Entfernen und nicht mehr eintragen"}
 {"uk": "Прибрати картинку з листа", "en": "Remove the image from the letter", "de": "Bild aus der E-Mail entfernen"}
 {"uk": "Прибрати крок", "en": "Remove the step", "de": "Schritt entfernen"}
@@ -14775,6 +14790,7 @@
 {"uk": "Прибрати цю кількість", "en": "Remove this quantity", "de": "Diese Menge entfernen"}
 {"uk": "Прибрати цю сторону", "en": "Remove this side", "de": "Diese Seite entfernen"}
 {"uk": "Прибрати цю сторону? Її фото видалиться назавжди, друга сторона лишиться.", "en": "Remove this side? Its photo will be deleted permanently, the other side stays.", "de": "Diese Seite entfernen? Ihr Foto wird dauerhaft gelöscht, die andere Seite bleibt."}
+{"uk": "Прибрати ці адреси з «Копія» кожного листа", "en": "Remove these addresses from «CC» of every letter", "de": "Diese Adressen aus «CC» jedes Briefs entfernen"}
 {"uk": "Прибув на склад", "en": "Arrived in stock", "de": "Im Lager eingetroffen"}
 {"uk": "Прив'яжи упаковку нижче (inline) — буде відображатись як рекомендація на замовленні", "en": "Attach the packaging below (inline) — it will be shown as a recommendation on the order", "de": "Verknüpfen Sie unten die Verpackung (inline) — sie wird als Empfehlung im Auftrag angezeigt"}
 {"uk": "Прив'язано", "en": "Linked", "de": "Verknüpft"}
@@ -21224,6 +21240,7 @@
 {"uk": "кожні {0} хв", "en": "every {0} min", "de": "alle {0} Min."}
 {"uk": "колега", "en": "colleague", "de": "Kollege"}
 {"uk": "колега@фірма", "en": "colleague@company", "de": "kollege@firma"}
+{"uk": "колега@фірма — кожен лист піде і йому", "en": "colleague@company — every letter also goes to them", "de": "kollege@firma — jeder Brief geht auch an ihn"}
 {"uk": "колеги", "en": "a colleague", "de": "eines Kollegen"}
 {"uk": "колеги, яким у Minerva відкрито постачальників.", "en": "colleagues who have access to suppliers in Minerva.", "de": "Kollegen, die in Minerva Zugriff auf Lieferanten haben."}
 {"uk": "колегу", "en": "colleague", "de": "Kollegen"}
@@ -23214,6 +23231,7 @@
 {"uk": "сервер не відповів вчасно", "en": "server did not respond in time", "de": "Server hat nicht rechtzeitig geantwortet"}
 {"uk": "сервер не відповідає", "en": "the server is not responding", "de": "der Server antwortet nicht"}
 {"uk": "сервер повернув HTML-сторінку, а не {0}", "en": "server returned an HTML page, not {0}", "de": "Server hat eine HTML-Seite statt {0} geliefert"}
+{"uk": "сервер пошти просить зачекати — повтор через {0} с", "en": "the mail server asks to wait — retrying in {0} s", "de": "der Mailserver bittet zu warten — neuer Versuch in {0} s"}
 {"uk": "сервері", "en": "server", "de": "Server vorhanden ist"}
 {"uk": "сервісні сповіщення", "en": "service notifications", "de": "Service-Benachrichtigungen"}
 {"uk": "середа", "en": "Wednesday", "de": "Mittwoch"}

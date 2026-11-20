@@ -42,6 +42,7 @@
 {% if can_change %}<dialog id="rw-each" class="rw-pv rwe-dlg" aria-labelledby="rw-each-h">
   <div class="rw-pv-head"><b id="rw-each-h">✉️ Написати кожному</b><button type="button" class="button" data-each-close aria-label="Закрити">✕</button></div>
   <div class="rw-pv-mail" id="rwe-step1">
+    <div class="spf-warn rwe-saved" id="rwe-saved" hidden></div>
     <div class="spf-muted">Кожен вибраний постачальник отримає свій окремий лист — відповіддю в його гілці листування (автору останнього листа), з вашої скриньки й з підписом. Інші постачальники цього листа не бачать. Перед надсиланням кожен лист можна переглянути й виправити.</div>
     <label class="rwc-subjf rwe-wishl">Що написати <textarea id="rwe-wish" rows="4" placeholder="Напр.: подякуй за пропозицію й запитай, скільки коштуватиме плата з позолотою контактів (ENIG / hard gold) для тих самих кількостей"></textarea></label>
     <div class="rw-fwd-parts">
@@ -52,6 +53,11 @@
     <div class="rwc-row"><button type="button" class="button default" id="rwe-compose">✍️ Скласти листи</button><span class="spf-job" id="rwe-job"></span></div>
   </div>
   <div id="rwe-step2" hidden>
+    <div class="rwe-ccall">
+      <label class="rwc-subjf">👥 Копія всім листам <input id="rwe-ccall" list="rwc-colleagues" placeholder="колега@фірма — кожен лист піде і йому" translate="no"></label>
+      <button type="button" class="button" id="rwe-ccall-add" title="Дописати ці адреси в «Копія» кожного листа (ще не надісланого)">＋ Додати всім</button>
+      <button type="button" class="button" id="rwe-ccall-del" title="Прибрати ці адреси з «Копія» кожного листа">－ Прибрати з усіх</button>
+    </div>
     <div class="rw-pv-who" id="rwe-who"></div>
     <div class="rw-pv-mail" id="rwe-mail"></div>
   </div>
@@ -70,6 +76,9 @@
   .rwe-tab.ok::after { content: " ✓"; }
   .rwe-body { width: 100%; box-sizing: border-box; min-height: 260px; resize: vertical; font-family: inherit; }
   .rwe-form { display: flex; flex-direction: column; gap: 6px; }
+  .rwe-saved { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .rwe-ccall { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 14px 0; }
+  .rwe-ccall .rwc-subjf { flex: 1 1 320px; }
   .rw-cmp .rw-n { white-space: nowrap; width: 1%; color: var(--text-muted, #888); }
   .rw-cmp .rw-n label { cursor: pointer; display: inline-flex; gap: 4px; align-items: center; }
   .rw-cmp tr.rw-picked > td { background: rgba(91, 141, 239, .12) !important; }
@@ -234,6 +243,7 @@
       letters.forEach(function(L, i){
         var b = el('button', 'button rwe-tab' + (i === cur ? ' on' : '') + (L.on ? '' : ' off') + (L.error ? ' bad' : '') + (L.sent ? ' ok' : ''), (i + 1) + '. ' + L.name);
         b.type = 'button'; b.setAttribute('translate', 'no');
+        if (L.error) b.title = '⚠️ ' + L.error;
         b.addEventListener('click', function(){ show(i); });
         who.appendChild(b);
       });
@@ -242,7 +252,7 @@
       var lab = el('label', 'rwc-subjf'); lab.appendChild(document.createTextNode(label + ' '));
       var inp = el('input'); inp.value = L[key] || ''; inp.setAttribute('translate', 'no');
       if (key === 'cc') inp.setAttribute('list', 'rwc-colleagues');
-      inp.addEventListener('input', function(){ L[key] = inp.value; });
+      inp.addEventListener('input', function(){ L[key] = inp.value; autosave(); });
       lab.appendChild(inp); return lab;
     }
     function show(i) {
@@ -250,7 +260,7 @@
       var L = letters[i]; mailBox.innerHTML = '';
       var f = el('div', 'rwe-form');
       var on = el('label'); var cb = el('input'); cb.type = 'checkbox'; cb.checked = L.on;
-      cb.addEventListener('change', function(){ L.on = cb.checked; tabs(); count(); });
+      cb.addEventListener('change', function(){ L.on = cb.checked; tabs(); count(); autosave(); });
       on.appendChild(cb); on.appendChild(document.createTextNode(' Надіслати цьому постачальнику')); f.appendChild(on);
       if (L.error) f.appendChild(el('div', 'spf-bad', '⚠️ ' + L.error));
       if (L.note) f.appendChild(el('div', 'spf-warn', L.note));
@@ -258,15 +268,44 @@
       var to = el('div', 'rwc-to'); to.appendChild(field('Кому', 'to', L)); to.appendChild(field('Копія', 'cc', L)); f.appendChild(to);
       f.appendChild(field('Тема', 'subject', L));
       var ta = el('textarea', 'rwe-body'); ta.value = L.body || ''; ta.setAttribute('translate', 'no');
-      ta.addEventListener('input', function(){ L.body = ta.value; });
+      ta.addEventListener('input', function(){ L.body = ta.value; autosave(); });
       f.appendChild(ta);
       f.appendChild(el('div', 'spf-muted', (L.from ? 'з ' + L.from + ' · ' : '') + (L.reply ? 'відповідь у його гілці, з цитатою останнього листа' : 'нова гілка — листування у вас немає') + ' · підпис скриньки додасться сам'));
       mailBox.appendChild(f);
     }
-    ebtn.addEventListener('click', function(){
-      sentDone = false; letters = []; step(1); enote.textContent = 'Вибрано: ' + ids().length; each.showModal();
-      document.getElementById('rwe-wish').focus();
-    });
+    // 📝 правки — у збережені листи (раз на 1,2 с); закрили вікно — одразу
+    var saveTimer = null;
+    function saveNow() {
+      clearTimeout(saveTimer); saveTimer = null;
+      var keep = letters.filter(function(L){ return !L.sent; });
+      if (!keep.length) return;
+      post({do: 'each_save', letters: JSON.stringify(keep.map(function(L){ return {rid: L.rid, to: L.to, cc: L.cc, subject: L.subject, body: L.body, on: L.on}; }))});
+    }
+    function autosave() { clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 1200); }
+    function useSaved(saved) {
+      letters = saved.map(function(L){ return Object.assign({}, L); });
+      cur = 0; step(2); show(0); count();
+      enote.textContent = 'Збережені листи — перегляньте й надішліть.';
+    }
+    // відкрити: є збережені невідправлені листи — запропонувати їх (resume — одразу їх, з рядка над таблицею)
+    function openEach(resume) {
+      sentDone = false; letters = []; step(1); each.showModal();
+      enote.textContent = ids().length ? 'Вибрано: ' + ids().length : '';
+      var box = document.getElementById('rwe-saved'); box.hidden = true; box.innerHTML = '';
+      post({do: 'each_load'}).then(function(res){
+        var saved = res.letters || [];
+        if (!saved.length) { if (resume) enote.textContent = 'Збережених листів немає.'; return; }
+        if (resume) { useSaved(saved); return; }
+        box.appendChild(document.createTextNode('📝 Збережені листи — не надіслано: ' + saved.length + (res.at ? ' · ' + res.at : '') + ' '));
+        var b = el('button', 'button', '📝 Відкрити збережені'); b.type = 'button';
+        b.addEventListener('click', function(){ useSaved(saved); });
+        box.appendChild(b); box.hidden = false;
+      }).catch(function(){});
+      if (!resume) document.getElementById('rwe-wish').focus();
+    }
+    ebtn.addEventListener('click', function(){ openEach(false); });
+    var savedOpen = document.getElementById('rw-saved-open');
+    if (savedOpen) savedOpen.addEventListener('click', function(){ openEach(true); });
     document.getElementById('rwe-compose').addEventListener('click', function(){
       var wish = document.getElementById('rwe-wish').value.trim(), job = document.getElementById('rwe-job');
       if (!wish) { job.textContent = 'Напишіть, що сказати постачальникам.'; return; }
@@ -280,6 +319,25 @@
         enote.textContent = 'Перегляньте кожен лист (вкладки вгорі) — можна виправити або зняти галочку.';
       });
     });
+    // 👥 копія всім: дописати / прибрати адреси в «Копія» кожного ще не надісланого листа
+    function addrs(v) { return String(v || '').split(/[\s,;]+/).filter(function(a){ return a.indexOf('@') > 0; }); }
+    function ccAll(add) {
+      var want = addrs(document.getElementById('rwe-ccall').value), n = 0;
+      if (!want.length) { enote.textContent = 'Впишіть адресу колеги.'; return; }
+      var low = want.map(function(a){ return a.toLowerCase(); });
+      letters.forEach(function(L){
+        if (L.sent) return;
+        var have = addrs(L.cc), keep = have.filter(function(a){ return low.indexOf(a.toLowerCase()) < 0; });
+        var next = add ? keep.concat(want) : keep;
+        if (next.join(', ') !== have.join(', ')) { L.cc = next.join(', '); n++; }
+      });
+      show(cur); autosave();
+      enote.textContent = (add ? '👥 Додано в копію листів: ' : '👥 Прибрано з копії листів: ') + n;
+    }
+    document.getElementById('rwe-ccall-add').addEventListener('click', function(){ ccAll(true); });
+    document.getElementById('rwe-ccall-del').addEventListener('click', function(){ ccAll(false); });
+    document.getElementById('rwe-ccall').addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); ccAll(true); } });
+
     eback.addEventListener('click', function(){ if (!letters.length || confirm('Складені листи й ваші правки пропадуть — скласти заново?')) step(1); });
     esend.addEventListener('click', function(){
       var go = letters.filter(function(L){ return L.on && !L.sent; });
@@ -295,14 +353,19 @@
           else { L.sent = true; L.on = false; L.result = '✓ Надіслано'; L.error = ''; }
         });
         show(cur); count();
-        enote.textContent = '📤 Надіслано: ' + (res.sent || []).length + ((res.failed || []).length ? ' · ⚠️ не вдалося (вкладки з ⚠️): ' + res.failed.length : '');
+        // підсумок за всі спроби: скільки вже пішло з усіх; кому не вдалося — з причиною
+        var done = letters.filter(function(L){ return L.sent; }).length;
+        enote.textContent = '📤 Надіслано: ' + done + ' / ' + letters.length;
+        go.filter(function(L){ return !L.sent; }).forEach(function(L){
+          var d = el('div', 'spf-bad', '⚠️ ' + L.name + ': ' + L.error); d.setAttribute('translate', 'no'); enote.appendChild(d);
+        });
       });
     });
     each.querySelectorAll('[data-each-close]').forEach(function(b){ b.addEventListener('click', function(){ each.close(); }); });
     each.addEventListener('cancel', function(e){
       if (letters.some(function(L){ return L.on && !L.sent; }) && !sentDone && !confirm('Листи не надіслано — закрити?')) e.preventDefault();
     });
-    each.addEventListener('close', function(){ if (sentDone) location.reload(); });
+    each.addEventListener('close', function(){ if (saveTimer) saveNow(); if (sentDone) location.reload(); });
   }
 
   /* ── ☑ вибір рядків і ↪ переслати колезі ── */

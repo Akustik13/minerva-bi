@@ -19,7 +19,7 @@ from django.utils import timezone
 from django.utils.html import format_html
 
 from suppliers.models import (SupplierCategory, SupplierEvent, SupplierRequest, SupplierRequestFile,
-                              SupplierRequestRecipient)
+                              SupplierRequestLetter, SupplierRequestRecipient)
 from suppliers.icons import IconPickerWidget
 from suppliers.services import rfq
 
@@ -681,6 +681,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             more=more, more_mail=sum(1 for s in more if s.f_email), events=events, quantities=rfq.parse_quantities(req.quantities),
             cmp=cmp, qtys=cmp["qtys"], ncols=max(len(cmp["qtys"]), 1) + 7, stale=rfq_compare.stale(req),
             st=rfq_stats.stats(req, cmp),
+            letters_pending=SupplierRequestLetter.objects.filter(request=req, user=request.user, sent_at=None).count(),
             chat_url_json=_js(reverse("admin:suppliers_supplierrequest_chat", args=[req.pk, 0])),
             colleagues=self._colleagues(),
             analysis_at=analysis_at,
@@ -721,6 +722,16 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                     out = rfq_talk.compose_each(req, rids, user, wish, mode=mode, model=model, report=report)
                     return {"letters": out, "message": f"✍️ Листів: {len(out)}"}
                 return JsonResponse({"job": jobs.start(user, f"each {req.pk}", run, progress=True)})
+            if do in ("each_save", "each_load"):     # 📝 збережені листи: автозбереження правок / відкрити знову
+                import json as _json
+                if do == "each_save":
+                    try:
+                        items = _json.loads(P.get("letters") or "[]")
+                    except ValueError:
+                        items = []
+                    return JsonResponse({"saved": rfq_talk.update_letters(req, user, items if isinstance(items, list)
+                                                                          else [])})
+                return JsonResponse(rfq_talk.saved_letters(req, user))
             if do == "each_send":                    # 📤 кожному окремо, у його гілку
                 import json as _json
                 try:
@@ -786,8 +797,13 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             raise Http404
         items = rfq_talk.letters(r, request.user)
         tm = rfq_stats.timing(r, [x["m"] for x in items])
+        draft = SupplierRequestLetter.objects.filter(recipient=r, user=request.user, sent_at=None).first()
+        target = rfq_talk.target(req, r, items, request.user)
+        if draft is not None and draft.body.strip():        # 📝 збережений лист «Написати кожному» — у поле відповіді
+            target.update(to=draft.to or target["to"], cc=draft.cc, subject=draft.subject or target["subject"],
+                          reply_pk=draft.reply_message_id or target["reply_pk"])
         return TemplateResponse(request, "admin/suppliers/_request_chat.html", {
-            "req": req, "r": r, "letters": items, "target": rfq_talk.target(req, r, items, request.user),
+            "req": req, "r": r, "letters": items, "target": target, "draft": draft,
             "history": rfq_talk.history(req, r, tm), "tm": tm, "brief": rfq_talk.brief_cached(request.user, r, items),
             "hidden": sum(1 for x in items if not x["readable"]), "readable": sum(1 for x in items if x["readable"]),
             "can_change": self.has_change_permission(request, req)})
@@ -852,7 +868,8 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                         msg += " · не вдалося: " + "; ".join(failed)
                     return {"url": back, "message": msg}
                 return JsonResponse({"job": jobs.start(user, f"quotes {req.pk}", run, progress=True)})
-            elif do in ("chat_brief", "chat_send", "forward_plan", "forward_send", "each_compose", "each_send"):
+            elif do in ("chat_brief", "chat_send", "forward_plan", "forward_send", "each_compose", "each_send",
+                        "each_save", "each_load"):
                 return self._talk(request, req, r, do)
             elif do == "compare_ai":
                 from suppliers.services import rfq_compare
