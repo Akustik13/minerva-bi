@@ -113,15 +113,15 @@ def apply(profile, draft):
     return profile
 
 
-def summary(profile, draft) -> list:
-    """Що зміниться, людською мовою: [рядок]."""
+def summary(profile, draft, note_reset=True) -> list:
+    """Що зміниться, людською мовою: [рядок]. `note_reset` — рядок «↺ усе як у ролі» для чернетки з reset."""
     from copy import copy
     names = {m.app_label: m.name for m in _modules()}
     before = current(profile)
     after_profile = apply(copy(profile), draft)
     after = current(after_profile)
     lines = []
-    if clean(draft)["reset"]:
+    if note_reset and clean(draft)["reset"]:
         lines.append("↺ усе як у ролі / пакеті (ручні модулі, операції, сховані сторінки й особливі права скинуто)")
     for app in sorted(set(before["modules"]) | set(after["modules"]), key=lambda a: names.get(a, a)):
         a, b = before["modules"].get(app), after["modules"].get(app)
@@ -185,3 +185,102 @@ def draft_from(source_profile) -> dict:
     cur = current(source_profile)
     return {"modules": cur["modules"], "extra": cur["extra"],
             "pages": {p: True for p in cur["pages"]}, "special": cur["special"], "reset": True}
+
+
+# ── «📤 Застосувати ці права до інших» ───────────────────────────────────────
+# Збережені права людини (і за бажанням її роль) — рівно такі самі кільком іншим: розділи й рівні, експорт / імпорт,
+# сховані сторінки, особливі права. Те саме `draft_from` + `save`, що «📋 Скопіювати права з…», лише навпаки:
+# з однієї людини — багатьом. Кожному — свій запис у журналі аудиту.
+
+MAX_TARGETS = 100
+
+
+def _source_ok(editor, source):
+    why = can_edit(editor, source)
+    if why:
+        raise AccessError(why)
+
+
+def _role_line(source, target, with_role) -> list:
+    if not with_role or target.role == source.role:
+        return []
+    return [f"Роль: {target.get_role_display()} → {source.get_role_display()}"]
+
+
+def targets(editor, source) -> list:
+    """Кому можна застосувати: [{profile, why}] — усі інші профілі, why — чому ні (адміністратор, ви самі…)."""
+    from core.models import UserProfile
+    out = []
+    for p in (UserProfile.objects.exclude(pk=source.pk).select_related("user")
+              .order_by("user__first_name", "user__last_name", "user__username")):
+        out.append({"profile": p, "why": can_edit(editor, p)})
+    return out
+
+
+def plan_to(editor, source, target_ids, with_role=True) -> list:
+    """Що зміниться в кожного (нічого не пише): [{pk, name, username, role, why, lines}]."""
+    from core.models import UserProfile
+    _source_ok(editor, source)
+    draft = draft_from(source)
+    ids = [int(i) for i in target_ids if str(i).isdigit()][:MAX_TARGETS]
+    rows = []
+    for p in UserProfile.objects.filter(pk__in=ids).exclude(pk=source.pk).select_related("user"):
+        why = can_edit(editor, p)
+        if not why and draft["special"].get("manage_users") and not is_minerva_admin(editor):
+            why = "Надати «Керувати користувачами» може лише адміністратор."
+        rows.append({"pk": p.pk, "name": p.user.get_full_name() or p.user.get_username(),
+                     "username": p.user.get_username(), "role": p.get_role_display(), "why": why,
+                     "lines": [] if why else _role_line(source, p, with_role) + summary(p, draft, note_reset=False)})
+    rows.sort(key=lambda r: r["name"].lower())
+    return rows
+
+
+def apply_to(editor, source, target, with_role=True, ip=None) -> list:
+    """Записати людині `target` рівно ті самі права (і роль), що збережені в `source`. → перелік змін."""
+    from core.models import AuditLog
+    _source_ok(editor, source)
+    if target.pk == source.pk:
+        return []
+    why = can_edit(editor, target)
+    if why:
+        raise AccessError(why)
+    draft = draft_from(source)
+    if draft["special"].get("manage_users") and not is_minerva_admin(editor):
+        raise AccessError("Надати «Керувати користувачами» може лише адміністратор.")
+    lines = _role_line(source, target, with_role) + summary(target, draft, note_reset=False)
+    if not lines:
+        return []
+    before, old_role = current(target), target.role
+    if with_role:
+        target.role = source.role
+    apply(target, draft)
+    target.save(update_fields=["role", "allowed_modules", "module_operations", "denied_models",
+                               "can_delete", "can_export", "can_import", "can_view_audit", "can_manage_users"])
+    AuditLog.objects.create(
+        user=editor, action=AuditLog.Action.SETTINGS, object_id=str(target.user_id),
+        object_repr=f"Доступ: {target.user.get_username()} (як у {source.user.get_username()})"[:500],
+        ip_address=ip,
+        extra={"access_changes": lines, "copied_from": source.user.get_username(),
+               "role": [old_role, target.role], "before": before, "after": current(target)})
+    return lines
+
+
+def apply_to_many(editor, source, target_ids, with_role=True, ip=None) -> dict:
+    """«✅ Застосувати»: кожному вибраному окремо (одна відмова не зупиняє інших).
+    → {"done": [(ім'я, [зміни])], "same": [ім'я], "refused": [(ім'я, чому)]}."""
+    from django.db import transaction
+    from core.models import UserProfile
+    _source_ok(editor, source)
+    ids = [int(i) for i in target_ids if str(i).isdigit()][:MAX_TARGETS]
+    out = {"done": [], "same": [], "refused": []}
+    for p in UserProfile.objects.filter(pk__in=ids).exclude(pk=source.pk).select_related("user"):
+        name = p.user.get_full_name() or p.user.get_username()
+        try:
+            with transaction.atomic():
+                p = UserProfile.objects.select_for_update(of=("self",)).select_related("user").get(pk=p.pk)
+                lines = apply_to(editor, source, p, with_role=with_role, ip=ip)
+        except AccessError as exc:
+            out["refused"].append((name, str(exc)))
+            continue
+        (out["done"].append((name, lines)) if lines else out["same"].append(name))
+    return out

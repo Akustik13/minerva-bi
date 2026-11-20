@@ -78,10 +78,28 @@
   .ap-ctx button:hover { background: rgba(59, 130, 246, .15); }
   .ap-ctx .t { padding: 4px 10px; font-size: 11px; opacity: .6; }
   #ap-root.ap-busy { opacity: .6; pointer-events: none; }
+  /* вікно #ap-apply — права цієї людини іншим */
+  .ap-dlg { width: min(680px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 16px 18px; border-radius: 10px;
+            border: 1px solid var(--border-strong, #243347); background: var(--bg-card, #1a2535);
+            color: var(--body-fg, #e6edf3); box-shadow: 0 10px 40px rgba(0, 0, 0, .45); }
+  .ap-dlg::backdrop { background: rgba(0, 0, 0, .5); }
+  .ap-dlg h3 { margin: 0 0 6px; font-size: 15px; }
+  .ap-dlg p { margin: 0 0 10px; font-size: 12.5px; }
+  .ap-dlg input[type=search] { width: 100%; box-sizing: border-box; margin: 8px 0 6px; }
+  .ap-ap-list { max-height: 34vh; overflow: auto; border: 1px solid var(--hairline-color, #2b3c52); border-radius: 8px;
+                padding: 4px 6px; }
+  .ap-ap-row { display: flex; gap: 8px; align-items: flex-start; padding: 4px 2px; font-size: 13px; cursor: pointer; }
+  .ap-ap-row.off { opacity: .55; cursor: default; }
+  .ap-ap-row[hidden] { display: none; }
+  .ap-ap-row input { margin-top: 3px; }
+  .ap-ap-plan { margin: 10px 0; max-height: 28vh; overflow: auto; font-size: 12.5px; }
+  .ap-ap-plan ul { margin: 2px 0 8px; padding-left: 18px; }
+  .ap-warn { padding: 8px 10px; border-radius: 6px; border-left: 4px solid #f5a524; margin: 0 0 10px; font-size: 12.5px;
+             background: var(--darkened-bg, rgba(127, 127, 127, .08)); }
   @media (max-width: 900px) { .ap { grid-template-columns: 1fr; } }
 </style>
 
-<div id="ap-root" data-edit="{% if editing %}1{% else %}0{% endif %}">
+<div id="ap-root" data-edit="{% if editing %}1{% else %}0{% endif %}" data-dirty="{% if changes %}1{% else %}0{% endif %}">
 {{ draft_json|json_script:"ap-draft" }}
 
 <div class="ap-box ap-head">
@@ -96,6 +114,7 @@
   {% if not p.can_login %}<span class="ap-chip ap-no">не може увійти (неактивний або не співробітник)</span>{% endif %}
   <span style="margin-left:auto;display:flex;gap:10px;align-items:center">
     {% if not editing and not why_not %}<a class="button" href="?edit=1">✏️ Змінити доступ</a>{% endif %}
+    {% if not why_not %}<button type="button" class="button" data-ap-apply title="Ті самі права (і роль) — кільком іншим людям">📤 Застосувати ці права до інших…</button>{% endif %}
     <a href="{% url 'admin:core_userprofile_change' original.pk %}">← до профілю</a>
   </span>
 </div>
@@ -243,6 +262,118 @@
   <input type="hidden" name="url" value="{{ url }}"><input type="hidden" name="source" value="">
 </form>
 <div class="ap-ctx" id="ap-ctx"></div>
+
+{% if apply_targets %}
+<dialog id="ap-apply" class="ap-dlg" aria-labelledby="ap-apply-h">
+  <h3 id="ap-apply-h">📤 Ті самі права — іншим людям</h3>
+  <p class="ap-muted">Вибраним людям Minerva запише рівно такі самі права, які <b>збережені</b> в
+    <span translate="no">{{ original.user.get_full_name|default:original.user.username }}</span>: розділи й рівні,
+    експорт / імпорт, сховані сторінки, особливі права. Їхні власні налаштування доступу заміняться. Кожна зміна
+    потрапляє в журнал аудиту.</p>
+  <div class="ap-warn" id="ap-ap-dirty" hidden>⚠️ На сторінці є незбережені зміни. Іншим застосуються лише збережені
+    права — спершу натисніть «💾 Зберегти».</div>
+  <label style="font-size:13px"><input type="checkbox" id="ap-ap-role" checked> 👤 Також роль
+    «{{ original.get_role_display }}»</label>
+  <div class="ap-muted">Роль визначає ще й особливі права «за роллю», 🏛 Minerva AI і доступ до бази знань.</div>
+  <input type="search" id="ap-ap-q" placeholder="🔎 Пошук: ім'я, логін, роль" autocomplete="off">
+  <div class="ap-row" style="margin-bottom:6px">
+    <button type="button" class="ap-tgl" data-ap-all>☑ Вибрати всіх видимих</button>
+    <button type="button" class="ap-tgl" data-ap-none>☐ Зняти всі</button>
+    <span class="ap-muted" id="ap-ap-n"></span>
+  </div>
+  <div class="ap-ap-list" id="ap-ap-list">
+    {% for t in apply_targets %}{% with u=t.profile.user %}
+    <label class="ap-ap-row{% if t.why %} off{% endif %}" data-q="{{ u.get_full_name|lower }} {{ u.username|lower }} {{ u.email|lower }} {{ t.profile.get_role_display|lower }}">
+      <input type="checkbox" value="{{ t.profile.pk }}"{% if t.why %} disabled{% endif %}>
+      <span><span translate="no">{{ u.get_full_name|default:u.username }}</span>
+        <span class="ap-muted"><span translate="no">{{ u.username }}</span> · {{ t.profile.get_role_display }}</span>
+        {% if t.why %}<br><span class="ap-muted">{{ t.why }}</span>{% endif %}</span>
+    </label>
+    {% endwith %}{% endfor %}
+  </div>
+  <div class="ap-ap-plan" id="ap-ap-plan"></div>
+  <div class="ap-row">
+    <button type="button" class="button" data-ap-plan>👁 Що зміниться</button>
+    <button type="button" class="button default" data-ap-go disabled>✅ Застосувати</button>
+    <span style="margin-left:auto"></span>
+    <button type="button" class="button" data-ap-close>✕ Закрити</button>
+  </div>
+</dialog>
+<script>
+(function () {
+  var dlg = document.getElementById('ap-apply'); if (!dlg) return;
+  var form = document.getElementById('ap-form');
+  var list = document.getElementById('ap-ap-list'), plan = document.getElementById('ap-ap-plan');
+  var go = dlg.querySelector('[data-ap-go]'), count = document.getElementById('ap-ap-n');
+  var role = document.getElementById('ap-ap-role'), q = document.getElementById('ap-ap-q');
+  function picked() {
+    return Array.prototype.map.call(list.querySelectorAll('input:checked'), function (c) { return c.value; });
+  }
+  function dirty() { var r = document.getElementById('ap-root'); return r && r.dataset.dirty === '1'; }
+  function reset() {                        // вибір змінився — план треба побачити знову
+    plan.textContent = ''; go.disabled = true; go.textContent = '✅ Застосувати';
+    var n = picked().length; count.textContent = n ? 'Вибрано: ' + n : '';
+  }
+  function el(tag, text, cls) { var e = document.createElement(tag); if (text) e.textContent = text; if (cls) e.className = cls; return e; }
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('[data-ap-apply]')) {
+      document.getElementById('ap-ap-dirty').hidden = !dirty();
+      reset(); dlg.showModal(); q.focus(); return;
+    }
+    if (!dlg.contains(e.target)) return;
+    if (e.target.closest('[data-ap-close]')) { dlg.close(); return; }
+    if (e.target.closest('[data-ap-all]') || e.target.closest('[data-ap-none]')) {
+      var on = !!e.target.closest('[data-ap-all]');
+      list.querySelectorAll('.ap-ap-row').forEach(function (r) {
+        var c = r.querySelector('input');
+        if (!c.disabled && (!on || !r.hidden)) c.checked = on;
+      });
+      reset(); return;
+    }
+    if (e.target.closest('[data-ap-plan]')) {
+      var ids = picked();
+      if (!ids.length) { plan.textContent = 'Виберіть хоча б одну людину.'; return; }
+      var fd = new FormData(form); fd.set('action', 'apply_preview');
+      fd.set('with_role', role.checked ? '1' : '0'); ids.forEach(function (i) { fd.append('targets', i); });
+      plan.textContent = '⏳ …';
+      fetch(location.pathname, { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(function (r) { return r.json(); }).then(function (res) {
+          plan.textContent = '';
+          if (res.error) { plan.appendChild(el('div', '⛔ ' + res.error, 'ap-warn')); return; }
+          var will = 0;
+          (res.rows || []).forEach(function (row) {
+            var head = el('div'); head.appendChild(el('b', row.name)); head.lastChild.setAttribute('translate', 'no');
+            head.appendChild(el('span', ' · ' + row.role, 'ap-muted'));
+            plan.appendChild(head);
+            if (row.why) { plan.appendChild(el('div', '⛔ ' + row.why, 'ap-muted')); return; }
+            if (!row.lines.length) { plan.appendChild(el('div', '= уже так само', 'ap-muted')); return; }
+            will++;
+            var ul = el('ul'); row.lines.forEach(function (l) { ul.appendChild(el('li', l)); }); plan.appendChild(ul);
+          });
+          go.disabled = !will;
+          go.textContent = will ? '✅ Застосувати до ' + will : '✅ Застосувати';
+        }).catch(function () { plan.textContent = 'Не вдалося порахувати — спробуйте ще раз.'; });
+      return;
+    }
+    if (e.target.closest('[data-ap-go]') && !go.disabled) {
+      if (!confirm('Записати цим людям такі самі права' + (role.checked ? ' і роль' : '') + '?')) return;
+      var f = document.createElement('form'); f.method = 'post'; f.action = location.pathname; f.style.display = 'none';
+      function add(n, v) { var i = document.createElement('input'); i.type = 'hidden'; i.name = n; i.value = v; f.appendChild(i); }
+      add('csrfmiddlewaretoken', form.querySelector('[name=csrfmiddlewaretoken]').value);
+      add('action', 'apply'); add('with_role', role.checked ? '1' : '0');
+      picked().forEach(function (i) { add('targets', i); });
+      document.body.appendChild(f); f.submit();
+    }
+  });
+  list.addEventListener('change', reset);
+  role.addEventListener('change', reset);
+  q.addEventListener('input', function () {
+    var s = q.value.trim().toLowerCase();
+    list.querySelectorAll('.ap-ap-row').forEach(function (r) { r.hidden = !!s && r.dataset.q.indexOf(s) < 0; });
+  });
+})();
+</script>
+{% endif %}
 
 <script>
 (function () {

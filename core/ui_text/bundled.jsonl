@@ -5060,6 +5060,7 @@
 {"uk": "Виберіть файли або папку — назва джерела підставиться сама (назва папки). Поле «Папка» лишіть порожнім: Minerva створить свою. Після «Зберегти» Minerva створить джерело й завантажить вибране. Типи: {0} · до {1} МБ на файл.", "en": "Choose files or a folder — the source name will be filled in automatically (the folder name). Leave the “Folder” field empty: Minerva will create its own. After “Save” Minerva will create the source and upload the selection. Types: {0} · up to {1} MB per file.", "de": "Wählen Sie Dateien oder einen Ordner – der Name der Quelle wird automatisch eingesetzt (Ordnername). Lassen Sie das Feld „Ordner“ leer: Minerva erstellt einen eigenen. Nach „Speichern“ erstellt Minerva die Quelle und lädt die Auswahl hoch. Typen: {0} · bis zu {1} MB pro Datei."}
 {"uk": "Виберіть фото.", "en": "Choose photos.", "de": "Fotos auswählen."}
 {"uk": "Виберіть хоча б один файл", "en": "Choose at least one file", "de": "Wählen Sie mindestens eine Datei"}
+{"uk": "Виберіть хоча б одну людину.", "en": "Select at least one person.", "de": "Wählen Sie mindestens eine Person aus."}
 {"uk": "Виберіть шаблон", "en": "Choose a template", "de": "Wählen Sie eine Vorlage"}
 {"uk": "Виберіть, куди додати пункт", "en": "Choose where to add the item", "de": "Wählen Sie, wohin der Punkt hinzugefügt wird"}
 {"uk": "Виберіть, що буде в листі", "en": "Choose what goes into the e-mail", "de": "Wählen Sie, was in die E-Mail kommt"}
@@ -5068,6 +5069,7 @@
 {"uk": "Вибирається в таблиці «Що звідки йде»: для «Willkommen» / оплат, команди й сайту — скринька або SMTP сповіщень; не вибрано — як «Відправник листів покупцям».", "en": "Chosen in the «Що звідки йде» table: for «Willkommen» / payments, team and site — a mailbox or the notification SMTP; not chosen — as «Відправник листів покупцям».", "de": "Wird in der Tabelle «Що звідки йде» gewählt: für «Willkommen» / Zahlungen, Team und Website — ein Postfach oder SMTP der Benachrichtigungen; nicht gewählt — wie «Відправник листів покупцям»."}
 {"uk": "Вибрав AI — ще не підтверджено", "en": "Chosen by AI — not confirmed yet", "de": "Von der KI gewählt — noch nicht bestätigt"}
 {"uk": "Вибрав AI — ще не підтверджено.", "en": "Chosen by AI — not confirmed yet.", "de": "Von der KI gewählt — noch nicht bestätigt."}
+{"uk": "Вибраним людям Minerva запише рівно такі самі права, які", "en": "Minerva will give the selected people exactly the same rights as those", "de": "Minerva gibt den ausgewählten Personen genau dieselben Rechte, die"}
 {"uk": "Вибрано", "en": "Selected", "de": "Ausgewählt"}
 {"uk": "Вибрано «Свій курс», але курс не вписано — діє «Курси валют» Minerva.", "en": "“Own rate” is selected but no rate was entered — Minerva’s “Exchange rates” apply.", "de": "„Eigener Kurs“ ist ausgewählt, aber kein Kurs eingetragen — es gelten die „Wechselkurse“ von Minerva."}
 {"uk": "Вибрано в запиті {0}", "en": "Chosen in request {0}", "de": "In Anfrage {0} gewählt"}
@@ -5093,6 +5095,7 @@
 {"uk": "Вибрати всі з різницею ({0})", "en": "Select all with differences ({0})", "de": "Alle mit Abweichungen auswählen ({0})"}
 {"uk": "Вибрати всі країни регіону, крім тих, що в інших зонах", "en": "Select all countries of the region except those in other zones", "de": "Alle Länder der Region auswählen, außer denen in anderen Zonen"}
 {"uk": "Вибрати всі, що чекають", "en": "Select all pending", "de": "Alle wartenden auswählen"}
+{"uk": "Вибрати всіх видимих", "en": "Select all visible", "de": "Alle sichtbaren auswählen"}
 {"uk": "Вибрати дату та час", "en": "Choose date and time", "de": "Datum und Uhrzeit wählen"}
 {"uk": "Вибрати директорію", "en": "Select directory", "de": "Verzeichnis auswählen"}
 {"uk": "Вибрати країни", "en": "Select countries", "de": "Länder auswählen"}
@@ -7086,6 +7089,7 @@
 {"uk": "Доступ обмежено — Minerva", "en": "Access restricted — Minerva", "de": "Zugriff eingeschränkt – Minerva"}
 {"uk": "Доступ — хто може користуватись базою знань і RAG", "en": "Access — who can use the knowledge base and RAG", "de": "Zugriff — wer die Wissensdatenbank und RAG nutzen darf"}
 {"uk": "Доступ: {0}", "en": "Access: {0}", "de": "Zugriff: {0}"}
+{"uk": "Доступ: {0} (як у {1})", "en": "Access: {0} (same as {1})", "de": "Zugriff: {0} (wie bei {1})"}
 {"uk": "Доступно", "en": "Available", "de": "Verfügbar"}
 {"uk": "Доступно = Склад − Резерв", "en": "Available = Stock − Reserved", "de": "Verfügbar = Bestand − Reserviert"}
 {"uk": "Доступно {0}", "en": "Available {0}", "de": "Verfügbar {0}"}
@@ -7964,6 +7968,7 @@
 {"uk": "Записати нараду: підготовка запису з цієї зустрічі", "en": "Record meeting: prepare a recording from this appointment", "de": "Besprechung aufnehmen: Aufnahme aus diesem Termin vorbereiten"}
 {"uk": "Записати продовження", "en": "Record continuation", "de": "Fortsetzung aufnehmen"}
 {"uk": "Записати результат дзвінка, зафіксувати потреби.", "en": "Record the result of the call and note the needs.", "de": "Das Ergebnis des Anrufs festhalten und die Bedürfnisse erfassen."}
+{"uk": "Записати цим людям такі самі права", "en": "Give these people the same rights", "de": "Diesen Personen dieselben Rechte geben"}
 {"uk": "Записати цю вагу в картку товару (там її ще немає)", "en": "Save this weight to the product card (it is not there yet)", "de": "Dieses Gewicht in die Artikelkarte schreiben (dort ist es noch nicht)"}
 {"uk": "Записати ще одну", "en": "Record another one", "de": "Weitere aufnehmen"}
 {"uk": "Записати ще одну нараду", "en": "Record another meeting", "de": "Weitere Besprechung aufnehmen"}
@@ -8268,6 +8273,7 @@
 {"uk": "Застосувати в таблицю", "en": "Apply to the table", "de": "In die Tabelle übernehmen"}
 {"uk": "Застосувати вибрані", "en": "Apply selected", "de": "Ausgewählte übernehmen"}
 {"uk": "Застосувати всі ({0})", "en": "Apply all ({0})", "de": "Alle übernehmen ({0})"}
+{"uk": "Застосувати до", "en": "Apply to", "de": "Anwenden auf"}
 {"uk": "Застосувати до {0} лістингів", "en": "Apply to {0} listings", "de": "Auf {0} Listings anwenden"}
 {"uk": "Застосувати до вибраних", "en": "Apply to selected", "de": "Auf Auswahl anwenden"}
 {"uk": "Застосувати до плану всі зміни, що чекають ({0})?", "en": "Apply all waiting changes to the plan ({0})?", "de": "Alle offenen Änderungen in den Plan übernehmen ({0})?"}
@@ -8284,6 +8290,7 @@
 {"uk": "Застосувати рекомендовані ціни для", "en": "Apply the recommended prices for", "de": "Empfohlene Preise übernehmen für"}
 {"uk": "Застосувати рекомендовані ціни?", "en": "Apply the recommended prices?", "de": "Empfohlene Preise übernehmen?"}
 {"uk": "Застосувати цю зміну до плану", "en": "Apply this change to the plan", "de": "Diese Änderung in den Plan übernehmen"}
+{"uk": "Застосувати ці права до інших…", "en": "Apply these rights to others…", "de": "Diese Rechte auf andere anwenden…"}
 {"uk": "Застосувати ціни", "en": "Apply prices", "de": "Preise übernehmen"}
 {"uk": "Застосувати і зберегти", "en": "Apply and save", "de": "Übernehmen und speichern"}
 {"uk": "Затверджено", "en": "Approved", "de": "Freigegeben"}
@@ -10703,6 +10710,8 @@
 {"uk": "На сторінці немає тексту", "en": "The page has no text", "de": "Die Seite enthält keinen Text"}
 {"uk": "На сторінці стратегії → кнопка", "en": "On the strategy page → button", "de": "Auf der Strategieseite → Schaltfläche"}
 {"uk": "На сторінці товару (під «In den Warenkorb») і в кошику — «Lieferung nach [країна ▾]»: ціна доставки й термін для вибраної країни; вибір запам'ятовується і підставляється в касі (адреса з акаунта покупця важливіша). Далі «Lieferzeit: 1–2 Werktage nach Versand» — у касі, на сторінці підтвердження і в листі про замовлення. Без терміну рядок не показується.", "en": "On the product page (under “In den Warenkorb”) and in the cart — “Lieferung nach [country ▾]”: the shipping price and lead time for the selected country; the choice is remembered and filled into the checkout (the address from the buyer’s account takes priority). Then “Lieferzeit: 1–2 Werktage nach Versand” — in the checkout, on the confirmation page and in the order email. Without a lead time, the line is not shown.", "de": "Auf der Artikelseite (unter „In den Warenkorb“) und im Warenkorb — „Lieferung nach [Land ▾]“: Versandpreis und Lieferzeit für das gewählte Land; die Auswahl wird gemerkt und in der Kasse übernommen (die Adresse aus dem Käuferkonto hat Vorrang). Weiter „Lieferzeit: 1–2 Werktage nach Versand“ — in der Kasse, auf der Bestätigungsseite und in der Auftrags-E-Mail. Ohne Lieferzeit wird die Zeile nicht angezeigt."}
+{"uk": "На сторінці є незбережені зміни. Іншим застосуються лише збережені", "en": "This page has unsaved changes. Only the saved", "de": "Auf dieser Seite gibt es ungespeicherte Änderungen. Für andere gelten nur die gespeicherten"}
+{"uk": "На сторінці є незбережені зміни. Іншим застосуються лише збережені права — спершу натисніть «💾 Зберегти».", "en": "This page has unsaved changes. Only the saved rights are applied to others — click «💾 Save» first.", "de": "Auf dieser Seite gibt es ungespeicherte Änderungen. Für andere gelten nur die gespeicherten Rechte — klicken Sie zuerst auf «💾 Speichern»."}
 {"uk": "На фото є QR", "en": "The photo has a QR code", "de": "Auf dem Foto ist ein QR-Code"}
 {"uk": "На цей Telegram ID Minerva пише вам особисто: ранковий брифінг, нагадування, чат з 🏛️ Minerva AI.", "en": "Minerva writes to you personally at this Telegram ID: morning briefing, reminders, chat with 🏛️ Minerva AI.", "de": "An diese Telegram-ID schreibt Minerva Ihnen persönlich: Morgenbriefing, Erinnerungen, Chat mit 🏛️ Minerva AI."}
 {"uk": "На цей Telegram ID Minerva пише вам особисто: ранковий брифінг, нагадування, чат з 🏛️ Minerva AI. Порожнє поле — особистих повідомлень у Telegram немає. Що саме надсилати, налаштовується там, де повідомлення виникають: брифінг і звіти — «Налаштування сповіщень» / «Налаштування брифінгу», нагадування — «📅 Календар → Сповіщення», нові листи — налаштування вашої скриньки.", "en": "Minerva writes to you personally at this Telegram ID: morning briefing, reminders, chat with 🏛️ Minerva AI. Empty field — no personal Telegram messages. What exactly to send is configured where the messages originate: briefing and reports — “Notification settings” / “Briefing settings”, reminders — “📅 Calendar → Notifications”, new e-mails — your mailbox settings.", "de": "An diese Telegram-ID schreibt Minerva Ihnen persönlich: Morgenbriefing, Erinnerungen, Chat mit 🏛️ Minerva AI. Leeres Feld – keine persönlichen Nachrichten in Telegram. Was genau gesendet wird, wird dort eingestellt, wo die Nachrichten entstehen: Briefing und Berichte – „Benachrichtigungseinstellungen“ / „Briefing-Einstellungen“, Erinnerungen – „📅 Kalender → Benachrichtigungen“, neue E-Mails – die Einstellungen Ihres Postfachs."}
@@ -11364,6 +11373,7 @@
 {"uk": "Не вдалося повернути фото.", "en": "Could not rotate the photo.", "de": "Das Foto konnte nicht gedreht werden."}
 {"uk": "Не вдалося повідомити", "en": "Could not notify", "de": "Benachrichtigung fehlgeschlagen"}
 {"uk": "Не вдалося показати цей блок.", "en": "Could not show this block.", "de": "Dieser Block konnte nicht angezeigt werden."}
+{"uk": "Не вдалося порахувати — спробуйте ще раз.", "en": "Could not calculate — please try again.", "de": "Berechnung fehlgeschlagen — bitte erneut versuchen."}
 {"uk": "Не вдалося прочитати «{0}» з пошти — завантажте файл з ПК.", "en": "Could not read «{0}» from the mail — upload the file from your PC.", "de": "«{0}» konnte nicht aus der E-Mail gelesen werden — laden Sie die Datei vom PC hoch."}
 {"uk": "Не вдалося прочитати запит.", "en": "Could not read the request.", "de": "Die Anfrage konnte nicht gelesen werden."}
 {"uk": "Не вдалося прочитати зміни — оновіть сторінку й спробуйте ще раз.", "en": "Could not read the changes — refresh the page and try again.", "de": "Die Änderungen konnten nicht gelesen werden — aktualisieren Sie die Seite und versuchen Sie es erneut."}
@@ -12128,6 +12138,7 @@
 {"uk": "Нігерія", "en": "Nigeria", "de": "Nigeria"}
 {"uk": "Нідерланди", "en": "Netherlands", "de": "Niederlande"}
 {"uk": "Нікарагуа", "en": "Nicaragua", "de": "Nicaragua"}
+{"uk": "Нікого не вибрано.", "en": "Nobody selected.", "de": "Niemand ausgewählt."}
 {"uk": "Нікому надсилати — усім уже надіслано або отримувачів немає.", "en": "Nobody to send to — all already sent or no recipients.", "de": "Niemand zum Senden — alle bereits gesendet oder keine Empfänger."}
 {"uk": "Німеччина", "en": "Germany", "de": "Deutschland"}
 {"uk": "Нічого", "en": "None", "de": "Keine"}
@@ -14394,6 +14405,7 @@
 {"uk": "Пошук ще не запускали", "en": "The search has not been started yet", "de": "Die Suche wurde noch nicht gestartet"}
 {"uk": "Пошук: назва або код — напр. Schweiz, Швейцарія, CH", "en": "Search: name or code — e.g. Schweiz, Switzerland, CH", "de": "Suche: Name oder Code – z. B. Schweiz, Switzerland, CH"}
 {"uk": "Пошук: назва, людина, email, країна…", "en": "Search: name, person, email, country…", "de": "Suche: Name, Person, E-Mail, Land…"}
+{"uk": "Пошук: ім'я, логін, роль", "en": "Search: name, login, role", "de": "Suche: Name, Login, Rolle"}
 {"uk": "Пошуки в RAG", "en": "RAG searches", "de": "RAG-Suchen"}
 {"uk": "Пошуків", "en": "Searches", "de": "Suchanfragen"}
 {"uk": "Права", "en": "Permissions", "de": "Berechtigungen"}
@@ -15592,6 +15604,7 @@
 {"uk": "Роль в AI", "en": "Role in AI", "de": "Rolle in der KI"}
 {"uk": "Роль в AI асистенті", "en": "Role in the AI assistant", "de": "Rolle im KI-Assistenten"}
 {"uk": "Роль в AI: {0}", "en": "AI role: {0}", "de": "KI-Rolle: {0}"}
+{"uk": "Роль визначає ще й особливі права «за роллю», 🏛 Minerva AI і доступ до бази знань.", "en": "The role also decides the special rights «by role», 🏛 Minerva AI and knowledge base access.", "de": "Die Rolle bestimmt auch die Sonderrechte «nach Rolle», 🏛 Minerva AI und den Zugriff auf die Wissensbasis."}
 {"uk": "Роль за замовчуванням: manager", "en": "Default role: manager", "de": "Standardrolle: manager"}
 {"uk": "Роль змінено → {0}. Модулі скинуто до дефолтів нової ролі.", "en": "Role changed → {0}. Modules reset to the defaults of the new role.", "de": "Rolle geändert → {0}. Module auf die Standardwerte der neuen Rolle zurückgesetzt."}
 {"uk": "Роль на сайті", "en": "Role on the site", "de": "Rolle auf der Website"}
@@ -15601,6 +15614,7 @@
 {"uk": "Роль і доступ змінюються тільки адміністратором системи.", "en": "Role and access can only be changed by the system administrator.", "de": "Rolle und Zugriff können nur vom Systemadministrator geändert werden."}
 {"uk": "Роль, модулі, can_delete/export/import — все керується в", "en": "Role, modules, can_delete/export/import — all managed in", "de": "Rolle, Module, can_delete/export/import — alles wird verwaltet in"}
 {"uk": "Роль: {0}", "en": "Role: {0}", "de": "Rolle: {0}"}
+{"uk": "Роль: {0} → {1}", "en": "Role: {0} → {1}", "de": "Rolle: {0} → {1}"}
 {"uk": "Ролі користувачів", "en": "User roles", "de": "Benutzerrollen"}
 {"uk": "Ролі користувачів → Telegram ID", "en": "User roles → Telegram ID", "de": "Benutzerrollen → Telegram-ID"}
 {"uk": "Ролі людей", "en": "People’s roles", "de": "Rollen der Personen"}
@@ -16900,6 +16914,8 @@
 {"uk": "Також коли покупець уперше задає пароль за запрошенням менеджера.", "en": "Also when the customer sets a password for the first time via a manager's invitation.", "de": "Auch, wenn der Kunde erstmals über die Einladung eines Managers ein Passwort festlegt."}
 {"uk": "Також переконайтесь, що", "en": "Also make sure that", "de": "Stellen Sie außerdem sicher, dass"}
 {"uk": "Також прибрати цитати з цих пунктів ({0})", "en": "Also remove the quotes from these items ({0})", "de": "Auch die Zitate aus diesen Punkten entfernen ({0})"}
+{"uk": "Також роль", "en": "Also the role", "de": "Auch die Rolle"}
+{"uk": "Також роль «{0}»", "en": "Also the role «{0}»", "de": "Auch die Rolle «{0}»"}
 {"uk": "Також у Telegram", "en": "Also to Telegram", "de": "Auch an Telegram"}
 {"uk": "Також усі інші папки сервера (нові листи за UID) — для крону", "en": "Also all other server folders (new emails by UID) — for cron", "de": "Auch alle anderen Serverordner (neue E-Mails per UID) — für Cron"}
 {"uk": "Такої адреси API для {0} немає.", "en": "There is no such API address for {0}.", "de": "Eine solche API-Adresse für {0} gibt es nicht."}
@@ -17479,6 +17495,8 @@
 {"uk": "Тягніть — ширша колонка «КРОК» · подвійний клік — під найдовшу назву", "en": "Drag to widen the «STEP» column · double-click to fit the longest name", "de": "Ziehen — Spalte «SCHRITT» breiter · Doppelklick — passend zum längsten Namen"}
 {"uk": "Тягніть — ширша колонка «Крок» · подвійний клік — під найдовшу назву", "en": "Drag to widen the «Step» column · double-click to fit the longest name", "de": "Ziehen — Spalte «Schritt» breiter · Doppelklick — passend zum längsten Namen"}
 {"uk": "Ті самі посилання, що для магазинів, або свої правила саме для DigiKey.", "en": "The same links as for the web shops, or own rules specifically for DigiKey.", "de": "Dieselben Links wie für die Webshops oder eigene Regeln speziell für DigiKey."}
+{"uk": "Ті самі права (і роль) — кільком іншим людям", "en": "The same rights (and role) for several other people", "de": "Dieselben Rechte (und Rolle) für mehrere andere Personen"}
+{"uk": "Ті самі права — іншим людям", "en": "The same rights for other people", "de": "Dieselben Rechte für andere Personen"}
 {"uk": "Ті, хто відповів на старий запит", "en": "Those who answered the old request", "de": "Diejenigen, die auf die alte Anfrage geantwortet haben"}
 {"uk": "Ті, хто надіслав ціну", "en": "Those who sent a price", "de": "Diejenigen, die einen Preis geschickt haben"}
 {"uk": "Тіло (JSON, для POST / PATCH)", "en": "Body (JSON, for POST / PATCH)", "de": "Body (JSON, für POST / PATCH)"}
@@ -17731,6 +17749,7 @@
 {"uk": "Уже оплачено й накладений платіж — без банківських реквізитів у рахунку.", "en": "Already paid and cash on delivery — no bank details in the invoice.", "de": "Bereits bezahlt und Nachnahme — keine Bankverbindung in der Rechnung."}
 {"uk": "Уже оплачено — без банківських реквізитів у рахунку.", "en": "Already paid — no bank details in the invoice.", "de": "Bereits bezahlt — keine Bankverbindung in der Rechnung."}
 {"uk": "Уже отримано: закупівля в стані «Отримано» без позицій — склад і «Очікується» не змінюються", "en": "Already received: purchase order in status «Received» without lines — stock and «Expected» do not change", "de": "Bereits erhalten: Bestellung im Status «Erhalten» ohne Positionen — Lager und «Erwartet» ändern sich nicht"}
+{"uk": "Уже так само", "en": "Already the same", "de": "Bereits gleich"}
 {"uk": "Узбекистан", "en": "Uzbekistan", "de": "Usbekistan"}
 {"uk": "Україна", "en": "Ukraine", "de": "Ukraine"}
 {"uk": "Українська", "en": "Ukrainian", "de": "Ukrainisch"}
@@ -18959,6 +18978,7 @@
 {"uk": "Що змінити", "en": "What to change", "de": "Was ändern"}
 {"uk": "Що змінити в плані?", "en": "What should change in the plan?", "de": "Was soll sich am Plan ändern?"}
 {"uk": "Що змінить запит — перевірка без запису", "en": "What the request will change — check without writing", "de": "Was die Anfrage ändert — Prüfung ohne Schreiben"}
+{"uk": "Що зміниться", "en": "What will change", "de": "Was sich ändert"}
 {"uk": "Що змінювалось — {0}", "en": "What changed — {0}", "de": "Was sich geändert hat — {0}"}
 {"uk": "Що знайшла остання перевірка повідомлень і куди надіслала (або чому ні)", "en": "What the last message check found and where it was sent (or why not)", "de": "Was die letzte Nachrichtenprüfung gefunden hat und wohin gesendet wurde (oder warum nicht)"}
 {"uk": "Що зробив агент", "en": "What the agent did", "de": "Was der Agent getan hat"}
@@ -20214,6 +20234,7 @@
 {"uk": "дії", "en": "actions", "de": "Aktionen"}
 {"uk": "експорт", "en": "export", "de": "Export"}
 {"uk": "експорт / Innerdeutsch", "en": "export / domestic", "de": "Export / Innerdeutsch"}
+{"uk": "експорт / імпорт, сховані сторінки, особливі права. Їхні власні налаштування доступу заміняться. Кожна зміна", "en": "export / import, hidden pages, special rights. Their own access settings will be replaced. Every change", "de": "Export / Import, ausgeblendete Seiten, Sonderrechte. Ihre eigenen Zugriffseinstellungen werden ersetzt. Jede Änderung"}
 {"uk": "елемент", "en": "item", "de": "Element"}
 {"uk": "елементи", "en": "items", "de": "Elemente"}
 {"uk": "елементів", "en": "items", "de": "Elemente"}
@@ -22392,6 +22413,7 @@
 {"uk": "поточний крок", "en": "current step", "de": "aktueller Schritt"}
 {"uk": "поточний крок має форму для заповнення результату. У режимі", "en": "the current step has a form for entering the result. In the mode", "de": "der aktuelle Schritt hat ein Formular zur Eingabe des Ergebnisses. Im Modus"}
 {"uk": "поточний, ставиться сам", "en": "current, set automatically", "de": "aktuell, wird automatisch gesetzt"}
+{"uk": "потрапляє в журнал аудиту.", "en": "goes into the audit log.", "de": "wird im Audit-Protokoll festgehalten."}
 {"uk": "потребує уваги", "en": "needs attention", "de": "braucht Aufmerksamkeit"}
 {"uk": "потрібен category_id", "en": "category_id is required", "de": "category_id ist erforderlich"}
 {"uk": "потрібен вхід покупця", "en": "buyer login required", "de": "Anmeldung des Käufers erforderlich"}
@@ -22440,6 +22462,7 @@
 {"uk": "пошуків: {0}", "en": "searches: {0}", "de": "Suchen: {0}"}
 {"uk": "права «Агент (MCP) — читання / пропонувати зміни». Пропозиції стають завданням цієї людини в «🧩 Завдання агенту» — застосовує вона ✓. Як підключити — гід «Агент через MCP».", "en": "permissions “Agent (MCP) — read / propose changes”. The proposals become a task for this person in “🧩 Agent tasks” — they apply them with ✓. How to connect — see the guide “Agent via MCP”.", "de": "Rechte „Agent (MCP) — Lesen / Änderungen vorschlagen“. Die Vorschläge werden zu einer Aufgabe dieser Person unter „🧩 Agentenaufgaben“ — sie übernimmt sie mit ✓. Zur Anbindung siehe den Leitfaden „Agent über MCP“."}
 {"uk": "права повернулись anna", "en": "permissions returned to anna", "de": "Berechtigungen an anna zurückgegeben"}
+{"uk": "права — спершу натисніть «💾 Зберегти».", "en": "rights are applied to others — click «💾 Save» first.", "de": "Rechte — klicken Sie zuerst auf «💾 Speichern»."}
 {"uk": "права: усі потрібні", "en": "rights: all required", "de": "Rechte: alle erforderlichen"}
 {"uk": "правий клік — «за роллю»", "en": "right-click — “by role”", "de": "Rechtsklick — „nach Rolle“"}
 {"uk": "правий клік — меню", "en": "right-click — menu", "de": "Rechtsklick — Menü"}
@@ -22743,6 +22766,8 @@
 {"uk": "розбіжностей складу: {0}", "en": "stock discrepancies: {0}", "de": "Lagerabweichungen: {0}"}
 {"uk": "розгалуження (Так/Ні)", "en": "branching (Yes/No)", "de": "Verzweigung (Ja/Nein)"}
 {"uk": "роздрібний", "en": "retail", "de": "Einzelhandel"}
+{"uk": "розділи й рівні", "en": "sections and levels", "de": "Bereiche und Stufen"}
+{"uk": "розділи й рівні, експорт / імпорт, сховані сторінки, особливі права. Їхні власні налаштування доступу заміняться. Кожна зміна потрапляє в журнал аудиту.", "en": "sections and levels, export / import, hidden pages, special rights. Their own access settings will be replaced. Every change goes into the audit log.", "de": "Bereiche und Stufen, Export / Import, ausgeblendete Seiten, Sonderrechte. Ihre eigenen Zugriffseinstellungen werden ersetzt. Jede Änderung wird im Audit-Protokoll festgehalten."}
 {"uk": "розділи — спершу приберіть один (★).", "en": "sections — first remove one (★).", "de": "Bereiche — entfernen Sie zuerst einen (★)."}
 {"uk": "розклад автоматичних листів не зсувається.", "en": "the schedule of automatic e-mails does not shift.", "de": "der Zeitplan der automatischen E-Mails verschiebt sich nicht."}
 {"uk": "розміри", "en": "dimensions", "de": "Maße"}
@@ -23444,6 +23469,7 @@
 {"uk": "уже не заноситься (", "en": "is no longer added (", "de": "wird nicht mehr eingetragen ("}
 {"uk": "уже не працює", "en": "no longer works there", "de": "arbeitet nicht mehr dort"}
 {"uk": "уже списано", "en": "already written off", "de": "bereits ausgebucht"}
+{"uk": "уже так само", "en": "already the same", "de": "bereits gleich"}
 {"uk": "уже такий строк", "en": "already has this lead time", "de": "hat bereits diese Lieferzeit"}
 {"uk": "уже є в базі етикеток — можливо, його виправляли вручну.", "en": "already exists in the label database — it may have been corrected manually.", "de": "ist bereits in der Etikettendatenbank vorhanden — möglicherweise wurde sie manuell korrigiert."}
 {"uk": "уже є картка DigiKey ({0}", "en": "a DigiKey card already exists ({0}", "de": "es gibt bereits eine DigiKey-Karte ({0}"}
@@ -23962,6 +23988,7 @@
 {"uk": "і полем «Магазин». Ключ вставляється в конфіг сайту.", "en": "and the “Shop” field. The key is pasted into the website config.", "de": "und das Feld „Shop“. Der Schlüssel wird in die Website-Konfiguration eingefügt."}
 {"uk": "і порівняти з DigiKey", "en": "and compare with DigiKey", "de": "und mit DigiKey vergleichen"}
 {"uk": "і після підтвердження перевірить, чи DigiKey прив'язав його до замовлення.", "en": "and after the confirmation checks whether DigiKey attached it to the order.", "de": "und prüft nach der Bestätigung, ob DigiKey sie dem Auftrag zugeordnet hat."}
+{"uk": "і роль", "en": "and the role", "de": "und die Rolle"}
 {"uk": "і створює записи DigiKeyListing. Оберіть режим імпорту", "en": "and creates DigiKeyListing records. Choose the import mode", "de": "und legt DigiKeyListing-Datensätze an. Wählen Sie den Importmodus"}
 {"uk": "і товарами", "en": "and products", "de": "und Artikeln"}
 {"uk": "і хочете побачити їх у Minerva зі статусом ⏳ Очікує затвердження.", "en": "and want to see them in Minerva with the status ⏳ Awaiting approval.", "de": "und sie in Minerva mit dem Status ⏳ Wartet auf Freigabe sehen möchten."}

@@ -1094,7 +1094,8 @@ class UserProfileAdmin(admin.ModelAdmin):
 
     def _access_view(self, request, pk):
         """«👁 Як бачить Minerva <людина>» — меню, дозволи, модулі, база знань, перевірка адреси (core/access_preview);
-        «✏️ Змінити доступ» — POST {action: preview | save | copy, draft} (core/access_editor)."""
+        «✏️ Змінити доступ» — POST {action: preview | save | copy, draft} (core/access_editor);
+        «📤 Застосувати ці права до інших» — POST {action: apply_preview (JSON) | apply, targets, with_role}."""
         import json
         from django.contrib import messages
         from django.core.exceptions import PermissionDenied
@@ -1114,6 +1115,27 @@ class UserProfileAdmin(admin.ModelAdmin):
                 draft = {}
             if why_not:
                 raise PermissionDenied
+            if action in ('apply_preview', 'apply'):
+                ids = request.POST.getlist('targets')
+                with_role = request.POST.get('with_role') == '1'
+                try:
+                    if action == 'apply_preview':
+                        return JsonResponse({'rows': access_editor.plan_to(request.user, profile, ids, with_role)})
+                    res = access_editor.apply_to_many(request.user, profile, ids, with_role, client_ip(request))
+                except access_editor.AccessError as exc:
+                    if action == 'apply_preview':
+                        return JsonResponse({'error': str(exc)}, status=400)
+                    messages.error(request, str(exc))
+                    return redirect(reverse('admin:core_userprofile_access', args=[profile.pk]))
+                for name, lines in res['done']:
+                    messages.success(request, f'✅ {name}: ' + '; '.join(lines))
+                if res['same']:
+                    messages.info(request, 'Уже так само: ' + ', '.join(res['same']))
+                for name, why in res['refused']:
+                    messages.error(request, f'⛔ {name}: {why}')
+                if not (res['done'] or res['same'] or res['refused']):
+                    messages.warning(request, 'Нікого не вибрано.')
+                return redirect(reverse('admin:core_userprofile_access', args=[profile.pk]))
             if action == 'copy':
                 src = UserProfile.objects.filter(pk=request.POST.get('source') or 0).first()
                 if src is None:
@@ -1142,6 +1164,7 @@ class UserProfileAdmin(admin.ModelAdmin):
             'levels': access_editor.LEVELS, 'extra_ops': access_editor.EXTRA_OPS,
             'others': UserProfile.objects.exclude(pk=profile.pk).select_related('user').order_by('user__username')
             if editing else [],
+            'apply_targets': access_editor.targets(request.user, profile) if not why_not else [],
         })
 
     @admin.display(description='Перегляд')
