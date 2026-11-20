@@ -1,0 +1,29 @@
+{# 📊 Статистика запиту над таблицею пропозицій — suppliers/services/rfq_stats.py stats, suppliers/admin.py work_view #}
+{% if st.asked or st.planned %}
+<details class="rw-stats" id="rw-stats" open>
+  <summary><b>📊 Статистика</b> <span class="spf-muted">· запитали {{ st.asked }} · відповіли {{ st.replied }}{% if st.asked %} ({{ st.replied_pct }} %){% endif %}{% if st.priced %} · з цінами {{ st.priced }}{% endif %}</span></summary>
+  <div class="rw-st-tiles">
+    <div class="rw-st"><b>{{ st.asked }}</b><span>запитали</span>{% if st.planned %}<small>ще не надіслано: {{ st.planned }}</small>{% endif %}{% if st.failed %}<small class="spf-bad">не надіслано: {{ st.failed }}</small>{% endif %}</div>
+    <div class="rw-st"><b>{{ st.replied }}</b><span>відповіли{% if st.asked %} · {{ st.replied_pct }} %{% endif %}</span></div>
+    <div class="rw-st"><b>{{ st.priced }}</b><span>з цінами</span>{% if st.priced and st.comparable != st.priced %}<small>повних: {{ st.comparable }}</small>{% endif %}</div>
+    {% if st.declined %}<div class="rw-st"><b>{{ st.declined }}</b><span>відмовились</span></div>{% endif %}
+    <div class="rw-st{% if st.overdue %} rw-st-warn{% endif %}"><b>{{ st.silent }}</b><span>мовчать</span>{% if st.overdue %}<small>⏰ строк минув: {{ st.overdue }}</small>{% elif st.silent and st.waiting_for %}<small>чекаємо вже {{ st.waiting_for }}</small>{% endif %}</div>
+    {% if st.reply %}<div class="rw-st rw-st-wide"><b>{{ st.reply.median }}</b><span>медіана часу відповіді{% if st.reply.n > 1 %} ({{ st.reply.n }}){% endif %}</span>
+      {% if st.reply.n > 1 %}<small>⚡ найшвидше {{ st.reply.fast }} — <span translate="no">{{ st.reply.fast_who }}</span></small><small>🐢 найдовше {{ st.reply.slow }} — <span translate="no">{{ st.reply.slow_who }}</span></small>{% else %}<small translate="no">{{ st.reply.fast_who }}</small>{% endif %}</div>{% endif %}
+    {% if st.lead %}<div class="rw-st rw-st-wide"><b>{% if st.lead.min == st.lead.max %}{{ st.lead.min }}{% else %}{{ st.lead.min }}–{{ st.lead.max }}{% endif %} дн.</b><span>строк виготовлення</span>
+      {% if st.lead.n > 1 and st.lead.min != st.lead.max %}<small>найкоротший — <span translate="no">{{ st.lead.min_who }}</span></small><small>найдовший — <span translate="no">{{ st.lead.max_who }}</span></small>{% endif %}</div>{% endif %}
+  </div>
+  {% if st.per_qty %}
+  <div class="rw-scroll"><table class="spf-table rw-st-prices">
+    <tr><th>Кількість</th><th>🟢 Найнижча</th><th>Медіана</th><th>🔴 Найвища</th><th>Розкид</th></tr>
+    {% for p in st.per_qty %}<tr>
+      <td><b>{{ p.qty }} шт</b> <span class="spf-muted">· {{ p.n }} пропоз.{% if p.partial %}, з неповних{% endif %}</span></td>
+      <td>{{ p.min }} {{ st.home }} <span class="spf-muted" translate="no">{{ p.min_who }}</span></td>
+      <td>{% if p.one %}—{% else %}{{ p.median }} {{ st.home }}{% endif %}</td>
+      <td>{% if p.one %}—{% else %}{{ p.max }} {{ st.home }} <span class="spf-muted" translate="no">{{ p.max_who }}</span>{% endif %}</td>
+      <td>{{ p.spread|default:"—" }}</td></tr>{% endfor %}
+  </table></div>
+  <div class="spf-muted">Ціна за 1 шт. разом з разовими витратами, у {{ st.home }}; лише повні пропозиції (як 🥇), немає повних — з неповних.</div>
+  {% endif %}
+</details>
+{% endif %}

@@ -1,0 +1,59 @@
+{# 💬 Вікно листування з одним постачальником запиту — suppliers/admin.py chat_view, services/rfq_talk.py #}
+{# Текст і теми листів — лише з власних скриньок людини; «🧭 Коротко» — збережене цієї людини #}
+<div class="rwc" data-rid="{{ r.pk }}">
+  <div class="rwc-main">
+    <div class="rwc-list" id="rwc-list">
+      {% for l in letters %}
+      <div class="rwc-msg{% if l.ours %} ours{% endif %}{% if not l.readable %} locked{% endif %}" id="rwc-{{ l.pk }}">
+        <div class="rwc-meta"><span>{% if l.ours %}📤{% else %}📥{% endif %} <b translate="no">{{ l.who }}</b>{% if l.email %} <span class="spf-muted" translate="no">&lt;{{ l.email }}&gt;</span>{% endif %}</span>
+          <span class="spf-muted">{{ l.at|date:"d.m.Y H:i" }}{% if l.first %} · запит{% endif %}{% if l.readable %} · <a href="/email/?msg={{ l.pk }}" target="_blank" title="Відкрити в пошті">✉️ ↗</a>{% endif %}</span></div>
+        {% if l.readable %}
+        {% if l.subject %}<div class="rwc-subj" translate="no">{{ l.subject }}</div>{% endif %}
+        <div class="rwc-text" translate="no">{{ l.text|default:"(без тексту)" }}</div>
+        {% if l.files %}<div class="rwc-files">{% for f in l.files %}<span class="spf-tag" translate="no">{{ f.icon }} {{ f.name }} · {{ f.size }}</span>{% endfor %}</div>{% endif %}
+        {% else %}<div class="spf-muted">🔒 Лист у скриньці колеги — тему й текст бачить лише власник скриньки.</div>{% endif %}
+      </div>
+      {% empty %}<div class="spf-muted" style="padding:12px">{% if r.state == "planned" %}Запит ще не надіслано.{% else %}Листів ще немає.{% endif %}</div>{% endfor %}
+    </div>
+    {% if can_change and r.state != "planned" %}
+    <form class="rwc-reply" id="rwc-reply" autocomplete="off">
+      <div class="rwc-to">
+        <label>Кому <input name="to" value="{{ target.to }}" translate="no"></label>
+        <label>Копія <input name="cc" value="{{ target.cc }}" translate="no" list="rwc-colleagues"></label>
+      </div>
+      <label class="rwc-subjf">Тема <input name="subject" value="{{ target.subject }}" translate="no"></label>
+      <textarea name="body" rows="6" placeholder="Відповідь постачальнику — піде в ту саму гілку листування, з підписом скриньки (Ctrl + Enter — надіслати)"></textarea>
+      <input type="hidden" name="reply" value="{{ target.reply_pk|default:'' }}">
+      <div class="rwc-act">
+        <span class="spf-muted">{% if target.from %}з <span translate="no">{{ target.from }}</span>{% endif %}{% if target.reply_pk %} · відповідь на останній лист, з цитатою{% endif %}</span>
+        <span class="spf-job" id="rwc-job"></span>
+        <button type="submit" class="button default">📤 Надіслати</button>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+  <aside class="rwc-side">
+    <section>
+      <div class="rwc-h2">🧭 Коротко</div>
+      {% if brief %}{% with b=brief.data %}
+        {% if not brief.fresh %}<div class="spf-warn">⚠️ Після цього підсумку змінилось листування — 🧠 оновіть.</div>{% endif %}
+        {% if b.status %}<div class="rwc-status">{{ b.status }}</div>{% endif %}
+        {% if b.they_ask %}<div class="rwc-k">❓ Питають у нас</div><ul>{% for x in b.they_ask %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+        {% if b.to_answer %}<div class="rwc-k">✅ Треба відповісти / зробити</div><ul>{% for x in b.to_answer %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+        {% if b.they_promised %}<div class="rwc-k">🤝 Обіцяли вони</div><ul>{% for x in b.they_promised %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+        {% if b.we_promised %}<div class="rwc-k">📌 Обіцяли ми</div><ul>{% for x in b.we_promised %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+        {% if b.draft and can_change %}<textarea hidden id="rwc-draft">{{ b.draft }}</textarea>
+          <button type="button" class="button" data-rwc-draft title="Покласти чернетку AI у поле відповіді — перегляньте й допишіть [у дужках]">✍️ Чернетка у відповідь</button>{% endif %}
+        <div class="spf-muted rwc-small">🧠 AI{% if brief.at_dt %} · {{ brief.at_dt|date:"d.m.Y H:i" }}{% endif %} — лише для вас (з ваших листів)</div>
+      {% endwith %}{% else %}
+        <div class="spf-muted">AI коротко підсумує листування: про що питають, що обіцяли вони й ми, на що треба відповісти — і запропонує чернетку відповіді.</div>
+      {% endif %}
+      {% if can_change and readable %}<div class="rwc-row"><button type="button" class="button" data-rwc-brief>🧠 {% if brief %}Оновити{% else %}Що відповісти?{% endif %}</button><span class="spf-job" id="rwc-brief-job"></span></div>{% endif %}
+      {% if hidden %}<div class="spf-muted rwc-small">🔒 Листів у скриньках колег: {{ hidden }} — AI їх не читає.</div>{% endif %}
+    </section>
+    <section>
+      <div class="rwc-h2">🕘 Історія</div>
+      {% for h in history %}<div class="rwc-hist"><span class="spf-muted">{{ h.at|date:"d.m H:i" }}</span> {{ h.text }}</div>{% empty %}<div class="spf-muted">—</div>{% endfor %}
+    </section>
+  </aside>
+</div>

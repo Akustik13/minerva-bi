@@ -205,6 +205,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             path("<int:pk>/letters/", view(self.letters_view), name="suppliers_supplierrequest_letters"),
             path("<int:pk>/missed/", view(self.missed_view), name="suppliers_supplierrequest_missed"),
             path("<int:pk>/recipient/<int:rid>/panel/", view(self.panel_view), name="suppliers_supplierrequest_panel"),
+            path("<int:pk>/recipient/<int:rid>/chat/", view(self.chat_view), name="suppliers_supplierrequest_chat"),
             path("preview/", view(self.preview_view), name="suppliers_supplierrequest_preview"),
             path("ai-letter/", view(self.ai_letter_view), name="suppliers_supplierrequest_ai_letter"),
             path("test-mail/", view(self.test_mail_view), name="suppliers_supplierrequest_test_mail"),
@@ -633,7 +634,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
     # ── сторінка запиту ──
     def work_view(self, request, pk):
         from suppliers.models import SupplierReplyFile
-        from suppliers.services import rfq_compare, rfq_copy, rfq_replies
+        from suppliers.services import rfq_compare, rfq_copy, rfq_replies, rfq_stats
         req = self._request(request, pk)
         for r in req.recipients.exclude(thread=None, reply_message=None):
             try:   # 📎 вкладення відповідей, що вже на диску (з пошти — панель рядка)
@@ -652,6 +653,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                 r.reply_message.account.user_id == request.user.pk else None
             row["peek"] = rfq_replies.peek(r, request.user) if row["reply_link"] else None
             row["files_n"] = n_files.get(r.pk, 0)
+            row["timing"] = rfq_stats.timing(r)              # ⏱ за скільки відповів, останній лист, листів
             r.tiers_text = rfq_compare.tiers_text(r.tiers)          # форма ✏️
             r.one_time_text = rfq_compare.one_time_text(r.one_time)
         try:
@@ -677,11 +679,45 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             copies=list(req.copies.order_by("-created_at").values("pk", "code", "status")[:10]),
             states=[s for s in SupplierRequestRecipient.STATES if s[0] != SupplierRequestRecipient.PLANNED],
             more=more, more_mail=sum(1 for s in more if s.f_email), events=events, quantities=rfq.parse_quantities(req.quantities),
-            cmp=cmp, qtys=cmp["qtys"], ncols=max(len(cmp["qtys"]), 1) + 6, stale=rfq_compare.stale(req),
+            cmp=cmp, qtys=cmp["qtys"], ncols=max(len(cmp["qtys"]), 1) + 7, stale=rfq_compare.stale(req),
+            st=rfq_stats.stats(req, cmp),
+            chat_url_json=_js(reverse("admin:suppliers_supplierrequest_chat", args=[req.pk, 0])),
+            colleagues=self._colleagues(),
             analysis_at=analysis_at,
             reparse=len(self._to_parse(req, False)), scope_choices=rfq_compare.SCOPE,
             planned=sum(1 for row in rows if row["recipient"].state in (SupplierRequestRecipient.PLANNED,
                                                                           SupplierRequestRecipient.FAILED))))
+
+    def _talk(self, request, req, r, do):
+        """💬 / ↪ — JSON: 🧭 Коротко (у фоні), відповідь у гілку, план і надсилання пересилання колезі."""
+        from suppliers.services import ai, jobs, rfq_talk
+        user = request.user
+        P = request.POST
+        try:
+            if do == "chat_brief":
+                if r is None:
+                    return JsonResponse({"error": "Немає постачальника."}, status=400)
+                model = ai.model_of(P.get("model"))
+
+                def run():
+                    rfq_talk.brief(req, r, user, model=model)
+                    return {"message": "🧭 Готово"}
+                return JsonResponse({"job": jobs.start(user, f"brief {r.pk}", run)})
+            if do == "chat_send":
+                if r is None:
+                    return JsonResponse({"error": "Немає постачальника."}, status=400)
+                out = rfq_talk.reply(req, r, user, P.get("to", ""), P.get("cc", ""), P.get("subject", ""),
+                                     P.get("body", ""), reply_pk=P.get("reply") if str(P.get("reply") or "").isdigit()
+                                     else None)
+                return JsonResponse(out)
+            rids = P.getlist("rid") or str(P.get("rids") or "").split(",")
+            if do == "forward_plan":
+                return JsonResponse(rfq_talk.forward_plan(req, rids, user))
+            out = rfq_talk.forward(req, rids, user, P.get("to", ""), P.get("cc", ""), P.get("subject", ""),
+                                   P.get("note", ""), P.getlist("part"))
+            return JsonResponse(out)
+        except (rfq_talk.TalkError, rfq.RFQError, ai.AIError) as e:
+            return JsonResponse({"error": str(e)}, status=400)
 
     @staticmethod
     def _to_parse(req, overwrite) -> list:
@@ -714,6 +750,23 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             "can_change": self.has_change_permission(request, req),
             "quantities": rfq.parse_quantities(req.quantities),
             "act": reverse("admin:suppliers_supplierrequest_action", args=[req.pk])})
+
+    def chat_view(self, request, pk, rid):
+        """💬 Вікно листування з одним постачальником: листи рядка (текст — лише з власних скриньок), кому
+        відповідати, «🧭 Коротко» (збережене), коротка історія."""
+        from suppliers.services import rfq_stats, rfq_talk
+        req = self._request(request, pk)
+        r = req.recipients.select_related("supplier", "contact", "reply_message__account", "sent_message__account") \
+            .filter(pk=rid).first()
+        if r is None:
+            raise Http404
+        items = rfq_talk.letters(r, request.user)
+        tm = rfq_stats.timing(r, [x["m"] for x in items])
+        return TemplateResponse(request, "admin/suppliers/_request_chat.html", {
+            "req": req, "r": r, "letters": items, "target": rfq_talk.target(req, r, items, request.user),
+            "history": rfq_talk.history(req, r, tm), "tm": tm, "brief": rfq_talk.brief_cached(request.user, r, items),
+            "hidden": sum(1 for x in items if not x["readable"]), "readable": sum(1 for x in items if x["readable"]),
+            "can_change": self.has_change_permission(request, req)})
 
     def action_view(self, request, pk):
         if request.method != "POST":
@@ -775,6 +828,8 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                         msg += " · не вдалося: " + "; ".join(failed)
                     return {"url": back, "message": msg}
                 return JsonResponse({"job": jobs.start(user, f"quotes {req.pk}", run, progress=True)})
+            elif do in ("chat_brief", "chat_send", "forward_plan", "forward_send"):
+                return self._talk(request, req, r, do)
             elif do == "compare_ai":
                 from suppliers.services import rfq_compare
                 model, user = ai.model_of(request.POST.get("model")), request.user

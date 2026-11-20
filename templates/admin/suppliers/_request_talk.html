@@ -1,0 +1,251 @@
+{# 💬 Вікно листування з постачальником і ↪ пересилання вибраних колезі — suppliers/services/rfq_talk.py #}
+{# Підключено внизу request_work.html (після spJob) #}
+<datalist id="rwc-colleagues">{% for c in colleagues %}<option value="{{ c.email }}">{{ c.name }}</option>{% endfor %}</datalist>
+
+<dialog id="rw-chat" class="rw-pv rwc-dlg" aria-labelledby="rw-chat-h">
+  <div class="rw-pv-head"><b id="rw-chat-h" translate="no">💬</b>
+    <span class="rwc-nav"><button type="button" class="button" data-chat-go="-1" title="Попередній постачальник">‹</button><button type="button" class="button" data-chat-go="1" title="Наступний постачальник">›</button>
+    <button type="button" class="button" data-chat-close aria-label="Закрити">✕</button></span></div>
+  <div id="rw-chat-body" class="rwc-body"></div>
+</dialog>
+
+<div class="rw-selbar" id="rw-selbar" hidden>
+  <b id="rw-sel-n"></b>
+  <button type="button" class="button default" id="rw-fwd-btn" title="Таблиця пропозицій, листування й файли вибраних постачальників — одним листом колезі">↪ Переслати колезі</button>
+  <button type="button" class="button" id="rw-sel-none">✕ Зняти вибір</button>
+</div>
+
+{% if can_change %}
+<dialog id="rw-fwd" class="rw-pv" aria-labelledby="rw-fwd-h">
+  <div class="rw-pv-head"><b id="rw-fwd-h">↪ Переслати колезі</b><button type="button" class="button" data-fwd-close aria-label="Закрити">✕</button></div>
+  <form id="rw-fwd-form" class="rw-pv-mail" autocomplete="off">
+    <div class="rwc-to">
+      <label>Кому <input name="to" list="rwc-colleagues" placeholder="колега@фірма" required></label>
+      <label>Копія <input name="cc" list="rwc-colleagues"></label>
+    </div>
+    <label class="rwc-subjf">Тема <input name="subject" translate="no"></label>
+    <label class="rwc-subjf">Коментар <textarea name="note" rows="3" placeholder="Напр.: Глянь, будь ласка, пропозиції — кого беремо?"></textarea></label>
+    <div class="rw-fwd-parts">
+      <label><input type="checkbox" name="part" value="table" checked> 📊 Таблиця пропозицій (ціни за кількістю, умови)</label>
+      <label><input type="checkbox" name="part" value="mail" checked> ✉️ Листування з кожним (лише з ваших скриньок)</label>
+      <label><input type="checkbox" name="part" value="files" checked> 📎 Файли постачальників <span class="spf-muted" id="rw-fwd-mb"></span></label>
+    </div>
+    <div id="rw-fwd-plan" class="rw-fwd-plan"></div>
+  </form>
+  <div class="rw-pv-foot"><span class="spf-muted" id="rw-fwd-note"></span>
+    <button type="button" class="button" data-fwd-close>Скасувати</button>
+    <button type="button" class="button default" id="rw-fwd-send">📤 Надіслати</button></div>
+</dialog>
+{% endif %}
+
+<style>
+  .rw-cmp .rw-n { white-space: nowrap; width: 1%; color: var(--text-muted, #888); }
+  .rw-cmp .rw-n label { cursor: pointer; display: inline-flex; gap: 4px; align-items: center; }
+  .rw-cmp tr.rw-picked > td { background: rgba(91, 141, 239, .12) !important; }
+  .rw-after { color: var(--text-muted, #888); }
+  .rw-sup { font-size: 11px; }
+  .rw-sup.bad { color: var(--error-fg, #c62828); font-weight: 600; }
+  .rw-chat-btn { white-space: nowrap; }
+  .rw-stats { margin: 6px 0 10px; }
+  .rw-stats > summary { cursor: pointer; }
+  .rw-st-tiles { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+  .rw-st { border: 1px solid var(--border-strong, #ddd); border-radius: 8px; padding: 6px 10px; min-width: 92px; display: flex; flex-direction: column; }
+  .rw-st b { font-size: 20px; line-height: 1.2; }
+  .rw-st span { font-size: 12px; color: var(--text-muted, #888); }
+  .rw-st small { font-size: 11px; }
+  .rw-st-wide { min-width: 200px; }
+  .rw-st-warn { border-color: var(--message-warning-bg, #e0a800); }
+  .rw-st-prices { width: auto; }
+  .rw-selbar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 1001; display: flex; gap: 10px; align-items: center; padding: 8px 14px; border-radius: 10px; background: var(--body-bg, #fff); border: 1px solid var(--border-strong, #ccc); box-shadow: 0 4px 18px rgba(0, 0, 0, .25); }
+  .rw-selbar[hidden] { display: none; }
+  .rwc-dlg { width: min(1180px, 97vw); height: 90vh; display: none; flex-direction: column; }
+  .rwc-dlg[open] { display: flex; }
+  .rwc-nav { display: inline-flex; gap: 6px; }
+  .rwc-body { flex: 1; min-height: 0; }
+  .rwc { display: flex; height: 100%; min-height: 0; }
+  .rwc-main { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--border-strong, #ddd); }
+  .rwc-list { flex: 1; overflow: auto; padding: 10px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .rwc-msg { max-width: 82%; align-self: flex-start; border: 1px solid var(--border-strong, #ddd); border-radius: 10px; padding: 8px 12px; background: rgba(76, 175, 80, .07); }
+  .rwc-msg.ours { align-self: flex-end; background: rgba(91, 141, 239, .10); }
+  .rwc-msg.locked { opacity: .7; }
+  .rwc-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; font-size: 12px; }
+  .rwc-subj { font-weight: 600; margin-top: 2px; }
+  .rwc-text { white-space: pre-wrap; margin-top: 4px; font-size: 13px; overflow-wrap: anywhere; }
+  .rwc-files { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .rwc-reply { border-top: 1px solid var(--border-strong, #ddd); padding: 8px 14px; display: flex; flex-direction: column; gap: 6px; }
+  .rwc-to { display: flex; flex-wrap: wrap; gap: 8px; }
+  .rwc-to label, .rwc-subjf { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+  .rwc-to label { flex: 1 1 260px; }
+  .rwc-subjf { flex: none; }
+  .rwc-to input, .rwc-subjf input, .rwc-subjf textarea { flex: 1; min-width: 0; }
+  .rwc-reply textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+  .rwc-act { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+  .rwc-act > .spf-muted:first-child { margin-right: auto; font-size: 12px; }
+  .rwc-side { flex: 0 0 320px; overflow: auto; padding: 10px 14px; display: flex; flex-direction: column; gap: 14px; font-size: 13px; }
+  .rwc-h2 { font-weight: 700; margin-bottom: 4px; }
+  .rwc-k { font-weight: 600; margin-top: 8px; }
+  .rwc-side ul { margin: 2px 0 0 18px; padding: 0; }
+  .rwc-status { margin-bottom: 4px; }
+  .rwc-row { display: flex; gap: 6px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .rwc-small { font-size: 11px; margin-top: 6px; }
+  .rwc-hist { margin: 3px 0; }
+  .rw-fwd-parts { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+  .rw-fwd-plan { font-size: 13px; }
+  .rw-fwd-plan table { width: 100%; }
+  @media (max-width: 860px) {
+    .rwc { flex-direction: column; overflow: auto; }
+    .rwc-main { border-right: 0; flex: none; }
+    .rwc-list { max-height: 55vh; }
+    .rwc-side { flex: none; border-top: 1px solid var(--border-strong, #ddd); }
+    .rwc-msg { max-width: 94%; }
+  }
+</style>
+<script>
+(function(){
+  var act = {{ act_json|safe }}, chatUrl = {{ chat_url_json|safe }};
+  function csrf(){ var i = document.querySelector('input[name=csrfmiddlewaretoken]'); if (i) return i.value;
+    var m = document.cookie.match(/csrftoken=([^;]+)/); return m ? m[1] : ''; }
+  function post(data) {
+    var fd = new FormData();
+    Object.keys(data).forEach(function(k){ [].concat(data[k]).forEach(function(v){ fd.append(k, v); }); });
+    return fetch(act, {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-CSRFToken': csrf()}})
+      .then(function(r){ return r.json(); });
+  }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+  /* ── 💬 листування з одним постачальником ── */
+  var dlg = document.getElementById('rw-chat'), body = document.getElementById('rw-chat-body'),
+      head = document.getElementById('rw-chat-h'), cur = 0, seq = 0;
+  function rows() { return Array.prototype.map.call(document.querySelectorAll('[data-rw-chat]'), function(b){ return b.getAttribute('data-rw-chat'); }); }
+  function load(rid, keepDraft) {
+    var my = ++seq, draft = '';
+    var ta = body.querySelector('#rwc-reply textarea');
+    if (keepDraft && ta) draft = ta.value;
+    cur = Number(rid);
+    var b = document.querySelector('[data-rw-chat="' + rid + '"]');
+    head.textContent = '💬 ' + (b ? b.getAttribute('data-name') : '');
+    if (!keepDraft) body.innerHTML = '<div class="spf-muted" style="padding:20px">⏳ Завантажую…</div>';
+    return fetch(chatUrl.replace('/0/chat/', '/' + rid + '/chat/'), {credentials: 'same-origin'})
+      .then(function(r){ if (!r.ok) throw r; return r.text(); })
+      .then(function(html){
+        if (my !== seq) return;
+        body.innerHTML = html;
+        var list = body.querySelector('#rwc-list'); if (list) list.scrollTop = list.scrollHeight;   // найновіші внизу
+        var t2 = body.querySelector('#rwc-reply textarea'); if (t2 && draft) t2.value = draft;
+        bind(rid);
+      })
+      .catch(function(){ if (my === seq) body.innerHTML = '<div class="spf-bad" style="padding:20px">⚠️ Не вдалося завантажити.</div>'; });
+  }
+  function bind(rid) {
+    var form = body.querySelector('#rwc-reply');
+    var dbtn = body.querySelector('[data-rwc-draft]');
+    if (dbtn) dbtn.addEventListener('click', function(){
+      var ta = form && form.querySelector('textarea'), src = body.querySelector('#rwc-draft');
+      if (!ta || !src) return;
+      if (ta.value.trim() && !confirm('Замінити написане чернеткою AI?')) return;
+      ta.value = src.value; ta.focus();
+    });
+    var bb = body.querySelector('[data-rwc-brief]');
+    if (bb) bb.addEventListener('click', function(){
+      bb.disabled = true;
+      var m = document.getElementById('rw-model');
+      spJob(act, {do: 'chat_brief', rid: rid, model: m ? m.value : ''}, body.querySelector('#rwc-brief-job'),
+            function(){ load(rid, true); });
+    });
+    if (!form) return;
+    var ta = form.querySelector('textarea');
+    ta.addEventListener('keydown', function(e){ if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); form.requestSubmit(); } });
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      var job = form.querySelector('#rwc-job'), btn = form.querySelector('button[type=submit]');
+      var to = form.elements.to.value.trim();
+      if (!ta.value.trim()) { job.textContent = 'Порожній лист.'; return; }
+      if (!confirm('Надіслати лист → ' + to + '?')) return;
+      btn.disabled = true; job.textContent = '⏳ Надсилаю…';
+      post({do: 'chat_send', rid: rid, to: to, cc: form.elements.cc.value, subject: form.elements.subject.value,
+            body: ta.value, reply: form.elements.reply.value}).then(function(j){
+        if (j.error) { job.textContent = '⚠️ ' + j.error; btn.disabled = false; return; }
+        changed = true;
+        load(rid).then(function(){ var j2 = body.querySelector('#rwc-job'); if (j2) j2.textContent = '✓ Надіслано → ' + j.to.join(', '); });
+      }).catch(function(){ job.textContent = '⚠️ Немає зв’язку'; btn.disabled = false; });
+    });
+  }
+  var changed = false;
+  if (dlg && typeof dlg.showModal === 'function') {
+    document.querySelectorAll('[data-rw-chat]').forEach(function(b){
+      b.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); dlg.showModal(); load(b.getAttribute('data-rw-chat')); });
+    });
+    dlg.querySelectorAll('[data-chat-close]').forEach(function(b){ b.addEventListener('click', function(){ dlg.close(); }); });
+    dlg.querySelectorAll('[data-chat-go]').forEach(function(b){ b.addEventListener('click', function(){
+      var list = rows(), i = list.indexOf(String(cur)); if (i < 0) return;
+      var ta = body.querySelector('#rwc-reply textarea');
+      if (ta && ta.value.trim() && !confirm('Написане не надіслано — перейти до іншого постачальника?')) return;
+      load(list[(i + Number(b.getAttribute('data-chat-go')) + list.length) % list.length]);
+    }); });
+    dlg.addEventListener('cancel', function(e){
+      var ta = body.querySelector('#rwc-reply textarea');
+      if (ta && ta.value.trim() && !confirm('Написане не надіслано — закрити?')) e.preventDefault();
+    });
+    dlg.addEventListener('close', function(){ if (changed) location.reload(); });
+  }
+
+  /* ── ☑ вибір рядків і ↪ переслати колезі ── */
+  var bar = document.getElementById('rw-selbar'), all = document.getElementById('rw-all');
+  function picked() { return Array.prototype.filter.call(document.querySelectorAll('.rw-pick'), function(c){ return c.checked; }); }
+  function sync() {
+    var p = picked();
+    document.querySelectorAll('.rw-pick').forEach(function(c){ var tr = c.closest('tr'); if (tr) tr.classList.toggle('rw-picked', c.checked); });
+    bar.hidden = !p.length;
+    document.getElementById('rw-sel-n').textContent = 'Вибрано: ' + p.length;
+    if (all) { var n = document.querySelectorAll('.rw-pick').length; all.checked = p.length === n && n > 0; all.indeterminate = p.length > 0 && p.length < n; }
+    try { sessionStorage.setItem('rw-pick-{{ req.pk }}', p.map(function(c){ return c.value; }).join(',')); } catch (e) {}
+  }
+  document.querySelectorAll('.rw-pick').forEach(function(c){ c.addEventListener('change', sync); });
+  if (all) all.addEventListener('change', function(){ document.querySelectorAll('.rw-pick').forEach(function(c){ c.checked = all.checked; }); sync(); });
+  document.getElementById('rw-sel-none').addEventListener('click', function(){ document.querySelectorAll('.rw-pick').forEach(function(c){ c.checked = false; }); sync(); });
+  try { var keep = (sessionStorage.getItem('rw-pick-{{ req.pk }}') || '').split(',');
+    document.querySelectorAll('.rw-pick').forEach(function(c){ if (keep.indexOf(c.value) >= 0) c.checked = true; }); } catch (e) {}
+  sync();
+
+  var fwd = document.getElementById('rw-fwd'), fbtn = document.getElementById('rw-fwd-btn');
+  if (!fwd || typeof fwd.showModal !== 'function') { if (fbtn) fbtn.hidden = true; return; }
+  var form = document.getElementById('rw-fwd-form'), plan = document.getElementById('rw-fwd-plan'),
+      note = document.getElementById('rw-fwd-note'), send = document.getElementById('rw-fwd-send');
+  function ids() { return picked().map(function(c){ return c.value; }); }
+  fbtn.addEventListener('click', function(){
+    plan.innerHTML = ''; note.textContent = '⏳ Складаю…'; send.disabled = true;
+    fwd.showModal();
+    post({do: 'forward_plan', rid: ids()}).then(function(j){
+      if (j.error) { note.textContent = '⚠️ ' + j.error; return; }
+      if (!form.elements.subject.value) form.elements.subject.value = j.subject;
+      document.getElementById('rw-fwd-mb').textContent = j.files.length ? '(' + j.files.length + ' · ' + j.attach_mb + ' MB)' : '—';
+      var t = el('table', 'spf-table'), h = el('tr');
+      ['Постачальник', 'Листів', 'Файлів'].forEach(function(x){ h.appendChild(el('th', null, x)); }); t.appendChild(h);
+      j.rows.forEach(function(r){
+        var tr = el('tr'), n = el('td', null, r.name); n.setAttribute('translate', 'no'); tr.appendChild(n);
+        tr.appendChild(el('td', null, r.letters + (r.hidden ? ' + 🔒 ' + r.hidden : '')));
+        tr.appendChild(el('td', null, String(r.files))); t.appendChild(tr);
+      });
+      plan.appendChild(t);
+      if (j.rows.some(function(r){ return r.hidden; })) plan.appendChild(el('div', 'spf-muted', '🔒 Листи зі скриньок колег не пересилаються.'));
+      var left = j.files.filter(function(f){ return !f.attach; });
+      if (left.length) plan.appendChild(el('div', 'spf-warn', '📎 Не влізуть у лист (разом понад ліміт) — підуть лише назвами: ' + left.map(function(f){ return f.name; }).join(', ')));
+      note.textContent = 'Піде одним листом з вашої скриньки, з підписом.'; send.disabled = false;
+      form.elements.to.focus();
+    }).catch(function(){ note.textContent = '⚠️ Немає зв’язку'; });
+  });
+  fwd.querySelectorAll('[data-fwd-close]').forEach(function(b){ b.addEventListener('click', function(){ fwd.close(); }); });
+  send.addEventListener('click', function(){
+    if (!form.reportValidity()) return;
+    send.disabled = true; note.textContent = '⏳ Надсилаю…';
+    var parts = Array.prototype.filter.call(form.querySelectorAll('input[name=part]'), function(c){ return c.checked; }).map(function(c){ return c.value; });
+    post({do: 'forward_send', rid: ids(), to: form.elements.to.value, cc: form.elements.cc.value,
+          subject: form.elements.subject.value, note: form.elements.note.value, part: parts}).then(function(j){
+      if (j.error) { note.textContent = '⚠️ ' + j.error; send.disabled = false; return; }
+      note.textContent = '✓ Переслано → ' + j.to.join(', ');
+      try { sessionStorage.removeItem('rw-pick-{{ req.pk }}'); } catch (e) {}      // переслано — вибір знято
+      setTimeout(function(){ fwd.close(); location.reload(); }, 1400);
+    }).catch(function(){ note.textContent = '⚠️ Немає зв’язку'; send.disabled = false; });
+  });
+})();
+</script>

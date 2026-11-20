@@ -693,14 +693,18 @@ def evaluate(supplier, user, scan_result: dict, purchases: dict | None = None, m
 
 
 QUOTE_JSON = (
-    '{"declined": false, "currency": "USD", "tiers": [{"qty": 100, "unit_price": 1.23, "lead_days": 14}], '
+    '{"declined": false, "currency": "USD", "tiers": [{"qty": 100, "unit_price": 1.23, "total": 153.0, '
+    '"total_has_one_time": true, "lead_days": 14}], '
     '"one_time": [{"name": "Stencil", "amount": 30, "qty": null}], "includes": ["pcb", "assembly", "components"], '
     '"lead_days": 0, "shipping": null, "valid_until": "YYYY-MM-DD або порожньо", "moq": null, '
     '"conditions": "оплата, Incoterms, що не входить", '
     '"questions": ["що постачальник уточнює в нас"], "summary": "1–2 речення українською"}')
 QUOTE_RULES = (
     " Ціни — рівно як у даних, валюта як у постачальника. tiers.unit_price — ціна за 1 шт. БЕЗ разових витрат; "
-    "постачальник дав лише суму за партію — unit_price = (сума − разові витрати цієї партії) ÷ кількість; разові вже "
+    "постачальник дав лише суму за партію — unit_price = (сума − разові витрати цієї партії) ÷ кількість; "
+    "tiers.total — сума за цю кількість рівно так, як її написав постачальник (null — якщо суми не назвав), "
+    "total_has_one_time — чи входять у цю суму разові витрати з one_time (трафарет, NRE…); ціну за шт. Minerva "
+    "перевірить за сумою сама. Разові вже "
     "розкладені в ціну за шт. і окремо не названі — лиши як є. one_time — разові витрати за замовлення, не за шт. "
     "(NRE, трафарет / stencil, оснастка / fixture / test jig, налаштування / setup, програмування, інженерія), сума "
     "у тій самій валюті; qty — лише якщо ця витрата стосується тільки однієї кількості, інакше null. includes — що "
@@ -779,25 +783,12 @@ def quote(recipient, user=None, model=DEFAULT_MODEL) -> dict:
     text, price = call(system, f"{asked}\n<<<ДАНІ\n" + "\n\n".join(parts)[:60000] + "\nДАНІ>>>",
                        model=model_of(model), user=user, effort="low", max_tokens=6000)
     data = parse_json(text)
-    tiers = []
-    for t in data.get("tiers") or []:
-        if not isinstance(t, dict):
-            continue
-        try:
-            qty = int(Decimal(str(t.get("qty"))))
-            unit = Decimal(str(t.get("unit_price"))) if t.get("unit_price") not in (None, "") else None
-        except Exception:  # noqa: BLE001
-            continue
-        if qty > 0 and unit is not None and unit >= 0:
-            tier = {"qty": qty, "unit_price": str(unit.quantize(Decimal("0.0001")))}
-            if isinstance(t.get("lead_days"), int) and 0 <= t["lead_days"] <= 1000:
-                tier["lead_days"] = t["lead_days"]
-            tiers.append(tier)
     from suppliers.services import rfq_compare
+    one_time = rfq_compare.clean_one_time(data.get("one_time") if isinstance(data.get("one_time"), list) else [])
+    tiers = [t for t in (tier_from_ai(t, one_time) for t in (data.get("tiers") or [])) if t]
     out = {"v": 2, "declined": bool(data.get("declined")), "currency": _s(data.get("currency"), 3).upper(),
            "tiers": sorted(tiers, key=lambda t: t["qty"])[:10],
-           "one_time": rfq_compare.clean_one_time(data.get("one_time") if isinstance(data.get("one_time"), list)
-                                                  else []),
+           "one_time": one_time,
            "includes": rfq_compare.clean_includes(data.get("includes") if isinstance(data.get("includes"), list)
                                                   else []),
            "at": timezone.now().isoformat(),
@@ -809,6 +800,88 @@ def quote(recipient, user=None, model=DEFAULT_MODEL) -> dict:
            if isinstance(data.get("questions"), list) else [],
            "summary": _s(data.get("summary"), 400), "cost_usd": float(price), "model": model_of(model)}
     return out
+
+
+BRIEF_JSON = ('{"status": "одне речення: де ми зараз з цим постачальником", '
+              '"they_ask": ["що постачальник питає / просить у нас"], '
+              '"they_promised": ["що пообіцяв постачальник (з датою чи строком, якщо є)"], '
+              '"we_promised": ["що пообіцяли ми"], "to_answer": ["на що нам треба відповісти або що зробити"], '
+              '"lang": "мова останніх листів постачальника: en / de / uk / …", '
+              '"draft": "чернетка нашої відповіді мовою листування, з привітанням і прощанням, без підпису"}')
+
+
+def chat_brief(req, r, letters, offer="", user=None, model=None) -> dict:
+    """🧭 Коротко про листування з постачальником запиту: про що питають, що обіцяли вони / ми, на що відповісти,
+    чернетка відповіді. letters — rfq_talk.letters (лише ті, які людина бачить), найстаріший першим."""
+    model = model_of(model)
+    parts = []
+    for x in letters:
+        head = "📤 НАШ лист" if x["ours"] else "📥 Лист постачальника"
+        files = (" · вкладення: " + ", ".join(f["name"] for f in x["files"])) if x["files"] else ""
+        when = f"{x['at']:%Y-%m-%d %H:%M}" if x["at"] else ""
+        parts.append(f"{head} {when} від {x['email']}{files}\nТема: {x['subject']}\n{x['text'][:3000]}")
+    asked = (f"Наш запит {req.code}: {req.title}\nКількості: {req.quantities or '—'}\nПостачальник: "
+             f"{r.supplier.name}\n" + (f"Його ціни в Minerva: {offer}\n" if offer else "") +
+             f"Сьогодні: {timezone_now():%Y-%m-%d}")
+    system = ("Ти допомагаєш менеджеру закупівель швидко відповісти постачальнику на наш запит пропозиції (RFQ). " +
+              DATA_NOTE + " Пункти — коротко (до 20 слів), українською, лише з листів; нічого не вигадуй; порожньо — []. "
+              "they_ask — питання й прохання постачальника до нас, на які ще НЕ відповіли наші пізніші листи. "
+              "to_answer — що нам зробити: відповісти на питання, підтвердити, надіслати файли, вирішити. "
+              "draft — відповідь на останній лист постачальника мовою його листів: відповідає на питання, які "
+              "можна закрити з даних (наш запит, наші листи); де потрібне рішення людини (ціна, строк, кількість, "
+              "файли) — [у квадратних дужках, що вписати]; без вигаданих цифр і обіцянок; без підпису. "
+              "Відповідай лише JSON: " + BRIEF_JSON)
+    text, price = call(system, asked + "\n<<<ДАНІ\n" + "\n\n".join(parts)[:40000] + "\nДАНІ>>>", model=model,
+                       user=user, effort="low", max_tokens=4000)
+    data = parse_json(text)
+
+    def items(key):
+        v = data.get(key)
+        return [_s(x, 300) for x in v if _s(x)][:8] if isinstance(v, list) else []
+    return {"status": _s(data.get("status"), 400), "they_ask": items("they_ask"),
+            "they_promised": items("they_promised"), "we_promised": items("we_promised"),
+            "to_answer": items("to_answer"), "lang": _s(data.get("lang"), 8),
+            "draft": str(data.get("draft") or "").strip()[:6000], "cost_usd": float(price)}
+
+
+def timezone_now():
+    from django.utils import timezone
+    return timezone.localtime()
+
+
+SUM_TOLERANCE = Decimal("0.005")      # ціна за шт. від AI відрізняється від суми постачальника більше — рахуємо з суми
+
+
+def tier_from_ai(t, one_time) -> dict:
+    """Ступінь ціни з відповіді AI. Є сума постачальника (total) — ціну за шт. рахує Minerva:
+    (сума − разові цієї кількості, якщо вони в сумі) ÷ кількість; AI помилився в арифметиці (напр. не відняв
+    трафарет, хоч написав, що відняв) — виправляємо й позначаємо fixed. None — не ступінь."""
+    if not isinstance(t, dict):
+        return None
+    try:
+        qty = int(Decimal(str(t.get("qty"))))
+        unit = Decimal(str(t.get("unit_price"))) if t.get("unit_price") not in (None, "") else None
+        total = Decimal(str(t.get("total"))) if t.get("total") not in (None, "", 0) else None
+    except Exception:  # noqa: BLE001
+        return None
+    if qty <= 0:
+        return None
+    tier = {"qty": qty}
+    if total is not None and total.is_finite() and total > 0:
+        with_ot = bool(t.get("total_has_one_time"))
+        ot = sum((Decimal(str(it["amount"])) for it in one_time if not it.get("qty") or it["qty"] == qty), Decimal(0))
+        calc = ((total - ot) if with_ot and ot < total else total) / qty
+        if unit is None or unit < 0 or abs(calc - unit) > calc * SUM_TOLERANCE:
+            tier["fixed"] = True
+            unit = calc
+        tier["total"] = str(total.quantize(Decimal("0.01")))
+        tier["total_ot"] = with_ot
+    if unit is None or unit < 0:
+        return None
+    tier["unit_price"] = str(unit.quantize(Decimal("0.0001")))
+    if isinstance(t.get("lead_days"), int) and 0 <= t["lead_days"] <= 1000:
+        tier["lead_days"] = t["lead_days"]
+    return tier
 
 
 def compare(request, user=None, model=DEFAULT_MODEL) -> dict:

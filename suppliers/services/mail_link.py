@@ -50,9 +50,9 @@ def for_messages(emails, thread, user) -> list:
     if user.has_perm("suppliers.view_supplierrequest"):
         pks = [m.pk for m in emails]
         cond = Q(reply_message_id__in=pks) | Q(sent_message_id__in=pks)
-        if thread is not None:
-            cond |= Q(thread_id=thread.pk)
-        for r in R.objects.filter(cond).select_related("request").order_by("-request__created_at")[:10]:
+        if thread is not None:      # гілка запиту і гілки, прив'язані пізніше (відповідь окремим листом, з іншої адреси)
+            cond |= Q(thread_id=thread.pk) | Q(extra_threads=thread.pk)
+        for r in R.objects.filter(cond).select_related("request").distinct().order_by("-request__created_at")[:10]:
             found.setdefault(r.supplier_id, ("запит постачальнику в цій гілці", r.email))
             rfq.setdefault(r.supplier_id, []).append({
                 "code": r.request.code, "title": r.request.title,

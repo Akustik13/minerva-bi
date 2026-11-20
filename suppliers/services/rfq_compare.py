@@ -183,7 +183,9 @@ def _tiers(r, qtys) -> list:
             continue
         if qty > 0 and unit is not None:
             lead = t.get("lead_days")
-            out.append({"qty": qty, "unit": unit, "lead": lead if isinstance(lead, int) and lead >= 0 else None})
+            out.append({"qty": qty, "unit": unit, "lead": lead if isinstance(lead, int) and lead >= 0 else None,
+                        # 💶 сума, як її написав постачальник (AI), і чи в ній разові — для перевірки «разом»
+                        "total": dec(t.get("total")), "total_ot": bool(t.get("total_ot")), "fixed": bool(t.get("fixed"))})
     if not out and (r.price is not None or r.total is not None):    # лише «ціна за шт.» / «сума» — на першу кількість
         q = qtys[0] if qtys else 1
         unit = r.price if r.price is not None else (r.total / q)
@@ -241,6 +243,13 @@ def table(req) -> dict:
                 cell["total_home"] = (total * rate).quantize(CENT, ROUND_HALF_UP)
                 cell["eff_home_text"] = price(cell["eff_home"])
                 cell["total_home_text"] = money(cell["total_home"])
+            if t.get("total") is not None and cell["exact"]:
+                # у постачальника «разом» — з разовими чи без; наше «разом» — завжди з ними
+                theirs = t["total"] if t["total_ot"] else t["total"] + ot
+                cell["sup_total_text"] = money(t["total"])
+                cell["sup_total_ot"] = t["total_ot"]
+                cell["sum_mismatch"] = abs(theirs - total) > max(CENT, total * Decimal("0.01"))
+                cell["fixed"] = t["fixed"]
             if not cell["exact"]:
                 approx.append(f"ціна на {t['qty']} шт замість {q}")
             cells.append(cell)
