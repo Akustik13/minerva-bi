@@ -1775,6 +1775,7 @@
 {"uk": "Kundennummer дубліката переходить, лише якщо в основного її ще немає (інакше лишається без клієнта)", "en": "The duplicate's Kundennummer is transferred only if the primary customer does not have one yet (otherwise it stays without a customer)", "de": "Die Kundennummer des Duplikats wird nur übernommen, wenn der Hauptkunde noch keine hat (sonst bleibt sie ohne Kunden)"}
 {"uk": "Kundennummer і номери документів", "en": "Kundennummer and document numbers", "de": "Kundennummer und Dokumentnummern"}
 {"uk": "Kundennummer — перший номер", "en": "Kundennummer — first number", "de": "Kundennummer – erste Nummer"}
+{"uk": "L — 15…35 л", "en": "L — 15…35 l", "de": "L — 15…35 l"}
 {"uk": "LC, SAW, BAW, Cavity, Bandpass, Lowpass тощо", "en": "LC, SAW, BAW, Cavity, Bandpass, Lowpass, etc.", "de": "LC, SAW, BAW, Cavity, Bandpass, Lowpass usw."}
 {"uk": "LC, SAW, BAW, Cavity, Diplexer, Bandpass тощо", "en": "LC, SAW, BAW, Cavity, Diplexer, Bandpass, etc.", "de": "LC, SAW, BAW, Cavity, Diplexer, Bandpass usw."}
 {"uk": "LLM · tool use · AI аналіз", "en": "LLM · tool use · AI analysis", "de": "LLM · Tool-Nutzung · KI-Analyse"}
@@ -1785,6 +1786,7 @@
 {"uk": "Lifecycle статус не вказаний", "en": "Lifecycle status not specified", "de": "Lifecycle-Status nicht angegeben"}
 {"uk": "Linear (лінійна), Circular (кругова) тощо", "en": "Linear, Circular, etc.", "de": "Linear, Circular (zirkular) usw."}
 {"uk": "Lobby / Лобі", "en": "Lobby / Lobby", "de": "Lobby / Lobby"}
+{"uk": "M — 5…15 л", "en": "M — 5…15 l", "de": "M — 5…15 l"}
 {"uk": "MCP-клієнт", "en": "MCP client", "de": "MCP-Client"}
 {"uk": "MINERVA BI — КАРТА МОДУЛІВ", "en": "MINERVA BI — MODULE MAP", "de": "MINERVA BI — MODULÜBERSICHT"}
 {"uk": "MINERVA · ПІДТВЕРДЖЕННЯ", "en": "MINERVA · CONFIRMATION", "de": "MINERVA · BESTÄTIGUNG"}
@@ -2231,6 +2233,7 @@
 {"uk": "R≥3, F≥3 — Постійні покупці.", "en": "R≥3, F≥3 — Loyal buyers.", "de": "R≥3, F≥3 — Stammkäufer."}
 {"uk": "R≥4 — Нові активні, потенціал росту.", "en": "R≥4 — New active customers, growth potential.", "de": "R≥4 — Neue aktive Kunden, Wachstumspotenzial."}
 {"uk": "R≥4, F≥4, M≥4 — Найкращі клієнти.", "en": "R≥4, F≥4, M≥4 — Best customers.", "de": "R≥4, F≥4, M≥4 — Beste Kunden."}
+{"uk": "S — 1…5 л", "en": "S — 1…5 l", "de": "S — 1…5 l"}
 {"uk": "SHA-1 напису", "en": "SHA-1 of the text", "de": "SHA-1 des Textes"}
 {"uk": "SHA256 файлу — один і той самий файл не буде імпортовано двічі.", "en": "File SHA256 — the same file will not be imported twice.", "de": "SHA256 der Datei — dieselbe Datei wird nicht zweimal importiert."}
 {"uk": "SIGHUP надіслано до PID 1. Воркери перезавантажуються (~5–10 с).", "en": "SIGHUP sent to PID 1. Workers are restarting (~5–10 s).", "de": "SIGHUP an PID 1 gesendet. Worker werden neu gestartet (~5–10 s)."}
@@ -2519,6 +2522,8 @@
 {"uk": "Workers перезапущено!", "en": "Workers restarted!", "de": "Worker wurden neu gestartet!"}
 {"uk": "Workflow Builder — серії контактів (email, дзвінок, пауза, рішення). 4 шаблони: Реактивація, Нарощування, VIP, Онбординг. Canvas-схема прогресу.", "en": "Workflow Builder — contact sequences (email, call, pause, decision). 4 templates: Reactivation, Build-up, VIP, Onboarding. Canvas progress diagram.", "de": "Workflow Builder — Kontaktserien (E-Mail, Anruf, Pause, Entscheidung). 4 Vorlagen: Reaktivierung, Ausbau, VIP, Onboarding. Canvas-Fortschrittsdiagramm."}
 {"uk": "X-DIGIKEY-Account-Id (з діагностики API або DigiKey підтримки)", "en": "X-DIGIKEY-Account-Id (from API diagnostics or DigiKey support)", "de": "X-DIGIKEY-Account-Id (aus der API-Diagnose oder vom DigiKey-Support)"}
+{"uk": "XL — від 35 л", "en": "XL — from 35 l", "de": "XL — ab 35 l"}
+{"uk": "XS — до 1 л", "en": "XS — up to 1 l", "de": "XS — bis 1 l"}
 {"uk": "YYYY-MM-DD або DD.MM.YYYY. Числа — крапка або кома як роздільник.", "en": "YYYY-MM-DD or DD.MM.YYYY. Numbers — a dot or a comma as the separator.", "de": "YYYY-MM-DD oder DD.MM.YYYY. Zahlen — Punkt oder Komma als Trennzeichen."}
 {"uk": "YYYY-MM-DD — очікувана доставка", "en": "YYYY-MM-DD — expected delivery", "de": "JJJJ-MM-TT — erwartete Zustellung"}
 {"uk": "YYYY-MM-DD; порожньо — +7 днів", "en": "YYYY-MM-DD; empty — +7 days", "de": "YYYY-MM-DD; leer — +7 Tage"}
@@ -7366,6 +7371,8 @@
 {"uk": "Друкувати вибране", "en": "Print selected", "de": "Auswahl drucken"}
 {"uk": "Друкувати на DYMO", "en": "Print on DYMO", "de": "Auf DYMO drucken"}
 {"uk": "Друкувати на DYMO (служба DYMO Connect на цьому ПК)", "en": "Print on DYMO (DYMO Connect service on this PC)", "de": "Auf DYMO drucken (Dienst DYMO Connect auf diesem PC)"}
+{"uk": "Друкувати наклейки коробок", "en": "Print box labels", "de": "Kartonetiketten drucken"}
+{"uk": "Друкувати наклейку", "en": "Print label", "de": "Etikett drucken"}
 {"uk": "Друкувати рядок Digi-Key P/N", "en": "Print the Digi-Key P/N line", "de": "Zeile Digi-Key P/N drucken"}
 {"uk": "Друкувати файл з бази на DYMO", "en": "Print the file from the database on DYMO", "de": "Datei aus der Datenbank auf DYMO drucken"}
 {"uk": "Друкувати цей файл одразу на DYMO · правий клік — меню", "en": "Print this file straight to DYMO · right-click — menu", "de": "Diese Datei direkt auf DYMO drucken · Rechtsklick — Menü"}
@@ -7735,6 +7742,7 @@
 {"uk": "Завантажити листи з IMAP і додати в хронологію клієнтів (per-user)", "en": "Download e-mails from IMAP and add them to the customer timeline (per-user)", "de": "E-Mails per IMAP herunterladen und zum Kundenverlauf hinzufügen (per-user)"}
 {"uk": "Завантажити на ПК", "en": "Download to PC", "de": "Auf PC herunterladen"}
 {"uk": "Завантажити на сервер", "en": "Upload to the server", "de": "Auf den Server hochladen"}
+{"uk": "Завантажити наклейку коробки", "en": "Download box label", "de": "Kartonetikett herunterladen"}
 {"uk": "Завантажити новий шаблон (.docx)", "en": "Upload new template (.docx)", "de": "Neue Vorlage hochladen (.docx)"}
 {"uk": "Завантажити поточний шаблон", "en": "Download current template", "de": "Aktuelle Vorlage herunterladen"}
 {"uk": "Завантажити поточні значення як .json файл на ПК", "en": "Download the current values as a .json file to your PC", "de": "Aktuelle Werte als .json-Datei auf den PC herunterladen"}
@@ -8221,6 +8229,7 @@
 {"uk": "Записати в поле «Наступна дія»", "en": "Write to the “Next action” field", "de": "In das Feld „Nächste Aktion“ eintragen"}
 {"uk": "Записати введену «Вагу/шт» у картки товарів, де ваги ще немає.", "en": "Write the entered “Weight/pc” to product cards that have no weight yet.", "de": "Eingegebenes „Gewicht/Stk.“ in die Artikelkarten schreiben, die noch kein Gewicht haben."}
 {"uk": "Записати введену «Вагу/шт» у картки товарів, де ваги ще немає. Наявну вагу не перезаписує; рядки з позначкою «⚠️ авто» (брутто ÷ к-сть) не записуються — тільки вага, введена вручну.", "en": "Write the entered “Weight/pc” to product cards that have no weight yet. Existing weight is not overwritten; rows marked “⚠️ auto” (gross ÷ qty) are not saved — only manually entered weight.", "de": "Eingegebenes „Gewicht/Stk.“ in die Artikelkarten schreiben, die noch kein Gewicht haben. Vorhandenes Gewicht wird nicht überschrieben; Zeilen mit der Markierung „⚠️ auto“ (Brutto ÷ Menge) werden nicht gespeichert — nur manuell eingegebenes Gewicht."}
+{"uk": "Записати вибране", "en": "Save the selected", "de": "Ausgewählte speichern"}
 {"uk": "Записати вибрані", "en": "Save selected", "de": "Ausgewählte speichern"}
 {"uk": "Записати вибрані (", "en": "Save selected (", "de": "Ausgewählte speichern ("}
 {"uk": "Записати вибрані в картки", "en": "Write selected to the cards", "de": "Ausgewählte in die Karten schreiben"}
@@ -8685,6 +8694,7 @@
 {"uk": "Збережіть замовлення спочатку", "en": "Save the order first", "de": "Speichern Sie zuerst den Auftrag"}
 {"uk": "Збережіть клієнта спочатку", "en": "Save the customer first", "de": "Speichern Sie zuerst den Kunden"}
 {"uk": "Збережіть коробку — потім можна вписати, скільки їх є.", "en": "Save the box first — then you can enter how many there are.", "de": "Karton zuerst speichern — dann kann man eintragen, wie viele es gibt."}
+{"uk": "Збережіть коробку — потім можна друкувати наклейку.", "en": "Save the box — then the label can be printed.", "de": "Karton speichern — dann lässt sich das Etikett drucken."}
 {"uk": "Збережіть подію — потім у календарі «👥 Запросити учасників…».", "en": "Save the event — then use “👥 Invite attendees…” in the calendar.", "de": "Speichern Sie den Termin — dann im Kalender „👥 Teilnehmer einladen…“."}
 {"uk": "Збережіть рахунок, щоб завантажити PDF", "en": "Save the invoice to download the PDF", "de": "Speichern Sie die Rechnung, um das PDF herunterzuladen"}
 {"uk": "Збережіть та завантажте PDF", "en": "Save and download the PDF", "de": "Speichern Sie und laden Sie das PDF herunter"}
@@ -8939,6 +8949,7 @@
 {"uk": "Змінено вручну", "en": "Changed manually", "de": "Manuell geändert"}
 {"uk": "Змінено вручну: {0}", "en": "Changed manually: {0}", "de": "Manuell geändert: {0}"}
 {"uk": "Змінено для {0} коробок: {1}.", "en": "Changed for {0} boxes: {1}.", "de": "Für {0} Kartons geändert: {1}."}
+{"uk": "Змінено коробок: {0}.", "en": "Boxes changed: {0}.", "de": "Geänderte Kartons: {0}."}
 {"uk": "Змінено на DigiKey (lastUpdateDateUtc)", "en": "Changed on DigiKey (lastUpdateDateUtc)", "de": "Auf DigiKey geändert (lastUpdateDateUtc)"}
 {"uk": "Змінено після надсилання (", "en": "Changed after sending (", "de": "Nach dem Senden geändert ("}
 {"uk": "Змінено після надсилання — учасники ще бачать старе", "en": "Changed after sending — attendees still see the old version", "de": "Nach dem Senden geändert — die Teilnehmer sehen noch den alten Stand"}
@@ -9447,6 +9458,12 @@
 {"uk": "Китай", "en": "China", "de": "China"}
 {"uk": "Клавіші панелі", "en": "Panel keys", "de": "Panel-Tastenkürzel"}
 {"uk": "Клавіші…", "en": "Keys…", "de": "Tastenkürzel…"}
+{"uk": "Клас", "en": "Class", "de": "Klasse"}
+{"uk": "Клас розміру", "en": "Size class", "de": "Größenklasse"}
+{"uk": "Клас — за об’ємом: XS до 1 л · S 1…5 л · M 5…15 л · L 15…35 л · XL більше; можна вибрати свій. Назва — клас і", "en": "Class — by volume: XS up to 1 l · S 1…5 l · M 5…15 l · L 15…35 l · XL more; you can choose your own. Name — class and", "de": "Klasse — nach Volumen: XS bis 1 l · S 1…5 l · M 5…15 l · L 15…35 l · XL mehr; eigene Wahl möglich. Name — Klasse und"}
+{"uk": "Клас — за об’ємом: XS до 1 л · S 1…5 л · M 5…15 л · L 15…35 л · XL більше; можна вибрати свій. Назва — клас і розміри, код — тип, клас і номер (BX — коробка, EN — конверт, TB — тубус, BG — пакет, PK — інше). Наявний код не змінюється сам: він уже може бути на наклейці. Усе можна поправити перед записом; зняти галочку — коробку не чіпати.", "en": "Class — by volume: XS up to 1 l · S 1…5 l · M 5…15 l · L 15…35 l · XL more; you can choose your own. Name — class and dimensions, code — type, class and number (BX — box, EN — envelope, TB — tube, BG — bag, PK — other). An existing code is not changed automatically: it may already be on a label. Everything can be corrected before saving; untick — leave the box untouched.", "de": "Klasse — nach Volumen: XS bis 1 l · S 1…5 l · M 5…15 l · L 15…35 l · XL mehr; eigene Wahl möglich. Name — Klasse und Maße, Code — Typ, Klasse und Nummer (BX — Karton, EN — Umschlag, TB — Rolle, BG — Beutel, PK — Sonstiges). Ein vorhandener Code wird nicht automatisch geändert: er kann schon auf einem Etikett stehen. Alles lässt sich vor dem Speichern korrigieren; Haken entfernen — Karton bleibt unverändert."}
+{"uk": "Класифікація, назви й коди", "en": "Classification, names and codes", "de": "Klassifizierung, Namen und Codes"}
+{"uk": "Класифікація, назви й коди…", "en": "Classification, names and codes…", "de": "Klassifizierung, Namen und Codes…"}
 {"uk": "Класична діаграма Ганта", "en": "Classic Gantt chart", "de": "Klassisches Gantt-Diagramm"}
 {"uk": "Класичний — як було", "en": "Classic — as it was", "de": "Klassisch — wie bisher"}
 {"uk": "Класичний — як було до 11.2026", "en": "Classic — as before 11.2026", "de": "Klassisch — wie vor 11.2026"}
@@ -9656,6 +9673,10 @@
 {"uk": "Код (slug) — внутрішній ідентифікатор категорії", "en": "Code (slug) — internal category identifier", "de": "Code (Slug) — interne Kennung der Kategorie"}
 {"uk": "Код (джерело замовлень)", "en": "Code (order source)", "de": "Code (Auftragsquelle)"}
 {"uk": "Код DigiKey", "en": "DigiKey code", "de": "DigiKey-Code"}
+{"uk": "Код {0} вибрано для двох коробок.", "en": "Code {0} is chosen for two boxes.", "de": "Code {0} ist für zwei Kartons gewählt."}
+{"uk": "Код {0} уже має інша коробка.", "en": "Code {0} already belongs to another box.", "de": "Code {0} hat schon ein anderer Karton."}
+{"uk": "Код «{0}»: лише латинські літери, цифри й «-», до 20 знаків.", "en": "Code «{0}»: Latin letters, digits and «-» only, up to 20 characters.", "de": "Code «{0}»: nur lateinische Buchstaben, Ziffern und «-», bis 20 Zeichen."}
+{"uk": "Код · клас", "en": "Code · class", "de": "Code · Klasse"}
 {"uk": "Код ТН ЗЕД (для митниці)", "en": "HS code (for customs)", "de": "HS-Code (für den Zoll)"}
 {"uk": "Код валюти ISO-4217. За замовч.: USD", "en": "ISO-4217 currency code. Default: USD", "de": "Währungscode nach ISO 4217. Standard: USD"}
 {"uk": "Код валюти з 3 літер, напр. EUR або USD", "en": "3-letter currency code, e.g. EUR or USD", "de": "Dreibuchstabiger Währungscode, z. B. EUR oder USD"}
@@ -9686,6 +9707,7 @@
 {"uk": "Коди ISO через кому: DE, AT, CH. «EU» — усі країни ЄС, «*» — решта світу.", "en": "ISO codes separated by commas: DE, AT, CH. “EU” — all EU countries, “*” — the rest of the world.", "de": "ISO-Codes durch Komma getrennt: DE, AT, CH. „EU“ – alle EU-Länder, „*“ – übrige Welt."}
 {"uk": "Коди атрибутів DigiKey", "en": "DigiKey attribute codes", "de": "DigiKey-Attributcodes"}
 {"uk": "Коди залежать від підтипу антени. Натисни «📥 Стягнути з DigiKey» — атрибути заповняться автоматично.", "en": "The codes depend on the antenna subtype. Click “📥 Pull from DigiKey” — the attributes will be filled in automatically.", "de": "Die Codes hängen vom Antennen-Untertyp ab. Klicken Sie auf „📥 Von DigiKey abrufen“ — die Attribute werden automatisch gefüllt."}
+{"uk": "Коди перетинаються з іншими коробками — змініть їх по черзі.", "en": "Codes overlap with other boxes — change them one at a time.", "de": "Codes überschneiden sich mit anderen Kartons — nacheinander ändern."}
 {"uk": "Коди підключення сайту", "en": "Site connection codes", "de": "Verbindungscodes der Website"}
 {"uk": "Коефіцієнт підсилення антени відносно ізотропного випромінювача", "en": "Antenna gain relative to an isotropic radiator", "de": "Antennengewinn relativ zu einem isotropen Strahler"}
 {"uk": "Коефіцієнт стоячої хвилі — якість узгодження. Норма: < 2,0", "en": "Voltage standing wave ratio — quality of matching. Normal: < 2.0", "de": "Stehwellenverhältnis — Qualität der Anpassung. Normal: < 2,0"}
@@ -9951,6 +9973,7 @@
 {"uk": "Короткий SKU", "en": "Short SKU", "de": "Kurz-SKU"}
 {"uk": "Короткий артикул", "en": "Short SKU", "de": "Kurze Artikelnummer"}
 {"uk": "Короткий висновок Мінерви", "en": "Minerva's brief conclusion", "de": "Kurzfazit von Minerva"}
+{"uk": "Короткий код коробки для наклейки й штрихкоду, напр. BX-M-02. «🏷 Класифікація, назви й коди…» у списку підкаже його сам.", "en": "Short box code for the label and barcode, e.g. BX-M-02. «🏷 Classification, names and codes…» in the list suggests it.", "de": "Kurzer Kartoncode für Etikett und Barcode, z. B. BX-M-02. «🏷 Klassifizierung, Namen und Codes…» in der Liste schlägt ihn vor."}
 {"uk": "Короткий огляд: майбутні події на тиждень, кількість прострочених, виконаних сьогодні.", "en": "Short overview: upcoming events for the week, number of overdue ones, done today.", "de": "Kurzübersicht: anstehende Termine der Woche, Anzahl der überfälligen, heute erledigte."}
 {"uk": "Короткий опис листів — AI", "en": "Short e-mail description — AI", "de": "Kurze E-Mail-Beschreibung – KI"}
 {"uk": "Короткий проєкт: Angebot → замовлення → відправка зі складу.", "en": "Short project: Angebot → order → shipping from stock.", "de": "Kurzes Projekt: Angebot → Auftrag → Versand ab Lager."}
@@ -11124,6 +11147,7 @@
 {"uk": "Над межею «— далі в меню ⋯ —» — кнопки на панелі, під нею — у «⋯». Межу теж можна тягти.", "en": "Above the line “— more in the ⋯ menu —” are the buttons on the panel, below it — in “⋯”. The line can be dragged too.", "de": "Über der Grenze „— weiter im Menü ⋯ —“ stehen die Schaltflächen im Panel, darunter — in „⋯“. Auch die Grenze lässt sich ziehen."}
 {"uk": "Надати «Керувати користувачами» може лише адміністратор.", "en": "Only an administrator can grant “Manage users”.", "de": "„Benutzer verwalten“ kann nur ein Administrator gewähren."}
 {"uk": "Надбавка / знижка, %", "en": "Markup / discount, %", "de": "Aufschlag / Rabatt, %"}
+{"uk": "Надруковано", "en": "Printed", "de": "Gedruckt"}
 {"uk": "Надрукуйте етикетки", "en": "Print the labels", "de": "Drucken Sie die Etiketten"}
 {"uk": "Надсилання карток на DigiKey", "en": "Sending cards to DigiKey", "de": "Karten werden an DigiKey gesendet"}
 {"uk": "Надсилання строків на DigiKey", "en": "Sending lead times to DigiKey", "de": "Lieferzeiten werden an DigiKey gesendet"}
@@ -11363,6 +11387,7 @@
 {"uk": "Назва, примітка, виставка, постачальник…", "en": "Title, note, trade fair, supplier…", "de": "Titel, Notiz, Messe, Lieferant…"}
 {"uk": "Назва, ціна доставки нетто, термін доставки «від–до» робочих днів після відправки. Ціна й термін зони діють для всіх її країн.", "en": "Name, net shipping price, delivery time “from–to” working days after dispatch. The zone’s price and lead time apply to all of its countries.", "de": "Name, Versandpreis netto, Lieferzeit „von–bis“ Werktage nach Versand. Preis und Lieferzeit der Zone gelten für alle ihre Länder."}
 {"uk": "Назва, час, місце, посилання останнього надісланого — для «♻ Надіслати оновлення» і скасування після видалення події.", "en": "Title, time, location and link of the last version sent — for “♻ Send update” and cancellation after the event is deleted.", "de": "Titel, Zeit, Ort und Link der zuletzt gesendeten Version — für „♻ Aktualisierung senden“ und die Absage nach dem Löschen des Termins."}
+{"uk": "Назва, штрихкод коду, розмір і що кладемо в коробку", "en": "Name, code barcode, size and what goes into the box", "de": "Name, Code-Barcode, Größe und was in den Karton kommt"}
 {"uk": "Назва/reference JLC", "en": "JLC name / reference", "de": "JLC-Name/Referenz"}
 {"uk": "Назва: {0}", "en": "Name: {0}", "de": "Name: {0}"}
 {"uk": "Назви кнопок і полів — точно як у гіді, жирним: **«📤 Вибрати файли…»**.", "en": "Button and field names — exactly as in the guide, in bold: **“📤 Select files…”**.", "de": "Namen von Schaltflächen und Feldern — genau wie im Leitfaden, fett: **„📤 Dateien auswählen…“**."}
@@ -11406,7 +11431,12 @@
 {"uk": "Накладений платіж / Nachnahme (DE)", "en": "Cash on delivery / Nachnahme (DE)", "de": "Nachnahme (DE)"}
 {"uk": "Накладений платіж / Nachnahme (EN)", "en": "Cash on delivery / Nachnahme (EN)", "de": "Nachnahme (EN)"}
 {"uk": "Накладна (delivery_id)", "en": "Delivery note (delivery_id)", "de": "Lieferschein (delivery_id)"}
+{"uk": "Наклейка", "en": "Label", "de": "Etikett"}
+{"uk": "Наклейка DYMO", "en": "DYMO label", "de": "DYMO-Etikett"}
+{"uk": "Наклейка коробки DYMO: назва, штрихкод, розмір, вміст · правий клік — меню", "en": "DYMO box label: name, barcode, size, contents · right click — menu", "de": "DYMO-Kartonetikett: Name, Barcode, Größe, Inhalt · Rechtsklick — Menü"}
 {"uk": "Наклейки DYMO", "en": "DYMO labels", "de": "DYMO-Etiketten"}
+{"uk": "Наклейки DYMO всіх коробок, що зараз у списку (з фільтрами), по черзі на принтер", "en": "DYMO labels of all boxes now in the list (with filters), one after another to the printer", "de": "DYMO-Etiketten aller Kartons in der Liste (mit Filtern), nacheinander auf den Drucker"}
+{"uk": "Наклейки всіх у списку", "en": "Labels for all in the list", "de": "Etiketten für alle in der Liste"}
 {"uk": "Налаштовано", "en": "Configured", "de": "Konfiguriert"}
 {"uk": "Налаштовується в картці магазину (🏬 Магазини → магазин): зони внизу сторінки, безкоштовна доставка — блок «🚚 Доставка».", "en": "Set up in the shop card (🏬 Shops → shop): zones at the bottom of the page, free shipping — the “🚚 Shipping” block.", "de": "Wird in der Shop-Karte eingerichtet (🏬 Shops → Shop): Zonen unten auf der Seite, kostenloser Versand — Block „🚚 Versand“."}
 {"uk": "Налаштовується в картці магазину (🏬 Магазини → магазин): зони внизу сторінки, безкоштовна доставка — блок «🚚 Доставка». Сайт отримує це через", "en": "Set up in the shop card (🏬 Shops → shop): zones at the bottom of the page, free shipping — the “🚚 Shipping” block. The website receives this via", "de": "Wird in der Shop-Karte eingerichtet (🏬 Shops → Shop): Zonen unten auf der Seite, kostenloser Versand — Block „🚚 Versand“. Die Website erhält dies über"}
@@ -12689,6 +12719,7 @@
 {"uk": "Обіцянка", "en": "Promise", "de": "Zusage"}
 {"uk": "Обіцянки", "en": "Promises", "de": "Zusagen"}
 {"uk": "Обіцяно відкритим замовленням і ще не списано (резерви й незаписані замовлення)", "en": "Promised to open orders and not yet written off (reservations and unrecorded orders)", "de": "Offenen Aufträgen zugesagt und noch nicht ausgebucht (Reservierungen und nicht erfasste Aufträge)"}
+{"uk": "Об’єм", "en": "Volume", "de": "Volumen"}
 {"uk": "Огляд", "en": "Overview", "de": "Übersicht"}
 {"uk": "Огляд (AI)", "en": "Overview (AI)", "de": "Übersicht (KI)"}
 {"uk": "Огляд / запитання по картці", "en": "Card review / question", "de": "Übersicht / Frage zur Karte"}
@@ -14518,6 +14549,7 @@
 {"uk": "Порожньо — використовується «Ціна продажу».", "en": "Empty — the “Sale price” is used.", "de": "Leer — es wird der „Verkaufspreis“ verwendet."}
 {"uk": "Порожньо — додайте параметри або синхронізуйте з DigiKey лістингом.", "en": "Empty — add parameters or sync with the DigiKey listing.", "de": "Leer — fügen Sie Parameter hinzu oder synchronisieren Sie mit dem DigiKey-Listing."}
 {"uk": "Порожньо — доставка на адресу рахунку (рядка «Lieferadresse» у документі не буде).", "en": "Empty — delivery to the billing address (no “Lieferadresse” line in the document).", "de": "Leer — Lieferung an die Rechnungsadresse (keine Zeile „Lieferadresse“ im Dokument)."}
+{"uk": "Порожньо — за об’ємом (XS до 1 л, S до 5 л, M до 15 л, L до 35 л, XL більше).", "en": "Empty — by volume (XS up to 1 l, S up to 5 l, M up to 15 l, L up to 35 l, XL more).", "de": "Leer — nach Volumen (XS bis 1 l, S bis 5 l, M bis 15 l, L bis 35 l, XL mehr)."}
 {"uk": "Порожньо — загальний ліміт сервера (API_RATE_LIMIT, зазвичай 120).", "en": "Empty — the server’s general limit (API_RATE_LIMIT, usually 120).", "de": "Leer — allgemeines Limit des Servers (API_RATE_LIMIT, normalerweise 120)."}
 {"uk": "Порожньо — залишити збережене.", "en": "Leave empty to keep the saved value.", "de": "Leer lassen, um den gespeicherten Wert beizubehalten."}
 {"uk": "Порожньо — залишити збережений ключ. Ключ зберігається лише на сервері Minerva.", "en": "Empty — keep the saved key. The key is stored only on the Minerva server.", "de": "Leer — gespeicherten Schlüssel behalten. Der Schlüssel wird nur auf dem Minerva-Server gespeichert."}
@@ -18216,6 +18248,7 @@
 {"uk": "У списку замовлень", "en": "In the order list", "de": "In der Bestellliste"}
 {"uk": "У списку замовлень при наведенні на Артикул показує фото товару зі складу. Вимкніть якщо це сповільнює роботу.", "en": "In the order list, hovering over the SKU shows the product photo from stock. Turn off if it slows things down.", "de": "In der Auftragsliste zeigt das Darüberfahren über die Artikelnummer das Artikelfoto aus dem Lager. Deaktivieren, wenn es die Arbeit verlangsamt."}
 {"uk": "У списку замовлень при наведенні на значок 📄 показує маленький попередній перегляд PDF.", "en": "In the order list, hovering over the 📄 icon shows a small PDF preview.", "de": "In der Auftragsliste zeigt das Darüberfahren über das 📄-Symbol eine kleine PDF-Vorschau."}
+{"uk": "У списку немає коробок.", "en": "There are no boxes in the list.", "de": "Keine Kartons in der Liste."}
 {"uk": "У старому файлі Digi-Key P/N {0} — на новій етикетці {1}.", "en": "In the old file the Digi-Key P/N is {0} — on the new label {1}.", "de": "In der alten Datei lautet die Digi-Key P/N {0} — auf dem neuen Etikett {1}."}
 {"uk": "У старому файлі {0} {1}: {2} — на новій етикетці {3}.", "en": "In the old file {0} {1}: {2} — on the new label {3}.", "de": "In der alten Datei {0} {1}: {2} — auf dem neuen Etikett {3}."}
 {"uk": "У старому файлі рік {0} — на новій етикетці {1}.", "en": "In the old file the year is {0} — on the new label {1}.", "de": "In der alten Datei steht das Jahr {0} — auf dem neuen Etikett {1}."}
@@ -19942,6 +19975,7 @@
 {"uk": "або інше значення:", "en": "or another value:", "de": "oder anderer Wert:"}
 {"uk": "або: меню", "en": "or: menu", "de": "oder: Menü"}
 {"uk": "авто", "en": "auto", "de": "automatisch"}
+{"uk": "авто ({0})", "en": "auto ({0})", "de": "auto ({0})"}
 {"uk": "авто — не зважено", "en": "auto — not weighed", "de": "auto — nicht gewogen"}
 {"uk": "авто-обраний переможець (найбільше замовлень, при рівних — старший запис).", "en": "auto-selected winner (most orders; on a tie, the older record).", "de": "automatisch gewählter Gewinner (meiste Aufträge, bei Gleichstand – der ältere Datensatz)."}
 {"uk": "авто-обраний переможець (найбільше замовлень, при рівних — старший запис). Кнопка", "en": "auto-selected winner (most orders; on a tie, the older record). The button", "de": "automatisch gewählter Gewinner (meiste Aufträge, bei Gleichstand – der ältere Datensatz). Die Schaltfläche"}
@@ -20418,6 +20452,7 @@
 {"uk": "власнику — у його чат з ботом (Telegram ID)", "en": "to the owner — in their chat with the bot (Telegram ID)", "de": "an den Inhaber — in seinen Chat mit dem Bot (Telegram-ID)"}
 {"uk": "вміст змінився", "en": "content changed", "de": "Inhalt geändert"}
 {"uk": "вміст не схожий на {0}", "en": "content does not look like {0}", "de": "Inhalt sieht nicht nach {0} aus"}
+{"uk": "вміст: {0} товарів", "en": "contents: {0} products", "de": "Inhalt: {0} Artikel"}
 {"uk": "внесено", "en": "entered", "de": "eingetragen"}
 {"uk": "внесено вручну — Minerva не втручається", "en": "entered manually — Minerva does not interfere", "de": "manuell eingetragen — Minerva greift nicht ein"}
 {"uk": "внизу екрану — натисніть", "en": "at the bottom of the screen — click", "de": "unten auf dem Bildschirm — klicken Sie auf"}
@@ -21376,6 +21411,7 @@
 {"uk": "змінюють дані", "en": "change data", "de": "ändern Daten"}
 {"uk": "змінює", "en": "changes", "de": "ändert"}
 {"uk": "змінює в Minerva", "en": "changes in Minerva", "de": "ändert in Minerva"}
+{"uk": "змінюється сам: він уже може бути на наклейці. Усе можна поправити перед записом; зняти галочку — коробку не чіпати.", "en": "changed automatically: it may already be on a label. Everything can be corrected before saving; untick — leave the box untouched.", "de": "automatisch geändert: er kann schon auf einem Etikett stehen. Alles lässt sich vor dem Speichern korrigieren; Haken entfernen — Karton bleibt unverändert."}
 {"uk": "змінюється у вікні кроку", "en": "change it in the step window", "de": "im Schrittfenster änderbar"}
 {"uk": "знайдених термінів", "en": "deadlines found", "de": "gefundene Fristen"}
 {"uk": "знайдено", "en": "found", "de": "gefunden"}
@@ -21507,6 +21543,7 @@
 {"uk": "кг!", "en": "kg!", "de": "kg!"}
 {"uk": "керує сайт (private/minerva-config.php)", "en": "controlled by the site (private/minerva-config.php)", "de": "gesteuert von der Website (private/minerva-config.php)"}
 {"uk": "кеш каталогу + вебхук", "en": "catalog cache + webhook", "de": "Katalog-Cache + Webhook"}
+{"uk": "клас за об’ємом", "en": "class by volume", "de": "Klasse nach Volumen"}
 {"uk": "класична діаграма Ганта", "en": "classic Gantt chart", "de": "klassisches Gantt-Diagramm"}
 {"uk": "клацніть на картку клієнта, якого хочете залишити (він стане основним).", "en": "click the card of the customer you want to keep (it becomes the primary one).", "de": "klicken Sie auf die Karte des Kunden, den Sie behalten möchten (er wird zum Hauptkunden)."}
 {"uk": "клацніть на картку клієнта, якого хочете залишити (він стане основним). Усе, що прив'язано до інших клієнтів (", "en": "click the card of the customer you want to keep (it becomes the primary one). Everything linked to the other customers (", "de": "klicken Sie auf die Karte des Kunden, den Sie behalten möchten (er wird zum Hauptkunden). Alles, was mit den anderen Kunden verknüpft ist ("}
@@ -22538,6 +22575,7 @@
 {"uk": "новий", "en": "new", "de": "neu"}
 {"uk": "новий акаунт", "en": "new account", "de": "neues Konto"}
 {"uk": "новий залишок", "en": "new stock level", "de": "neuer Bestand"}
+{"uk": "новий код", "en": "new code", "de": "neuer Code"}
 {"uk": "новий крок", "en": "new step", "de": "neuer Schritt"}
 {"uk": "новий лист знайдено", "en": "new e-mail found", "de": "neue E-Mail gefunden"}
 {"uk": "новий не надсилається.", "en": "no new one is sent.", "de": "es wird keine neue gesendet."}
@@ -23573,6 +23611,7 @@
 {"uk": "розділу Angebote в цій Minerva немає", "en": "this Minerva has no Angebote section", "de": "in dieser Minerva gibt es keinen Bereich Angebote"}
 {"uk": "розклад автоматичних листів не зсувається.", "en": "the schedule of automatic e-mails does not shift.", "de": "der Zeitplan der automatischen E-Mails verschiebt sich nicht."}
 {"uk": "розміри", "en": "dimensions", "de": "Maße"}
+{"uk": "розміри, код — тип, клас і номер (BX — коробка, EN — конверт, TB — тубус, BG — пакет, PK — інше). Наявний код не", "en": "dimensions, code — type, class and number (BX — box, EN — envelope, TB — tube, BG — bag, PK — other). An existing code is not", "de": "Maße, Code — Typ, Klasse und Nummer (BX — Karton, EN — Umschlag, TB — Rolle, BG — Beutel, PK — Sonstiges). Ein vorhandener Code wird nicht"}
 {"uk": "розподільник слухає 127.0.0.1:{0} (публічний → {1}, {2} → {3})", "en": "router listens on 127.0.0.1:{0} (public → {1}, {2} → {3})", "de": "Verteiler lauscht auf 127.0.0.1:{0} (öffentlich → {1}, {2} → {3})"}
 {"uk": "розпізнати", "en": "recognise", "de": "erkennen"}
 {"uk": "розпізнає браузер.", "en": "the browser recognises.", "de": "der Browser erkennt."}
@@ -24066,6 +24105,7 @@
 {"uk": "товарів на цій сторінці, одразу після збереження. Позиція магазину далі", "en": "products on this page, immediately after saving. The shop line is then", "de": "Artikel auf dieser Seite, unmittelbar nach dem Speichern. Die Webshop-Position wird danach"}
 {"uk": "товарів на цій сторінці, одразу після збереження. Позиція магазину далі оновлюється разом з базовими цінами; ціна в валюті магазину — за курсом із «Налаштувань цін».", "en": "products on this page, immediately after saving. The shop line is then updated together with the base prices; the price in the shop’s currency — at the rate from “Price settings”.", "de": "Artikel auf dieser Seite, unmittelbar nach dem Speichern. Die Webshop-Position wird danach zusammen mit den Basispreisen aktualisiert; der Preis in der Webshop-Währung — zum Kurs aus den „Preiseinstellungen“."}
 {"uk": "товарів немає", "en": "no products", "de": "keine Artikel"}
+{"uk": "товарів ще немає", "en": "no products yet", "de": "noch keine Artikel"}
 {"uk": "товарів — перевірте таблицю й натисніть «💾 Зберегти».", "en": "products — check the table and click “💾 Save”.", "de": "Artikel — prüfen Sie die Tabelle und klicken Sie auf „💾 Speichern“."}
 {"uk": "товарів, замовлень…", "en": "products, orders…", "de": "Artikel, Aufträge…"}
 {"uk": "товарів, яких там немає", "en": "products that are not there", "de": "Artikel, die dort nicht vorhanden sind"}
@@ -24657,6 +24697,7 @@
 {"uk": "шт.» двічі", "en": "pcs.” twice", "de": "Stk.“ doppelt"}
 {"uk": "шт.» двічі.", "en": "pcs.” twice.", "de": "Stk.“ doppelt."}
 {"uk": "шт.…) заново за 1", "en": "pcs.…) again at 1", "de": "Stk.…) erneut zu 1"}
+{"uk": "шт?", "en": "pcs?", "de": "Stk.?"}
 {"uk": "штат", "en": "state", "de": "Bundesstaat"}
 {"uk": "штрихкод", "en": "barcode", "de": "Barcode"}
 {"uk": "шукати в інтернеті", "en": "search the internet", "de": "im Internet suchen"}

@@ -21,4 +21,5 @@ urlpatterns = [
     path('antenna/save/',               views.product_save),
     path('antenna/<str:sku>/',          views.product_label_file),
     path('order/<int:pk>/',             views.order_label,           name='order'),
+    path('box/<int:pk>/',               views.box_label,             name='box'),
 ]

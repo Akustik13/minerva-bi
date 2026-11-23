@@ -250,13 +250,98 @@ class PackagingMaterialForm(forms.ModelForm):
 @admin.register(PackagingMaterial)
 class PackagingMaterialAdmin(admin.ModelAdmin):
     form = PackagingMaterialForm
-    list_display  = ('type_badge', 'name', 'dimensions_col', 'stock_col', 'tare_weight_kg',
-                     'max_weight_kg', 'volume_col', 'cost', 'is_active')
-    list_filter   = (PackagingArchiveFilter, PackagingStockFilter, 'box_type')
+    list_display  = ('type_badge', 'name', 'code_col', 'dimensions_col', 'stock_col', 'tare_weight_kg',
+                     'max_weight_kg', 'volume_col', 'cost', 'label_btn', 'is_active')
+    list_filter   = (PackagingArchiveFilter, PackagingStockFilter, 'box_type', 'size_class')
     list_editable = ('is_active',)
-    search_fields = ('name',)
-    readonly_fields = ('stock_panel', 'movements_panel', 'fold_panel')
-    actions = ('bulk_settings_selected', 'archive_selected', 'restore_selected', 'stock_report_selected')
+    search_fields = ('name', 'code')
+    readonly_fields = ('stock_panel', 'movements_panel', 'fold_panel', 'label_panel')
+
+    def changelist_view(self, request, extra_context=None):
+        from labels_app.views import label_context
+        extra_context = {**(extra_context or {}), 'label_ctx': label_context()}   # кнопки 🖨️ наклейок
+        return super().changelist_view(request, extra_context)
+
+    @admin.display(description=_('Код · клас'), ordering='code')
+    def code_col(self, obj):
+        from .services.box_names import class_of
+        cls = class_of(obj)
+        auto = '' if obj.size_class else format_html(' <span style="color:var(--text-muted,#607d8b)" title="{}">≈</span>',
+                                                      _('клас за об’ємом'))
+        return format_html('<span translate="no" style="font-family:monospace">{}</span><br>'
+                           '<b style="font-size:11px">{}</b>{}', obj.code or '—', cls, auto)
+
+    def _label_button(self, obj, text):
+        from .services.box_names import barcode_value
+        return format_html(
+            '<button type="button" data-svl="box" data-order="{}" data-sku="{}" data-svl-act="print" title="{}" '
+            'style="background:#1976d2;color:#fff;border:none;cursor:pointer;padding:3px 10px;border-radius:6px;'
+            'font-size:11px;white-space:nowrap">{}</button>',
+            obj.pk, barcode_value(obj), _('Наклейка коробки DYMO: назва, штрихкод, розмір, вміст · правий клік — меню'),
+            text)
+
+    @admin.display(description=_('🏷️ Наклейка'))
+    def label_btn(self, obj):
+        return self._label_button(obj, '🖨️ ' + str(_('Друк')))
+
+    @admin.display(description=_('Наклейка DYMO'))
+    def label_panel(self, obj):
+        if not obj or not obj.pk:
+            return _('Збережіть коробку — потім можна друкувати наклейку.')
+        from django.template.loader import render_to_string
+        from labels_app.views import label_context
+        from labels_app.box_label import build
+        data = build(obj)
+        info = format_html('<span style="color:var(--text-muted,#607d8b);font-size:12px">{} · <span translate="no">'
+                           '{}</span> · {}</span>', _('штрихкод'), data['code'],
+                           _('вміст: {} товарів').format(len(data['items'])) if data['items'] else _('товарів ще немає'))
+        script = mark_safe(render_to_string('labels/_label_actions.html', label_context()))
+        return format_html('{} &nbsp;{}{}', self._label_button(obj, '🖨️ ' + str(_('Друкувати наклейку'))), info, script)
+    actions = ('bulk_settings_selected', 'classify_selected', 'archive_selected', 'restore_selected',
+               'stock_report_selected')
+
+    @admin.action(description=_('🏷 Класифікація, назви й коди…'), permissions=['change'])
+    def classify_selected(self, request, queryset):
+        """Сторінка: клас розміру, назва «M 31×22×15» і код BX-M-02 для кожної вибраної коробки
+        (services.box_names) — людина правит і вибирає, що записати."""
+        from django.template.response import TemplateResponse
+        from .services import box_names
+        boxes = list(queryset)
+        rows, error = box_names.plan(boxes), ''
+        if request.POST.get('apply'):
+            changes = []
+            for r in rows:
+                pk = r['material'].pk
+                if request.POST.get(f'on_{pk}') != '1':
+                    continue
+                changes.append({'material': r['material'], 'cls': request.POST.get(f'cls_{pk}', ''),
+                                'name': request.POST.get(f'name_{pk}', ''),
+                                'code': request.POST.get(f'code_{pk}', ''), 'new_code': r['new_code']})
+            if not changes:
+                self.message_user(request, _('Нічого не вибрано змінити.'), messages.INFO)
+                return None
+            try:
+                done = box_names.apply(changes)
+            except box_names.NamingError as e:
+                error = str(e)
+                for r in rows:                  # показати те, що людина вписала
+                    pk = r['material'].pk
+                    r.update(sel=request.POST.get(f'cls_{pk}', ''), name=request.POST.get(f'name_{pk}', r['name']),
+                             code=request.POST.get(f'code_{pk}', r['code']), on=request.POST.get(f'on_{pk}') == '1')
+            else:
+                labels = {'size_class': 'Клас розміру', 'name': 'Назва', 'code': 'Код'}
+                for m, fields in done:
+                    self.log_change(request, m, [{'changed': {'fields': [labels[f] for f in fields]}}])
+                self.message_user(request, _('🏷 Змінено коробок: {}.').format(len(done)), messages.SUCCESS)
+                return None
+        for r in rows:
+            r.setdefault('on', True)
+            r.setdefault('sel', r['material'].size_class or '')      # '' — клас за об'ємом
+        return TemplateResponse(request, 'admin/shipping/packagingmaterial/classify.html', {
+            **self.admin_site.each_context(request), 'opts': self.model._meta,
+            'title': _('🏷 Класифікація, назви й коди'), 'rows': rows, 'error': error,
+            'classes': box_names.CLASSES, 'action_name': 'classify_selected',
+        })
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         field = super().formfield_for_dbfield(db_field, request, **kwargs)
@@ -409,7 +494,7 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('📦 Упаковка', {
-            'fields': ('box_type', 'name', 'is_active', 'notes'),
+            'fields': ('box_type', 'name', ('code', 'size_class'), 'is_active', 'notes', 'label_panel'),
         }),
         ('📐 Розміри', {
             'fields': (('length_cm', 'width_cm', 'height_cm'), 'fold_heights', 'fold_panel'),

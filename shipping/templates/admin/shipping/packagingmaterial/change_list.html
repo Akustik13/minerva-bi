@@ -1,7 +1,32 @@
 {% extends "admin/change_list.html" %}
-{# Packaging materials list: «✉️ stock report» button (PackagingMaterialAdmin.stock_report_view) #}
+{# Packaging materials list: «✉️ stock report», «🖨️ labels of all in the list» (labels/_label_actions.html, kind box) #}
 
 {% block object-tools-items %}
     <li><a href="{% url 'admin:shipping_packagingmaterial_stock_report' %}">✉️ Звіт про залишки</a></li>
+    <li><a href="#" id="pkg-print-all" title="Наклейки DYMO всіх коробок, що зараз у списку (з фільтрами), по черзі на принтер">🖨️ Наклейки всіх у списку</a></li>
     {{ block.super }}
+{% endblock %}
+
+{% block content %}
+{{ block.super }}
+{% if label_ctx %}{% include "labels/_label_actions.html" with label_source=label_ctx.label_source dymo_mode=label_ctx.dymo_mode print_preview=label_ctx.print_preview %}{% endif %}
+<script>
+  (function () {
+    var a = document.getElementById('pkg-print-all');
+    if (!a) return;
+    a.addEventListener('click', function (e) {
+      e.preventDefault();
+      var items = [].slice.call(document.querySelectorAll('#result_list [data-svl="box"]')).map(function (b) {
+        return {kind: 'box', order: b.dataset.order, sku: b.dataset.sku, qty: 1, file: false};
+      });
+      if (!items.length || !window.svLabel) { alert('У списку немає коробок.'); return; }
+      if (!confirm('Друкувати наклейки коробок: ' + items.length + ' шт?')) return;
+      window.svLabel.batch(items, function (r) {
+        var bad = r.failed.map(function (f) { return f.o.sku + ': ' + f.error; });
+        alert((r.saved ? 'Завантажено файлів: ' : 'Надруковано: ') + r.printed.length
+              + (bad.length ? '\nНе вдалося: ' + bad.join('; ') : ''));
+      });
+    });
+  })();
+</script>
 {% endblock %}

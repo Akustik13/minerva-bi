@@ -3,6 +3,7 @@
 {# Кнопка: data-svl="antenna|filter|generic|cable|" data-sku data-qty | data-qty-input data-order data-file="1" #}
 {# data-svl-act="print|download|check|direct". Загальне правило: файлу немає — етикетка з шаблону (templ / uses_template). #}
 {# Етикетка замовлення: data-svl="order" data-order=<pk> data-sku=<номер замовлення> (labels_app/order_label.py) #}
+{# Наклейка коробки: data-svl="box" data-order=<pk пакувального матеріалу> data-sku=<код> (labels_app/box_label.py) #}
 {# Друк — служба DYMO Connect на цьому ПК (https://127.0.0.1:41951, GetPrinters / RenderLabel / PrintLabel), програму не відкривати; #}
 {# перед друком — вікно перегляду (картинка від DYMO, копії, «✏️ Правки» лише для цього друку) або одразу — print_preview; #}
 {# позначка походження в куті — labels_app/mark.py (MinervaMark), поправки тут ставлять «E». #}
@@ -557,19 +558,23 @@
       })
       .catch(function (e) { alert('Помилка мережі: ' + e); });
   }
-  // Етикетка замовлення — завжди з даних замовлення, без вікна перевірки
+  // Етикетка замовлення й наклейка коробки — завжди з даних Minerva, без вікна перевірки
+  var FIXED = {
+    order: function (o) { return {url: '/labels/order/' + encodeURIComponent(o.order) + '/', name: 'Order-' + o.sku}; },
+    box: function (o) { return {url: '/labels/box/' + encodeURIComponent(o.order) + '/', name: 'Box-' + o.sku}; }
+  };
   function orderLabel(o, act, how) {
-    var url = '/labels/order/' + encodeURIComponent(o.order) + '/', name = 'Order-' + o.sku;
-    if (act === 'download') download(url, name); else open(url, name, 1, act === 'direct', {how: how, o: o});
+    var r = FIXED[o.kind](o);
+    if (act === 'download') download(r.url, r.name); else open(r.url, r.name, 1, act === 'direct', {how: how, o: o});
   }
   // Те саме правило, що labels_app.views.uses_template: файлу немає — з шаблону; є — антени, фільтри й
   // кабелі за «Звідки брати етикетку DYMO», інші товари — файл з бази
   function templ(o) {
-    return !!o.kind && o.kind !== 'order' && (!o.file || (o.kind !== 'generic' && SOURCE === 'generate'));
+    return !!o.kind && !FIXED[o.kind] && (!o.file || (o.kind !== 'generic' && SOURCE === 'generate'));
   }
   function run(o, act, how) {
     act = act || o.act;
-    if (o.kind === 'order') return orderLabel(o, act, how);
+    if (FIXED[o.kind]) return orderLabel(o, act, how);
     if (act === 'check') return generate(o, 'check', how);
     if (templ(o)) return generate(o, act, how);
     if (o.file) return fromFile(o, act, how);
@@ -582,9 +587,7 @@
   // (вікно перевірки), не друкується — у звіті check. done({printed: [назва], check: [o], failed: [{o, error}],
   // saved: файли завантажено, а не надруковано}).
   function labelUrl(o) {
-    if (o.kind === 'order') {
-      return Promise.resolve({url: '/labels/order/' + encodeURIComponent(o.order) + '/', name: 'Order-' + o.sku});
-    }
+    if (FIXED[o.kind]) return Promise.resolve(FIXED[o.kind](o));
     if (!templ(o)) {
       if (o.file) return Promise.resolve({url: '/labels/serve/' + encodeURIComponent(o.sku) + '/?qty=' + o.qty, name: o.sku});
       return Promise.reject(new Error('немає етикетки в базі'));
@@ -647,14 +650,15 @@
     var clickPrints = direct || (!dl && !chk && DYMO_MODE === 'print');
     var clickSaves = dl || (!direct && !chk && DYMO_MODE === 'download');
     var dots = PREVIEW ? '…' : '';     // з переглядом — далі вікно
-    var items = o.kind === 'order' ? [
+    var items = FIXED[o.kind] ? [
       {t: '🖨️ Друкувати на DYMO' + dots, def: clickPrints, f: function () { orderLabel(o, 'direct'); }},
-      {t: '⬇️ Завантажити етикетку замовлення', def: clickSaves, f: function () { orderLabel(o, 'download'); }},
+      {t: o.kind === 'box' ? '⬇️ Завантажити наклейку коробки' : '⬇️ Завантажити етикетку замовлення',
+       def: clickSaves, f: function () { orderLabel(o, 'download'); }},
     ] : [
       {t: '📄 Завантажити з бази' + (o.file ? '' : ' — файлу немає'), dis: !o.file, def: !defGen && clickSaves,
        f: function () { fromFile(o, 'download'); }},
     ];
-    if (o.kind && o.kind !== 'order') {
+    if (o.kind && !FIXED[o.kind]) {
       items.push({t: '🧩 Згенерувати наклейку й завантажити', def: defGen && clickSaves,
                   f: function () { generate(o, 'download'); }});
       items.push({t: '🖨️ Згенерувати й друкувати на DYMO' + dots, def: defGen && clickPrints,
@@ -683,7 +687,8 @@
     var foot = document.createElement('div');
     foot.className = 'svl-foot';
     foot.innerHTML = (o.kind === 'order' ? 'Номер замовлення, країна й усі артикули з кількістю'
-                                          : 'Клік: ' + (defGen ? '🧩 сформувати з шаблону' : '📄 готовий файл з бази'))
+                      : o.kind === 'box' ? 'Назва, штрихкод коду, розмір і що кладемо в коробку'
+                      : 'Клік: ' + (defGen ? '🧩 сформувати з шаблону' : '📄 готовий файл з бази'))
       + ', ' + click
       + ' · <a href="/admin/sales/salessettings/" target="_blank">змінити</a>';
     m.appendChild(foot);

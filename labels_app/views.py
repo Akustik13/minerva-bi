@@ -350,6 +350,25 @@ def order_label(request, pk):
 
 
 @staff_member_required
+def box_label(request, pk):
+    """Наклейка коробки: назва, штрихкод коду, розмір, клас, тара й що в неї кладемо (labels_app/box_label.py);
+    право — бачити пакувальні матеріали."""
+    from django.core.exceptions import PermissionDenied
+    from django.shortcuts import get_object_or_404
+    from labels_app import box_label as builder, mark
+    from shipping.models import PackagingMaterial
+    if not request.user.has_perm('shipping.view_packagingmaterial'):
+        raise PermissionDenied
+    material = get_object_or_404(PackagingMaterial, pk=pk)
+    data = builder.build(material)
+    name = re.sub(r'[^\w.-]+', '_', data['code']) or str(material.pk)
+    xml = mark.stamp(builder.render(data), 'auto')
+    response = HttpResponse(xml.encode('utf-8'), content_type='application/octet-stream')
+    response['Content-Disposition'] = f'attachment; filename="Box-{name}.dymo"'
+    return response
+
+
+@staff_member_required
 def preview_cable_label(request):
     """GET ?part_no=CA-… → JSON with parsed label fields (for modal preview)."""
     from shipping.services.dymo_label_service import parse_part_number, label_lines

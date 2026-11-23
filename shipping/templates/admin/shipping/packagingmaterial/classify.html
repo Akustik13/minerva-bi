@@ -1,0 +1,76 @@
+{% extends "admin/base_site.html" %}
+{# Size class, name and code for the selected boxes (PackagingMaterialAdmin.classify_selected, services/box_names.py) #}
+
+{% block title %}{{ title }} — Minerva{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Головна</a> ›
+  <a href="{% url 'admin:shipping_packagingmaterial_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a> › {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .cl-box { max-width: 1100px; padding: 16px 20px; border: 1px solid var(--border-strong, #243347); border-radius: 8px;
+            background: var(--bg-card, #1a2535); margin-bottom: 16px; }
+  .cl-muted { color: var(--body-quiet-color, #8aa0b4); font-size: 12px; }
+  .cl-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .cl-table th, .cl-table td { padding: 6px 8px; border-bottom: 1px solid var(--border-color, #2a3a4e); text-align: left;
+                               vertical-align: middle; }
+  .cl-table input[type=text] { width: 100%; box-sizing: border-box; }
+  .cl-table .num { text-align: right; white-space: nowrap; }
+  .cl-err { margin: 0 0 12px; padding: 8px 12px; border-radius: 6px; background: rgba(229, 72, 77, .14); }
+  .cl-new { font-size: 11px; color: var(--ok, #3fb950); }
+  .cl-wrap { overflow-x: auto; }
+</style>
+
+<form method="post" class="cl-box">{% csrf_token %}
+  {% for r in rows %}<input type="hidden" name="_selected_action" value="{{ r.material.pk }}">{% endfor %}
+  <input type="hidden" name="action" value="{{ action_name }}">
+  <input type="hidden" name="apply" value="1">
+  {% if error %}<div class="cl-err">{{ error }}</div>{% endif %}
+  <div class="cl-muted" style="margin-bottom:12px">
+    Клас — за об’ємом: XS до 1 л · S 1…5 л · M 5…15 л · L 15…35 л · XL більше; можна вибрати свій. Назва — клас і
+    розміри, код — тип, клас і номер (BX — коробка, EN — конверт, TB — тубус, BG — пакет, PK — інше). Наявний код не
+    змінюється сам: він уже може бути на наклейці. Усе можна поправити перед записом; зняти галочку — коробку не чіпати.
+  </div>
+  <div class="cl-wrap">
+  <table class="cl-table">
+    <tr><th></th><th>Зараз</th><th class="num">Об’єм</th><th>Клас</th><th style="min-width:200px">Назва</th>
+        <th style="min-width:120px">Код</th></tr>
+    {% for r in rows %}{% with m=r.material %}
+    <tr data-pk="{{ m.pk }}">
+      <td><input type="checkbox" name="on_{{ m.pk }}" value="1"{% if r.on %} checked{% endif %}></td>
+      <td><span translate="no">{{ m }}</span>{% if m.code %}<div class="cl-muted" translate="no">{{ m.code }}</div>{% endif %}</td>
+      <td class="num">{{ m.volume_cm3|floatformat:0 }} см³</td>
+      <td><select name="cls_{{ m.pk }}" class="cl-cls">
+            <option value=""{% if not r.sel %} selected{% endif %}>авто ({{ r.auto_class }})</option>
+            {% for c in classes %}<option value="{{ c }}"{% if r.sel == c %} selected{% endif %}>{{ c }}</option>{% endfor %}
+          </select></td>
+      <td><input type="text" name="name_{{ m.pk }}" value="{{ r.name }}" maxlength="255" class="cl-name" translate="no"></td>
+      <td><input type="text" name="code_{{ m.pk }}" value="{{ r.code }}" maxlength="20" class="cl-code" translate="no"
+                 data-new="{% if r.new_code %}1{% endif %}">
+          {% if r.new_code %}<div class="cl-new">новий код</div>{% endif %}</td>
+    </tr>
+    {% endwith %}{% endfor %}
+  </table>
+  </div>
+  <div style="margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <button type="submit" class="button default">✓ Записати вибране</button>
+    <a href="{% url 'admin:shipping_packagingmaterial_changelist' %}">← до пакувальних матеріалів</a>
+  </div>
+</form>
+<script>
+  // Клас змінили — у назві й новому коді той самий клас (номер коду перевірить сервер)
+  document.querySelectorAll('.cl-cls').forEach(function (sel) {
+    var auto = sel.options[0].textContent.replace(/^.*\((\w+)\).*$/, '$1');
+    sel.addEventListener('change', function () {
+      var tr = sel.closest('tr'), cls = sel.value || auto;
+      var name = tr.querySelector('.cl-name'), code = tr.querySelector('.cl-code');
+      name.value = name.value.replace(/^(XS|S|M|L|XL)(?= )/, cls);
+      if (code.dataset.new) code.value = code.value.replace(/^([A-Z]+)-(XS|S|M|L|XL)-/, '$1-' + cls + '-');
+    });
+  });
+</script>
+{% endblock %}

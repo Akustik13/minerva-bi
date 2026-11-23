@@ -620,8 +620,22 @@ class PackagingMaterial(models.Model):
         BAG      = 'bag',      '🛍️ Пакет'
         CUSTOM   = 'custom',   '⚙️ Інше'
 
+    class SizeClass(models.TextChoices):
+        XS = 'XS', 'XS — до 1 л'
+        S  = 'S',  'S — 1…5 л'
+        M  = 'M',  'M — 5…15 л'
+        L  = 'L',  'L — 15…35 л'
+        XL = 'XL', 'XL — від 35 л'
+
     name      = models.CharField('Назва', max_length=255, blank=True, default='',
                                  help_text='Залиш порожнім — заповниться автоматично з розмірів')
+    code      = models.CharField(
+        'Код', max_length=20, blank=True, default='', db_index=True,
+        help_text='Короткий код коробки для наклейки й штрихкоду, напр. BX-M-02. «🏷 Класифікація, назви й '
+                  'коди…» у списку підкаже його сам.')
+    size_class = models.CharField(
+        'Клас розміру', max_length=4, blank=True, default='', choices=SizeClass.choices,
+        help_text='Порожньо — за об’ємом (XS до 1 л, S до 5 л, M до 15 л, L до 35 л, XL більше).')
     box_type  = models.CharField('Тип', max_length=20,
                                  choices=BoxType.choices, default=BoxType.BOX)
     length_cm = models.DecimalField('Довжина (см)', max_digits=6, decimal_places=1)
@@ -667,11 +681,14 @@ class PackagingMaterial(models.Model):
         verbose_name        = 'Пакувальний матеріал'
         verbose_name_plural = 'Пакувальні матеріали'
         ordering            = ['box_type', 'length_cm', 'width_cm']
+        constraints = [models.UniqueConstraint(fields=['code'], condition=~models.Q(code=''),
+                                               name='packagingmaterial_code_unique')]
 
     def _dim_str(self):
         return f'{self.length_cm}×{self.width_cm}×{self.height_cm} см'
 
     def save(self, *args, **kwargs):
+        self.code = (self.code or '').strip().upper()
         if not self.name and self.length_cm and self.width_cm and self.height_cm:
             self.name = self._dim_str()
         if self.track_stock and not self.stock_since:      # облік почався зараз — давні відправлення не списують
