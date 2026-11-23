@@ -260,6 +260,42 @@ class ReportTests(Base):
         m.assert_not_called()
 
 
+class DefaultMinTests(Base):
+    """«Мінімальний запас за замовчуванням» (Налаштування доставки) — для коробок без свого мінімуму."""
+
+    def setUp(self):
+        super().setUp()
+        self.bare = PackagingMaterial.objects.create(name="Mietel", length_cm=30, width_cm=20, height_cm=10,
+                                                     track_stock=True)
+        PackagingMaterial.objects.filter(pk=self.bare.pk).update(stock_qty=1)
+
+    def test_default_minimum_marks_low(self):
+        rep = packaging_stock.report()
+        self.assertEqual({str(r["material"]): r["state"] for r in rep["rows"]}["Mietel"], "critical")
+        self.assertIn(self.bare.pk, [m.pk for m in packaging_stock.low_materials()])
+        s = ShippingSettings.get()
+        s.packaging_default_min = None
+        s.save()
+        rep = packaging_stock.report()
+        self.assertEqual({str(r["material"]): r["state"] for r in rep["rows"]}["Mietel"], "ok")
+
+    def test_own_minimum_wins(self):
+        PackagingMaterial.objects.filter(pk=self.bare.pk).update(min_stock=0)
+        self.assertNotIn(self.bare.pk, [m.pk for m in packaging_stock.low_materials()])
+
+    def test_changing_default_alerts_once(self):
+        with mock.patch(NOTIFY, return_value=["лист"]) as notify:
+            self.assertEqual([m.pk for m in packaging_stock.check_all_low()], [self.bare.pk])
+            self.assertEqual(packaging_stock.check_all_low(), [])         # уже попереджали
+        self.assertEqual(notify.call_count, 1)
+
+    def test_report_mail_shows_general_minimum(self):
+        from dashboard.notifications import packaging_report_message
+        items = {i["name"]: i for i in packaging_report_message(packaging_stock.report())["items"]}
+        self.assertEqual(items["Mietel"]["min"], "3 шт (загальний)")
+        self.assertEqual(items["Mietel"]["state"], "critical")
+
+
 class AdminTests(Base):
     def setUp(self):
         super().setUp()
@@ -336,6 +372,34 @@ class AdminTests(Base):
         self.assertEqual(r.status_code, 302)
         self.assertEqual(mail.call_count, 1)
         self.assertIn("⛔ немає 1", mail.call_args.args[1])
+
+    def test_bulk_settings_action(self):
+        other = PackagingMaterial.objects.create(name="Other", length_cm=40, width_cm=30, height_cm=20)
+        url = "/admin/shipping/packagingmaterial/"
+        ids = [self.box.pk, other.pk]
+        page = self.client.post(url, {"action": "bulk_settings_selected", "index": 0, "_selected_action": ids})
+        self.assertContains(page, "Застосувати до 2 коробок")
+        self.assertEqual(PackagingMaterial.objects.get(pk=other.pk).min_stock, None)          # ще нічого
+        with mock.patch(NOTIFY):
+            r = self.client.post(url, {"action": "bulk_settings_selected", "_selected_action": ids, "apply": "1",
+                                       "min_stock": "4", "reorder_qty": "25", "track": "on", "buy_url": ""})
+        self.assertEqual(r.status_code, 302)
+        for m in PackagingMaterial.objects.filter(pk__in=ids):
+            self.assertEqual((m.min_stock, m.reorder_qty, m.track_stock), (4, 25, True))
+        self.assertIsNotNone(PackagingMaterial.objects.get(pk=other.pk).stock_since)
+        with mock.patch(NOTIFY):
+            self.client.post(url, {"action": "bulk_settings_selected", "_selected_action": [other.pk], "apply": "1",
+                                   "min_clear": "on"})
+        self.assertIsNone(PackagingMaterial.objects.get(pk=other.pk).min_stock)
+        self.assertEqual(PackagingMaterial.objects.get(pk=self.box.pk).min_stock, 4)          # не вибрана
+        r = self.client.post(url, {"action": "bulk_settings_selected", "_selected_action": [other.pk], "apply": "1",
+                                   "min_stock": "2", "min_clear": "on"})
+        self.assertContains(r, "Або вписати значення, або прибрати")
+
+    def test_min_stock_editable_in_list(self):
+        page = self.client.get("/admin/shipping/packagingmaterial/")
+        self.assertContains(page, 'name="form-0-min_stock"')
+        self.assertContains(page, "3 (загальний)")
 
     def test_stock_report_action_keeps_selection(self):
         r = self.client.post("/admin/shipping/packagingmaterial/",

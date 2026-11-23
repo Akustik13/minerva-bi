@@ -1,0 +1,77 @@
+{% extends "admin/base_site.html" %}
+{# Bulk minimum stock / tracking for the selected boxes (PackagingMaterialAdmin.bulk_settings_selected) #}
+
+{% block title %}{{ title }} — Minerva{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Головна</a> ›
+  <a href="{% url 'admin:shipping_packagingmaterial_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a> › {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .bs-box { max-width: 860px; padding: 16px 20px; border: 1px solid var(--border-strong, #243347); border-radius: 8px;
+            background: var(--bg-card, #1a2535); margin-bottom: 16px; }
+  .bs-muted { color: var(--body-quiet-color, #8aa0b4); font-size: 12px; }
+  .bs-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .bs-table th, .bs-table td { padding: 5px 8px; border-bottom: 1px solid var(--border-color, #2a3a4e); text-align: left; }
+  .bs-table td.num, .bs-table th.num { text-align: right; white-space: nowrap; }
+  .bs-grid { display: grid; grid-template-columns: minmax(180px, 240px) 1fr; gap: 10px 16px; align-items: start; }
+  .bs-grid label.bs-l { font-weight: 600; padding-top: 6px; float: none; width: auto; }
+  .bs-grid input[type=number] { width: 8em; }
+  .bs-grid input[type=url] { width: 100%; max-width: 420px; box-sizing: border-box; }
+  .bs-chk { display: flex; gap: 6px; align-items: center; margin-top: 4px; font-size: 12px; }
+  .bs-err { margin: 0 0 10px; padding: 8px 12px; border-radius: 6px; background: rgba(229, 72, 77, .14); }
+  @media (max-width: 640px) { .bs-grid { grid-template-columns: 1fr; } }
+</style>
+
+<div class="bs-box">
+  <div style="font-weight:600;margin-bottom:8px">Вибрано коробок: {{ boxes|length }}</div>
+  <table class="bs-table">
+    <tr><th>Коробка</th><th class="num">На складі</th><th class="num">Мінімум</th><th>Облік</th></tr>
+    {% for m in boxes %}
+    <tr>
+      <td translate="no">{{ m }}</td>
+      <td class="num">{% if m.track_stock %}{{ m.stock_qty }} шт{% else %}—{% endif %}</td>
+      <td class="num">{% if m.min_stock is not None %}{{ m.min_stock }} шт{% elif m.effective_min is not None %}<span class="bs-muted">{{ m.effective_min }} шт (загальний)</span>{% else %}—{% endif %}</td>
+      <td>{% if m.track_stock %}✓{% else %}<span class="bs-muted">не ведеться</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<form method="post" class="bs-box">{% csrf_token %}
+  {% for m in boxes %}<input type="hidden" name="_selected_action" value="{{ m.pk }}">{% endfor %}
+  <input type="hidden" name="action" value="{{ action_name }}">
+  <input type="hidden" name="apply" value="1">
+  {% if form.non_field_errors %}<div class="bs-err">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+  <div class="bs-muted" style="margin-bottom:12px">Порожнє поле нічого не змінює. Нове значення отримають усі
+    вибрані коробки.{% if default_min is not None %} Загальний мінімум зараз — {{ default_min }} шт
+    (<a href="{{ settings_url }}">«Налаштування доставки» → «📦 Запас коробок»</a>).{% endif %}</div>
+  <div class="bs-grid">
+    <label class="bs-l" for="id_min_stock">Мінімальний запас, шт</label>
+    <div>{{ form.min_stock }} {{ form.min_stock.errors }}
+      <label class="bs-chk">{{ form.min_clear }} Прибрати свій мінімум — діятиме загальний з «Налаштувань доставки»</label>
+      <div class="bs-muted">Залишилось стільки або менше — «⚠️ Мало» і повідомлення «📦 Мало коробок».</div></div>
+
+    <label class="bs-l" for="id_reorder_qty">Скільки докуповувати, шт</label>
+    <div>{{ form.reorder_qty }} {{ form.reorder_qty.errors }}
+      <label class="bs-chk">{{ form.reorder_clear }} Прибрати «Скільки докуповувати»</label></div>
+
+    <label class="bs-l" for="id_track">Вести облік на складі</label>
+    <div>{{ form.track }}
+      <div class="bs-muted">Увімкнули — запас рахується відтепер; вписати, скільки є, — у картці коробки
+        («🧮 Фактично є зараз»).</div></div>
+
+    <label class="bs-l" for="id_buy_url">Де купувати</label>
+    <div>{{ form.buy_url }} {{ form.buy_url.errors }}
+      <label class="bs-chk">{{ form.buy_clear }} Прибрати «Де купувати»</label></div>
+  </div>
+  <div style="margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <button type="submit" class="button default">✓ Застосувати до {{ boxes|length }} коробок</button>
+    <a href="{% url 'admin:shipping_packagingmaterial_changelist' %}">← до пакувальних матеріалів</a>
+  </div>
+</form>
+{% endblock %}

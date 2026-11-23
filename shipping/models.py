@@ -627,6 +627,11 @@ class PackagingMaterial(models.Model):
     length_cm = models.DecimalField('Довжина (см)', max_digits=6, decimal_places=1)
     width_cm  = models.DecimalField('Ширина (см)',  max_digits=6, decimal_places=1)
     height_cm = models.DecimalField('Висота (см)',  max_digits=6, decimal_places=1)
+    fold_heights = models.CharField(
+        'Можна скласти до висоти (см)', max_length=60, blank=True, default='',
+        help_text='Коробка з насічками, яку можна зробити нижчою: висоти через кому, напр. «22, 16». Довжина й '
+                  'ширина ті самі; це та сама коробка — один запас на складі, посилка 30×30×16 її теж списує, '
+                  'а рекомендація складає коробку до найменшої висоти, у яку вміщується товар.')
 
     tare_weight_kg = models.DecimalField('Вага порожньої (кг)', max_digits=6, decimal_places=3,
                                          default=0, help_text='Вага самої коробки без вмісту')
@@ -676,13 +681,65 @@ class PackagingMaterial(models.Model):
             self.stock_since = None
         super().save(*args, **kwargs)
 
+    @staticmethod
+    def parse_fold_heights(text):
+        """«22, 16» / «22;16» / «22 16» → ([Decimal висоти], [неправильні частини])."""
+        import re
+        from decimal import Decimal, InvalidOperation
+        good, bad = [], []
+        for part in re.split(r'[,;\s/]+', str(text or '').replace('см', ' ').replace('cm', ' ')):
+            if not part:
+                continue
+            try:
+                v = Decimal(part.replace(',', '.')).quantize(Decimal('0.1'))
+            except InvalidOperation:
+                bad.append(part)
+                continue
+            if v <= 0:
+                bad.append(part)
+            elif v not in good:
+                good.append(v)
+        return good, bad
+
+    @property
+    def heights(self):
+        """Висоти, до яких можна скласти: повна першою, далі нижчі (лише менші за повну)."""
+        from decimal import Decimal
+        full = Decimal(self.height_cm or 0)
+        folds, _ = self.parse_fold_heights(self.fold_heights)
+        return [full] + sorted((h for h in folds if h < full), reverse=True)
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        super().clean()
+        folds, bad = self.parse_fold_heights(self.fold_heights)
+        if bad:
+            raise ValidationError({'fold_heights': f'Не число: {", ".join(bad)}. Пишіть висоти через кому, напр. «22, 16».'})
+        if self.height_cm is not None and any(h >= self.height_cm for h in folds):
+            raise ValidationError({'fold_heights': 'Висота складеної коробки має бути меншою за «Висоту» '
+                                                   f'({self.height_cm} см).'})
+        self.fold_heights = ', '.join(f'{h.normalize():f}' for h in sorted(folds, reverse=True))
+
     @property
     def volume_cm3(self):
         return round(float(self.length_cm) * float(self.width_cm) * float(self.height_cm), 1)
 
     @property
+    def default_min(self):
+        """«Мінімальний запас за замовчуванням» з «Налаштувань доставки» (раз на об'єкт)."""
+        if not hasattr(self, '_default_min'):
+            self._default_min = ShippingSettings.get().packaging_default_min
+        return self._default_min
+
+    @property
+    def effective_min(self):
+        """Свій «Мінімальний запас», інакше — за замовчуванням; None — «мало» не буває."""
+        return self.min_stock if self.min_stock is not None else self.default_min
+
+    @property
     def is_low(self):
-        return bool(self.track_stock and self.min_stock is not None and self.stock_qty <= self.min_stock)
+        m = self.effective_min
+        return bool(self.track_stock and m is not None and self.stock_qty <= m)
 
     def __str__(self):
         return self.name or self._dim_str()
@@ -920,6 +977,11 @@ class ShippingSettings(models.Model):
     packaging_alert_repeat_days = models.PositiveSmallIntegerField(
         "Нагадувати кожні N днів", default=0,
         help_text="Поки коробок мало — нагадувати знову через стільки днів. 0 — лише раз.",
+    )
+    packaging_default_min = models.PositiveIntegerField(
+        "Мінімальний запас за замовчуванням, шт", null=True, blank=True, default=3,
+        help_text="Для коробок з обліком, у яких свій «Мінімальний запас» не вписано: залишилось стільки або "
+                  "менше — «⚠️ Мало» у звіті й повідомлення. Порожньо — такі коробки «мало» не бувають.",
     )
 
     @classmethod

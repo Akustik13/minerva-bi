@@ -129,10 +129,32 @@ def count(material, actual: int, *, user=None, note="") -> object | None:
 
 # ── Мало коробок ──────────────────────────────────────────────────────────────
 
+def _with_default(materials):
+    """Підставити «Мінімальний запас за замовчуванням» одним запитом (а не на кожну коробку)."""
+    from shipping.models import ShippingSettings
+    default = ShippingSettings.get().packaging_default_min
+    for m in materials:
+        m._default_min = default
+    return materials
+
+
 def low_materials():
     from shipping.models import PackagingMaterial
-    return [m for m in PackagingMaterial.objects.filter(track_stock=True, is_active=True, min_stock__isnull=False)
-            .order_by("name") if m.is_low]
+    return [m for m in _with_default(list(PackagingMaterial.objects.filter(track_stock=True, is_active=True)
+                                          .order_by("name"))) if m.is_low]
+
+
+def check_all_low() -> list:
+    """Змінили «Мінімальний запас за замовчуванням»: коробки, яких тепер мало й про які ще не попереджали, —
+    одним повідомленням. → [коробки]."""
+    from shipping.models import PackagingMaterial, ShippingSettings
+    if not ShippingSettings.get().packaging_alert_enabled:
+        return []
+    due = [m for m in low_materials() if not m.low_notified_at and
+           PackagingMaterial.objects.filter(pk=m.pk, low_notified_at__isnull=True).update(low_notified_at=timezone.now())]
+    if due:
+        notify(due)
+    return due
 
 
 def check_low(material_pk) -> bool:
@@ -200,7 +222,7 @@ def report(ids=None, untracked=False) -> dict:
     qs = qs.filter(pk__in=ids) if ids else qs.filter(is_active=True)
     if not untracked:
         qs = qs.filter(track_stock=True)
-    rows = [{"material": m, "state": state_of(m)} for m in qs]
+    rows = [{"material": m, "state": state_of(m)} for m in _with_default(list(qs))]
     rows.sort(key=lambda r: (STATE_ORDER.index(r["state"]), str(r["material"]).lower()))
     counts = {s: sum(1 for r in rows if r["state"] == s) for s in STATE_ORDER}
     return {"rows": rows, "counts": counts, "at": timezone.now()}

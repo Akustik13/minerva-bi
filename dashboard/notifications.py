@@ -1842,7 +1842,7 @@ def packaging_low_message(materials) -> dict:
     base = _site_base()
     items = []
     for m in materials:
-        line = f'на складі {m.stock_qty} шт · мінімум {m.min_stock} шт'
+        line = f'на складі {m.stock_qty} шт · мінімум {m.effective_min} шт'
         if m.reorder_qty:
             line += f' · купити ≈ {m.reorder_qty} шт'
         items.append({'name': str(m), 'line': line, 'buy': m.buy_url or '',
@@ -1918,7 +1918,8 @@ def packaging_report_message(rep) -> dict:
         items.append({
             'name': str(m), 'dims': m._dim_str(), 'state': state, 'icon': icon, 'label': label,
             'stock': f'{m.stock_qty} шт' if m.track_stock else '—',
-            'min': f'{m.min_stock} шт' if m.track_stock and m.min_stock is not None else '—',
+            'min': (f'{m.effective_min} шт' + ('' if m.min_stock is not None else ' (загальний)'))
+                   if m.track_stock and m.effective_min is not None else '—',
             'todo': todo, 'buy': m.buy_url or '', 'archived': not m.is_active,
             'link': f'{base}/admin/shipping/packagingmaterial/{m.pk}/change/'})
     parts = [f'⛔ немає {c["missing"]}' if c['missing'] else '', f'⚠️ мало {c["critical"]}' if c['critical'] else '']

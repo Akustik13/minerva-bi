@@ -214,6 +214,74 @@ class LearnTests(Base):
         self.assertEqual(packaging.learn_plan(s), [])
 
 
+class FoldingBoxTests(Base):
+    """Коробка 30×30×30, яку можна скласти до 22 і 16 см — одна коробка в усіх висотах."""
+
+    def setUp(self):
+        super().setUp()
+        self.cube = box(30, 30, 30)
+        self.cube.fold_heights = "22, 16"
+        self.cube.save()
+
+    def test_heights_and_clean(self):
+        self.assertEqual(self.cube.heights, [Decimal(30), Decimal(22), Decimal(16)])
+        from django.core.exceptions import ValidationError
+        m = PackagingMaterial(length_cm=30, width_cm=30, height_cm=30, fold_heights="16;22 cm, 22")
+        m.full_clean()
+        self.assertEqual(m.fold_heights, "22, 16")
+        for bad in ("30", "35", "abc"):
+            m.fold_heights = bad
+            with self.assertRaises(ValidationError):
+                m.full_clean()
+
+    def test_folded_parcel_is_the_same_box(self):
+        from types import SimpleNamespace as NS
+        self.assertEqual(packaging.material_for(NS(length_cm=30, width_cm=30, height_cm=16)), self.cube)
+        self.assertEqual(packaging.material_for(NS(length_cm=16, width_cm=30, height_cm=30)), self.cube)  # повернута
+        self.assertIsNone(packaging.material_for(NS(length_cm=30, width_cm=30, height_cm=19)))
+        exact = box(30, 30, 16)                               # окрема коробка точно цього розміру — вона
+        self.assertEqual(packaging.material_for(NS(length_cm=30, width_cm=30, height_cm=16)), exact)
+
+    def test_recommendation_folds_to_contents(self):
+        self.pp(self.a, self.cube, 10)
+        for qty, height in ((4, 16), (7, 22), (8, 30), (10, 30)):
+            rec = packaging.recommend(self.order((self.a, qty)))
+            self.assertEqual((rec.total_boxes, rec.boxes[0].height_cm), (1, Decimal(height)), qty)
+            self.assertEqual(rec.rows()[0]["height_cm"], float(height))
+        rec = packaging.recommend(self.order((self.a, 4)))
+        self.assertIn("складено до 16 см", rec.boxes[0].label)
+        self.assertEqual(rec.box, self.cube)
+
+    def test_learning_from_folded_parcel_scales_to_full_height(self):
+        s = self.ship(self.order((self.a, 5)), dims=(30, 30, 16))
+        plan = packaging.learn_plan(s)
+        self.assertEqual([(c["qty_per_box"], c["folded"]) for c in plan], [(9, Decimal(16))])
+        packaging.learn(s)
+        rec_pp = ProductPackaging.objects.get(product=self.a)
+        self.assertEqual((rec_pp.packaging, rec_pp.qty_per_box), (self.cube, 9))
+        self.assertFalse(PackagingMaterial.objects.filter(height_cm=16).exists())   # без коробки-дубля
+        self.assertEqual(packaging.learn_plan(s), [])
+        rec = packaging.recommend(self.order((self.a, 5)))          # те саме замовлення — 📜 як минулого разу
+        self.assertEqual((rec.source, rec.boxes[0].height_cm), ("history", Decimal(16)))
+        rec = packaging.recommend(self.order((self.a, 6)))          # 6 з 9 на повну висоту → 22 см
+        self.assertEqual((rec.source, rec.boxes[0].height_cm), ("product_packaging", Decimal(22)))
+        self.assertEqual(packaging.recommend(self.order((self.a, 4))).boxes[0].height_cm, Decimal(16))
+
+    def test_folded_parcel_uses_the_box_stock(self):
+        from shipping.services import packaging_stock
+        PackagingMaterial.objects.filter(pk=self.cube.pk).update(track_stock=True, stock_qty=10)
+        s = self.ship(self.order((self.a, 1)), dims=(30, 30, 16))
+        with self.captureOnCommitCallbacks(execute=True):
+            s.status = Shipment.Status.IN_TRANSIT
+            s.save()
+        packaging_stock.sync_shipment(s)
+        self.assertEqual(PackagingMaterial.objects.get(pk=self.cube.pk).stock_qty, 9)
+
+    def test_fold_boxes_for_the_form(self):
+        self.assertEqual(packaging.fold_boxes(), [{"name": str(self.cube), "l": 30.0, "w": 30.0,
+                                                   "heights": [30.0, 22.0, 16.0]}])
+
+
 class ViewTests(Base):
     def setUp(self):
         super().setUp()

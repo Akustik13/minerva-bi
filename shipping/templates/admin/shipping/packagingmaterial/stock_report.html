@@ -59,7 +59,7 @@
         {% if not m.is_active %}<span class="sr-muted">(в архіві)</span>{% endif %}
         <div class="sr-muted" translate="no">{{ m.length_cm }}×{{ m.width_cm }}×{{ m.height_cm }} см</div></td>
       <td class="num">{% if m.track_stock %}<b>{{ m.stock_qty }} шт</b>{% else %}—{% endif %}</td>
-      <td class="num">{% if m.track_stock and m.min_stock is not None %}{{ m.min_stock }} шт{% else %}—{% endif %}</td>
+      <td class="num">{% if m.track_stock and m.effective_min is not None %}{{ m.effective_min }} шт{% if m.min_stock is None %} <span class="sr-muted">(загальний)</span>{% endif %}{% else %}—{% endif %}</td>
       <td class="sr-state">{{ r.mark.0 }} {{ r.mark.1 }}</td>
       <td>{% if r.state == "missing" or r.state == "critical" %}{% if m.reorder_qty %}купити ≈ {{ m.reorder_qty }} шт{% else %}треба купити{% endif %}{% if m.buy_url %} · <a href="{{ m.buy_url }}" target="_blank" rel="noopener noreferrer">🛒 Де купувати</a>{% endif %}{% endif %}</td>
     </tr>

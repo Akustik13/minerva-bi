@@ -7,7 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from django import forms
 from django.contrib import admin, messages
 from django.db import models, transaction
-from django.db.models import F
+from django.db.models import F, Q
 from core.mixins import AuditableMixin
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -98,7 +98,11 @@ class PackagingStockFilter(admin.SimpleListFilter):
         if self.value() == 'missing':
             return queryset.filter(track_stock=True, stock_qty__lte=0)
         if self.value() == 'low':
-            return queryset.filter(track_stock=True, min_stock__isnull=False, stock_qty__lte=F('min_stock'))
+            low = Q(min_stock__isnull=False, stock_qty__lte=F('min_stock'))
+            default = ShippingSettings.get().packaging_default_min
+            if default is not None:                  # без свого мінімуму — «Мінімальний запас за замовчуванням»
+                low |= Q(min_stock__isnull=True, stock_qty__lte=default)
+            return queryset.filter(low, track_stock=True)
         if self.value() == 'tracked':
             return queryset.filter(track_stock=True)
         if self.value() == 'untracked':
@@ -133,6 +137,48 @@ class PackagingArchiveFilter(admin.SimpleListFilter):
         return queryset.filter(is_active=True)
 
 
+class PackagingBulkForm(forms.Form):
+    """«⚙️ Мінімальний запас і облік для вибраних…» — порожнє поле не змінює нічого."""
+    min_stock = forms.IntegerField(label=_('Мінімальний запас, шт'), required=False, min_value=0,
+                                   help_text=_('Порожньо — не змінювати.'))
+    min_clear = forms.BooleanField(label=_('Прибрати свій мінімум — діятиме загальний з «Налаштувань доставки»'),
+                                   required=False)
+    reorder_qty = forms.IntegerField(label=_('Скільки докуповувати, шт'), required=False, min_value=1,
+                                     help_text=_('Порожньо — не змінювати.'))
+    reorder_clear = forms.BooleanField(label=_('Прибрати «Скільки докуповувати»'), required=False)
+    track = forms.ChoiceField(label=_('Вести облік на складі'), required=False, choices=(
+        ('', _('не змінювати')), ('on', _('увімкнути')), ('off', _('вимкнути'))))
+    buy_url = forms.URLField(label=_('Де купувати'), required=False, max_length=500,
+                             help_text=_('Порожньо — не змінювати.'))
+    buy_clear = forms.BooleanField(label=_('Прибрати «Де купувати»'), required=False)
+
+    def clean(self):
+        data = super().clean()
+        for field, clear in (('min_stock', 'min_clear'), ('reorder_qty', 'reorder_clear'), ('buy_url', 'buy_clear')):
+            if data.get(clear) and data.get(field) not in (None, ''):
+                raise forms.ValidationError(_('Або вписати значення, або прибрати — не те й інше разом.'))
+        return data
+
+    def changes(self) -> dict:
+        """{поле моделі: нове значення} — лише те, що людина вибрала змінити."""
+        d, out = self.cleaned_data, {}
+        if d.get('min_clear'):
+            out['min_stock'] = None
+        elif d.get('min_stock') is not None:
+            out['min_stock'] = d['min_stock']
+        if d.get('reorder_clear'):
+            out['reorder_qty'] = None
+        elif d.get('reorder_qty') is not None:
+            out['reorder_qty'] = d['reorder_qty']
+        if d.get('track'):
+            out['track_stock'] = d['track'] == 'on'
+        if d.get('buy_clear'):
+            out['buy_url'] = ''
+        elif d.get('buy_url'):
+            out['buy_url'] = d['buy_url']
+        return out
+
+
 class PackagingMaterialForm(forms.ModelForm):
     """Прихід і інвентаризація — не поля моделі: кожна зміна запасу йде рухом (shipping/services/packaging_stock)."""
     receive_qty = forms.IntegerField(
@@ -162,13 +208,93 @@ class PackagingMaterialForm(forms.ModelForm):
 @admin.register(PackagingMaterial)
 class PackagingMaterialAdmin(admin.ModelAdmin):
     form = PackagingMaterialForm
-    list_display  = ('type_badge', 'name', 'dimensions_col', 'stock_col', 'tare_weight_kg',
+    list_display  = ('type_badge', 'name', 'dimensions_col', 'stock_col', 'min_stock', 'tare_weight_kg',
                      'max_weight_kg', 'volume_col', 'cost', 'is_active')
     list_filter   = (PackagingArchiveFilter, PackagingStockFilter, 'box_type')
-    list_editable = ('is_active',)
+    list_editable = ('min_stock', 'is_active')
     search_fields = ('name',)
-    readonly_fields = ('stock_panel', 'movements_panel')
-    actions = ('archive_selected', 'restore_selected', 'stock_report_selected')
+    readonly_fields = ('stock_panel', 'movements_panel', 'fold_panel')
+    actions = ('bulk_settings_selected', 'archive_selected', 'restore_selected', 'stock_report_selected')
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        field = super().formfield_for_dbfield(db_field, request, **kwargs)
+        if db_field.name == 'min_stock' and field is not None:
+            default = ShippingSettings.get().packaging_default_min
+            if default is not None:              # порожньо — діє загальний мінімум, видно в полі
+                field.widget.attrs['placeholder'] = _('{} (загальний)').format(default)
+            field.widget.attrs.setdefault('style', 'width:7em')
+        return field
+
+    def get_changelist_formset(self, request, **kwargs):
+        """Мінімум, змінений прямо в рядку списку, — одразу перевірка «мало коробок»."""
+        FormSet = super().get_changelist_formset(request, **kwargs)
+        from .services import packaging_stock
+
+        class Checked(FormSet):
+            def save(self, commit=True):
+                objs = super().save(commit)
+                pks = [f.instance.pk for f in self.forms if f.has_changed() and f.instance.pk]
+                transaction.on_commit(lambda: [packaging_stock.check_low(pk) for pk in pks])
+                return objs
+        return Checked
+
+    @admin.action(description=_('⚙️ Мінімальний запас і облік для вибраних…'), permissions=['change'])
+    def bulk_settings_selected(self, request, queryset):
+        """Сторінка з полями (порожнє — не змінювати) → «Застосувати» змінює всі вибрані коробки."""
+        from django.template.response import TemplateResponse
+        from .services import packaging_stock
+        form = PackagingBulkForm(request.POST if request.POST.get('apply') else None)
+        if request.POST.get('apply') and form.is_valid():
+            changes = form.changes()
+            if not changes:
+                self.message_user(request, _('Нічого не вибрано змінити.'), messages.INFO)
+                return None
+            names = [str(PackagingMaterial._meta.get_field(f).verbose_name) for f in changes]
+            done = []
+            for obj in queryset:
+                for field, value in changes.items():
+                    setattr(obj, field, value)
+                obj.save()
+                self.log_change(request, obj, [{'changed': {'fields': names}}])
+                done.append(obj)
+            pks = [o.pk for o in done if o.track_stock]
+            transaction.on_commit(lambda: [packaging_stock.check_low(pk) for pk in pks])
+            self.message_user(request, _('⚙️ Змінено для {} коробок: {}.').format(len(done), ', '.join(names)),
+                              messages.SUCCESS)
+            return None
+        boxes = packaging_stock._with_default(list(queryset.order_by('name')))
+        return TemplateResponse(request, 'admin/shipping/packagingmaterial/bulk_settings.html', {
+            **self.admin_site.each_context(request), 'opts': self.model._meta,
+            'title': _('⚙️ Мінімальний запас і облік для вибраних'), 'form': form, 'boxes': boxes,
+            'default_min': ShippingSettings.get().packaging_default_min,
+            'action_name': 'bulk_settings_selected',
+            'settings_url': reverse('admin:shipping_shippingsettings_changelist'),
+        })
+
+    @admin.display(description=_('Складена коробка'))
+    def fold_panel(self, obj):
+        """Висоти, до яких складається коробка, і окремі коробки тих самих розмірів (дублі — їх в архів)."""
+        if not obj or not obj.pk:
+            return '—'
+        if len(obj.heights) < 2:
+            return _('Не складається — посилки впізнаються лише за повними розмірами.')
+        from types import SimpleNamespace
+        from .services.packaging import fold_height
+        sizes = ' · '.join(f'{obj.length_cm.normalize():f}×{obj.width_cm.normalize():f}×{h.normalize():f}'
+                           for h in obj.heights)
+        dups = [m for m in PackagingMaterial.objects.filter(is_active=True).exclude(pk=obj.pk)
+                if any(fold_height(m, SimpleNamespace(length_cm=obj.length_cm, width_cm=obj.width_cm, height_cm=h))
+                       is not None for h in obj.heights[1:])]
+        out = format_html('📐 {} {}', _('Ця сама коробка:'), format_html('<span translate="no">{} см</span>', sizes))
+        if dups:
+            links = format_html_join(', ', '<a href="{}" translate="no">{}</a>', (
+                (reverse('admin:shipping_packagingmaterial_change', args=[m.pk]), str(m)) for m in dups))
+            out = format_html(
+                '{}<br><span style="color:var(--warn,#d29922)">⚠️ {} {} — {}</span>', out,
+                _('Є окремі коробки тих самих розмірів:'), links,
+                _('якщо це ця сама складена коробка, відправте їх в архів (дія «🗄 В архів»), щоб запас вівся '
+                  'в одній картці.'))
+        return out
 
     def get_urls(self):
         from django.urls import path
@@ -244,8 +370,10 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
             'fields': ('box_type', 'name', 'is_active', 'notes'),
         }),
         ('📐 Розміри', {
-            'fields': (('length_cm', 'width_cm', 'height_cm'),),
-            'description': 'Внутрішні розміри коробки в сантиметрах',
+            'fields': (('length_cm', 'width_cm', 'height_cm'), 'fold_heights', 'fold_panel'),
+            'description': 'Внутрішні розміри коробки в сантиметрах. Коробку з насічками, яку можна зробити '
+                           'нижчою, заводьте один раз — на повну висоту, а нижчі висоти впишіть у «Можна скласти '
+                           'до висоти».',
         }),
         ('⚖️ Вага', {
             'fields': (('tare_weight_kg', 'max_weight_kg'),),
@@ -317,8 +445,14 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
                                obj.stock_qty)
         if obj.is_low:
             return format_html('<b style="color:var(--err,#f85149)" title="{}">⚠️ {} шт</b>',
-                               _('Мінімум: {}').format(obj.min_stock), obj.stock_qty)
+                               _('Мінімум: {}').format(obj.effective_min), obj.stock_qty)
         return format_html('{} шт', obj.stock_qty)
+
+    def get_changelist_instance(self, request):
+        cl = super().get_changelist_instance(request)
+        from .services.packaging_stock import _with_default
+        _with_default(cl.result_list)                # «Мінімальний запас за замовчуванням» одним запитом
+        return cl
 
     @admin.display(description=_('Зараз на складі'))
     def stock_panel(self, obj):
@@ -328,7 +462,10 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
             return _('Облік не ведеться — увімкніть «Вести облік на складі» і впишіть «Фактично є зараз».')
         state = (format_html('<b style="color:var(--err,#f85149)">⚠️ {}</b>', _('мало — треба купити'))
                  if obj.is_low else format_html('<span style="color:var(--ok,#3fb950)">✓ {}</span>', _('вистачає'))
-                 if obj.min_stock is not None else _('мінімум не задано — без повідомлень'))
+                 if obj.effective_min is not None else _('мінімум не задано — без повідомлень'))
+        if obj.min_stock is None and obj.effective_min is not None:
+            state = format_html('{} · <span style="color:var(--text-muted,#607d8b)">{}</span>', state,
+                                _('мінімум за замовчуванням: {} шт («Налаштування доставки»)').format(obj.effective_min))
         since = timezone.localtime(obj.stock_since).strftime('%d.%m.%Y %H:%M') if obj.stock_since else '—'
         return format_html('<b style="font-size:16px">{} шт</b> · {} · <span style="color:var(--text-muted,#607d8b)">'
                            '{} {}</span>', obj.stock_qty, state, _('облік з'), since)
@@ -366,11 +503,16 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
     type_badge.short_description = _('Тип')
 
     def dimensions_col(self, obj):
-        return format_html(
+        dims = format_html(
             '<span style="font-family:monospace;color:#80cbc4">'
             '{}×{}×{} см</span>',
             obj.length_cm, obj.width_cm, obj.height_cm,
         )
+        folds = obj.heights[1:]
+        if not folds:
+            return dims
+        return format_html('{}<br><span style="font-size:11px;color:var(--text-muted,#607d8b)" title="{}">↧ {} см</span>',
+                           dims, _('Можна скласти до висоти'), ' · '.join(f'{h.normalize():f}' for h in folds))
     dimensions_col.short_description = _('Розміри (Д×Ш×В)')
 
     def volume_col(self, obj):
@@ -2108,6 +2250,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "default_ca_weight":   default_ca_weight,
             "title":               f"Нове відправлення — {order.order_number}",
             "pkg_rows_json":       _json.dumps(pkg_rows),
+            "pkg_folds":           self._fold_boxes(),
             "pkg_auto":            pkg_auto,
             "recent_recipients_json": _json.dumps(unique_recipients),
             "agent_checks":        self._ship_checks(order),
@@ -2116,6 +2259,16 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "parcel":              parcel_ctx,
             "weight_check":        self._weight_check(order, request),
         })
+
+    @staticmethod
+    def _fold_boxes():
+        """Коробки з насічками — кнопки висоти в рядках «Коробки» форми (services.packaging.fold_boxes)."""
+        try:
+            from .services.packaging import fold_boxes
+            return fold_boxes()
+        except Exception as e:  # noqa: BLE001 — без підказки форма однаково працює
+            logger.warning("fold boxes: %s", e)
+            return []
 
     @staticmethod
     def _weight_check(order, request):
@@ -2674,6 +2827,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "cancel_url":           reverse("admin:shipping_shipment_changelist"),
             "title":                f"{'Виправити помилку' if is_error else 'Редагувати чернетку'} #{shipment.pk}",
             "pkg_rows_json":        _json2.dumps(pkg_rows_edit),
+            "pkg_folds":            self._fold_boxes(),
             "pkg_auto":             len(pkg_rows_edit) > 1 or (len(pkg_rows_edit) == 1 and pkg_rows_edit[0]["quantity"] > 1),
             "pkg_items_dist_json":  _json2.dumps(pkg_items_dist_edit),
             "addr_book_json":       self._build_addr_book_json(request),
@@ -8619,9 +8773,16 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
     readonly_fields = ("last_tracking_run", "tracking_actions", "tracking_rules_panel",
                        "tracking_log_link", "packaging_sync_panel", "packaging_stock_panel")
 
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if change and ({"packaging_default_min", "packaging_alert_enabled"} & set(form.changed_data)):
+            from .services import packaging_stock   # тепер мало — одним повідомленням (про кого ще не попереджали)
+            transaction.on_commit(packaging_stock.check_all_low)
+
     fieldsets = [
         ("📦 Запас коробок", {
-            "fields": ("packaging_alert_enabled", ("packaging_alert_email", "packaging_alert_telegram"),
+            "fields": ("packaging_default_min", "packaging_alert_enabled",
+                       ("packaging_alert_email", "packaging_alert_telegram"),
                        "packaging_alert_repeat_days", "packaging_stock_panel"),
             "description": (
                 "Коробки з «Вести облік на складі»: оформлене відправлення списує коробку його розмірів, "
@@ -8854,7 +9015,8 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
 
     @admin.display(description=_("Коробки з обліком"))
     def packaging_stock_panel(self, obj):
-        mats = list(PackagingMaterial.objects.filter(track_stock=True, is_active=True).order_by("name"))
+        from .services.packaging_stock import _with_default
+        mats = _with_default(list(PackagingMaterial.objects.filter(track_stock=True, is_active=True).order_by("name")))
         changelist = reverse("admin:shipping_packagingmaterial_changelist")
         if not mats:
             return format_html('{} <a href="{}">{} →</a>', _("Жодна коробка ще не має обліку на складі."),
@@ -8862,8 +9024,9 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
         rows = format_html_join("", '<tr><td><a href="{}">{}</a></td><td style="text-align:right">{}</td>'
                                     '<td style="text-align:right">{}</td><td>{}</td></tr>', (
             (reverse("admin:shipping_packagingmaterial_change", args=[m.pk]), str(m), m.stock_qty,
-             m.min_stock if m.min_stock is not None else "—",
-             "⚠️ " + str(_("мало")) if m.is_low else ("✓" if m.min_stock is not None else "—"))
+             (str(m.min_stock) if m.min_stock is not None
+              else f"{m.effective_min} ({_('загальний')})" if m.effective_min is not None else "—"),
+             "⚠️ " + str(_("мало")) if m.is_low else ("✓" if m.effective_min is not None else "—"))
             for m in mats))
         routes = reverse("admin:config_notificationsettings_changelist")
         send = format_html(

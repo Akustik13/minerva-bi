@@ -1768,10 +1768,61 @@ document.addEventListener('DOMContentLoaded', function() {
         </button>
       </div>
 
+      {{ pkg_folds|default_if_none:""|json_script:"pkg-folds" }}
       <script>
       (function(){
         var _PKG_PRESET = {{ pkg_rows_json|default:"[]"|safe }};
         var _PKG_ITEMS_DIST = {{ pkg_items_dist_json|default:"[]"|safe }};
+        // Коробки з насічками («Можна скласти до висоти» в «Пакувальних матеріалах») — кнопки висоти в рядку
+        var _PKG_FOLDS = [];
+        try { _PKG_FOLDS = JSON.parse(document.getElementById('pkg-folds').textContent) || []; } catch (e) {}
+
+        function _pkgFoldHint(tr) {
+          var hIn = tr.querySelector('[name="pkg_height[]"]');
+          if (!hIn) return;
+          var box = tr.querySelector('.pkg-fold');
+          if (!box) {
+            box = document.createElement('div');
+            box.className = 'pkg-fold';
+            box.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:3px;font-size:11px';
+            hIn.parentNode.appendChild(box);
+          }
+          box.textContent = '';
+          if (!_PKG_FOLDS.length) return;
+          var v = function(n) { return parseFloat(tr.querySelector('[name="' + n + '"]')?.value || 0); };
+          var l = v('pkg_length[]'), w = v('pkg_width[]'), h = v('pkg_height[]');
+          var near = function(a, b) { return Math.abs(a - b) <= 1; };
+          var hit = _PKG_FOLDS.find(function(f) {
+            var lw = (near(l, f.l) && near(w, f.w)) || (near(l, f.w) && near(w, f.l));
+            return lw && f.heights.some(function(x) { return near(h, x); });
+          });
+          if (!hit) return;
+          var lab = document.createElement('span');
+          lab.textContent = '↧';
+          lab.title = 'Коробку можна скласти — виберіть висоту: ' + hit.name;
+          lab.style.color = 'var(--text-muted)';
+          box.appendChild(lab);
+          hit.heights.forEach(function(x) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.textContent = String(x);
+            var on = near(h, x);
+            b.style.cssText = 'padding:0 6px;border-radius:9px;cursor:pointer;font-size:11px;line-height:18px;'
+              + 'border:1px solid ' + (on ? 'var(--accent)' : 'var(--border-strong)') + ';'
+              + 'background:' + (on ? 'var(--accent)' : 'transparent') + ';color:' + (on ? 'var(--accent-fg,#fff)' : 'var(--text)');
+            b.title = on ? 'Зараз така висота' : 'Скласти коробку до цієї висоти';
+            b.addEventListener('click', function() {
+              hIn.value = x;
+              hIn.dispatchEvent(new Event('input', {bubbles: true}));
+              hIn.dispatchEvent(new Event('change', {bubbles: true}));
+            });
+            box.appendChild(b);
+          });
+        }
+        document.addEventListener('input', function(e) {
+          var n = e.target && e.target.name;
+          if (n === 'pkg_length[]' || n === 'pkg_width[]' || n === 'pkg_height[]') _pkgFoldHint(e.target.closest('tr'));
+        });
 
         window.addPkgRow = function(w, l, wd, h, q) {
           // No args → copy dims from last row (or use hardcoded defaults if table is empty)
@@ -1810,6 +1861,7 @@ document.addEventListener('DOMContentLoaded', function() {
           +   ' style="color:var(--err);background:none;border:none;cursor:pointer;font-size:16px;padding:0 4px">'
           +   '✕</button></td>';
           document.getElementById('pkg-tbody').appendChild(tr);
+          _pkgFoldHint(tr);
         };
 
         document.addEventListener('DOMContentLoaded', function() {

@@ -329,6 +329,7 @@
 {"uk": "(за бажанням)", "en": "(optional)", "de": "(optional)"}
 {"uk": "(за замовчуванням)", "en": "(default)", "de": "(Standard)"}
 {"uk": "(за замовчуванням: {0})", "en": "(default: {0})", "de": "(Standard: {0})"}
+{"uk": "(загальний)", "en": "(general)", "de": "(allgemein)"}
 {"uk": "(замовлення {0})", "en": "(order {0})", "de": "(Auftrag {0})"}
 {"uk": "(замовлення з сайту ↔ акаунт, ставка ПДВ, платіжна адреса). Нічого не змінено в Продажах: зв'язок з", "en": "(orders from the site ↔ account, VAT rate, billing address). Nothing was changed in Sales: the link with", "de": "(Aufträge von der Website ↔ Konto, Mehrwertsteuersatz, Rechnungsadresse). In den Verkäufen wurde nichts geändert: die Verbindung mit"}
 {"uk": "(замовлення: {0})", "en": "(order: {0})", "de": "(Auftrag: {0})"}
@@ -357,6 +358,7 @@
 {"uk": "(копія {0} — додається сама)", "en": "(копія {0} — додається сама)", "de": "(копія {0} — додається сама)"}
 {"uk": "(копія)", "en": "(copy)", "de": "(Kopie)"}
 {"uk": "(коригування {0}{1})", "en": "(adjustment {0}{1})", "de": "(Korrektur {0}{1})"}
+{"uk": "(коробку складено до {0} см — місткість перераховано на повну висоту)", "en": "(box folded down to {0} cm — capacity recalculated for the full height)", "de": "(Karton auf {0} cm gefaltet — Fassungsvermögen auf die volle Höhe umgerechnet)"}
 {"uk": "(коротко: {0})", "en": "(in short: {0})", "de": "(kurz: {0})"}
 {"uk": "(країна", "en": "(country", "de": "(Land"}
 {"uk": "(кроків", "en": "(steps", "de": "(Schritte"}
@@ -3009,6 +3011,7 @@
 {"uk": "{0} (дублі SKU)", "en": "{0} (duplicate SKUs)", "de": "{0} (doppelte SKUs)"}
 {"uk": "{0} (з Minerva)", "en": "{0} (from Minerva)", "de": "{0} (aus Minerva)"}
 {"uk": "{0} (з shop: true)", "en": "{0} (with shop: true)", "de": "{0} (mit shop: true)"}
+{"uk": "{0} (загальний)", "en": "{0} (general)", "de": "{0} (allgemein)"}
 {"uk": "{0} (копія)", "en": "{0} (copy)", "de": "{0} (Kopie)"}
 {"uk": "{0} (немає email)", "en": "{0} (no email)", "de": "{0} (keine E-Mail)"}
 {"uk": "{0} (немає в Minerva)", "en": "{0} (not in Minerva)", "de": "{0} (nicht in Minerva)"}
@@ -3122,6 +3125,7 @@
 {"uk": "{0} · посилки", "en": "{0} · parcels", "de": "{0} · Pakete"}
 {"uk": "{0} · пробний · {1}", "en": "{0} · trial · {1}", "de": "{0} · Probe · {1}"}
 {"uk": "{0} · резерв {1}", "en": "{0} · reserved {1}", "de": "{0} · reserviert {1}"}
+{"uk": "{0} · складено до {1} см", "en": "{0} · folded down to {1} cm", "de": "{0} · auf {1} cm gefaltet"}
 {"uk": "{0} · спершу збережіть зміни — перевіряються збережені налаштування.", "en": "{0} · save your changes first — the saved settings are checked.", "de": "{0} · speichern Sie zuerst die Änderungen – geprüft werden die gespeicherten Einstellungen."}
 {"uk": "{0} · створено {1} · {2}", "en": "{0} · created {1} · {2}", "de": "{0} · erstellt {1} · {2}"}
 {"uk": "{0} · трек-номер, що відправлено, етикетка у вкладенні", "en": "{0} · tracking number, what was shipped, label attached", "de": "{0} · Sendungsnummer, Inhalt der Sendung, Etikett im Anhang"}
@@ -3152,6 +3156,9 @@
 {"uk": "{0} ЛИСТИ", "en": "{0} ЛИСТИ", "de": "{0} ЛИСТИ"}
 {"uk": "{0} МБ", "en": "{0} MB", "de": "{0} MB"}
 {"uk": "{0} Повторіть через {1} хв.", "en": "{0} Try again in {1} min.", "de": "{0} Bitte versuchen Sie es in {1} Min. erneut."}
+{"uk": "{0} Прибрати «Де купувати»", "en": "{0} Remove «Where to buy»", "de": "{0} «Wo kaufen» entfernen"}
+{"uk": "{0} Прибрати «Скільки докуповувати»", "en": "{0} Remove «How many to reorder»", "de": "{0} «Nachbestellmenge» entfernen"}
+{"uk": "{0} Прибрати свій мінімум — діятиме загальний з «Налаштувань доставки»", "en": "{0} Remove the own minimum — the general one from «Shipping settings» applies", "de": "{0} Eigenen Mindestbestand entfernen — es gilt der allgemeine aus den «Versandeinstellungen»"}
 {"uk": "{0} Підготуй ввічливий лист клієнту {1} ({2}): нагадай про цей крок і попроси відповісти, коли буде. Мова — як у листуванні з клієнтом. Лист лише запропонуй — надішлю я сам.", "en": "{0} Prepare a polite email to the customer {1} ({2}): remind them of this step and ask them to reply when it will be done. Language — as in the correspondence with the customer. Only suggest the email — I will send it myself.", "de": "{0} Bereite eine höfliche E-Mail an den Kunden {1} ({2}) vor: erinnere an diesen Schritt und bitte um Antwort, wann er erledigt wird. Sprache — wie in der Korrespondenz mit dem Kunden. Schlage die E-Mail nur vor — senden werde ich sie selbst."}
 {"uk": "{0} Підготуй закупівлю (замовлення постачальнику) для цього кроку. Товари проєкту: {1}.{2} Кількості візьми із замовлень і Angebote проєкту; постачальника — з минулих закупівель цих товарів, якщо його не названо. Закупівлю лише запропонуй — створю її я після перевірки.", "en": "{0} Prepare a purchase order (order to a supplier) for this step. Project products: {1}.{2} Take the quantities from the project's orders and Angebote; the supplier — from past purchase orders of these products, if none is named. Only suggest the purchase order — I will create it after checking.", "de": "{0} Bereite eine Bestellung (Auftrag an einen Lieferanten) für diesen Schritt vor. Artikel des Projekts: {1}.{2} Mengen aus den Aufträgen und Angeboten des Projekts; den Lieferanten — aus früheren Bestellungen dieser Artikel, falls keiner genannt ist. Schlage die Bestellung nur vor — anlegen werde ich sie nach der Prüfung."}
 {"uk": "{0} Підготуй чернетку Angebot{1}.{2} Артикули й кількості візьми з останнього запиту клієнта в листуванні проєкту, інакше — товари проєкту: {3}. Мова документа — як у листуванні з клієнтом. Ціни й строки не вказуй — Minerva порахує сама. У propose_offer вкажи проєкт {4}. Angebot лише запропонуй — перевірю й надішлю я сам.", "en": "{0} Prepare a draft Angebot{1}.{2} Take the part numbers and quantities from the customer's latest request in the project correspondence, otherwise — the project products: {3}. Document language — as in the correspondence with the customer. Do not state prices or lead times — Minerva will calculate them itself. In propose_offer specify the project {4}. Only propose the Angebot — I will check it and send it myself.", "de": "{0} Bereite einen Angebotsentwurf{1} vor.{2} Artikel und Mengen aus der letzten Kundenanfrage in der Projektkorrespondenz übernehmen, sonst — die Projektprodukte: {3}. Dokumentsprache — wie in der Korrespondenz mit dem Kunden. Keine Preise und Lieferzeiten angeben — Minerva berechnet sie selbst. In propose_offer das Projekt {4} angeben. Das Angebot nur vorschlagen — ich prüfe es und sende es selbst."}
@@ -3319,6 +3326,7 @@
 {"uk": "{0} шари", "en": "{0} layers", "de": "{0} Lagen"}
 {"uk": "{0} шт", "en": "{0} pcs", "de": "{0} Stk"}
 {"uk": "{0} шт (MOQ {1})", "en": "{0} pcs (MOQ {1})", "de": "{0} Stk. (MOQ {1})"}
+{"uk": "{0} шт (загальний)", "en": "{0} pcs (general)", "de": "{0} Stk. (allgemein)"}
 {"uk": "{0} шт {1}", "en": "{0} pcs {1}", "de": "{0} Stk. {1}"}
 {"uk": "{0} шт стане по {1} ({2})", "en": "{0} pcs will become {1} each ({2})", "de": "{0} Stk. kosten künftig je {1} ({2})"}
 {"uk": "{0} шт → {1}", "en": "{0} pcs → {1}", "de": "{0} Stk. → {1}"}
@@ -3604,6 +3612,7 @@
 {"uk": "{0}», послуга — як минулого разу", "en": "{0}», service as last time", "de": "{0}», Service wie beim letzten Mal"}
 {"uk": "{0}×{1} мм", "en": "{0}×{1} mm", "de": "{0}×{1} mm"}
 {"uk": "{0}×{1}×{2} см", "en": "{0}×{1}×{2} cm", "de": "{0}×{1}×{2} cm"}
+{"uk": "{0}×{1}×{2} см (складено до {3} см: {4} шт → на повну висоту ≈ {5} шт)", "en": "{0}×{1}×{2} cm (folded down to {3} cm: {4} pcs → full height ≈ {5} pcs)", "de": "{0}×{1}×{2} cm (auf {3} cm gefaltet: {4} Stk. → volle Höhe ≈ {5} Stk.)"}
 {"uk": "{0}×{1}×{2} см, {3} кг", "en": "{0}×{1}×{2} cm, {3} kg", "de": "{0}×{1}×{2} cm, {3} kg"}
 {"uk": "{0}Вкладення: {1}", "en": "{0}Вкладення: {1}", "de": "{0}Вкладення: {1}"}
 {"uk": "{0}Готово", "en": "{0}Done", "de": "{0}Fertig"}
@@ -3754,6 +3763,7 @@
 {"uk": "«Надіслати зараз» — вікно «Кому» (config/admin_send.py): адреси з налаштувань підставлені, людина", "en": "“Send now” — the “To” window (config/admin_send.py): the addresses from the settings are pre-filled, the person", "de": "„Jetzt senden“ — Fenster „An“ (config/admin_send.py): Die Adressen aus den Einstellungen sind vorausgefüllt, die Person"}
 {"uk": "«Надіслати зараз» — вікно «Кому» (config/admin_send.py): адреси з налаштувань підставлені, людина міняє їх або вписує свою; Telegram — так / ні.", "en": "“Send now” — the “To” window (config/admin_send.py): the addresses from the settings are pre-filled, the person changes them or enters their own; Telegram — yes / no.", "de": "„Jetzt senden“ — Fenster „An“ (config/admin_send.py): Die Adressen aus den Einstellungen sind vorausgefüllt, die Person ändert sie oder trägt eine eigene ein; Telegram — ja / nein."}
 {"uk": "«Назва для покупців» не задана — у листах і на сторінці оплати буде «", "en": "“Name for customers” is not set — e-mails and the payment page will show “", "de": "„Name für Kunden“ ist nicht festgelegt – in E-Mails und auf der Zahlungsseite erscheint „"}
+{"uk": "«Налаштування доставки» → «📦 Запас коробок»", "en": "«Shipping settings» → «📦 Box stock»", "de": "«Versandeinstellungen» → «📦 Kartonbestand»"}
 {"uk": "«Написати кожному»", "en": "«Написати кожному»", "de": "«Написати кожному»"}
 {"uk": "«Обіцянки» — конкретні зобов'язання: строки, ціни, кількості, поставки, надіслати документ чи зразок", "en": "“Promises” — specific commitments: deadlines, prices, quantities, deliveries, sending a document or sample", "de": "„Zusagen“ — konkrete Verpflichtungen: Fristen, Preise, Mengen, Lieferungen, Versand eines Dokuments oder Musters"}
 {"uk": "«Обіцянки» — конкретні зобов'язання: строки, ціни, кількості, поставки, надіслати документ чи зразок — дані нами (we), клієнтом (customer) або постачальником (supplier).", "en": "“Promises” — specific commitments: deadlines, prices, quantities, deliveries, sending a document or sample — made by us (we), the customer (customer) or the supplier (supplier).", "de": "„Zusagen“ — konkrete Verpflichtungen: Fristen, Preise, Mengen, Lieferungen, Versand eines Dokuments oder Musters — gegeben von uns (we), vom Kunden (customer) oder vom Lieferanten (supplier)."}
@@ -3913,6 +3923,7 @@
 {"uk": "Є незбережені зміни — натисніть «Зберегти» внизу сторінки", "en": "There are unsaved changes — click “Save” at the bottom of the page", "de": "Es gibt ungespeicherte Änderungen — klicken Sie unten auf der Seite auf „Speichern“"}
 {"uk": "Є незбережені зміни. Покинути сторінку?", "en": "There are unsaved changes. Leave the page?", "de": "Es gibt nicht gespeicherte Änderungen. Seite verlassen?"}
 {"uk": "Є нове", "en": "Something new", "de": "Es gibt Neues"}
+{"uk": "Є окремі коробки тих самих розмірів", "en": "There are separate boxes of the same sizes", "de": "Es gibt eigene Kartons in denselben Maßen"}
 {"uk": "Є позиції, яких немає ні в каталозі Minerva, ні на DigiKey (виробництво / розробка) — ціну й строк перевірте вручну", "en": "Some lines exist neither in the Minerva catalog nor on DigiKey (production / development) — check price and lead time manually", "de": "Einige Positionen sind weder im Minerva-Katalog noch auf DigiKey vorhanden (Fertigung / Entwicklung) — Preis und Lieferzeit manuell prüfen"}
 {"uk": "Є проблеми з БОМ!", "en": "There are BOM problems!", "de": "Es gibt Probleme mit der BOM!"}
 {"uk": "Є проблеми з наявністю!", "en": "There are availability problems!", "de": "Es gibt Probleme mit der Verfügbarkeit!"}
@@ -4154,6 +4165,7 @@
 {"uk": "Або SSH на NAS у теці проєкту", "en": "Or SSH to the NAS in the project folder", "de": "Oder per SSH auf dem NAS im Projektordner"}
 {"uk": "Або будь-який публічний HTTP-URL, що повертає .csv або .xlsx.", "en": "Or any public HTTP URL that returns .csv or .xlsx.", "de": "Oder eine beliebige öffentliche HTTP-URL, die .csv oder .xlsx liefert."}
 {"uk": "Або вкажіть кількість знаків", "en": "Or specify the number of decimals", "de": "Oder geben Sie die Anzahl der Nachkommastellen an"}
+{"uk": "Або вписати значення, або прибрати — не те й інше разом.", "en": "Either enter a value or remove it — not both.", "de": "Entweder einen Wert eintragen oder entfernen — nicht beides."}
 {"uk": "Або вручну з примусовим надсиланням", "en": "Or manually with forced sending", "de": "Oder manuell mit erzwungenem Versand"}
 {"uk": "Або вручну через SSH", "en": "Or manually via SSH", "de": "Oder manuell über SSH"}
 {"uk": "Або відкрити в режимі інкогніто.", "en": "Or open it in incognito mode.", "de": "Oder im Inkognito-Modus öffnen."}
@@ -5256,6 +5268,7 @@
 {"uk": "Вибрано в запиті {0}", "en": "Chosen in request {0}", "de": "In Anfrage {0} gewählt"}
 {"uk": "Вибрано вручну основною для всієї гілки — має пріоритет над порядком категорій; за нею рахується час askDANTE (work_categories.py)", "en": "Chosen manually as primary for the whole thread — takes priority over category order; askDANTE time is counted for it (work_categories.py)", "de": "Manuell als Hauptkategorie für den gesamten Verlauf gewählt — hat Vorrang vor der Reihenfolge der Kategorien; danach wird die askDANTE-Zeit gerechnet (work_categories.py)"}
 {"uk": "Вибрано за замовчуванням", "en": "Selected by default", "de": "Standardmäßig ausgewählt"}
+{"uk": "Вибрано коробок: {0}", "en": "Boxes selected: {0}", "de": "Ausgewählte Kartons: {0}"}
 {"uk": "Вибрано товарів", "en": "Products selected", "de": "Ausgewählte Artikel"}
 {"uk": "Вибрано: 0", "en": "Selected: 0", "de": "Ausgewählt: 0"}
 {"uk": "Вибрано: 0 (найбільше {0})", "en": "Selected: 0 (at most {0})", "de": "Ausgewählt: 0 (höchstens {0})"}
@@ -5578,6 +5591,7 @@
 {"uk": "Високий пріоритет", "en": "High priority", "de": "Hohe Priorität"}
 {"uk": "Висота (макс.)", "en": "Height (max.)", "de": "Höhe (max.)"}
 {"uk": "Висота (см)", "en": "Height (cm)", "de": "Höhe (cm)"}
+{"uk": "Висота складеної коробки має бути меншою за «Висоту» ({0} см).", "en": "The folded height must be lower than the «Height» ({0} cm).", "de": "Die gefaltete Höhe muss kleiner als die «Höhe» sein ({0} cm)."}
 {"uk": "Виставити рахунок клієнту", "en": "Invoice the customer", "de": "Dem Kunden eine Rechnung stellen"}
 {"uk": "Виставка, зустріч… напр. «electronica 2026, хол B3»", "en": "Trade fair, meeting… e.g. «electronica 2026, hall B3»", "de": "Messe, Treffen… z. B. «electronica 2026, Halle B3»"}
 {"uk": "Вистачить", "en": "Will last", "de": "Reicht"}
@@ -5753,6 +5767,7 @@
 {"uk": "Внутрішні", "en": "Internal", "de": "Interne"}
 {"uk": "Внутрішні нотатки", "en": "Internal notes", "de": "Interne Notizen"}
 {"uk": "Внутрішні розміри коробки в сантиметрах", "en": "Internal dimensions of the box in centimeters", "de": "Innenmaße des Kartons in Zentimetern"}
+{"uk": "Внутрішні розміри коробки в сантиметрах. Коробку з насічками, яку можна зробити нижчою, заводьте один раз — на повну висоту, а нижчі висоти впишіть у «Можна скласти до висоти».", "en": "Inner box dimensions in centimetres. A scored box that can be made lower is created once — at full height; enter the lower heights in «Can be folded down to height».", "de": "Innenmaße des Kartons in Zentimetern. Einen gerillten Karton, der sich niedriger falten lässt, einmal anlegen — in voller Höhe; die niedrigeren Höhen unter «Faltbar auf Höhe» eintragen."}
 {"uk": "Внутрішній", "en": "Internal", "de": "Intern"}
 {"uk": "Внутрішній API Minerva", "en": "Minerva internal API", "de": "Interne Minerva-API"}
 {"uk": "Внутрішній REST API Minerva", "en": "Minerva internal REST API", "de": "Interne REST-API von Minerva"}
@@ -6890,6 +6905,7 @@
 {"uk": "Для кожного товару магазину", "en": "For every product of the shop", "de": "Für jeden Artikel des Shops"}
 {"uk": "Для кожної теми, де від них є PI / рахунок або підтвердження, а закупівлі ще немає", "en": "For every topic with a PI / invoice or confirmation from them and no purchase order yet", "de": "Für jedes Thema mit PI / Rechnung oder Bestätigung von ihnen, zu dem es noch keine Bestellung gibt"}
 {"uk": "Для конкретного листа додайте &gid={0} (знайти в URL листа).", "en": "To target a specific sheet, add &gid={0} (found in the sheet URL).", "de": "Für ein bestimmtes Blatt fügen Sie &gid={0} hinzu (in der URL des Blatts zu finden)."}
+{"uk": "Для коробок з обліком, у яких свій «Мінімальний запас» не вписано: залишилось стільки або менше — «⚠️ Мало» у звіті й повідомлення. Порожньо — такі коробки «мало» не бувають.", "en": "For tracked boxes without their own «Minimum stock»: this many or fewer left — «⚠️ Low» in the report and a notification. Empty — such boxes are never «low».", "de": "Für Kartons mit Bestandsführung ohne eigenen «Mindestbestand»: so viele oder weniger übrig — «⚠️ Knapp» im Bericht und eine Meldung. Leer — solche Kartons sind nie «knapp»."}
 {"uk": "Для кількості ≥ min_qty діє ціна ступеня. Діє найбільший ступінь, якого досягла кількість.", "en": "For a quantity ≥ min_qty the break price applies. The highest price break the quantity has reached is used.", "de": "Für eine Menge ≥ min_qty gilt der Staffelpreis. Maßgeblich ist die höchste Staffel, die die Menge erreicht hat."}
 {"uk": "Для малого e-commerce", "en": "For small e-commerce", "de": "Für kleinen E-Commerce"}
 {"uk": "Для митниці", "en": "For customs", "de": "Für den Zoll"}
@@ -7805,6 +7821,8 @@
 {"uk": "Загальне правило: файлу в базі немає — етикетка будь-якого товару формується з шаблону. «Сформувати» — антени, фільтри й кабелі з шаблону навіть коли файл є: артикул, кількість із замовлення, опис / частота / роз'єм зі складу або DigiKey, поточний рік; перший раз — вікно перевірки. Інші товари з файлом — файл. Правий клік на 🖨️ Друкувати — меню: «Завантажити з бази» / «Згенерувати й завантажити».", "en": "General rule: if there is no file in the database, the label for any product is generated from the template. “Generate” — antennas, filters and cables are generated from the template even when a file exists: SKU, quantity from the order, description / frequency / connector from stock or DigiKey, current year; the first time — a check window. Other products with a file — the file. Right-click on 🖨️ Print — menu: “Download from database” / “Generate and download”.", "de": "Allgemeine Regel: Gibt es keine Datei in der Datenbank, wird das Etikett für jeden Artikel aus der Vorlage erzeugt. „Erzeugen“ — Antennen, Filter und Kabel werden auch dann aus der Vorlage erzeugt, wenn eine Datei vorhanden ist: Artikelnummer, Menge aus dem Auftrag, Beschreibung / Frequenz / Steckverbinder aus dem Lager oder von DigiKey, aktuelles Jahr; beim ersten Mal — ein Prüffenster. Andere Artikel mit Datei — die Datei. Rechtsklick auf 🖨️ Drucken — Menü: „Aus der Datenbank herunterladen“ / „Erzeugen und herunterladen“."}
 {"uk": "Загальний HS-код для категорії — підставляється якщо у товару не заданий власний", "en": "General HS code for the category — used if the product has no code of its own", "de": "Allgemeiner HS-Code für die Kategorie — wird verwendet, wenn der Artikel keinen eigenen hat"}
 {"uk": "Загальний запит", "en": "General request", "de": "Allgemeine Anfrage"}
+{"uk": "Загальний мінімум зараз — {0} шт", "en": "The general minimum is now {0} pcs", "de": "Der allgemeine Mindestbestand ist jetzt {0} Stk."}
+{"uk": "Загальний мінімум зараз — {0} шт (", "en": "The general minimum is now {0} pcs (", "de": "Der allgemeine Mindestbestand ist jetzt {0} Stk. ("}
 {"uk": "Загальний чат", "en": "General chat", "de": "Allgemeiner Chat"}
 {"uk": "Загальних налаштуваннях сповіщень", "en": "General notification settings", "de": "Allgemeinen Benachrichtigungseinstellungen"}
 {"uk": "Загальні (Commercial)", "en": "General (Commercial)", "de": "Allgemein (Commercial)"}
@@ -7917,6 +7935,7 @@
 {"uk": "Залиш порожнім — шаблон буде доступний для всіх джерел. Якщо вказано — кнопка з'явиться тільки для замовлень цього джерела.", "en": "Leave empty — the template will be available for all sources. If specified, the button will appear only for orders from this source.", "de": "Leer lassen — die Vorlage steht für alle Quellen zur Verfügung. Wenn angegeben, erscheint die Schaltfläche nur bei Aufträgen dieser Quelle."}
 {"uk": "Залишилось", "en": "Remaining", "de": "Verbleibend"}
 {"uk": "Залишилось {0}д", "en": "{0}d left", "de": "Noch {0} T."}
+{"uk": "Залишилось стільки або менше — «⚠️ Мало» і повідомлення «📦 Мало коробок».", "en": "This many or fewer left — «⚠️ Low» and the «📦 Low on boxes» notification.", "de": "So viele oder weniger übrig — «⚠️ Knapp» und die Meldung «📦 Kartons knapp»."}
 {"uk": "Залишилось стільки або менше — повідомлення «мало, треба купити» (кому й куди — «Налаштування доставки» → «📦 Запас коробок»). Порожньо — без повідомлень.", "en": "This many or fewer left — a «low, buy more» notice (who and where — «Shipping settings» → «📦 Box stock»). Empty — no notices.", "de": "So viele oder weniger übrig — Meldung «wenig, bitte kaufen» (an wen und wohin — «Versandeinstellungen» → «📦 Kartonbestand»). Leer — keine Meldungen."}
 {"uk": "Залишиться", "en": "Will remain", "de": "Bleibt erhalten"}
 {"uk": "Залишки", "en": "Stock levels", "de": "Bestände"}
@@ -8494,6 +8513,7 @@
 {"uk": "Зараз на складі", "en": "In stock now", "de": "Jetzt auf Lager"}
 {"uk": "Зараз надсилати нічого: критичних товарів і прострочених замовлень немає.", "en": "Nothing to send right now: there are no critical products or overdue orders.", "de": "Derzeit gibt es nichts zu senden: Es gibt keine kritischen Artikel und keine überfälligen Aufträge."}
 {"uk": "Зараз недоступно.", "en": "Not available right now.", "de": "Derzeit nicht verfügbar."}
+{"uk": "Зараз така висота", "en": "Current height", "de": "Aktuelle Höhe"}
 {"uk": "Зараз у програмі увійдено як {0} — вхід буде замінено.", "en": "The app is currently signed in as {0} — this sign-in will be replaced.", "de": "Die App ist gerade als {0} angemeldet — diese Anmeldung wird ersetzt."}
 {"uk": "Зараз у роботі", "en": "In progress now", "de": "Gerade in Arbeit"}
 {"uk": "Зараз усіх коробок достатньо — повідомляти нема про що.", "en": "All boxes are sufficient right now — nothing to report.", "de": "Derzeit sind alle Kartons ausreichend — nichts zu melden."}
@@ -8524,6 +8544,7 @@
 {"uk": "Застосувати вибрані", "en": "Apply selected", "de": "Ausgewählte übernehmen"}
 {"uk": "Застосувати всі ({0})", "en": "Apply all ({0})", "de": "Alle übernehmen ({0})"}
 {"uk": "Застосувати до", "en": "Apply to", "de": "Anwenden auf"}
+{"uk": "Застосувати до {0} коробок", "en": "Apply to {0} boxes", "de": "Auf {0} Kartons anwenden"}
 {"uk": "Застосувати до {0} лістингів", "en": "Apply to {0} listings", "de": "Auf {0} Listings anwenden"}
 {"uk": "Застосувати до вибраних", "en": "Apply to selected", "de": "Auf Auswahl anwenden"}
 {"uk": "Застосувати до плану всі зміни, що чекають ({0})?", "en": "Apply all waiting changes to the plan ({0})?", "de": "Alle offenen Änderungen in den Plan übernehmen ({0})?"}
@@ -8917,6 +8938,7 @@
 {"uk": "Змінено {0} транзакцій → Списання.", "en": "{0} transactions changed → Write-off.", "de": "{0} Transaktionen geändert → Ausbuchung."}
 {"uk": "Змінено вручну", "en": "Changed manually", "de": "Manuell geändert"}
 {"uk": "Змінено вручну: {0}", "en": "Changed manually: {0}", "de": "Manuell geändert: {0}"}
+{"uk": "Змінено для {0} коробок: {1}.", "en": "Changed for {0} boxes: {1}.", "de": "Für {0} Kartons geändert: {1}."}
 {"uk": "Змінено на DigiKey (lastUpdateDateUtc)", "en": "Changed on DigiKey (lastUpdateDateUtc)", "de": "Auf DigiKey geändert (lastUpdateDateUtc)"}
 {"uk": "Змінено після надсилання (", "en": "Changed after sending (", "de": "Nach dem Senden geändert ("}
 {"uk": "Змінено після надсилання — учасники ще бачать старе", "en": "Changed after sending — attendees still see the old version", "de": "Nach dem Senden geändert — die Teilnehmer sehen noch den alten Stand"}
@@ -9915,6 +9937,7 @@
 {"uk": "Користувачі: e2e_anna (id {0}, {1}), e2e_boris (id {2}, {3}); e2e_admin без пароля.", "en": "Users: e2e_anna (id {0}, {1}), e2e_boris (id {2}, {3}); e2e_admin has no password.", "de": "Benutzer: e2e_anna (id {0}, {1}), e2e_boris (id {2}, {3}); e2e_admin ohne Passwort."}
 {"uk": "Коробка", "en": "Box", "de": "Karton"}
 {"uk": "Коробка {0} ({1} кг, {2}×{3}×{4} см)", "en": "Box {0} ({1} kg, {2}×{3}×{4} cm)", "de": "Karton {0} ({1} kg, {2}×{3}×{4} cm)"}
+{"uk": "Коробка з насічками, яку можна зробити нижчою: висоти через кому, напр. «22, 16». Довжина й ширина ті самі; це та сама коробка — один запас на складі, посилка 30×30×16 її теж списує, а рекомендація складає коробку до найменшої висоти, у яку вміщується товар.", "en": "A scored box that can be made lower: heights separated by commas, e.g. «22, 16». Length and width stay the same; it is the same box — one stock, a 30×30×16 parcel also uses it, and the recommendation folds the box down to the lowest height the goods fit into.", "de": "Gerillter Karton, der sich niedriger falten lässt: Höhen durch Kommas getrennt, z. B. «22, 16». Länge und Breite bleiben; es ist derselbe Karton — ein Bestand, ein Paket 30×30×16 bucht ihn ebenfalls ab, und die Empfehlung faltet den Karton auf die niedrigste Höhe, in die die Ware passt."}
 {"uk": "Коробки", "en": "Boxes", "de": "Kartons"}
 {"uk": "Коробки (Parcels)", "en": "Boxes (Parcels)", "de": "Kartons (Parcels)"}
 {"uk": "Коробки (multi-package)", "en": "Boxes (multi-package)", "de": "Kartons (Multi-Package)"}
@@ -9922,6 +9945,7 @@
 {"uk": "Коробки з обліком", "en": "Boxes with stock tracking", "de": "Kartons mit Bestandsführung"}
 {"uk": "Коробки партія 500 шт {0}", "en": "Boxes, batch of 500 pcs {0}", "de": "Kartons, Charge von 500 Stk. {0}"}
 {"uk": "Коробки, конверти, тубуси: тип, розміри (L×W×H мм), tare_weight_g, max_weight_g, ціна", "en": "Boxes, envelopes, tubes: type, dimensions (L×W×H mm), tare_weight_g, max_weight_g, price", "de": "Kartons, Umschläge, Rollen: Typ, Maße (L×B×H mm), tare_weight_g, max_weight_g, Preis"}
+{"uk": "Коробку можна скласти — виберіть висоту", "en": "The box can be folded — choose the height", "de": "Der Karton lässt sich falten — Höhe wählen"}
 {"uk": "Коробок", "en": "Boxes", "de": "Kartons"}
 {"uk": "Короткий SKU", "en": "Short SKU", "de": "Kurz-SKU"}
 {"uk": "Короткий артикул", "en": "Short SKU", "de": "Kurze Artikelnummer"}
@@ -10862,6 +10886,8 @@
 {"uk": "Можна передати", "en": "Can be sent", "de": "Übertragbar"}
 {"uk": "Можна писати будь-якою мовою, з пробілами.", "en": "You can write in any language, with spaces.", "de": "Sie können in jeder Sprache schreiben, auch mit Leerzeichen."}
 {"uk": "Можна покласти документи в", "en": "You can put documents in", "de": "Dokumente können abgelegt werden in"}
+{"uk": "Можна скласти до висоти", "en": "Can be folded down to height", "de": "Faltbar auf Höhe"}
+{"uk": "Можна скласти до висоти (см)", "en": "Can be folded down to height (cm)", "de": "Faltbar auf Höhe (cm)"}
 {"uk": "Можна створити й за покупця", "en": "You can also create one on behalf of the customer", "de": "Sie können auch im Namen des Kunden eines erstellen"}
 {"uk": "Можна шукати в інтернеті", "en": "Web search allowed", "de": "Internetsuche erlaubt"}
 {"uk": "Мозамбік", "en": "Mozambique", "de": "Mosambik"}
@@ -10923,6 +10949,9 @@
 {"uk": "Мінімальний залишок", "en": "Minimum stock", "de": "Mindestbestand"}
 {"uk": "Мінімальний залишок для повторного", "en": "Minimum stock level for a repeat", "de": "Mindestbestand für eine erneute"}
 {"uk": "Мінімальний залишок для повторного замовлення. Ціле число ≥ 0.", "en": "Minimum stock level for a repeat order. Integer ≥ 0.", "de": "Mindestbestand für eine erneute Bestellung. Ganzzahl ≥ 0."}
+{"uk": "Мінімальний запас за замовчуванням, шт", "en": "Default minimum stock, pcs", "de": "Standard-Mindestbestand, Stk."}
+{"uk": "Мінімальний запас і облік для вибраних", "en": "Minimum stock and tracking for the selected", "de": "Mindestbestand und Bestandsführung für die ausgewählten"}
+{"uk": "Мінімальний запас і облік для вибраних…", "en": "Minimum stock and tracking for the selected…", "de": "Mindestbestand und Bestandsführung für die ausgewählten…"}
 {"uk": "Мінімальний запас, шт", "en": "Minimum stock, pcs", "de": "Mindestbestand, Stk"}
 {"uk": "Мінімальний інтервал між запусками. Cron запускає команду частіше — профіль пропустить якщо ще не час.", "en": "Minimum interval between runs. Cron runs the command more often — the profile will skip if it is not yet due.", "de": "Mindestabstand zwischen den Läufen. Cron führt den Befehl häufiger aus — das Profil wird übersprungen, wenn es noch nicht fällig ist."}
 {"uk": "Мінімальний інтервал між надсиланнями (год)", "en": "Minimum interval between sends (h)", "de": "Mindestintervall zwischen Sendungen (Std.)"}
@@ -11887,6 +11916,7 @@
 {"uk": "Не розумію рядок «{0}». Формат: 100: 12", "en": "I don’t understand the line “{0}”. Format: 100: 12", "de": "Die Zeile „{0}“ wird nicht verstanden. Format: 100: 12"}
 {"uk": "Не сказано, що входить у цю ціну — у 🥇 не бере участі", "en": "It is not stated what this price includes — not part of 🥇", "de": "Nicht angegeben, was dieser Preis enthält — nimmt an 🥇 nicht teil"}
 {"uk": "Не скасовано", "en": "Not cancelled", "de": "Nicht storniert"}
+{"uk": "Не складається — посилки впізнаються лише за повними розмірами.", "en": "Not foldable — parcels are matched only by the full dimensions.", "de": "Nicht faltbar — Pakete werden nur nach den vollen Maßen erkannt."}
 {"uk": "Не створювати нічого — лише зафіксувати відсутні SKU у підсумковому повідомленні", "en": "Create nothing — only record the missing SKUs in the summary message", "de": "Nichts anlegen — nur die fehlenden SKUs in der Abschlussmeldung festhalten"}
 {"uk": "Не створювати нічого — лише оновити вже наявні в Minerva лістинги", "en": "Do not create anything — only update listings already in Minerva", "de": "Nichts erstellen — nur bereits in Minerva vorhandene Listings aktualisieren"}
 {"uk": "Не створювати, але зафіксувати SKU у повідомленні після завершення", "en": "Do not create, but record the SKUs in the message after completion", "de": "Nichts erstellen, aber die Artikelnummern nach Abschluss in der Meldung festhalten"}
@@ -11906,6 +11936,7 @@
 {"uk": "Не той курс, що для DigiKey: ціни на DigiKey після «💲 Ціни на DigiKey» зміняться на", "en": "Not the rate used for DigiKey: after “💲 Prices on DigiKey”, the prices on DigiKey will change by", "de": "Nicht der Kurs von DigiKey: Nach „💲 Preise auf DigiKey“ ändern sich die Preise auf DigiKey um"}
 {"uk": "Не той курс, що для DigiKey: ціни на DigiKey після «💲 Ціни на DigiKey» зміняться на {0}", "en": "Not the rate used for DigiKey: after “💲 Prices on DigiKey”, the prices on DigiKey will change by {0}", "de": "Nicht der Kurs von DigiKey: Nach „💲 Preise auf DigiKey“ ändern sich die Preise auf DigiKey um {0}"}
 {"uk": "Не число: {0}", "en": "Not a number: {0}", "de": "Keine Zahl: {0}"}
+{"uk": "Не число: {0}. Пишіть висоти через кому, напр. «22, 16».", "en": "Not a number: {0}. Write the heights separated by commas, e.g. «22, 16».", "de": "Keine Zahl: {0}. Höhen durch Kommas getrennt eingeben, z. B. «22, 16»."}
 {"uk": "Не чує? «🎙 Мікрофон» — той, у який ви говорите.", "en": "Not hearing you? “🎙 Microphone” — the one you speak into.", "de": "Hört nichts? „🎙 Mikrofon“ — das, in das Sie sprechen."}
 {"uk": "Не індексувати в базі знань", "en": "Do not index in the knowledge base", "de": "Nicht in der Wissensdatenbank indizieren"}
 {"uk": "Неактивний", "en": "Inactive", "de": "Inaktiv"}
@@ -12523,6 +12554,7 @@
 {"uk": "Німеччина", "en": "Germany", "de": "Deutschland"}
 {"uk": "Нічого", "en": "None", "de": "Keine"}
 {"uk": "Нічого (лише загальне сповіщення про відправлення)", "en": "Nothing (only the general shipment notification)", "de": "Nichts (nur die allgemeine Sendungsbenachrichtigung)"}
+{"uk": "Нічого не вибрано змінити.", "en": "Nothing chosen to change.", "de": "Nichts zum Ändern ausgewählt."}
 {"uk": "Нічого не вибрано — Minerva сама прив'яже найраніший підхожий об'єкт проєкту.", "en": "Nothing selected — Minerva links the earliest matching project object by itself.", "de": "Nichts ausgewählt — Minerva verknüpft selbst das früheste passende Projektobjekt."}
 {"uk": "Нічого не вибрано — Minerva сама прив'яже найраніший підхожий об'єкт проєкту. «Виконано» й «Пропущено», поставлені вручну, автоматика не змінює.", "en": "Nothing selected — Minerva links the earliest matching project object by itself. “Done” and “Skipped” set by hand are never changed by automation.", "de": "Nichts ausgewählt — Minerva verknüpft selbst das früheste passende Projektobjekt. Von Hand gesetzte Zustände „Erledigt“ und „Übersprungen“ ändert die Automatik nicht."}
 {"uk": "Нічого не вибрано — щодня.", "en": "Nothing selected — every day.", "de": "Nichts ausgewählt — täglich."}
@@ -12598,6 +12630,7 @@
 {"uk": "Оберіть що саме перевіряти та що робити з відсутніми товарами.", "en": "Choose what exactly to check and what to do with missing products.", "de": "Wählen Sie, was genau geprüft werden soll und was mit fehlenden Artikeln geschehen soll."}
 {"uk": "Оберіть які операції дозволені для цього ключа.", "en": "Select which operations are allowed for this key.", "de": "Wählen Sie, welche Operationen für diesen Schlüssel erlaubt sind."}
 {"uk": "Обидва боки + флаєр", "en": "Both sides + flyer", "de": "Beide Seiten + Flyer"}
+{"uk": "Облік", "en": "Tracking", "de": "Bestandsführung"}
 {"uk": "Облік витрат з категоріями (ієрархія), прив'язкою до постачальника, завантаженням чеків. Прапорець VAT-deductible для EU-звітності.", "en": "Expense tracking with categories (hierarchy), supplier linking and receipt uploads. VAT-deductible flag for EU reporting.", "de": "Ausgabenerfassung mit Kategorien (Hierarchie), Zuordnung zum Lieferanten und Hochladen von Belegen. Kennzeichen VAT-deductible für die EU-Berichterstattung."}
 {"uk": "Облік з", "en": "Tracked since", "de": "Bestand geführt seit"}
 {"uk": "Облік не ведеться — увімкніть «Вести облік на складі» і впишіть «Фактично є зараз».", "en": "Stock is not tracked — turn on «Track stock» and enter «Actually on hand now».", "de": "Kein Bestand geführt — «Bestand führen» einschalten und «Jetzt tatsächlich vorhanden» eintragen."}
@@ -14493,6 +14526,7 @@
 {"uk": "Порожньо — назва файлу.", "en": "Empty — the file name.", "de": "Leer — der Dateiname."}
 {"uk": "Порожньо — натисни 📥 Стягнути поля з DigiKey щоб заповнити.", "en": "Empty — click 📥 Pull fields from DigiKey to fill it in.", "de": "Leer — klicken Sie auf 📥 Felder von DigiKey abrufen, um es zu füllen."}
 {"uk": "Порожньо — натисніть 📥 Стягнути поля з DigiKey.", "en": "Empty — click 📥 Pull fields from DigiKey.", "de": "Leer — auf 📥 Felder von DigiKey abrufen klicken."}
+{"uk": "Порожньо — не змінювати.", "en": "Empty — leave unchanged.", "de": "Leer — unverändert lassen."}
 {"uk": "Порожньо — позиції з базовими цінами зберігають свій %, решта — 100 %", "en": "Empty — items with base prices keep their %, the rest — 100 %", "de": "Leer — Positionen mit Basispreisen behalten ihren %, die übrigen — 100 %"}
 {"uk": "Порожньо — проєкт частини наради, де прозвучав пункт, інакше головний", "en": "Empty — the project of the meeting part where the point was said, otherwise the main one", "de": "Leer — Projekt des Besprechungsteils, in dem der Punkt fiel, sonst das Hauptprojekt"}
 {"uk": "Порожньо — рекомендована заміна з картки товару.", "en": "Empty — the recommended replacement from the product card.", "de": "Leer – der empfohlene Ersatz aus der Artikelkarte."}
@@ -14518,6 +14552,8 @@
 {"uk": "Порожнє «кому» — діють адреси «Кому (email)» і основний чат Telegram. «＋ з Minerva» — співробітники, скриньки пошти, особисті чати з ботом (Telegram ID у «Ролі користувачів»); свою адресу чи Chat ID — впишіть і Enter. «Клієнтам — з адреси» — SMTP сповіщень або скринька пошти Minerva (свою може вибрати кожен, чужу — лише адміністратор); у кожного листа клієнту — своя адреса або «як для всіх». Збереже кнопка «Зберегти» внизу сторінки. «↓» — до розділу на цій сторінці, «→» — інша сторінка.", "en": "Empty «to» — the «To (email)» addresses and the main Telegram chat apply. «＋ from Minerva» — employees, mailboxes, personal chats with the bot (Telegram ID in «User roles»); your own address or Chat ID — type it and press Enter. «To customers — from address» — notification SMTP or a Minerva mailbox (anyone can choose their own, someone else's — only an administrator); each customer e-mail has its own address or «same as for all». The «Save» button at the bottom of the page saves. «↓» — to a section on this page, «→» — another page.", "de": "Leeres «an» — es gelten die Adressen «An (E-Mail)» und der Haupt-Telegram-Chat. «＋ aus Minerva» — Mitarbeiter, Postfächer, persönliche Chats mit dem Bot (Telegram-ID in «Benutzerrollen»); eigene Adresse oder Chat-ID — eingeben und Enter. «An Kunden — von Adresse» — Benachrichtigungs-SMTP oder ein Minerva-Postfach (das eigene kann jeder wählen, ein fremdes nur ein Administrator); jede Kunden-E-Mail hat ihre eigene Adresse oder «wie für alle». Gespeichert wird mit «Speichern» unten auf der Seite. «↓» — zu einem Abschnitt auf dieser Seite, «→» — andere Seite."}
 {"uk": "Порожнє «кому» — діють адреси «Кому (email)» і основний чат Telegram. «＋ з Minerva» — співробітники, скриньки пошти, особисті чати з ботом (Telegram ID у «Ролі користувачів»); свою адресу чи Chat ID — впишіть і Enter. Збереже кнопка «Зберегти» внизу сторінки. «↓» — до розділу на цій сторінці, «→» — інша сторінка.", "en": "Empty «to whom» — the «To (email)» addresses and the main Telegram chat apply. «＋ from Minerva» — staff, mailboxes, personal chats with the bot (Telegram ID in «User roles»); type your own address or Chat ID and press Enter. The «Save» button at the bottom saves it. «↓» — to the section on this page, «→» — another page.", "de": "Leeres «an wen» — es gelten die Adressen «An (E-Mail)» und der Telegram-Hauptchat. «＋ aus Minerva» — Mitarbeiter, Postfächer, persönliche Chats mit dem Bot (Telegram-ID in «Benutzerrollen»); eigene Adresse oder Chat-ID eintippen und Enter drücken. Gespeichert wird mit «Speichern» unten auf der Seite. «↓» — zum Abschnitt auf dieser Seite, «→» — andere Seite."}
 {"uk": "Порожнє повідомлення", "en": "Empty message", "de": "Leere Nachricht"}
+{"uk": "Порожнє поле нічого не змінює. Нове значення отримають усі", "en": "An empty field changes nothing. The new value goes to all", "de": "Ein leeres Feld ändert nichts. Den neuen Wert erhalten alle"}
+{"uk": "Порожнє поле нічого не змінює. Нове значення отримають усі вибрані коробки.", "en": "An empty field changes nothing. The new value goes to all selected boxes.", "de": "Ein leeres Feld ändert nichts. Den neuen Wert erhalten alle ausgewählten Kartons."}
 {"uk": "Порожнє поле — без обмеження. Приклад «лише кількість зі складу»: право «Склад — читання», поля", "en": "An empty field means no restriction. Example “stock quantity only”: permission “Stock — read”, fields", "de": "Ein leeres Feld bedeutet keine Einschränkung. Beispiel „nur Bestandsmenge“: Recht „Lager — Lesen“, Felder"}
 {"uk": "Порожнє поле — особистих повідомлень у Telegram немає. Що саме надсилати, налаштовується там", "en": "Empty field — no personal Telegram messages. What exactly to send is configured where", "de": "Leeres Feld – keine persönlichen Nachrichten in Telegram. Was genau gesendet wird, wird dort eingestellt,"}
 {"uk": "Порожнє → {0}", "en": "Empty → {0}", "de": "Leer → {0}"}
@@ -14967,6 +15003,8 @@
 {"uk": "Прибрано зі списку", "en": "Removed from the list", "de": "Aus der Liste entfernt"}
 {"uk": "Прибрано: {0}", "en": "Removed: {0}", "de": "Entfernt: {0}"}
 {"uk": "Прибрати", "en": "Remove", "de": "Entfernen"}
+{"uk": "Прибрати «Де купувати»", "en": "Remove «Where to buy»", "de": "«Wo kaufen» entfernen"}
+{"uk": "Прибрати «Скільки докуповувати»", "en": "Remove «How many to reorder»", "de": "«Nachbestellmenge» entfernen"}
 {"uk": "Прибрати все від цього відправника й більше не заносити — спершу покаже, що саме", "en": "Remove everything from this sender and stop adding — it will first show exactly what", "de": "Alles von diesem Absender entfernen und nichts mehr eintragen — zuerst wird genau angezeigt, was"}
 {"uk": "Прибрати все з індексу", "en": "Remove everything from the index", "de": "Alles aus dem Index entfernen"}
 {"uk": "Прибрати всі залежності", "en": "Remove all dependencies", "de": "Alle Abhängigkeiten entfernen"}
@@ -14986,6 +15024,7 @@
 {"uk": "Прибрати позначку", "en": "Remove the mark", "de": "Markierung entfernen"}
 {"uk": "Прибрати проєкт з наради", "en": "Remove the project from the meeting", "de": "Projekt aus der Besprechung entfernen"}
 {"uk": "Прибрати пункт разом з його підпунктами?", "en": "Remove the item together with its sub-items?", "de": "Punkt samt seinen Unterpunkten entfernen?"}
+{"uk": "Прибрати свій мінімум — діятиме загальний з «Налаштувань доставки»", "en": "Remove the own minimum — the general one from «Shipping settings» applies", "de": "Eigenen Mindestbestand entfernen — es gilt der allgemeine aus den «Versandeinstellungen»"}
 {"uk": "Прибрати спам і події від відправників, від яких ви більше не хочете термінів — спершу видно, що саме прибереться", "en": "Remove spam and events from senders you no longer want deadlines from — you will first see exactly what will be removed", "de": "Spam und Termine von Absendern entfernen, von denen Sie keine Fristen mehr wollen — zuerst sehen Sie genau, was entfernt wird"}
 {"uk": "Прибрати сторону «", "en": "Remove the party «", "de": "Beteiligten entfernen «"}
 {"uk": "Прибрати фазу (її кроки лишаться без фази)", "en": "Remove the phase (its steps stay without a phase)", "de": "Phase entfernen (ihre Schritte bleiben ohne Phase)"}
@@ -16585,6 +16624,7 @@
 {"uk": "Складаю лист…", "en": "Building the e-mail…", "de": "E-Mail wird erstellt…"}
 {"uk": "Складаю план…", "en": "Building the plan…", "de": "Plan wird erstellt…"}
 {"uk": "Складаю…", "en": "Preparing…", "de": "Wird erstellt…"}
+{"uk": "Складена коробка", "en": "Folded box", "de": "Gefalteter Karton"}
 {"uk": "Складено", "en": "Compiled", "de": "Zusammengestellt"}
 {"uk": "Складені листи й ваші правки пропадуть — скласти заново?", "en": "The composed letters and your edits will be lost — compose again?", "de": "Die erstellten Briefe und Ihre Änderungen gehen verloren — neu erstellen?"}
 {"uk": "Склади email клієнту {0} з метою: {1}. Мова: {2}. Тон: професійний але дружній. Відповідай СТРОГО у такому форматі (без відхилень)", "en": "Compose an email to customer {0} with the purpose: {1}. Language: {2}. Tone: professional but friendly. Reply STRICTLY in the following format (no deviations)", "de": "Verfassen Sie eine E-Mail an den Kunden {0} mit dem Ziel: {1}. Sprache: {2}. Ton: professionell, aber freundlich. Antworten Sie STRENG im folgenden Format (keine Abweichungen)"}
@@ -16602,6 +16642,7 @@
 {"uk": "Скласти агенду", "en": "Draw up the agenda", "de": "Tagesordnung erstellen"}
 {"uk": "Скласти в редакторі", "en": "Draw up in the editor", "de": "Im Editor erstellen"}
 {"uk": "Скласти заново", "en": "Create again", "de": "Neu erstellen"}
+{"uk": "Скласти коробку до цієї висоти", "en": "Fold the box down to this height", "de": "Karton auf diese Höhe falten"}
 {"uk": "Скласти лист клієнту (без відправки). Повертає тему і текст.", "en": "Compose an email to a customer (without sending). Returns the subject and text.", "de": "E-Mail an einen Kunden verfassen (ohne Versand). Liefert Betreff und Text."}
 {"uk": "Скласти лист клієнту — відкриєте в пошті й надішлете самі", "en": "Compose an e-mail to a customer — you open it in the mail and send it yourself", "de": "E-Mail an einen Kunden verfassen – Sie öffnen sie im Postfach und senden sie selbst"}
 {"uk": "Скласти листи", "en": "Compose letters", "de": "Briefe erstellen"}
@@ -18219,6 +18260,8 @@
 {"uk": "Увімкнено — сповіщення надходить лише коли є реальні зміни.", "en": "Enabled — a notification is sent only when there are real changes.", "de": "Aktiviert — eine Benachrichtigung erfolgt nur, wenn es tatsächliche Änderungen gibt."}
 {"uk": "Увімкнено: {0}.", "en": "Enabled: {0}.", "de": "Aktiviert: {0}."}
 {"uk": "Увімкнено: сайт отримує перевірені фото й даташити з Minerva (після оновлення каталогу сайту, зазвичай за 1 хв).", "en": "Enabled: the site receives verified photos and datasheets from Minerva (after the site’s catalog refresh, usually within 1 min).", "de": "Aktiviert: Die Website erhält geprüfte Fotos und Datenblätter von Minerva (nach der Aktualisierung des Website-Katalogs, normalerweise innerhalb von 1 Min.)."}
+{"uk": "Увімкнули — запас рахується відтепер; вписати, скільки є, — у картці коробки", "en": "Turned on — stock is counted from now on; enter how many there are in the box card", "de": "Aktiviert — der Bestand wird ab jetzt gezählt; die vorhandene Menge in der Kartonkarte eintragen"}
+{"uk": "Увімкнули — запас рахується відтепер; вписати, скільки є, — у картці коробки («🧮 Фактично є зараз»).", "en": "Turned on — stock is counted from now on; enter how many there are in the box card («🧮 Actually in stock now»).", "de": "Aktiviert — der Bestand wird ab jetzt gezählt; die vorhandene Menge in der Kartonkarte eintragen («🧮 Jetzt tatsächlich vorhanden»)."}
 {"uk": "Увімкнути", "en": "Turn on", "de": "Einschalten"}
 {"uk": "Увімкнути email нагадування", "en": "Enable email reminders", "de": "E-Mail-Erinnerungen aktivieren"}
 {"uk": "Увімкнути акаунт", "en": "Enable account", "de": "Konto aktivieren"}
@@ -18860,6 +18903,7 @@
 {"uk": "Ця гілка", "en": "This thread", "de": "Dieser Verlauf"}
 {"uk": "Ця дія", "en": "This action", "de": "Diese Aktion"}
 {"uk": "Ця операція незворотна. Дані не можна відновити без backup.", "en": "This operation is irreversible. The data cannot be restored without a backup.", "de": "Dieser Vorgang ist unumkehrbar. Die Daten lassen sich ohne Backup nicht wiederherstellen."}
+{"uk": "Ця сама коробка", "en": "The same box", "de": "Derselbe Karton"}
 {"uk": "Ця функція працює для відправок, створених після оновлення системи.", "en": "This function works for shipments created after the system update.", "de": "Diese Funktion funktioniert für Sendungen, die nach dem Systemupdate erstellt wurden."}
 {"uk": "Ця частина — про проєкт {0} · {1}.", "en": "This part is about project {0} · {1}.", "de": "Dieser Teil betrifft das Projekt {0} · {1}."}
 {"uk": "Ці дані підставляються автоматично при кожному відправленні.", "en": "This data is filled in automatically for every shipment.", "de": "Diese Daten werden bei jeder Sendung automatisch eingetragen."}
@@ -20314,6 +20358,7 @@
 {"uk": "вимкнено — сайт показує власні файли", "en": "disabled — the site shows its own files", "de": "deaktiviert – die Website zeigt ihre eigenen Dateien"}
 {"uk": "вимкнено — сайт показує власні файли.", "en": "disabled — the site shows its own files.", "de": "deaktiviert — die Website zeigt eigene Dateien an."}
 {"uk": "вимкнено: {0}", "en": "disabled: {0}", "de": "deaktiviert: {0}"}
+{"uk": "вимкнути", "en": "turn off", "de": "deaktivieren"}
 {"uk": "вимкніть якщо статус керується трекінгом перевізника (UPS/DHL) або виставляється вручну. Зазвичай вмикають поки трекінг-номер ще не отримано.", "en": "turn off if the status is controlled by carrier tracking (UPS/DHL) or set manually. It is usually turned on while the tracking number has not yet been received.", "de": "deaktivieren Sie dies, wenn der Status über die Sendungsverfolgung des Versanddienstleisters (UPS/DHL) gesteuert oder manuell gesetzt wird. Üblicherweise ist es aktiviert, solange die Sendungsnummer noch nicht vorliegt."}
 {"uk": "виняток", "en": "exception", "de": "Ausnahme"}
 {"uk": "виправити", "en": "fix", "de": "korrigieren"}
@@ -21039,6 +21084,7 @@
 {"uk": "завтра після {0}:00", "en": "tomorrow after {0}:00", "de": "morgen nach {0}:00"}
 {"uk": "загальне", "en": "general", "de": "allgemein"}
 {"uk": "загальне, не про проєкт", "en": "general, not about a project", "de": "allgemein, kein Projekt"}
+{"uk": "загальний", "en": "general", "de": "allgemein"}
 {"uk": "загальні", "en": "general", "de": "allgemein"}
 {"uk": "загальні документи — без клієнта, проєкту й товару", "en": "general documents — without customer, project and product", "de": "allgemeine Dokumente — ohne Kunde, Projekt und Artikel"}
 {"uk": "заголовки, стани, дати й текст листа; назви кроків — як ви їх написали", "en": "headings, statuses, dates and the e-mail text; step names stay as you wrote them", "de": "Überschriften, Status, Termine und E-Mail-Text; Schrittnamen bleiben, wie Sie sie geschrieben haben"}
@@ -21928,6 +21974,7 @@
 {"uk": "міняє їх або вписує свою; Telegram — так / ні.", "en": "changes them or enters their own; Telegram — yes / no.", "de": "ändert sie oder trägt eine eigene ein; Telegram — ja / nein."}
 {"uk": "мінімальний залишок", "en": "minimum stock", "de": "Mindestbestand"}
 {"uk": "мінімальну", "en": "minimum", "de": "minimale"}
+{"uk": "мінімум за замовчуванням: {0} шт («Налаштування доставки»)", "en": "default minimum: {0} pcs («Shipping settings»)", "de": "Standard-Mindestbestand: {0} Stk. («Versandeinstellungen»)"}
 {"uk": "мінімум не задано — без повідомлень", "en": "no minimum set — no notices", "de": "kein Minimum — keine Meldungen"}
 {"uk": "міс", "en": "mo.", "de": "Mon."}
 {"uk": "місто", "en": "city", "de": "Stadt"}
@@ -22233,6 +22280,7 @@
 {"uk": "не записано", "en": "not saved", "de": "nicht gespeichert"}
 {"uk": "не заповнено", "en": "not filled in", "de": "nicht ausgefüllt"}
 {"uk": "не збігається з сумою замовлення {0}", "en": "does not match the order total {0}", "de": "stimmt nicht mit der Auftragssumme {0} überein"}
+{"uk": "не змінювати", "en": "leave unchanged", "de": "nicht ändern"}
 {"uk": "не знайдено", "en": "not found", "de": "nicht gefunden"}
 {"uk": "не знайдено в Minerva", "en": "not found in Minerva", "de": "in Minerva nicht gefunden"}
 {"uk": "не знайдено в Minerva DB", "en": "not found in Minerva DB", "de": "in der Minerva-DB nicht gefunden"}
@@ -24748,6 +24796,7 @@
 {"uk": "якщо у товару є і локально завантажений файл, і посилання (URL) — вкажіть що відображати в першу чергу. Fallback: якщо пріоритетне джерело порожнє — використовується інше.", "en": "if a product has both a locally uploaded file and a link (URL), specify which to show first. Fallback: if the priority source is empty, the other one is used.", "de": "wenn ein Artikel sowohl eine lokal hochgeladene Datei als auch einen Link (URL) hat, legen Sie fest, was zuerst angezeigt wird. Fallback: Ist die bevorzugte Quelle leer, wird die andere verwendet."}
 {"uk": "якщо увімкнено — при надходженні замовлення створюється м'яке бронювання (товар ще на складі, але позначений як зарезервований). При переведенні замовлення у «Відправлено» — резерв автоматично стає фактичним списанням. Це дозволяє бачити", "en": "if enabled — a soft reservation is created when an order arrives (the product is still in stock but marked as reserved). When the order is moved to “Shipped”, the reservation automatically becomes an actual write-off. This allows you to see", "de": "wenn aktiviert — beim Eingang eines Auftrags wird eine weiche Reservierung angelegt (der Artikel ist noch im Lager, aber als reserviert markiert). Wird der Auftrag auf „Versendet“ gesetzt, wird die Reservierung automatisch zur tatsächlichen Ausbuchung. Dadurch sehen Sie"}
 {"uk": "якщо це помилка, зверніться до адміністратора.", "en": "if this is a mistake, contact the administrator.", "de": "falls dies ein Fehler ist, wenden Sie sich an den Administrator."}
+{"uk": "якщо це ця сама складена коробка, відправте їх в архів (дія «🗄 В архів»), щоб запас вівся в одній картці.", "en": "if it is this same folded box, send them to the archive (action «🗄 Archive») so the stock is kept in one card.", "de": "wenn es derselbe gefaltete Karton ist, verschieben Sie sie ins Archiv (Aktion «🗄 Archivieren»), damit der Bestand in einer Karte geführt wird."}
 {"uk": "ятований → єдиний підключений → вибір у вікні (запам", "en": "remembered → the only connected one → choice in the window (remembered", "de": "gemerkt → einziger verbundener → Auswahl im Fenster (gemerkt"}
 {"uk": "є в Minerva", "en": "in Minerva", "de": "in Minerva vorhanden"}
 {"uk": "є запис", "en": "record exists", "de": "Datensatz vorhanden"}

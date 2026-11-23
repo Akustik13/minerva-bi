@@ -21,6 +21,11 @@
 скільки одиниць вмістила коробка (усі товари коробки разом — так дві позиції, що їхали
 в одній коробці, наступного разу знову підуть в одну), лише якщо Minerva ще не знає
 такої або більшої місткості цієї коробки для товару.
+
+Коробка з насічками («Можна скласти до висоти», `PackagingMaterial.heights`) — одна коробка в усіх висотах:
+`material_for` впізнає 30×30×16 як складену 30×30×30 (запас, навчання без нової коробки-дубля); місткість
+«Товарів в коробку» — завжди на повну висоту (з посилки, складеної до 16 см, перераховується пропорційно);
+рекомендація (`fill_height`) складає коробку до найменшої висоти, якої вистачає на вміст.
 """
 from __future__ import annotations
 
@@ -29,6 +34,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from decimal import Decimal
 from fractions import Fraction
+from types import SimpleNamespace
 
 from django.db.models import Count
 
@@ -56,6 +62,32 @@ def _same_size(a, b):
     return all(abs(x - y) <= DIM_TOLERANCE for x, y in zip(_dims(a), _dims(b)))
 
 
+def _variant(m, h):
+    return SimpleNamespace(length_cm=m.length_cm, width_cm=m.width_cm, height_cm=h)
+
+
+def _heights(m):
+    return m.heights if hasattr(m, "heights") else [Decimal(m.height_cm or 0)]
+
+
+def fold_height(m, obj):
+    """До якої висоти складено коробку m, щоб вийшли розміри obj (±1 см, будь-яка орієнтація): повна висота,
+    одна з «Можна скласти до висоти» або None — це не вона."""
+    for h in _heights(m):
+        if _same_size(_variant(m, h), obj):
+            return h
+    return None
+
+
+def _distance(m, obj):
+    h = fold_height(m, obj)
+    return sum(abs(x - y) for x, y in zip(_dims(_variant(m, h)), _dims(obj)))
+
+
+def is_folded(m, h) -> bool:
+    return m is not None and h is not None and Decimal(h) < Decimal(m.height_cm or 0) - DIM_TOLERANCE
+
+
 def _num(v):
     v = Decimal(v or 0).normalize()
     return f"{v:f}"
@@ -67,12 +99,29 @@ def materials():
 
 
 def material_for(obj, pool=None):
-    """Активний пакувальний матеріал тих самих розмірів (±1 см, будь-яка орієнтація)."""
+    """Активний пакувальний матеріал тих самих розмірів (±1 см, будь-яка орієнтація) — і складений до однієї з
+    «Можна скласти до висоти». Кілька — найближчий за розмірами, при рівних — не складений."""
     pool = materials() if pool is None else pool
-    exact = [m for m in pool if _same_size(m, obj)]
+    exact = [m for m in pool if fold_height(m, obj) is not None]
     if not exact:
         return None
-    return min(exact, key=lambda m: sum(abs(x - y) for x, y in zip(_dims(m), _dims(obj))))
+    return min(exact, key=lambda m: (_distance(m, obj), is_folded(m, fold_height(m, obj))))
+
+
+def fold_boxes(pool=None) -> list:
+    """Коробки з насічками для форми відправлення: [{name, l, w, heights}] — кнопки «↧ 30 · 22 · 16» біля висоти."""
+    pool = materials() if pool is None else pool
+    return [{"name": str(m), "l": float(m.length_cm), "w": float(m.width_cm),
+             "heights": [float(h) for h in m.heights]} for m in pool if len(m.heights) > 1]
+
+
+def fill_height(m, fill):
+    """Найменша висота, до якої можна скласти m, коли вміст займає частку fill (0…1) повної висоти."""
+    hs = _heights(m)
+    fill = Fraction(fill)
+    need = Decimal(hs[0]) * fill.numerator / fill.denominator
+    fits = [h for h in hs if h >= need]
+    return min(fits) if fits else hs[0]
 
 
 @dataclass
@@ -86,9 +135,16 @@ class Box:
     lines: int = 0                      # позицій замовлення в цих коробках
 
     @property
+    def folded_to(self):
+        """Висота, до якої складено коробку (None — повна)."""
+        h = fold_height(self.packaging, self) if self.packaging else None
+        return h if is_folded(self.packaging, h) else None
+
+    @property
     def label(self):
         if self.packaging:
-            return str(self.packaging)
+            h = self.folded_to
+            return f"{self.packaging} · складено до {_num(h)} см" if h else str(self.packaging)
         return f"{_num(self.length_cm)}×{_num(self.width_cm)}×{_num(self.height_cm)} см"
 
     def row(self):
@@ -332,7 +388,8 @@ def _from_products(lines):
         m = g["material"]
         tare = Decimal(m.tare_weight_kg or 0) * 1000
         per_box = g["content"] / n + tare
-        boxes.append(Box(m.length_cm, m.width_cm, m.height_cm, qty=n, packaging=m,
+        h = fill_height(m, min(Fraction(1), g["share"] / n))      # коробка з насічками — до висоти вмісту
+        boxes.append(Box(m.length_cm, m.width_cm, h, qty=n, packaging=m,
                          weight_g=per_box if per_box > 0 else None, lines=g["lines"]))
     return Recommendation(
         source="product_packaging", lines=infos, boxes=boxes,
@@ -399,26 +456,41 @@ def learn_plan(shipment, pool=None):
     for r in ProductPackaging.objects.filter(product_id__in=products).select_related("packaging"):
         known[r.product_id].append(r)
 
+    def same_box(known_material, known_dims, box_material, box):
+        """Той самий пакувальний матеріал (і складений), інакше — ті самі розміри."""
+        if known_material is not None and box_material is not None:
+            return known_material.pk == box_material.pk
+        return _same_size(known_dims, box)
+
     plan = []
     for box, weight_kg, units, n in _box_contents(shipment, lines):
         cap = math.ceil(sum(units.values()) / n)
         if cap < 1:
             continue
         material = material_for(box, pool)
+        dims = f"{_num(box.length_cm)}×{_num(box.width_cm)}×{_num(box.height_cm)} см"
+        folded = fold_height(material, box) if material is not None else None
+        if is_folded(material, folded):
+            # Коробку склали нижче — місткість на повну висоту (рекомендація потім складе її знову)
+            full = Decimal(material.height_cm)
+            sent = cap
+            cap = max(cap, int(Decimal(cap) * full / folded))
+            dims = (f"{_num(material.length_cm)}×{_num(material.width_cm)}×{_num(full)} см "
+                    f"(складено до {_num(folded)} см: {sent} шт → на повну висоту ≈ {cap} шт)")
         for pid in units:
-            if any(_same_size(r.packaging, box) and r.qty_per_box >= cap for r in known[pid]):
+            if any(same_box(r.packaging, r.packaging, material, box) and r.qty_per_box >= cap for r in known[pid]):
                 continue
             if any(p["product"].pk == pid and p["qty_per_box"] >= cap
-                   and _same_size(p["box"], box) for p in plan):
+                   and same_box(p["packaging"], p["box"], material, box) for p in plan):
                 continue
             p = products[pid]
             plan.append({
                 "product": p, "sku": p.sku, "name": str(p),
-                "box": box, "packaging": material,
-                "dims": f"{_num(box.length_cm)}×{_num(box.width_cm)}×{_num(box.height_cm)} см",
+                "box": box, "packaging": material, "dims": dims,
                 "qty_per_box": min(cap, 32767),
                 "weight_g": int(Decimal(weight_kg or 0) * 1000) or None,
                 "approx": len(units) > 1,
+                "folded": folded if is_folded(material, folded) else None,
             })
     return plan
 
@@ -442,6 +514,8 @@ def learn(shipment, plan=None, pool=None):
             )
             pool.append(material)
         note = f"Авто зі відправлення #{shipment.pk}"
+        if c.get("folded"):
+            note += f" (коробку складено до {_num(c['folded'])} см — місткість перераховано на повну висоту)"
         if c["approx"]:
             note += " (в коробці кілька товарів — вага на всю коробку)"
         ProductPackaging.objects.create(
