@@ -5,9 +5,11 @@
   {{TITLE}} — назва коробки великими жирними літерами (AlwaysFit);
   {{CODE}}  — штрихкод Code128 з кодом коробки (`box_names.barcode_value`: код, без нього — PKG-<номер>), код під ним;
   {{SIZE}}  — «30×30×30 cm · ↧ 27/22/16 · 27 L»; {{INFO}} — клас, тара, макс. вага вмісту;
-  {{LINE}} / {{FS}} — «Fits:» і що в неї кладемо — рекомендовані упаковки товарів (`ProductPackaging`: артикул ×
-                      скільки вміщує), рядками до `LINE_CHARS` символів, до `MAX_LINES` рядків, решта — «+N more».
-Без товарів — нотатки коробки (перший рядок). XML-коментарів DYMO не приймає — маркери блоку прибирає render.
+  {{LINE}} / {{FS}} — лише на прохання (`build(contents=True)`, `?contents=1`; за замовчуванням блоку немає):
+                      «Fits:» і що в неї кладемо — рекомендовані упаковки товарів (`ProductPackaging`: артикул ×
+                      скільки вміщує), рядками до `LINE_CHARS` символів, до `MAX_LINES` рядків, решта — «+N more»;
+                      без товарів — нотатки коробки (перший рядок).
+XML-коментарів DYMO не приймає — маркери блоку прибирає render; без рядків render прибирає й сам текстовий блок.
 """
 import re
 from decimal import Decimal
@@ -66,7 +68,8 @@ def wrap(items, prefix="Fits: ", width=LINE_CHARS, max_lines=MAX_LINES) -> list[
     return lines
 
 
-def build(material) -> dict:
+def build(material, contents_line=False) -> dict:
+    """contents_line — додати «Fits:» (товари, що в неї кладемо) або, без товарів, перший рядок нотаток."""
     from shipping.services import box_names
     m = material
     folds = m.heights[1:]
@@ -80,9 +83,10 @@ def build(material) -> dict:
     if m.max_weight_kg:
         info.append(f"max {_n(m.max_weight_kg)} kg")
     items = contents(m)
-    if items:
+    lines = []
+    if contents_line and items:
         lines = wrap(items)
-    else:
+    elif contents_line:
         note = (m.notes or "").strip().splitlines()
         lines = [note[0][:LINE_CHARS * 2]] if note else []
     return {"title": m.name or m._dim_str(), "code": box_names.barcode_value(m), "size": size,
@@ -96,6 +100,8 @@ def render(data) -> str:
     span = block.group(1).replace("{{FS}}", str(data["font_size"]))
     spans = "".join(span.replace("{{LINE}}", escape(line)) for line in (data["lines"] or [" "]))
     xml = xml[:block.start()] + spans + xml[block.end():]
+    if not data["lines"]:           # переліку немає — без порожнього блоку («✏️ Правки» його не показують)
+        xml = re.sub(r"[ \t]*<TextObject>\s*<Name>ITextObject3</Name>.*?</TextObject>\r?\n", "", xml, flags=re.S)
     for marker, key in (("{{TITLE}}", "title"), ("{{CODE}}", "code"), ("{{SIZE}}", "size"), ("{{INFO}}", "info")):
         xml = xml.replace(marker, escape(data[key]))
     return xml

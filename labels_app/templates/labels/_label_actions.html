@@ -3,7 +3,7 @@
 {# Кнопка: data-svl="antenna|filter|generic|cable|" data-sku data-qty | data-qty-input data-order data-file="1" #}
 {# data-svl-act="print|download|check|direct". Загальне правило: файлу немає — етикетка з шаблону (templ / uses_template). #}
 {# Етикетка замовлення: data-svl="order" data-order=<pk> data-sku=<номер замовлення> (labels_app/order_label.py) #}
-{# Наклейка коробки: data-svl="box" data-order=<pk пакувального матеріалу> data-sku=<код> (labels_app/box_label.py) #}
+{# Наклейка коробки: data-svl="box" data-order=<pk пакувального матеріалу> data-sku=<код> (labels_app/box_label.py); «Fits:» — лише з меню #}
 {# Друк — служба DYMO Connect на цьому ПК (https://127.0.0.1:41951, GetPrinters / RenderLabel / PrintLabel), програму не відкривати; #}
 {# перед друком — вікно перегляду (картинка від DYMO, копії, «✏️ Правки» лише для цього друку) або одразу — print_preview; #}
 {# позначка походження в куті — labels_app/mark.py (MinervaMark), поправки тут ставлять «E». #}
@@ -561,7 +561,10 @@
   // Етикетка замовлення й наклейка коробки — завжди з даних Minerva, без вікна перевірки
   var FIXED = {
     order: function (o) { return {url: '/labels/order/' + encodeURIComponent(o.order) + '/', name: 'Order-' + o.sku}; },
-    box: function (o) { return {url: '/labels/box/' + encodeURIComponent(o.order) + '/', name: 'Box-' + o.sku}; }
+    box: function (o) {        // o.contents — ще «Fits:» (що кладемо в коробку), за замовчуванням без нього
+      return {url: '/labels/box/' + encodeURIComponent(o.order) + '/' + (o.contents ? '?contents=1' : ''),
+              name: 'Box-' + o.sku};
+    }
   };
   function orderLabel(o, act, how) {
     var r = FIXED[o.kind](o);
@@ -654,7 +657,10 @@
       {t: '🖨️ Друкувати на DYMO' + dots, def: clickPrints, f: function () { orderLabel(o, 'direct'); }},
       {t: o.kind === 'box' ? '⬇️ Завантажити наклейку коробки' : '⬇️ Завантажити етикетку замовлення',
        def: clickSaves, f: function () { orderLabel(o, 'download'); }},
-    ] : [
+    ].concat(o.kind === 'box' ? [
+      {t: '🧾 Друкувати з переліком товарів («Fits:»)' + dots,
+       f: function () { orderLabel(Object.assign({}, o, {contents: true}), 'direct'); }},
+    ] : []) : [
       {t: '📄 Завантажити з бази' + (o.file ? '' : ' — файлу немає'), dis: !o.file, def: !defGen && clickSaves,
        f: function () { fromFile(o, 'download'); }},
     ];
@@ -687,7 +693,7 @@
     var foot = document.createElement('div');
     foot.className = 'svl-foot';
     foot.innerHTML = (o.kind === 'order' ? 'Номер замовлення, країна й усі артикули з кількістю'
-                      : o.kind === 'box' ? 'Назва, штрихкод коду, розмір і що кладемо в коробку'
+                      : o.kind === 'box' ? 'Назва, штрихкод коду, розмір і клас коробки'
                       : 'Клік: ' + (defGen ? '🧩 сформувати з шаблону' : '📄 готовий файл з бази'))
       + ', ' + click
       + ' · <a href="/admin/sales/salessettings/" target="_blank">змінити</a>';

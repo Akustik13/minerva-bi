@@ -95,9 +95,19 @@ class BoxLabelTests(TestCase):
             p = Product.objects.get_or_create(sku=sku, defaults={"name": sku})[0]
             ProductPackaging.objects.create(product=p, packaging=self.cube, qty_per_box=qty, is_default=n == 0)
 
-    def test_build_and_render(self):
+    def test_default_label_has_no_contents_block(self):
         from labels_app import box_label
         data = box_label.build(self.cube)
+        self.assertEqual(data["lines"], [])
+        xml = box_label.render(data)
+        self.assertNotIn("ITextObject3", xml)
+        self.assertNotIn("Fits:", xml)
+        root = ET.fromstring(xml.encode("utf-8"))
+        self.assertIn("L 30×30×30", [t.text for t in root.iter("Text")])
+
+    def test_build_and_render(self):
+        from labels_app import box_label
+        data = box_label.build(self.cube, contents_line=True)
         self.assertEqual(data["code"], "BX-L-01")
         self.assertEqual(data["items"], [("CA-SMA-1", 10), ("AN220213-01C", 4)])       # найбільша місткість
         self.assertIn("30×30×30 cm · ↧ 22/16 · 27 L", data["size"])
@@ -123,9 +133,10 @@ class BoxLabelTests(TestCase):
     def test_without_code_or_products(self):
         from labels_app import box_label
         bare = box("Bare", 20, 10, 5, notes="Для кабелів\nдругий рядок")
-        data = box_label.build(bare)
+        data = box_label.build(bare, contents_line=True)
         self.assertEqual(data["code"], f"PKG-{bare.pk:04d}")
         self.assertEqual(data["lines"], ["Для кабелів"])
+        self.assertEqual(box_label.build(bare)["lines"], [])
 
     def test_view_and_permission(self):
         from config.models import SystemSettings
@@ -137,6 +148,8 @@ class BoxLabelTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn('Box-BX-L-01.dymo', r["Content-Disposition"])
         self.assertIn(b"MinervaMark", r.content)
+        self.assertNotIn("Fits:", r.content.decode("utf-8"))
+        self.assertIn("Fits:", self.client.get(f"/labels/box/{self.cube.pk}/?contents=1").content.decode("utf-8"))
         clerk = User.objects.create_user("clerk", password="x", is_staff=True)
         clerk.profile.role = "readonly"
         clerk.profile.allowed_modules = ["crm"]

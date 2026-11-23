@@ -294,7 +294,7 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
         data = build(obj)
         info = format_html('<span style="color:var(--text-muted,#607d8b);font-size:12px">{} · <span translate="no">'
                            '{}</span> · {}</span>', _('штрихкод'), data['code'],
-                           _('вміст: {} товарів').format(len(data['items'])) if data['items'] else _('товарів ще немає'))
+                           _('перелік товарів («Fits:») — правий клік → «🧾 Друкувати з переліком товарів»'))
         script = mark_safe(render_to_string('labels/_label_actions.html', label_context()))
         return format_html('{} &nbsp;{}{}', self._label_button(obj, '🖨️ ' + str(_('Друкувати наклейку'))), info, script)
     actions = ('bulk_settings_selected', 'classify_selected', 'archive_selected', 'restore_selected',

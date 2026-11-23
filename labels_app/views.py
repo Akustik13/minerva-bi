@@ -351,8 +351,8 @@ def order_label(request, pk):
 
 @staff_member_required
 def box_label(request, pk):
-    """Наклейка коробки: назва, штрихкод коду, розмір, клас, тара й що в неї кладемо (labels_app/box_label.py);
-    право — бачити пакувальні матеріали."""
+    """Наклейка коробки: назва, штрихкод коду, розмір, клас і тара (labels_app/box_label.py); ?contents=1 — ще
+    «Fits:» (що в неї кладемо). Право — бачити пакувальні матеріали."""
     from django.core.exceptions import PermissionDenied
     from django.shortcuts import get_object_or_404
     from labels_app import box_label as builder, mark
@@ -360,7 +360,7 @@ def box_label(request, pk):
     if not request.user.has_perm('shipping.view_packagingmaterial'):
         raise PermissionDenied
     material = get_object_or_404(PackagingMaterial, pk=pk)
-    data = builder.build(material)
+    data = builder.build(material, contents_line=request.GET.get('contents') == '1')
     name = re.sub(r'[^\w.-]+', '_', data['code']) or str(material.pk)
     xml = mark.stamp(builder.render(data), 'auto')
     response = HttpResponse(xml.encode('utf-8'), content_type='application/octet-stream')

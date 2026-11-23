@@ -7369,6 +7369,7 @@
 {"uk": "Друкувати", "en": "Print", "de": "Drucken"}
 {"uk": "Друкувати ({0} шт.)", "en": "Print ({0} pcs)", "de": "Drucken ({0} Stk.)"}
 {"uk": "Друкувати вибране", "en": "Print selected", "de": "Auswahl drucken"}
+{"uk": "Друкувати з переліком товарів («Fits:»)", "en": "Print with the product list («Fits:»)", "de": "Mit Artikelliste drucken («Fits:»)"}
 {"uk": "Друкувати на DYMO", "en": "Print on DYMO", "de": "Auf DYMO drucken"}
 {"uk": "Друкувати на DYMO (служба DYMO Connect на цьому ПК)", "en": "Print on DYMO (DYMO Connect service on this PC)", "de": "Auf DYMO drucken (Dienst DYMO Connect auf diesem PC)"}
 {"uk": "Друкувати наклейки коробок", "en": "Print box labels", "de": "Kartonetiketten drucken"}
@@ -11387,6 +11388,7 @@
 {"uk": "Назва, примітка, виставка, постачальник…", "en": "Title, note, trade fair, supplier…", "de": "Titel, Notiz, Messe, Lieferant…"}
 {"uk": "Назва, ціна доставки нетто, термін доставки «від–до» робочих днів після відправки. Ціна й термін зони діють для всіх її країн.", "en": "Name, net shipping price, delivery time “from–to” working days after dispatch. The zone’s price and lead time apply to all of its countries.", "de": "Name, Versandpreis netto, Lieferzeit „von–bis“ Werktage nach Versand. Preis und Lieferzeit der Zone gelten für alle ihre Länder."}
 {"uk": "Назва, час, місце, посилання останнього надісланого — для «♻ Надіслати оновлення» і скасування після видалення події.", "en": "Title, time, location and link of the last version sent — for “♻ Send update” and cancellation after the event is deleted.", "de": "Titel, Zeit, Ort und Link der zuletzt gesendeten Version — für „♻ Aktualisierung senden“ und die Absage nach dem Löschen des Termins."}
+{"uk": "Назва, штрихкод коду, розмір і клас коробки", "en": "Box name, code barcode, size and class", "de": "Name, Code-Barcode, Größe und Klasse des Kartons"}
 {"uk": "Назва, штрихкод коду, розмір і що кладемо в коробку", "en": "Name, code barcode, size and what goes into the box", "de": "Name, Code-Barcode, Größe und was in den Karton kommt"}
 {"uk": "Назва/reference JLC", "en": "JLC name / reference", "de": "JLC-Name/Referenz"}
 {"uk": "Назва: {0}", "en": "Name: {0}", "de": "Name: {0}"}
@@ -22941,6 +22943,7 @@
 {"uk": "перекладено (підсумок для листа)", "en": "translated (summary for the e-mail)", "de": "übersetzt (Zusammenfassung für die E-Mail)"}
 {"uk": "перекладів з комплекту: {0}", "en": "bundled translations: {0}", "de": "mitgelieferte Übersetzungen: {0}"}
 {"uk": "перекривається з записом askDANTE {0}", "en": "overlaps with askDANTE entry {0}", "de": "überschneidet sich mit askDANTE-Eintrag {0}"}
+{"uk": "перелік товарів («Fits:») — правий клік → «🧾 Друкувати з переліком товарів»", "en": "product list («Fits:») — right click → «🧾 Print with the product list»", "de": "Artikelliste («Fits:») — Rechtsklick → «🧾 Mit Artikelliste drucken»"}
 {"uk": "переможець", "en": "winner", "de": "Gewinner"}
 {"uk": "перенесено замовлень", "en": "orders moved", "de": "Aufträge übertragen"}
 {"uk": "перенесено на наступну нараду", "en": "moved to the next meeting", "de": "auf die nächste Besprechung verschoben"}
