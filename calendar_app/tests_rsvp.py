@@ -27,6 +27,14 @@ class RsvpTests(TestCase):
         from config.models import SystemSettings
         from email_assistant.models import EmailAccount, EmailMessage
         SystemSettings.objects.update_or_create(pk=1, defaults={'is_onboarding_complete': True})
+        import shutil
+        import tempfile
+        from django.test import override_settings
+        media = tempfile.mkdtemp()                  # прев'ю кладе iCalendar з тексту листа у файл invite.ics
+        self.addCleanup(shutil.rmtree, media, True)
+        over = override_settings(MEDIA_ROOT=media)
+        over.enable()
+        self.addCleanup(over.disable)
         self.user = User.objects.create_superuser('slava', 's@x.y', 'p')
         self.account = EmailAccount.objects.create(user=self.user, email_address='viacheslav.pryimak@sevskiy.de',
                                                    display_name='Viacheslav Pryimak')

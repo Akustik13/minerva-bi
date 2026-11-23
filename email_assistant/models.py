@@ -243,14 +243,29 @@ class EmailMessage(models.Model):
         return self.CATEGORY_SHORT.get(self.category, '')
 
     def fix_html_body(self, save=True) -> bool:
-        """Листи лише з text/html раніше зберігались як текст — перенести розмітку в body_html."""
-        from email_assistant.imap_client import html_to_text, looks_like_html
-        if self.body_html or not looks_like_html(self.body_text):
+        """Листи лише з text/html раніше зберігались як текст — перенести розмітку в body_html. Так само запрошення
+        Outlook / Teams лише блоком text/calendar зберігались сирим iCalendar («BEGIN:VCALENDAR…», посилання Teams не
+        клікалось) — текст і HTML з події (imap_client.calendar_body)."""
+        from email_assistant.imap_client import (calendar_body, html_to_text, keep_calendar_file, looks_like_html,
+                                                 looks_like_ics)
+        if self.body_html:
             return False
-        self.body_html = self.body_text
-        self.body_text = html_to_text(self.body_html)
+        fields = ['body_html', 'body_text']
+        if looks_like_ics(self.body_text):
+            text, html = calendar_body(self.body_text)
+            atts = keep_calendar_file(self, self.body_text) if (text or html) else None
+            if atts is None:            # iCalendar нікуди зберегти — текст лишається, щоб календар його бачив
+                return False
+            self.attachments = atts
+            self.body_text, self.body_html = text, html
+            fields.append('attachments')
+        elif looks_like_html(self.body_text):
+            self.body_html = self.body_text
+            self.body_text = html_to_text(self.body_html)
+        else:
+            return False
         if save and self.pk:
-            self.save(update_fields=['body_html', 'body_text'])
+            self.save(update_fields=fields)
         return True
 
 

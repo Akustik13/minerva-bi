@@ -87,6 +87,43 @@ def looks_like_html(text: str) -> bool:
     return bool(re.search(r'</(html|body|div|p|table|span|font)>|<br\s*/?>', head))
 
 
+ICS_START_RE = re.compile(r'\s*BEGIN:VCALENDAR\b', re.IGNORECASE)
+
+
+def looks_like_ics(text: str) -> bool:
+    """Чи це сирий iCalendar (лист-запрошення, де Outlook / Teams надіслали лише блок text/calendar)."""
+    return bool(ICS_START_RE.match(text or ''))
+
+
+def calendar_body(ics: str) -> tuple:
+    """Лист-запрошення лише з блоком text/calendar: що показати замість сирого iCalendar — (текст, HTML) першої події:
+    HTML — X-ALT-DESC;FMTTYPE=text/html (те, що малює Outlook: «Microsoft Teams-Besprechung · Teilnehmen: <посилання>»),
+    текст — DESCRIPTION (без нього — з HTML; без обох — назва й місце). Нічого — ('', '')."""
+    from calendar_app.invites import _lines, _unescape
+    fields, in_event, depth = {}, False, 0
+    for name, params, value in _lines(ics or ''):
+        if name == 'BEGIN' and value.strip().upper() == 'VEVENT' and not in_event:
+            in_event = True
+            continue
+        if not in_event:
+            continue
+        if name == 'BEGIN':
+            depth += 1           # VALARM усередині події
+        elif name == 'END':
+            if not depth:
+                break
+            depth -= 1
+        elif not depth:
+            if name == 'X-ALT-DESC' and params.get('FMTTYPE', '').lower() != 'text/html':
+                continue
+            fields.setdefault(name, _unescape(value))
+    html = fields.get('X-ALT-DESC', '')
+    text = fields.get('DESCRIPTION', '') or (html_to_text(html) if html else '')
+    if not text and not html:
+        text = '\n'.join(v for v in (fields.get('SUMMARY', ''), fields.get('LOCATION', '')) if v)
+    return text[:200000], html[:1000000]
+
+
 def _decode_payload(part, payload: bytes) -> str:
     charset = part.get_content_charset() or 'utf-8'
     try:
@@ -96,7 +133,7 @@ def _decode_payload(part, payload: bytes) -> str:
 
 
 def _get_body(msg) -> tuple:
-    text_body = html_body = ''
+    text_body = html_body = calendar = ''
     if msg.is_multipart():
         for part in msg.walk():
             ct  = part.get_content_type()
@@ -111,6 +148,8 @@ def _get_body(msg) -> tuple:
                 text_body = decoded[:200000]
             elif ct == 'text/html' and not html_body:
                 html_body = decoded[:1000000]
+            elif ct == 'text/calendar' and not calendar:
+                calendar = decoded
     else:
         payload = msg.get_payload(decode=True)
         if payload:
@@ -118,8 +157,16 @@ def _get_body(msg) -> tuple:
             # Веб-пошта (IONOS/OX, GMX…) часто шле лише text/html без multipart
             if msg.get_content_type() == 'text/html':
                 html_body = decoded[:1000000]
+            elif msg.get_content_type() == 'text/calendar':
+                calendar = decoded
             else:
                 text_body = decoded[:200000]
+    # Запрошення Outlook / Teams лише блоком text/calendar — текст і HTML з події (як в Outlook), а не сирий iCalendar.
+    # Сам iCalendar лишається вкладенням invite.ics (_get_attachments_raw) — з нього календар бере зустріч
+    if calendar and not text_body and not html_body:
+        text_body, html_body = calendar_body(calendar)
+        if not (text_body or html_body):
+            text_body = calendar[:200000]
     if html_body and not text_body:
         text_body = html_to_text(html_body)[:200000]
     return text_body, html_body
@@ -265,6 +312,28 @@ def is_calendar(att) -> bool:
     name = (att.get('name') or '').lower()
     ctype = (att.get('content_type') or '').lower()
     return not att.get('is_inline') and (ctype == 'text/calendar' or name.endswith('.ics'))
+
+
+def keep_calendar_file(message, ics: str):
+    """iCalendar з тексту старого листа-запрошення — у файл вкладення invite.ics (вкладення-запрошення без файлу або
+    нове), щоб календар (calendar_app/invites.calendars_of) і далі знаходив зустріч, коли текст листа замінено
+    текстом події. → новий список вкладень; файл уже є — той самий список; не вдалося записати — None."""
+    atts = [dict(a) for a in message.attachments or []]
+    if any(is_calendar(a) and a.get('file_path') for a in atts):
+        return atts
+    data = (ics or '').encode('utf-8')
+    index = next((i for i, a in enumerate(atts) if is_calendar(a)), None)
+    if index is None:
+        atts.append({'name': 'invite.ics', 'content_type': 'text/calendar', 'size': len(data), 'content_id': ''})
+        index = len(atts) - 1
+    rel_dir = _attachment_dir(message.account_id, message.imap_uid or 0,
+                              message.imap_folder_name or f'minerva-{message.pk}')
+    path = _write_attachment(rel_dir, index, atts[index].get('name') or 'invite.ics', data)
+    if not path:
+        return None
+    atts[index]['file_path'] = path
+    atts[index].pop('cal_fail', None)
+    return atts
 
 
 def keeps_file(att) -> bool:
