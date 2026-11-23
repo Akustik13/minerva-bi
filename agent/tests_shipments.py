@@ -79,7 +79,7 @@ class ShipmentTests(Base):
         names = [t['name'] for t in tools.definitions(self.task(each_product=True))]
         self.assertNotIn('propose_shipment', names)
         self.assertIn('propose_shipment', [t['name'] for t in tools.definitions(self.task())])
-        self.assertIn('orders_to_ship', mcp.names())
+        self.assertIn('orders_to_ship', mcp.names(self.user))           # MCP — за правами людини ключа
 
     # ── чернетка відправлення ──
     def test_draft_shipment_on_approve(self):

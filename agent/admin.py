@@ -16,7 +16,7 @@ from django.utils.safestring import mark_safe
 from agent import from_task
 from agent import mail as agent_mail
 from agent import products as product_fields
-from agent import run_state
+from agent import run_state, toolsets
 from agent.models import AgentProposal, AgentRule, AgentRun, AgentSchedule, AgentTask
 
 # ✓ на сторінці завдання — кому є що застосувати (кожна пропозиція ще перевіряє своє право, agent/decide.py)
@@ -913,7 +913,7 @@ class AgentTaskAdmin(admin.ModelAdmin):
             'running': task.status in (AgentTask.QUEUED, AgentTask.RUNNING),
             'stopped': task.status in (AgentTask.FAILED, AgentTask.CANCELLED),
             'total': task.products.count(), 'done': len(task.done_products or []),
-            'can_apply': any(request.user.has_perm(x) for x in APPLY_PERMS),
+            'can_apply': any(request.user.has_perm(x) for x in APPLY_PERMS + toolsets.apply_perms()),
             'log': list(reversed((task.log or [])[-80:])),
             'back_url': reverse('admin:agent_agenttask_changelist'),
             'repeat_url': (reverse('admin:agent_agenttask_repeat', args=[task.pk])

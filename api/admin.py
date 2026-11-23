@@ -43,6 +43,17 @@ class APIKeyForm(forms.ModelForm):
         if self.instance.pk:
             self.fields['scopes_input'].initial = self.instance.scopes
 
+    request_user = None           # хто зберігає (APIKeyAdmin.get_form) — власник нового ключа
+
+    def clean(self):
+        data = super().clean()
+        owner = self.instance.owner if self.instance.owner_id else self.request_user
+        agent = data.get('agent_user')
+        if data.get('private') and agent is not None and owner is not None and agent.pk != owner.pk:
+            self.add_error('agent_user', '🔒 Особистий ключ — агент лише від імені власника ключа ({}).'.format(
+                owner.get_full_name() or owner.get_username()))
+        return data
+
     def save(self, commit=True):
         instance = super().save(commit=False)
         instance.scopes = self.cleaned_data.get('scopes_input', [])
@@ -54,15 +65,17 @@ class APIKeyForm(forms.ModelForm):
 @admin.register(APIKey)
 class APIKeyAdmin(admin.ModelAdmin):
     form = APIKeyForm
-    list_display  = ['name', 'key_preview', 'scopes_display', 'is_active',
+    list_display  = ['name', 'key_preview', 'owner_col', 'scopes_display', 'is_active',
                      'last_used', 'activity_col', 'limits_col', 'expires_at', 'created_at']
-    list_filter   = ['is_active']
+    list_filter   = ['is_active', 'private']
     search_fields = ['name']
-    readonly_fields = ['key_display', 'created_at', 'last_used', 'usage_display', 'activity_panel', 'insight_panel']
+    readonly_fields = ['key_display', 'key_hidden_display', 'owner_display', 'created_at', 'last_used',
+                       'usage_display', 'activity_panel', 'insight_panel']
+    actions = ['action_deactivate']
 
     fieldsets = [
         ('Загальне', {
-            'fields': ['name', 'is_active', 'expires_at', 'shop', 'default_source'],
+            'fields': ['name', 'is_active', 'expires_at', 'shop', 'default_source', 'private', 'owner_display'],
         }),
         ('Права доступу', {
             'fields': ['scopes_input'],
@@ -98,13 +111,62 @@ class APIKeyAdmin(admin.ModelAdmin):
 
     _base_url = ''
 
+    # ── 🔒 Особистий ключ: повний ключ бачить і змінює лише власник ─────────────
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        form.request_user = request.user
+        return form
+
+    def get_fieldsets(self, request, obj=None):
+        sets = super().get_fieldsets(request, obj)
+        if obj is not None and obj.hidden_from(request.user):     # чужий особистий — без повного ключа на сторінці
+            sets = [(title, {**opts, 'fields': ['key_hidden_display' if f == 'key_display' else f
+                                                for f in opts['fields']]}) for title, opts in sets]
+        return sets
+
+    def has_change_permission(self, request, obj=None):
+        if obj is not None and obj.hidden_from(request.user):
+            return False                    # лише перегляд (замасковано); вимкнути — «⏸ Вимкнути», видалити — можна
+        return super().has_change_permission(request, obj)
+
+    def save_model(self, request, obj, form, change):
+        if not obj.owner_id and (not change or obj.private):    # новий ключ / старий без власника стає особистим
+            obj.owner = request.user
+        super().save_model(request, obj, form, change)
+
+    @admin.action(description='⏸ Вимкнути вибрані ключі (і особисті — на випадок витоку)', permissions=['delete'])
+    def action_deactivate(self, request, queryset):
+        n = queryset.filter(is_active=True).update(is_active=False)
+        self.message_user(request, f'Вимкнено ключів: {n}. Увімкнути особистий ключ може лише його власник.')
+
+    @admin.display(description='Власник')
+    def owner_col(self, obj):
+        who = (obj.owner.get_full_name() or obj.owner.get_username()) if obj.owner_id else '—'
+        return format_html('{}{}', '🔒 ' if obj.private else '', who)
+
+    @admin.display(description='Власник')
+    def owner_display(self, obj):
+        if not obj or not obj.pk:
+            return 'ви (той, хто створює ключ)'
+        who = (obj.owner.get_full_name() or obj.owner.get_username()) if obj.owner_id else '— (створено до 11.2026)'
+        return format_html('{}{}', who, ' · 🔒 особистий: повний ключ бачить і змінює лише власник'
+                           if obj.private else ' · спільний: бачать усі, кому відкриті ключі API')
+
+    @admin.display(description='API Ключ')
+    def key_hidden_display(self, obj):
+        from core.secrets import mask
+        who = (obj.owner.get_full_name() or obj.owner.get_username()) if obj.owner_id else '?'
+        return format_html('<code>{}</code><div style="margin-top:6px;font-size:12px;opacity:.8">🔒 Особистий ключ '
+                           '{} — повністю бачить і змінює лише власник. Вимкнути (на випадок витоку): дія «⏸ Вимкнути '
+                           'вибрані ключі» у списку.</div>', mask(obj.key), who)
+
     def change_view(self, request, object_id, form_url='', extra_context=None):
         self._base_url = request.build_absolute_uri('/').rstrip('/')
         return super().change_view(request, object_id, form_url, extra_context)
 
     def key_preview(self, obj):
         from core.secrets import mask
-        return mask(obj.key)
+        return ('🔒 ' if obj.private else '') + mask(obj.key)
     key_preview.short_description = 'Ключ'
 
     def key_display(self, obj):

@@ -327,3 +327,21 @@ class WatchTests(TestCase):
         viewer = User.objects.create_user("vera", "v@x.y", "p", is_staff=True)
         self.client.force_login(viewer)
         self.assertIn(self.client.post(url).status_code, (302, 403))
+
+
+class HubReplyRightsTests(TestCase):
+    """Відповісти / написати покупцю DigiKey у хабі — лише з правом змінювати налаштування DigiKey."""
+
+    def test_reply_needs_change_right(self):
+        from config.models import SystemSettings
+        SystemSettings.objects.update_or_create(pk=1, defaults={"is_onboarding_complete": True})
+        viewer = User.objects.create_user("vera", "v@x.y", "p", is_staff=True)
+        self.client.force_login(viewer)
+        with mock.patch("bots.services.digikey_messages.reply") as reply:
+            r = self.client.post("/admin/bots/digikeyconfig/messages/t1/reply/", '{"content": "Hi"}',
+                                 content_type="application/json")
+            self.assertIn(r.status_code, (302, 403))
+            r = self.client.post("/admin/bots/digikeyconfig/messages/new-topic/",
+                                 '{"order_id": "1", "content": "Hi"}', content_type="application/json")
+            self.assertIn(r.status_code, (302, 403))
+        reply.assert_not_called()

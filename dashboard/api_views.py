@@ -147,19 +147,20 @@ def _admin_required(view):
     return staff_member_required(wrapped)
 
 
-def console_keys():
+def console_keys(user=None):
     """Активні ключі для вибору в консолі: id, назва, замаскований ключ — без самого ключа.
-    Службових ключів RAG / RAG-ПК (права knowledge:* чи meetings:*) у списку немає."""
+    Службових ключів RAG / RAG-ПК (права knowledge:* чи meetings:*) і 🔒 особистих ключів інших людей у списку немає."""
     from api.models import APIKey
     from core.secrets import mask
     return [{'id': k.pk, 'name': k.name, 'masked': mask(k.key)}
-            for k in APIKey.objects.filter(is_active=True).order_by('name', 'pk') if not service_key(k)]
+            for k in APIKey.objects.filter(is_active=True).order_by('name', 'pk')
+            if not service_key(k) and not k.hidden_from(user)]
 
 
 def api_console(request):
     context = admin.site.each_context(request)
     context.update({
-        'console_keys': console_keys(),
+        'console_keys': console_keys(request.user),
         'api_prefix':   CONSOLE_PREFIX,
     })
     return render(request, 'dashboard/api_console.html', context)
@@ -286,6 +287,9 @@ def api_proxy(request):
             return JsonResponse({'error': 'Ключ не знайдено або вимкнено — оновіть сторінку консолі'}, status=400)
         if service_key(key):
             return JsonResponse({'error': SERVICE_KEY_TEXT}, status=400)
+        if key.hidden_from(request.user):
+            return JsonResponse({'error': '🔒 Особистий ключ іншої людини — користуватися ним може лише власник'},
+                                status=403)
         headers = {k: v for k, v in headers.items() if k.lower() != 'authorization'}
         headers['Authorization'] = f'Token {key.key}'
         auth_label = f'key: {key.name} ({mask(key.key)})'

@@ -1405,6 +1405,8 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         from bots.services.digikey_messages import reply, get_topic
         if request.method != "POST":
             return JsonResponse({"error": "POST only"}, status=405)
+        if not self.has_change_permission(request):       # відповідь покупцю — як «✉️ Чат на пошту» (право change)
+            return JsonResponse({"error": "Немає права відповідати покупцям DigiKey"}, status=403)
         import json
         try:
             body = json.loads(request.body)
@@ -1430,6 +1432,8 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         from bots.services.digikey_messages import create_topic
         if request.method != "POST":
             return JsonResponse({"error": "POST only"}, status=405)
+        if not self.has_change_permission(request):
+            return JsonResponse({"error": "Немає права писати покупцям DigiKey"}, status=403)
         import json
         try:
             body = json.loads(request.body)

@@ -138,6 +138,7 @@ class Context:
         self.allowed = None if only or not task.pk else (set(task.products.values_list('pk', flat=True)) or None)
         self.pages = {}                       # pk → (сторінки, звідки)
         self.proposed = 0
+        self.personal = True                  # особисте людини (пошта, календар); MCP — лише з 🔒 особистим ключем
 
     # ── товари ──
     def product(self, sku):
@@ -211,9 +212,10 @@ def run(ctx, name, args) -> tuple:
     try:
         if name in inbox_tools.HANDLERS and not inbox_tools.can_read(ctx.task.owner):
             raise ToolError('пошта й календар — лише для того, хто дав завдання і має скриньку')
+        from agent import toolsets
         fn = (HANDLERS.get(name) or channels.HANDLERS.get(name) or shipments.HANDLERS.get(name)
               or purchases.HANDLERS.get(name) or rag.HANDLERS.get(name) or inbox_tools.HANDLERS.get(name)
-              or _offer_handler(name))
+              or _offer_handler(name) or toolsets.handler(name))
         if fn is None:
             raise ToolError(f'невідомий інструмент {name}')
         return fn(ctx, args or {}), False
@@ -310,8 +312,12 @@ def _attr(ctx, args):
     return _proposal(ctx, product, AgentProposal.ATTRIBUTE, name, old, value, args)
 
 
-def allowed_addresses(task) -> set:
-    """Кому агент може писати: адреси з тексту завдання й поля «Кому надсилати листи» (лише те, що написала людина)."""
+def allowed_addresses(task):
+    """Кому агент може писати: адреси з тексту завдання й поля «Кому надсилати листи» (лише те, що написала людина).
+    Зовнішній агент через MCP (`mcp_session`) — будь-кому: людина ключа сама дала йому завдання й бачить «Кому» перед
+    ✓ (сторінка перевірки попереджає) → None."""
+    if getattr(task, 'mcp_session', ''):
+        return None
     return {a.lower() for a in EMAIL_RE.findall(f'{task.instruction or ""}\n{task.mail_to or ""}')}
 
 
@@ -326,12 +332,19 @@ def _mail(ctx, args):
         raise ToolError('у режимі «окремо для кожного товару» листів не готуємо')
     to = [str(a).strip().lower() for a in (args.get('to') or []) if str(a).strip()]
     task_to, task_cc = task_recipients(ctx.task)
+    reply = _reply_to(ctx, args.get('reply_to_id'))
+    if not to and reply is not None:            # відповідь — відправнику листа (наш лист — його отримувачам)
+        own = reply.folder == reply.FOLDER_SENT
+        to = [a.lower() for a in (reply.to_emails if own else [reply.from_email]) if a]
     if not to:
         to = task_to                            # «Кому надсилати листи» завдання
     if not to:
         raise ToolError('кому?')
+    bad = [a for a in to if not EMAIL_RE.fullmatch(a)]
+    if bad:
+        raise ToolError(f'не схоже на адресу: {", ".join(bad)}')
     allowed = allowed_addresses(ctx.task)
-    foreign = [a for a in to if a not in allowed]
+    foreign = [a for a in to if allowed is not None and a not in allowed]
     if foreign:
         raise ToolError(f'адреси {", ".join(foreign)} немає в завданні — лист можна лише на адреси, які написала '
                         f'людина (текст завдання або «Кому надсилати листи»)')
@@ -344,11 +357,30 @@ def _mail(ctx, args):
     body = str(args.get('body') or '').strip()
     if not subject or not body:
         raise ToolError('потрібні тема й текст листа')
+    cc = [a.lower() for a in EMAIL_RE.findall(' '.join(str(x) for x in (args.get('cc') or [])))] or task_cc
+    data = {'cc': cc} if cc else {}
+    if reply is not None:
+        data['reply_to'] = reply.pk
     AgentProposal.objects.create(task=ctx.task, kind=AgentProposal.MAIL, mail_to=', '.join(to), mail_subject=subject,
-                                 mail_body=body[:20000], mail_attach=attach, data={'cc': task_cc} if task_cc else {})
+                                 mail_body=body[:20000], mail_attach=attach, data=data)
     ctx.proposed += 1
-    return f'Лист на {", ".join(to)} підготовлено — людина перевірить і надішле' + (
-        f' (вкладення: даташити {", ".join(attach)})' if attach else '')
+    return (f'Лист на {", ".join(to)} підготовлено' + (f' (відповідь на лист #{reply.pk})' if reply is not None else '')
+            + ' — людина перевірить і надішле' + (f' (вкладення: даташити {", ".join(attach)})' if attach else ''))
+
+
+def _reply_to(ctx, value):
+    """Лист, на який відповідаємо (id з list_mail / search_mail) — лише зі скриньок людини завдання."""
+    if value in (None, ''):
+        return None
+    from email_assistant.models import EmailMessage
+    try:
+        pk = int(value)
+    except (TypeError, ValueError):
+        raise ToolError('reply_to_id — число (id листа)')
+    msg = EmailMessage.objects.filter(pk=pk, account__user=ctx.task.owner, is_deleted=False).first()
+    if msg is None:
+        raise ToolError('листа з таким id немає у ваших скриньках')
+    return msg
 
 
 # ── Лист завдання, склад, календар ───────────────────────────────────────────
@@ -361,8 +393,12 @@ def _the_mail(ctx):
 
 
 def _read_mail(ctx, args):
+    return mail_text_of(_the_mail(ctx))
+
+
+def mail_text_of(msg) -> str:
+    """Лист для агента: від кого, кому, тема, новий текст, переслане, вкладення з номерами, 3 попередні в гілці."""
     from email_assistant.quotes import new_text
-    msg = _the_mail(ctx)
     when = timezone.localtime(msg.sent_at).strftime('%Y-%m-%d %H:%M') if msg.sent_at else '?'
     atts = [f'[{i}] {a.get("name", "")} ({a.get("size", 0)} байт)'
             for i, a in enumerate(msg.attachments or []) if isinstance(a, dict)]
@@ -388,8 +424,12 @@ def _read_mail(ctx, args):
 
 
 def _read_attachment(ctx, args):
+    return attachment_of(_the_mail(ctx), args)
+
+
+def attachment_of(msg, args) -> str:
+    """Текст вкладення листа за номером (PDF по сторінках, DOCX, TXT, CSV); немає на диску — з поштового сервера."""
     from email_assistant.reply_brief import _attachment_path, attachment_text
-    msg = _the_mail(ctx)
     atts = msg.attachments or []
     try:
         index = int(args.get('index'))

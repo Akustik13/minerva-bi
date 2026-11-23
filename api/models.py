@@ -95,6 +95,17 @@ class APIKey(models.Model):
         help_text='Пропозиції зовнішнього агента (Claude Code, Claude Desktop…) стають завданням цієї людини в '
                   '«🧩 Завдання агенту» — вона перевіряє й застосовує ✓; її права діють і для читання. '
                   'Порожньо — MCP для ключа вимкнено.')
+    # 🔒 Особистий ключ: повний ключ бачить і змінює лише власник; лише такий ключ (агент = власник) дає через MCP
+    # особисте — пошту, календар, робочий час (agent/mcp.py personal_ok). Спільний — як раніше.
+    owner = models.ForeignKey(
+        'auth.User', null=True, blank=True, on_delete=models.SET_NULL, related_name='+', editable=False,
+        verbose_name='Власник', help_text='Хто створив ключ.')
+    private = models.BooleanField(
+        '🔒 Лише я (особистий ключ)', default=False,
+        help_text='Повний ключ бачить і змінює лише власник; інші бачать лише початок і кінець, вимкнути чи видалити '
+                  'можуть (на випадок витоку). Лише особистий ключ з «🤖 Агент (MCP)» = власник дає агенту вашу пошту, '
+                  'календар і робочий час. Не ставте для ключа сайту магазину, RAG чи інтеграцій — їх ведуть кілька '
+                  'людей.')
 
     class Meta:
         verbose_name = 'API Ключ'
@@ -111,6 +122,14 @@ class APIKey(models.Model):
 
     def has_scope(self, scope):
         return scope in self.scopes
+
+    def hidden_from(self, user) -> bool:
+        """🔒 Особистий ключ іншої людини: повного ключа не показувати, змінювати й використовувати не можна."""
+        return bool(self.private and (user is None or self.owner_id != user.pk))
+
+    def personal_ok(self) -> bool:
+        """Чи можна через цей ключ особисте (пошта, календар, робочий час): особистий ключ, агент — сам власник."""
+        return bool(self.private and self.owner_id and self.agent_user_id == self.owner_id)
 
     @property
     def is_authenticated(self):

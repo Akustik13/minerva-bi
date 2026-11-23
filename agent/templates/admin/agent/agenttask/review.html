@@ -136,7 +136,12 @@
       <div class="agt-head"><b>✉️ Лист</b> <span class="agt-muted">{{ m.get_status_display }}</span>
         {% if m.result_url %}<a href="{{ m.result_url }}" target="_blank">{% if 'compose' in m.result_url %}📝 відкрити чернетку{% else %}⏳ запланований лист{% endif %}</a>{% endif %}
         {% if m.error %}<span class="agt-muted">⚠️ {{ m.error }}</span>{% endif %}</div>
+      {% if m.data.reply_to %}<div class="agt-muted">↩ Відповідь на <a href="/email/?msg={{ m.data.reply_to }}" target="_blank">лист #{{ m.data.reply_to }}</a> — з тієї самої скриньки</div>{% endif %}
+      {% if task.mcp_session %}
+      <label>Кому <span class="agt-muted">— ⚠️ адресатів обрав зовнішній агент (MCP): перевірте, чи справді цим людям</span></label>
+      {% else %}
       <label>Кому <span class="agt-muted">— лише адреси із завдання (текст або «Кому надсилати листи»)</span></label>
+      {% endif %}
       <input type="text" name="to" value="{{ m.mail_to }}" {% if m.status != 'pending' %}readonly{% endif %} translate="no">
       <label>Копія (CC) <span class="agt-muted">— адреси через кому, необов’язково</span></label>
       <input type="text" name="cc" value="{{ m.data.cc|join:', ' }}" placeholder="sergey@sevskiy.de" {% if m.status != 'pending' %}readonly{% endif %} translate="no">

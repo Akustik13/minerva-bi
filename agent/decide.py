@@ -4,7 +4,8 @@
 📦 прихід — `stock.create_movement` Incoming (ключ `agent:<pk пропозиції>` — двічі не прийде; право
 add_inventorytransaction); 📅 подія — CalendarEvent людини (право add_calendarevent, лист завдання — якщо її скринька).
 Лист — лише на адреси з тексту завдання (`tools.allowed_addresses`,
-перевіряється й тут: людина могла дописати адресу в полі «Кому») зі скриньки людини: «📝 Чернетка» — EmailDraft
+перевіряється й тут: людина могла дописати адресу в полі «Кому»; зовнішній агент MCP — будь-кому, людина бачить
+«Кому» перед ✓; відповідь `data.reply_to` — з тієї самої скриньки, лише її власник) зі скриньки людини: «📝 Чернетка» — EmailDraft
 (відкривається в «✏️ Написати»), «✉️ Надіслати» — ScheduledEmail зараз (cron `send_scheduled`, до 2 хв, у
 «⏳ Заплановані» ще можна скасувати); даташити — копією у вкладенні (`attachments.store_file`).
 """
@@ -59,6 +60,10 @@ def apply_one(p, user, request=None) -> str:
     if p.kind == AgentProposal.OFFER:
         from agent import offers_tool
         return offers_tool.apply_offer(p, user)
+    from agent import toolsets
+    module = toolsets.module_for_kind(p.kind)        # CRM, проєкти, робочий час, DigiKey… (agent/toolsets.py)
+    if module is not None:
+        return module.apply(p, user)
     return product_fields.apply(p, user)
 
 
@@ -74,6 +79,10 @@ def describe(p) -> tuple:
         return channels.describe(p)
     if p.kind in (AgentProposal.SHIPMENT, AgentProposal.ORDER):
         return shipments.describe(p)
+    from agent import toolsets
+    module = toolsets.module_for_kind(p.kind)
+    if module is not None:
+        return module.describe(p)
     d = p.data or {}
     if p.kind == AgentProposal.STOCK_IN:
         where = d.get('location') or 'локація за замовчуванням'
@@ -185,11 +194,19 @@ def mail(proposal, user, *, send=False, to='', subject='', body='', cc=None) -> 
     from email_assistant.models import EmailAccount, EmailDraft, ScheduledEmail
     from inventory.models import Product
     account = EmailAccount.objects.filter(user=user, is_active=True).order_by('-is_primary').first()
+    reply = None
+    reply_pk = (proposal.data or {}).get('reply_to')
+    if reply_pk:                    # відповідь (MCP): з тієї самої скриньки, лише якщо лист у скриньках людини
+        from email_assistant.models import EmailMessage
+        reply = EmailMessage.objects.filter(pk=reply_pk, account__user=user).select_related('account').first()
+        if reply is None:
+            return 'лист, на який відповідаємо, не з вашої скриньки — відповісти може лише її власник'
+        account = reply.account
     if account is None:
         return 'у вас немає скриньки в Minerva'
     addresses = [a.lower() for a in EMAIL_RE.findall(to or proposal.mail_to)]
     allowed = allowed_addresses(proposal.task)
-    foreign = [a for a in addresses if a not in allowed]
+    foreign = [a for a in addresses if allowed is not None and a not in allowed]
     if not addresses or foreign:
         return (f'адреси {", ".join(foreign)} немає в завданні (текст або «Кому надсилати листи»)'
                 if foreign else 'кому?')
@@ -218,11 +235,12 @@ def mail(proposal, user, *, send=False, to='', subject='', body='', cc=None) -> 
     if send:
         sched = ScheduledEmail.objects.create(account=account, subject=subject, to_emails=addresses, body=body,
                                               cc_emails=cc_emails, attachments=items, scheduled_at=timezone.now(),
-                                              trigger='agent')
+                                              trigger='agent', reply_to=reply)
         proposal.result_url = f'/admin/email_assistant/scheduledemail/{sched.pk}/change/'
     else:
         draft = EmailDraft.objects.create(account=account, subject=subject, to_emails=addresses, body=body,
-                                          cc_emails=cc_emails, attachments=items, source=EmailDraft.SOURCE_MANUAL)
+                                          cc_emails=cc_emails, attachments=items, source=EmailDraft.SOURCE_MANUAL,
+                                          reply_to=reply)
         proposal.result_url = f'/email/compose/?draft={draft.pk}'
     proposal.mail_to, proposal.mail_subject, proposal.mail_body = ', '.join(addresses), subject, body
     proposal.data = {**(proposal.data or {}), 'cc': cc_emails}
