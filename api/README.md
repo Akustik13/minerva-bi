@@ -27,6 +27,7 @@
 | `orders:read` / `orders:write` | замовлення: читання / створення, зміна статусу, скасування |
 | `shipments:read` | відправлення, трекінг-номери, статус доставки |
 | `purchases:read` / `purchases:write` | закупівлі зовнішньої CRM: замовлення постачальникам, трекінг, «доставлено» (розділ 2a) |
+| `packaging:read` / `packaging:write` | упаковка (коробки): каталог, запас, використання, схожі розміри / створення, зміна, прихід, інвентаризація, об'єднання (розділ 5a). Ключ сайту магазину — `403 shop_key_forbidden` |
 | `customers:read` / `customers:write` | клієнти CRM |
 | `webhooks:read` / `webhooks:write` | вебхуки, зареєстровані цим ключем |
 | `accounts:read` / `accounts:write` | особистий кабінет покупців магазину ключа (розділ 11a) |
@@ -365,6 +366,36 @@
 }
 ```
 Статуси: `draft`, `submitted`, `label_ready`, `in_transit`, `delivered`, `error`, `cancelled`.
+
+---
+
+## 5a. Упаковка (коробки) (`/packaging/`)
+
+Каталог коробок (Доставка → Пакувальні матеріали), їхній запас, скільки використали, схожі розміри й об'єднання. Права: `packaging:read` (читання), `packaging:write` (створення, зміна, прихід, інвентаризація, об'єднання). Ключ сайту магазину — `403 shop_key_forbidden`. DELETE — `405`: коробку не видаляють, а відправляють в архів (`PATCH {"is_active": false}`). Логіка — `shipping/services/packaging_stock.py` і `packaging_usage.py`, ті самі, що в адмінці.
+
+- `GET /packaging/` — коробки. Фільтри: `active=true|false|all` (за замовчуванням `true` — без архіву), `q` (назва або код), `box_type` (`box`, `envelope`, `tube`, `bag`, `custom`), `low=true` (лише ті, яких мало). `?with_usage=1` — у кожної ще `usage` {boxes, shipments, last, recs, orders, days} за 365 днів.
+- `GET /packaging/{id}/` — одна (теж `?with_usage=1`).
+- `POST /packaging/` — нова: `length_cm`, `width_cm`, `height_cm` (обов'язкові), `code` (великими літерами, унікальний), `name` (порожньо — з розмірів), `box_type`, `size_class`, `fold_heights` (`[22, 16]` або `"22, 16"` — нижчі висоти коробки з насічками), `tare_weight_kg`, `max_weight_kg`, `cost`, `is_active`, `track_stock`, `own_min_stock` (свій мінімум; `null` — за замовчуванням з налаштувань доставки), `reorder_qty`, `buy_url`, `notes`.
+- `PATCH /packaging/{id}/` — ті самі поля. `stock_qty` тут не змінюється (ігнорується) — запас лише рухами нижче й відправленнями.
+
+```json
+{"id": 7, "code": "BX-M-02", "name": "M 30×20×15", "box_type": "box", "size_class": "", "size_class_effective": "M",
+ "length_cm": 30.0, "width_cm": 20.0, "height_cm": 15.0, "fold_heights": [12, 8], "tare_weight_kg": 0.15,
+ "max_weight_kg": 10.0, "cost": 0.9, "is_active": true, "track_stock": true, "stock_qty": 40, "min_stock": 3,
+ "own_min_stock": null, "reorder_qty": 100, "is_low": false, "volume_cm3": 9000.0, "buy_url": "", "notes": ""}
+```
+`min_stock` — мінімум, що діє (свій або за замовчуванням), `is_low` — запас ≤ мінімуму (лише з `track_stock`).
+
+**Запас** (лише коробки з `track_stock: true`, інакше `400 no_stock_tracking`):
+- `POST /packaging/{id}/receive/` `{"qty": 100, "note": "RE-2026-118"}` — прийшло (купили).
+- `POST /packaging/{id}/count/` `{"actual": 37, "note": "…"}` — інвентаризація: запас стане рівно стільки (рух на різницю; уже стільки — `"changed": false`).
+
+Відповідь — `{"movement": {id, kind, qty, balance, note, created_at}, "packaging": {…}}`. У журналі руху — примітка з «API: <назва ключа>», «Хто» — власник ключа (або людина «🤖 Агент (MCP)» ключа).
+
+**Звіти й об'єднання:**
+- `GET /packaging/usage/?days=365` → `{days, since, shipments, materials: [{id, code, name, dims, is_active, boxes, shipments, last, recs, orders}], unmatched: [{dims, boxes, shipments, last}]}` — за оформленими відправленнями від нас; `materials` — від найвживанішої, `recs` — рекомендацій товарів, `orders` — записів «упаковано»; `unmatched` — розміри посилок, яким не відповідає жодна коробка (кандидати в каталог).
+- `GET /packaging/similar/?tolerance=1&inactive=0` → `{tolerance, include_inactive, groups: [{target_id, members: [{id, code, name, dims, is_active, boxes, recs}], spread}]}` — групи коробок одного типу, де кожен вимір відрізняється не більше ніж на `tolerance` см; `target_id` — у яку радимо зливати (найвживаніша → з кодом → активна), `spread` — розкид трьох вимірів, см.
+- `POST /packaging/merge/` `{"target": 7, "merge": [9, 12]}` — злити: рекомендації товарів і «упаковано» → на `target`, запас (облік) → на `target`, злиті — в архів. Відповідь — `{moved_recs, dropped_recs, moved_orders, stock, archived, target}`. Різні типи / нічого зливати — `400 merge_refused`, немає коробки — `404 not_found` (`missing`).
 
 ---
 
@@ -710,6 +741,8 @@ app.listen(3000);
 | 400 | `external_id_required`, `supplier_required`, `duplicate_line`, `delivery_id_required`, `bad_date`, `bad_qty`, `bad_status` | закупівлі (розділ 2a): чого бракує — у `detail` | виправити запит |
 | 403 | `not_external` | закупівля створена в Minerva — через API лише читання | — |
 | 409 | `over_receipt`, `qty_below_received` | доставка більша за замовлене / кількість менша за отриману | перевірити, чи це не повтор; інакше `allow_over: true` |
+| 400 | `no_stock_tracking`, `merge_refused`, `bad_param` | упаковка (розділ 5a): коробка без обліку на складі / злиття неможливе (різні типи, нічого зливати) / неправильний параметр | увімкнути `track_stock` / виправити запит |
+| 403 | `shop_key_forbidden` | ключ сайту магазину звертається до упаковки | окремий ключ з `packaging:*` |
 | 429 | — | перевищено ліміт запитів (хвилина / година / доба — у `detail`) | чекати `Retry-After` секунд і повторити |
 | 429 | `daily_items_limit` | ліміт «різних записів за добу» ключа вичерпано | уже переглянуті сьогодні записи доступні; нові — завтра |
 | 502 | — | тестовий вебхук не доставлено | дивитись `response_code`, `response_body` |

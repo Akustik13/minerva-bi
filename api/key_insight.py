@@ -38,7 +38,8 @@ NOT_DELETED = "Не підтримується (405) — через API це н�
 
 SECTIONS = [
     ("stock", "📦 Склад"), ("products", "🏷 Товари"), ("orders", "🧾 Замовлення"), ("shipments", "🚚 Доставка"),
-    ("customers", "👥 Клієнти CRM"), ("purchases", "📥 Закупівлі"), ("shop", "🏪 Магазин і сайт"),
+    ("customers", "👥 Клієнти CRM"), ("purchases", "📥 Закупівлі"), ("packaging", "📦 Упаковка (коробки)"),
+    ("shop", "🏪 Магазин і сайт"),
     ("account", "👤 Кабінет покупця"), ("payments", "💳 Оплати"), ("webhooks", "🔔 Вебхуки"),
     ("knowledge", "🧠 База знань (RAG)"), ("meetings", "🎙 Наради (RAG-ПК)"), ("service", "🔌 Службові"),
 ]
@@ -70,7 +71,7 @@ def section_of(path: str) -> str:
     for prefix, name in (("stock", "stock"), ("locations", "stock"), ("products", "products"),
                          ("categories", "products"), ("orders", "orders"), ("shipments", "shipments"),
                          ("customers", "customers"), ("purchase-orders", "purchases"), ("webhooks", "webhooks"),
-                         ("knowledge", "knowledge"), ("meetings/", "meetings")):
+                         ("knowledge", "knowledge"), ("meetings/", "meetings"), ("packaging", "packaging")):
         if rest.startswith(prefix):
             return name
     return "service"
@@ -131,6 +132,15 @@ SUMMARIES = {
     "PurchaseOrderViewSet.deliveries": "«Доставлено» — оприбуткування закупівлі",
     "PurchaseOrderViewSet.deliveries_by_ref": "«Доставлено» (номер у тілі)",
     "PurchaseOrderViewSet.cancel": "Скасувати закупівлю зовнішньої CRM",
+    "PackagingViewSet.list": "Коробки (пакувальні матеріали): розміри, запас, мінімум",
+    "PackagingViewSet.retrieve": "Одна коробка",
+    "PackagingViewSet.create": "Нова коробка",
+    "PackagingViewSet.partial_update": "Змінити поля коробки (в архів — is_active: false)",
+    "PackagingViewSet.receive": "📥 Прийшло (купили) коробок",
+    "PackagingViewSet.count": "🧮 Інвентаризація коробок",
+    "PackagingViewSet.usage": "📊 Скільки коробок кожного виду використали",
+    "PackagingViewSet.similar": "🔍 Групи схожих коробок (±см)",
+    "PackagingViewSet.merge": "🔀 Злити коробки в одну",
     "MeetingRedeemView.post": "RAG-ПК: обміняти одноразовий квиток вікна запису на нараду й ключ надсилання",
     "MeetingStatusView.post": "RAG-ПК: стан запису наради (згода, запис, розшифровка, готово, помилка)",
     "MeetingTranscriptView.post": "RAG-ПК: частина розшифровки наради",
@@ -150,6 +160,14 @@ EFFECTS = {
     "MeetingSyncView.post": "З блоком bench — оновлює «RAG-ПК на зв'язку»; хід обробки нарад, які ще йдуть.",
     "MeetingPingView.get": "Нічого не змінює (і «RAG-ПК на зв'язку» — теж).",
     "StockViewSet.check": "Лише перевіряє наявність — нічого не змінює (тому досить права читання).",
+    "PackagingViewSet.create": "Додає коробку в «Пакувальні матеріали» (запас — лише через прихід / інвентаризацію).",
+    "PackagingViewSet.partial_update": "Змінює поля коробки; is_active: false — в архів (нові відправлення її не "
+                                       "списують, не пропонується в упаковці). Запас не змінюється.",
+    "PackagingViewSet.destroy": NOT_DELETED,
+    "PackagingViewSet.receive": "Додає коробки до запасу на складі (рух «📥 Прихід»); може зняти «мало коробок».",
+    "PackagingViewSet.count": "Встановлює фактичний запас коробки — рух «🧮 Інвентаризація» на різницю.",
+    "PackagingViewSet.merge": "Рекомендації товарів, «упаковано» й запас злитих коробок переходять на ціль, злиті — "
+                              "в архів (нічого не видаляється).",
     "StockViewSet.count": "Інвентаризація: встановлює фактичний залишок товару на локації — Minerva записує рух "
                           "«Коригування» на різницю.",
     "MovementViewSet.create": "Записує рух складу — прихід (+), списання (−) або коригування — і змінює залишок. "
@@ -307,6 +325,7 @@ PREVIEW = {
     "SalesOrderViewSet.list", "SalesOrderViewSet.retrieve", "ShipmentViewSet.list", "ShipmentViewSet.retrieve",
     "CustomerViewSet.list", "CustomerViewSet.retrieve", "WebhookViewSet.list", "WebhookViewSet.retrieve",
     "WebhookViewSet.deliveries", "PurchaseOrderViewSet.list", "PurchaseOrderViewSet.retrieve",
+    "PackagingViewSet.list", "PackagingViewSet.retrieve", "PackagingViewSet.usage", "PackagingViewSet.similar",
     "ShopShippingView.get", "PaymentsStatusView.get",
 }
 NO_PREVIEW = {
@@ -324,6 +343,7 @@ SIMULATE_NO = {
     **{f"{name}.": "наради — службовий протокол RAG-ПК (квиток, ключ надсилання й стан запису) — без наслідків не "
                    "перевірити" for name in MEETING_VIEWS},
     "WebhookViewSet.test": "надсилає справжній запит на адресу вебхука — Minerva його не виконує",
+    "PackagingViewSet.": "запас, архів і злиття коробок змінюються лише під час запису — без наслідків не перевірити",
     "PurchaseOrderViewSet.": "тіло закупівлі перевіряє сервіс закупівель лише під час запису (постачальник, позиції, "
                              "доставки) — без наслідків не перевірити",
     "account:": "акаунти покупців: листи, сесії й паролі — без наслідків не перевірити",
@@ -1125,6 +1145,7 @@ SIMULATORS = {
     "SalesOrderViewSet.create": _sim_order_create, "SalesOrderViewSet.update": _sim_order_update,
     "SalesOrderViewSet.partial_update": _sim_order_update, "SalesOrderViewSet.cancel": _sim_order_cancel,
     "SalesOrderViewSet.destroy": _sim_not_deleted,
+    "PackagingViewSet.destroy": _sim_not_deleted,
     "CustomerViewSet.create": _sim_customer, "CustomerViewSet.update": _sim_customer,
     "CustomerViewSet.partial_update": _sim_customer, "CustomerViewSet.destroy": _sim_not_deleted,
     "WebhookViewSet.create": _sim_webhook, "WebhookViewSet.update": _sim_webhook,

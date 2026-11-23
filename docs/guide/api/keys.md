@@ -67,6 +67,7 @@ related: api/key-insight, api/log-analysis, api/overview, api/console, api/endpo
 | Доставка — відправлення і трекінг (читання) | `shipments:read` | відправлення, трек-номери, статус доставки |
 | Клієнти — читання / запис | `customers:read` / `customers:write` | клієнти CRM |
 | Закупівлі — читання / запис | `purchases:read` / `purchases:write` | закупівлі зовнішньої CRM ([Закупівлі з CRM](guide:api/purchases)) |
+| Упаковка — читання / запис | `packaging:read` / `packaging:write` | коробки: каталог, запас (прихід, інвентаризація), скільки використали, схожі коробки й злиття ([Адресна книга й упаковка](guide:shipping/address-book)) |
 | Акаунти покупців магазину — читання / запис | `accounts:read` / `accounts:write` | кабінет покупця на сайті ([Кабінет покупця](guide:shop/customer-accounts)) |
 | Вебхуки — перегляд / створення, зміна, видалення | `webhooks:read` / `webhooks:write` | вебхуки цього ключа ([Вебхуки](guide:api/webhooks)) |
 | База знань — стрічка / статуси | `knowledge:read` / `knowledge:write` | лише службовий ключ RAG-ПК, не магазин |

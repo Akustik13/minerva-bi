@@ -250,7 +250,7 @@ class PackagingMaterialForm(forms.ModelForm):
 @admin.register(PackagingMaterial)
 class PackagingMaterialAdmin(admin.ModelAdmin):
     form = PackagingMaterialForm
-    list_display  = ('type_badge', 'name', 'code_col', 'dimensions_col', 'stock_col', 'tare_weight_kg',
+    list_display  = ('type_badge', 'name', 'code_col', 'dimensions_col', 'stock_col', 'usage_col', 'tare_weight_kg',
                      'max_weight_kg', 'volume_col', 'cost', 'label_btn', 'is_active')
     list_filter   = (PackagingArchiveFilter, PackagingStockFilter, 'box_type', 'size_class')
     list_editable = ('is_active',)
@@ -426,7 +426,72 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
     def get_urls(self):
         from django.urls import path
         return [path('stock-report/', self.admin_site.admin_view(self.stock_report_view),
-                     name='shipping_packagingmaterial_stock_report')] + super().get_urls()
+                     name='shipping_packagingmaterial_stock_report'),
+                path('usage/', self.admin_site.admin_view(self.usage_view),
+                     name='shipping_packagingmaterial_usage')] + super().get_urls()
+
+    @admin.display(description=_('Використано за рік'))
+    def usage_col(self, obj):
+        """Скільки коробок цього виду пішло за 365 днів (shipping/services/packaging_usage.py, кеш 10 хв)."""
+        from .services.packaging_usage import usage_cached
+        st = usage_cached(365)['materials'].get(obj.pk) or {}
+        if not st.get('boxes'):
+            return format_html('<span style="opacity:.5">{}</span>', '—')
+        return format_html('<b>{}</b> {}<br><span style="font-size:11px;opacity:.75">{} {}</span>', st['boxes'],
+                           _('шт'), st['shipments'], _('відправл.'))
+
+    def usage_view(self, request):
+        """📊 Використання й схожі коробки: GET — статистика за період, розміри без коробки, групи схожих (±см);
+        POST action=merge — злити вибрані в ціль (право змінювати коробки)."""
+        from decimal import Decimal, InvalidOperation
+        from django.core.exceptions import PermissionDenied
+        from django.template.response import TemplateResponse
+        from .services import packaging_usage as pu
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        back = reverse('admin:shipping_packagingmaterial_usage')
+        if request.method == 'POST':
+            if not self.has_change_permission(request):
+                raise PermissionDenied
+            target = PackagingMaterial.objects.filter(pk=request.POST.get('target') or 0).first()
+            ids = [int(x) for x in request.POST.getlist('merge') if str(x).isdigit()]
+            others = list(PackagingMaterial.objects.filter(pk__in=ids, is_active=True).exclude(
+                pk=getattr(target, 'pk', 0)))
+            if target is None or not others:
+                messages.error(request, _('Виберіть коробку-ціль і хоча б одну, яку злити в неї.'))
+            else:
+                try:
+                    out = pu.merge(target, others, user=request.user)
+                    messages.success(request, _('Злито в «{}»: {} коробки в архів, рекомендацій товарів перенесено {}, '
+                                                '«упаковано» {}, запас +{}.').format(
+                        target, len(out['archived']), out['moved_recs'], out['moved_orders'], out['stock']))
+                except pu.MergeError as e:
+                    messages.error(request, str(e))
+            return redirect(back + '?' + request.GET.urlencode() if request.GET else back)
+        try:
+            days = max(1, min(int(request.GET.get('days') or 365), pu.DAYS_MAX))
+        except ValueError:
+            days = 365
+        try:
+            tol = Decimal(str(request.GET.get('tol') or '1').replace(',', '.'))
+        except InvalidOperation:
+            tol = Decimal('1')
+        inactive = request.GET.get('inactive') == '1'
+        data = pu.usage(days)
+        stats = data['materials']
+        boxes = list(PackagingMaterial.objects.all())
+        rows = sorted(({'m': m, 'st': stats.get(m.pk) or {}, 'dims': pu.dims_text(m)} for m in boxes
+                       if m.is_active or (stats.get(m.pk) or {}).get('boxes')),
+                      key=lambda r: (-(r['st'].get('boxes') or 0), not r['m'].is_active, r['m'].pk))
+        groups = pu.similar(tol, inactive, stats)
+        for g in groups:
+            g['rows'] = [{'m': m, 'st': stats.get(m.pk) or {}, 'dims': pu.dims_text(m)} for m in g['members']]
+        context = {**self.admin_site.each_context(request), 'opts': self.model._meta,
+                   'title': _('Використання й схожі коробки'), 'rows': rows, 'data': data, 'groups': groups,
+                   'days': days, 'tol': f'{tol.normalize():f}', 'inactive': inactive,
+                   'can_merge': self.has_change_permission(request),
+                   'back_url': reverse('admin:shipping_packagingmaterial_changelist')}
+        return TemplateResponse(request, 'admin/shipping/packagingmaterial/usage.html', context)
 
     @admin.action(description=_('✉️ Звіт про залишки вибраних…'), permissions=['view'])
     def stock_report_selected(self, request, queryset):

@@ -116,6 +116,8 @@ Claude Desktop підключається через `mcp-remote` (потріб�
 | `digikey_listings`, `digikey_messages`, `read_digikey_topic`, `propose_digikey_reply` | лістинги DigiKey (етап, наявність, ціна), повідомлення покупців, відповідь покупцю | `agent:read` / `agent:write` |
 | `find_projects`, `get_project`, `propose_project_moment` | проєкти (стан, потребує уваги, план, ризики), 📌 момент проєкту | `agent:read` / `agent:write` |
 | `find_suppliers`, `get_supplier` | постачальники: контакти, категорії, закупівлі, запити цін | `agent:read` |
+| `list_packaging`, `packaging_usage`, `similar_packaging` | 📦 коробки: каталог із запасом, скільки використали за період, розміри посилок без коробки, групи схожих коробок (±см) | `agent:read` |
+| `propose_packaging`, `propose_packaging_merge` | нова коробка, зміна полів, прихід, інвентаризація; злити схожі коробки в одну (людина ✓) | `agent:write` |
 | `list_mail`, `search_mail`, `read_email`, `read_mail_attachment`, `open_mail` | 🔒 ваші листи: останні, пошук (слова, відправник, клієнт, проєкт), лист повністю, вкладення | `agent:read` |
 | `propose_email` | 🔒 лист або відповідь (`reply_to_id`) з вашої скриньки — надсилаєте ви ✓ | `agent:write` |
 | `calendar_days`, `calendar_events` | 🔒 ваш календар: сьогодні й наступні дні, період | `agent:read` |

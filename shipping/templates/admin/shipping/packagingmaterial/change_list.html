@@ -2,6 +2,7 @@
 {# Packaging materials list: «✉️ stock report», «🖨️ labels of all in the list» (labels/_label_actions.html, kind box) #}
 
 {% block object-tools-items %}
+    <li><a href="{% url 'admin:shipping_packagingmaterial_usage' %}" title="Скільки яких коробок використали, розміри посилок без коробки, схожі коробки (±см) і їх об’єднання">📊 Використання й схожі</a></li>
     <li><a href="{% url 'admin:shipping_packagingmaterial_stock_report' %}">✉️ Звіт про залишки</a></li>
     <li><a href="#" id="pkg-print-all" title="Наклейки DYMO всіх коробок, що зараз у списку (з фільтрами), по черзі на принтер">🖨️ Наклейки всіх у списку</a></li>
     {{ block.super }}

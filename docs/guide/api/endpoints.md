@@ -5,7 +5,7 @@ summary: Повний список адрес REST API Minerva прямо з к�
 where: 🤖 API та скрипти → 📖 Документація API
 urls: /dashboard/api/docs/, /dashboard/api/console/
 roles: інтегратор, адміністратор
-keywords: адреси API, endpoints, ендпоінти, маршрути, список API, curl, python, приклад запиту, stock, orders, products, shipments, customers, webhooks, purchase-orders, meetings
+keywords: адреси API, endpoints, ендпоінти, маршрути, список API, curl, python, приклад запиту, stock, orders, products, shipments, customers, webhooks, purchase-orders, meetings, packaging, коробки, упаковка
 related: api/overview, api/keys, api/stock-orders, api/purchases, api/webhooks, meetings/settings
 ---
 
@@ -61,6 +61,14 @@ related: api/overview, api/keys, api/stock-orders, api/purchases, api/webhooks, 
 Відправлення замовлень: перевізник, трек-номер, посилання для покупця, статус, очікувана дата.
 
 {{api_endpoints:shipments}}
+
+## Упаковка (коробки)
+
+Коробки з «Пакувальних матеріалів»: каталог, створення й зміна (в архів — `is_active: false`, DELETE — 405),
+прихід і інвентаризація для коробок з обліком на складі, скільки коробок кожного виду використали, групи схожих
+розмірів і злиття кількох коробок в одну. Права `packaging:read` / `packaging:write`; ключ сайту магазину — 403.
+
+{{api_endpoints:packaging}}
 
 ## Клієнти
 

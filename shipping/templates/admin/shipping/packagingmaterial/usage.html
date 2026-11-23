@@ -1,0 +1,101 @@
+{% extends "admin/base_site.html" %}
+{# 📊 Packaging usage and similar boxes (PackagingMaterialAdmin.usage_view, shipping/services/packaging_usage.py) #}
+
+{% block title %}{{ title }} — Minerva{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Головна</a> ›
+  <a href="{{ back_url }}">{{ opts.verbose_name_plural|capfirst }}</a> › {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .pu-box { padding: 14px 18px; border: 1px solid var(--border-strong, #243347); border-radius: 8px;
+            background: var(--bg-card, #1a2535); margin-bottom: 16px; }
+  .pu-box h2 { margin: 0 0 8px; font-size: 16px; background: none; color: inherit; padding: 0; }
+  .pu-muted { color: var(--body-quiet-color, #8aa0b4); font-size: 12px; }
+  .pu-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .pu-table th, .pu-table td { padding: 5px 8px; border-bottom: 1px solid var(--border-color, #2a3a4e); text-align: left; }
+  .pu-table td.n { text-align: right; white-space: nowrap; }
+  .pu-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+  .pu-form label { display: block; float: none; width: auto; padding: 0; font-size: 12px; }
+  .pu-form input[type=number] { width: 90px; }
+  .pu-group { border: 1px solid var(--border-color, #2a3a4e); border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
+  .pu-arch { opacity: .55; }
+  .pu-bar { display: inline-block; height: 8px; border-radius: 4px; background: var(--accent, #79aec8); vertical-align: middle; }
+</style>
+
+<div class="pu-box">
+  <form method="get" class="pu-form">
+    <div><label>Період, днів</label><input type="number" name="days" min="1" max="3650" value="{{ days }}"></div>
+    <div><label>Схожі: ± см кожен вимір</label><input type="number" name="tol" min="0" max="20" step="0.5" value="{{ tol }}"></div>
+    <div><label><input type="checkbox" name="inactive" value="1" {% if inactive %}checked{% endif %}> з архівними</label></div>
+    <div><button type="submit" class="button">Показати</button></div>
+  </form>
+  <div class="pu-muted" style="margin-top:8px">За {{ data.days }} дн. оформлених відправлень від нас: <b>{{ data.shipments }}</b>.
+    Яка коробка — за розмірами посилки (±1 см у будь-якій орієнтації, і складена до своїх висот).</div>
+</div>
+
+<div class="pu-box">
+  <h2>🔗 Схожі коробки (±{{ tol }} см) — кандидати на об’єднання</h2>
+  {% if not groups %}<div class="pu-muted">Схожих коробок немає. Спробуйте більший допуск.</div>{% endif %}
+  {% for g in groups %}
+  <form method="post" class="pu-group" onsubmit="return confirm('Злити вибрані коробки в ціль? Рекомендації товарів і запас перейдуть на ціль, злиті — в архів.');">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="merge">
+    <div class="pu-muted">Різниця Д / Ш / В: {{ g.spread|join:" / " }} см · ціль — найчастіше вживана, можна вибрати іншу</div>
+    <table class="pu-table">
+      <tr><th>Ціль</th><th>Злити</th><th>Коробка</th><th>Розміри, см</th><th class="n">За період</th><th class="n">Рекомендацій товарів</th><th class="n">На складі</th></tr>
+      {% for r in g.rows %}
+      <tr class="{% if not r.m.is_active %}pu-arch{% endif %}">
+        <td><input type="radio" name="target" value="{{ r.m.pk }}" {% if forloop.first %}checked{% endif %}></td>
+        <td>{% if r.m.is_active and not forloop.first %}<input type="checkbox" name="merge" value="{{ r.m.pk }}" checked>{% elif r.m.is_active %}<input type="checkbox" name="merge" value="{{ r.m.pk }}">{% else %}🗄{% endif %}</td>
+        <td><a href="{% url 'admin:shipping_packagingmaterial_change' r.m.pk %}" translate="no">{{ r.m.code|default:"—" }}</a> {{ r.m }}</td>
+        <td translate="no">{{ r.dims }}{% if r.m.fold_heights %} <span class="pu-muted">↧ {{ r.m.fold_heights }}</span>{% endif %}</td>
+        <td class="n">{{ r.st.boxes|default:0 }} шт</td>
+        <td class="n">{{ r.st.recs|default:0 }}</td>
+        <td class="n">{% if r.m.track_stock %}{{ r.m.stock_qty }}{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% if can_merge %}<button type="submit" class="button" style="margin-top:8px">🔗 Злити вибрані в ціль</button>
+    <span class="pu-muted">Злиті — в архів (нічого не видаляється). Відправлення з їхніми розмірами далі коробку не списують — вписуйте розміри цілі.</span>{% endif %}
+  </form>
+  {% endfor %}
+</div>
+
+<div class="pu-box">
+  <h2>📊 Використання за {{ data.days }} дн.</h2>
+  <table class="pu-table">
+    <tr><th>Коробка</th><th>Розміри, см</th><th class="n">Штук</th><th class="n">Відправлень</th><th>Востаннє</th><th class="n">Рекомендацій товарів</th><th class="n">«Упаковано»</th><th class="n">На складі</th></tr>
+    {% for r in rows %}
+    <tr class="{% if not r.m.is_active %}pu-arch{% endif %}">
+      <td><a href="{% url 'admin:shipping_packagingmaterial_change' r.m.pk %}" translate="no">{{ r.m.code|default:"—" }}</a> {{ r.m }}{% if not r.m.is_active %} 🗄{% endif %}</td>
+      <td translate="no">{{ r.dims }}</td>
+      <td class="n"><b>{{ r.st.boxes|default:0 }}</b></td>
+      <td class="n">{{ r.st.shipments|default:0 }}</td>
+      <td>{{ r.st.last|date:"d.m.Y"|default:"—" }}</td>
+      <td class="n">{{ r.st.recs|default:0 }}</td>
+      <td class="n">{{ r.st.orders|default:0 }}</td>
+      <td class="n">{% if r.m.track_stock %}{{ r.m.stock_qty }}{% if r.m.is_low %} ⚠️{% endif %}{% else %}—{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+{% if data.unmatched %}
+<div class="pu-box">
+  <h2>❔ Розміри посилок без коробки в каталозі</h2>
+  <div class="pu-muted">Такі розміри вписували у відправлення, але жодна активна коробка їм не відповідає — можливо, варто додати коробку.</div>
+  <table class="pu-table">
+    <tr><th>Д × Ш × В, см</th><th class="n">Штук</th><th class="n">Відправлень</th><th>Востаннє</th></tr>
+    {% for u in data.unmatched %}
+    <tr><td translate="no">{{ u.dims }}</td><td class="n">{{ u.boxes }}</td><td class="n">{{ u.shipments }}</td><td>{{ u.last|date:"d.m.Y"|default:"—" }}</td></tr>
+    {% endfor %}
+  </table>
+  <div style="margin-top:8px"><a class="button" href="{% url 'admin:shipping_packagingmaterial_add' %}">＋ Додати коробку</a></div>
+</div>
+{% endif %}
+{% endblock %}
