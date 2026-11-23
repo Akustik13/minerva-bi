@@ -1,0 +1,10 @@
+{% load i18n %}{# одна частина розділу «📎»: підпис (лист, файли запиту, від постачальника) і файли — _attach_pick.html #}
+<div class="em-att-part">
+  {% if part.kind == 'letter' %}<div class="em-att-part-l">{% if part.own %}📤 {{ part.date }} · {% trans "ви" %} → <span translate="no">{{ part.who }}</span>{% else %}📥 {{ part.date }} · <b translate="no">{{ part.who }}</b>{% endif %}</div>
+  {% elif part.kind == 'request' %}<div class="em-att-part-l">📤 {% trans "Файли запиту (надіслані постачальникам)" %}</div>
+  {% elif part.kind == 'supplier' %}<div class="em-att-part-l">📥 {% trans "Від постачальника" %} <b translate="no">{{ part.who }}</b></div>{% endif %}
+  {% for d in part.files %}
+  <div class="em-att-opt" data-ref="{{ d.ref }}" data-name="{{ d.name }}" onclick="{{ fn }}(this)">
+    📎 <span translate="no">{{ d.name }}</span>{% if d.size %}<span class="sz">{{ d.size|filesizeformat }}</span>{% endif %}</div>
+  {% endfor %}
+</div>

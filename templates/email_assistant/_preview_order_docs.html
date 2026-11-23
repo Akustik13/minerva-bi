@@ -1,8 +1,10 @@
 {% load i18n %}{# «📄 Документи замовлення» у «📎 Вкладення» відповіді (views._attach_options); знову — з preview_links_view #}
 {% if attach_options.order_docs %}
+<div class="em-att-grp">
 <h5>📄 {% trans "Документи замовлення" %}</h5>
 {% for d in attach_options.order_docs %}
-<div class="em-att-opt" data-ref="{{ d.ref }}" data-name="{{ d.name }}" onclick="pvAttRef(this)">
-  📄 {{ d.name }}<span class="sz">{{ d.group }} · {{ d.size|filesizeformat }}</span></div>
+<div class="em-att-opt" data-ref="{{ d.ref }}" data-name="{{ d.name }}" onclick="{{ fn|default:'pvAttRef' }}(this)">
+  📄 <span translate="no">{{ d.name }}</span><span class="sz" translate="no">{{ d.group }} · {{ d.size|filesizeformat }}</span></div>
 {% endfor %}
+</div>
 {% endif %}

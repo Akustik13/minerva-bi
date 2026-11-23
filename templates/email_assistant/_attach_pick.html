@@ -1,0 +1,47 @@
+{% load i18n %}{% comment %}«📎» швидкої відповіді (fn=pvAttRef) і «📂 З Minerva» сторінки «Написати» (fn=attAdd): що можна
+вкласти — за джерелом (email_assistant/attach_sources.py, attachments.reply_options). docs_box — блок «Документи
+замовлення», який прев'ю оновлює після читання вкладень (preview_links_view).{% endcomment %}
+<style>
+.em-att-pick [hidden]{display:none!important}
+.em-att-find{width:100%;box-sizing:border-box;margin:2px 0 6px;padding:5px 8px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:12px}
+.em-att-grp{margin:2px 0 6px}
+.em-att-all{border:none;background:none;color:var(--accent);cursor:pointer;font-size:11px;font-weight:600;text-transform:none;letter-spacing:0;padding:0;margin-left:auto}
+.em-att-part-l{font-size:11px;color:var(--text-muted);padding:4px 6px 1px 6px}
+.em-att-part-l b{font-weight:600;color:var(--text)}
+.em-att-part .em-att-opt{padding-left:16px}
+.em-att-proj{margin:6px 0;border:1px solid var(--border);border-radius:7px;padding:2px 8px}
+.em-att-proj>summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--text);padding:5px 0;list-style-position:inside}
+.em-att-proj>summary .sz{color:var(--text-dim);font-weight:400;font-size:11px}
+</style>
+{% if att.count > 10 %}<input type="search" class="em-att-find" placeholder="🔎 {% trans "Знайти файл за назвою…" %}" oninput="MVAttNames.filter(this)">{% endif %}
+{% regroup att.rfq_files by group as rfq_groups %}
+{% for g in rfq_groups %}
+<div class="em-att-grp">
+  <h5>📨 {% trans "Файли запиту" %} <span translate="no">{{ g.grouper }}</span>{% if g.list|length > 1 %}
+    <button type="button" class="em-att-all" onclick="MVAttNames.all(this)">＋ {% trans "Додати всі" %}</button>{% endif %}</h5>
+  {% for d in g.list %}
+  <div class="em-att-opt" data-ref="{{ d.ref }}" data-name="{{ d.name }}" onclick="{{ fn }}(this)">
+    📨 <span translate="no">{{ d.name }}</span><span class="sz">{{ d.size|filesizeformat }}</span></div>
+  {% endfor %}
+</div>
+{% endfor %}
+{% if docs_box %}<div id="{{ docs_box }}">{% include "email_assistant/_preview_order_docs.html" with attach_options=att %}</div>
+{% else %}{% include "email_assistant/_preview_order_docs.html" with attach_options=att %}{% endif %}
+{% if att.thread_letters %}
+<div class="em-att-grp">
+  <h5>✉️ {% trans "Вкладення з цього листування" %}</h5>
+  {% for part in att.thread_letters %}{% include "email_assistant/_attach_part.html" %}{% endfor %}
+</div>
+{% endif %}
+{% for p in att.projects %}
+<details class="em-att-proj">
+  <summary>📁 {% trans "Проєкт" %} <span translate="no">{{ p.code }} · {{ p.name }}</span> <span class="sz">· {{ p.count }} 📎</span></summary>
+  {% for g in p.groups %}
+  <div class="em-att-grp">
+    <h5>{{ g.icon }} {% if g.kind == 'docs' %}{% trans "Документи проєкту" %}{% elif g.kind == 'rfq' %}{% trans "Запит постачальникам" %}{% elif g.kind == 'order' %}{% trans "Документи замовлення" %}{% else %}{% trans "Гілка" %}{% endif %}{% if g.name %} <span translate="no" style="text-transform:none">{{ g.name|truncatechars:70 }}</span>{% endif %}{% if g.n > 1 %}
+      <button type="button" class="em-att-all" onclick="MVAttNames.all(this)">＋ {% trans "Додати всі" %}</button>{% endif %}</h5>
+    {% for part in g.parts %}{% include "email_assistant/_attach_part.html" %}{% endfor %}
+  </div>
+  {% endfor %}
+</details>
+{% endfor %}

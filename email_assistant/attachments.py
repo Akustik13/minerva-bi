@@ -5,7 +5,10 @@ email_assistant/attachments.py — вкладення для листа-відп
   - документи замовлення, згаданого в листуванні (media/orders/{source}/{order_number}/ —
     інвойси, пакувальні листи, CN23…);
   - вкладення з листів цієї гілки (з диска або, якщо ще не збережені, з IMAP);
-  - 📨 файли запиту постачальникам (RFQ), до якого належить гілка (ZIP з Gerber, BOM, стекап…) — «rfq:<pk файлу>».
+  - 📨 файли запиту постачальникам (RFQ), до якого належить гілка (ZIP з Gerber, BOM, стекап…) — «rfq:<pk файлу>»;
+  - 📁 з кожного підтвердженого проєкту гілки (email_assistant/attach_sources.py): документи проєкту «kb:<pk>»,
+    файли його запитів «rfq:<pk>» і файли від постачальників «rfqreply:<pk>», документи його замовлень, вкладення
+    інших його гілок цієї скриньки.
 Браузер передає лише посилання «order:<pk>:<ім'я файлу>» / «msg:<pk>:<індекс>» / «rfq:<pk>», файли читає сервер.
 
 Чернетки (EmailDraft) і заплановані листи (ScheduledEmail) зберігають вкладення списком записів:
@@ -175,7 +178,8 @@ def can_attach(account, kind: str) -> bool:
     if user is None:
         return False
     perm = {'offer': 'offers.view_offer', 'offerint': 'offers.view_offer', 'order': 'sales.view_salesorder',
-            'invoice': 'sales.view_salesinvoice', 'rfq': 'suppliers.view_supplierrequest'}.get(kind)
+            'invoice': 'sales.view_salesinvoice', 'rfq': 'suppliers.view_supplierrequest',
+            'rfqreply': 'suppliers.view_supplierrequest'}.get(kind)
     return perm is None or user.has_perm(perm)
 
 
@@ -187,7 +191,7 @@ def load_ref(account, ref: str):
 
     kind, _, rest = (ref or '').partition(':')
     try:
-        if kind in ('offer', 'offerint', 'order', 'invoice', 'rfq') and not can_attach(account, kind):
+        if kind in ('offer', 'offerint', 'order', 'invoice', 'rfq', 'rfqreply') and not can_attach(account, kind):
             logger.warning('attachment ref %s: no permission for %s', ref, getattr(account, 'user', None))
             return None
         if kind == 'aifile':  # 📎 файл, доданий до запиту AI-відповіді, — лише цієї скриньки
@@ -204,15 +208,31 @@ def load_ref(account, ref: str):
         if kind == 'invoice':   # 🧾 рахунок (PDF, інакше DOCX) — sales/invoice_service.py
             from sales.invoice_service import attachment as invoice_attachment
             return invoice_attachment(int(rest))
-        if kind == 'rfq':   # 📨 файл запиту постачальникам — ще раз у листі (suppliers.SupplierRequestFile)
-            from suppliers.models import SupplierRequestFile
-            f = SupplierRequestFile.objects.filter(pk=int(rest)).first()
+        if kind in ('rfq', 'rfqreply'):   # 📨 файл запиту постачальникам / 📥 файл від постачальника на запит
+            from suppliers.models import SupplierReplyFile, SupplierRequestFile
+            f = (SupplierRequestFile if kind == 'rfq' else SupplierReplyFile).objects.filter(pk=int(rest)).first()
             if f is None or not f.file:
                 return None
             with f.file.open('rb') as fh:
                 content = fh.read()
             return {'name': f.name, 'content': content,
-                    'content_type': mimetypes.guess_type(f.name)[0] or 'application/octet-stream'}
+                    'content_type': getattr(f, 'content_type', '') or mimetypes.guess_type(f.name)[0]
+                    or 'application/octet-stream'}
+        if kind == 'kb':    # 📎 документ бази знань (картка проєкту…) — лише якщо власник скриньки його бачить
+            from rag_assistant import knowledge_items as ki
+            from rag_assistant.models import KnowledgeItem
+            item = KnowledgeItem.objects.filter(pk=int(rest)).select_related('knowledge_source').first()
+            user = getattr(account, 'user', None)
+            if item is None or user is None or not ki.can_view(user, item) or not ki.has_file(item):
+                return None
+            path = ki.file_path(item)
+            if not path:
+                return None
+            with open(path, 'rb') as fh:
+                content = fh.read()
+            name = item.file_name or os.path.basename(path)
+            return {'name': name, 'content': content,
+                    'content_type': item.content_type or mimetypes.guess_type(name)[0] or 'application/octet-stream'}
         if kind == 'order':
             pk, _, name = rest.partition(':')
             order = SalesOrder.objects.filter(pk=int(pk)).first()
@@ -399,8 +419,11 @@ def from_form(account, refs, names, files, draft=None, check=False):
     return out, ''
 
 
-def reply_options(emails, links, thread=None, user=None) -> dict:
-    """Що можна швидко додати до відповіді: файли запиту RFQ гілки, документи замовлень гілки і вкладення її листів."""
+def reply_options(emails, links, thread=None, user=None, account=None) -> dict:
+    """Що можна швидко додати до відповіді — за джерелом: файли запиту RFQ гілки, документи замовлень гілки,
+    вкладення її листів (по листах — thread_letters) і кожен підтверджений проєкт гілки (projects —
+    email_assistant/attach_sources.py). count — скільки всього варіантів."""
+    from email_assistant import attach_sources
     docs = []
     for link in links or []:
         docs += order_documents(link['order'])
@@ -409,4 +432,13 @@ def reply_options(emails, links, thread=None, user=None) -> dict:
     except Exception as e:  # noqa: BLE001 — без файлів запиту відповідь працює як була
         logger.warning('rfq files: %s', e)
         rfq = []
-    return {'rfq_files': rfq, 'order_docs': docs, 'thread_files': thread_attachments(emails)}
+    try:
+        projects = attach_sources.projects(thread, account, user, skip_codes={f['group'] for f in rfq},
+                                           skip_orders={link['order'].pk for link in links or []})
+    except Exception as e:  # noqa: BLE001 — без проєктів відповідь працює як була
+        logger.warning('project attachments: %s', e)
+        projects = []
+    files = thread_attachments(emails)
+    return {'rfq_files': rfq, 'order_docs': docs, 'thread_files': files,
+            'thread_letters': attach_sources.letters(emails, account), 'projects': projects,
+            'count': len(rfq) + len(docs) + len(files) + sum(p['count'] for p in projects)}

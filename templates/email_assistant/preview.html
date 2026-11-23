@@ -814,22 +814,7 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
           <div class="em-att-pick" id="pv-att-pick">
             <label class="em-att-opt">💻 {% trans "Файл з комп'ютера…" %}
               <input type="file" multiple style="display:none" onchange="pvAttFiles(this)"></label>
-            {% regroup attach_options.rfq_files by group as rfq_groups %}
-            {% for g in rfq_groups %}
-            <h5>📨 {% trans "Файли запиту" %} <span translate="no">{{ g.grouper }}</span></h5>
-            {% for d in g.list %}
-            <div class="em-att-opt" data-ref="{{ d.ref }}" data-name="{{ d.name }}" onclick="pvAttRef(this)">
-              📨 <span translate="no">{{ d.name }}</span><span class="sz">{{ d.size|filesizeformat }}</span></div>
-            {% endfor %}
-            {% endfor %}
-            <div id="pv-att-orderdocs">{% include "email_assistant/_preview_order_docs.html" %}</div>
-            {% if attach_options.thread_files %}
-            <h5>📎 {% trans "Вкладення з цього листування" %}</h5>
-            {% for d in attach_options.thread_files %}
-            <div class="em-att-opt" data-ref="{{ d.ref }}" data-name="{{ d.name }}" onclick="pvAttRef(this)">
-              📎 {{ d.name }}<span class="sz">{{ d.group }}{% if d.size %} · {{ d.size|filesizeformat }}{% endif %}</span></div>
-            {% endfor %}
-            {% endif %}
+            {% include "email_assistant/_attach_pick.html" with att=attach_options fn="pvAttRef" docs_box="pv-att-orderdocs" %}
           </div>
         </div>
         {% if reply_signature %}

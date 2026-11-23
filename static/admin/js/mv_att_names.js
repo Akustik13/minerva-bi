@@ -2,9 +2,11 @@
    Сторінка «Написати» («📂 З Minerva») і швидка відповідь у прев'ю («📎») додають їх у вкладення самі.
 
    MVAttNames.key(назва)            → без регістру й розділювачів («TM270402-04H _4L.zip» → «tm27040204h4lzip»);
-   MVAttNames.mentioned(текст, opts) → ті opts ({name, …}), чию назву (або назву без розширення від 8 знаків) є в тексті.
-   Довша назва, що містить коротшу («PandP_<назва ZIP>.txt»), коротшої не додає; той самий файл у двох групах
-   (файли запиту й вкладення гілки) — лише перший. */
+   MVAttNames.mentioned(текст, opts) → ті opts ({name, …}), чию назву (або назву без розширення від 8 знаків) є в тексті;
+     довша назва, що містить коротшу («PandP_<назва ZIP>.txt»), коротшої не додає; той самий файл у двох групах
+     (файли запиту й вкладення гілки) — лише перший.
+   MVAttNames.filter(поле)  — «🔎 Знайти файл за назвою…» у списку: решту файлів, порожні групи й проєкти сховано;
+   MVAttNames.all(кнопка)   — «＋ Додати всі» групи: клік по кожному ще не доданому видимому файлу. */
 (function () {
   'use strict';
 
@@ -33,5 +35,23 @@
     return (opts || []).filter(function (o, i) { return hit[i]; });
   }
 
-  window.MVAttNames = {key: key, mentioned: mentioned};
+  function filter(input) {
+    var q = key(input.value), box = input.parentNode;
+    box.querySelectorAll('.em-att-opt[data-ref]').forEach(function (o) {
+      o.hidden = !!q && key(o.dataset.name).indexOf(q) < 0;
+    });
+    box.querySelectorAll('.em-att-part, .em-att-grp, details.em-att-proj').forEach(function (g) {
+      var any = g.querySelector('.em-att-opt[data-ref]:not([hidden])');
+      g.hidden = !!q && !any;
+      if (q && any && g.tagName === 'DETAILS') g.open = true;
+    });
+  }
+
+  function all(btn) {
+    btn.closest('.em-att-grp').querySelectorAll('.em-att-opt[data-ref]').forEach(function (o) {
+      if (!o.hidden && !o.classList.contains('added')) o.click();
+    });
+  }
+
+  window.MVAttNames = {key: key, mentioned: mentioned, filter: filter, all: all};
 })();

@@ -62,7 +62,7 @@ class RfqReplyFilesTests(Base):
         self.assertIn('id="att-pick-btn"', html)
         self.assertIn(f'data-ref="rfq:{self.f_zip.pk}"', html)
         self.assertIn(self.req.code, html)
-        self.assertIn("attAddAll(this)", html)
+        self.assertIn("MVAttNames.all(this)", html)
         self.assertIn("_attAuto", html)                    # згадані в тексті — самі
         new = self.client.get("/email/compose/").content.decode()
         self.assertNotIn('id="att-pick-btn"', new)          # новий лист без гілки — без «З Minerva»
@@ -82,3 +82,95 @@ class RfqReplyFilesTests(Base):
         sent = send.call_args.kwargs["attachments"]
         self.assertEqual([(a["name"], a["content"]) for a in sent], [(ZIP, b"PK gerber")])
         self.assertEqual(send.call_args.kwargs["reply_to_message"], self.reply)
+
+
+class ProjectFilesTests(Base):
+    """📁 Проєкт гілки: документи проєкту, запити RFQ проєкту (файли запиту й від постачальників), інші гілки — по
+    листах; лише свої листи; що вже показано для гілки — не вдруге."""
+
+    def setUp(self):
+        super().setUp()
+        from django.core.files.base import ContentFile
+        from projects.services import create_project
+        from rag_assistant import knowledge_items as ki
+        from suppliers.models import SupplierReplyFile
+        self.th = EmailThread.objects.create(account=self.account, subject="Neue Testboards")
+        self.cur = self.mail(subject="Re: Neue Testboards", thread=self.th, frm="martin@iot.example")
+        self.project = create_project(name="Transponder 2", user=self.user, threads=[self.th])
+        self.other_th = EmailThread.objects.create(account=self.account, subject="Gehäuse Zeichnung")
+        from projects.services import link_thread
+        link_thread(self.project, self.other_th, user=self.user)
+        self.old = self.mail(subject="Gehäuse Zeichnung", thread=self.other_th, frm="cad@werk.example",
+                             name="CAD Werk")
+        self.old.attachments = [{"name": "housing_v3.step", "size": 2048},
+                                {"name": "logo.png", "size": 10, "is_inline": True}]
+        self.old.save(update_fields=["attachments"])
+        # чужа скринька в тій самій гілці проєкту — не показується
+        self.foreign = self.mail(subject="Gehäuse", thread=self.other_th, account=self.other_account)
+        self.foreign.attachments = [{"name": "secret.pdf", "size": 1}]
+        self.foreign.save(update_fields=["attachments"])
+        self.doc = ki.add_file(self.user, SimpleUploadedFile("Pflichtenheft.pdf", b"%PDF spec"),
+                               links={"project": self.project})
+        self.req = SupplierRequest.objects.create(title="Gehäuse", owner=self.user, account=self.account,
+                                                  project=self.project, status=SupplierRequest.ANSWERED)
+        self.req_file = rfq.add_file(self.req, SimpleUploadedFile("housing_drawing.pdf", b"%PDF draw"), self.user)
+        rcp = R.objects.create(request=self.req, supplier=self.supplier, email="anna@pcbway.com", state=R.QUOTED)
+        self.reply_file = SupplierReplyFile(recipient=rcp, name="Quotation_PCBWay.pdf", size=9, sha256="x")
+        self.reply_file.file.save("Quotation_PCBWay.pdf", ContentFile(b"%PDF quote"), save=False)
+        self.reply_file.save()
+
+    def options(self):
+        return attachments.reply_options([self.cur], [], self.th, self.user, self.account)
+
+    def test_project_sections_by_source(self):
+        opts = self.options()
+        self.assertEqual(len(opts["projects"]), 1)
+        p = opts["projects"][0]
+        self.assertEqual((p["code"], p["name"]), (self.project.code, "Transponder 2"))
+        kinds = [g["kind"] for g in p["groups"]]
+        self.assertEqual(kinds, ["docs", "rfq", "thread"])
+        docs, req, thread = p["groups"]
+        self.assertEqual(docs["parts"][0]["files"][0]["ref"], f"kb:{self.doc.pk}")
+        self.assertEqual([(x["kind"], [f["ref"] for f in x["files"]]) for x in req["parts"]],
+                         [("request", [f"rfq:{self.req_file.pk}"]), ("supplier", [f"rfqreply:{self.reply_file.pk}"])])
+        self.assertEqual(req["parts"][1]["who"], self.supplier.name)
+        self.assertIn(self.req.code, req["name"])
+        self.assertEqual(thread["name"], "Gehäuse Zeichnung")
+        letter = thread["parts"][0]
+        self.assertEqual((letter["kind"], letter["who"], [f["name"] for f in letter["files"]]),
+                         ("letter", "CAD Werk", ["housing_v3.step"]))        # без вбудованої картинки
+        self.assertNotIn("secret.pdf", str(opts))                            # чужа скринька
+        self.assertEqual(p["count"], 4)
+        self.assertEqual(opts["count"], 4)
+
+    def test_current_thread_and_its_request_not_repeated(self):
+        self.req.recipients.update(thread=self.th)                           # запит — цієї гілки
+        opts = self.options()
+        self.assertEqual([f["ref"] for f in opts["rfq_files"]], [f"rfq:{self.req_file.pk}"])
+        self.assertEqual([g["kind"] for g in opts["projects"][0]["groups"]], ["docs", "thread"])
+
+    def test_no_project_permission(self):
+        with mock.patch.object(get_user_model(), "has_perm",
+                               side_effect=lambda perm, obj=None: perm != "projects.view_project"):
+            self.assertEqual(self.options()["projects"], [])
+
+    def test_refs_load_for_sending(self):
+        kb = attachments.load_ref(self.account, f"kb:{self.doc.pk}")
+        self.assertEqual((kb["name"], kb["content"]), ("Pflichtenheft.pdf", b"%PDF spec"))
+        rep = attachments.load_ref(self.account, f"rfqreply:{self.reply_file.pk}")
+        self.assertEqual((rep["name"], rep["content"]), ("Quotation_PCBWay.pdf", b"%PDF quote"))
+        # 🔒 приватний документ іншої людини — не вкладається
+        from rag_assistant.models import KnowledgeItem
+        KnowledgeItem.objects.filter(pk=self.doc.pk).update(visibility=KnowledgeItem.PRIVATE, owner=self.other)
+        self.assertIsNone(attachments.load_ref(self.account, f"kb:{self.doc.pk}"))
+
+    def test_pages_show_project_sections(self):
+        html = self.client.get("/email/compose/", {"reply_to": self.cur.pk}).content.decode()
+        self.assertIn('class="em-att-proj"', html)
+        self.assertIn(f'data-ref="kb:{self.doc.pk}"', html)
+        self.assertIn(f'data-ref="rfqreply:{self.reply_file.pk}"', html)
+        self.assertIn('onclick="attAdd(this)"', html)
+        pv = self.client.get(f"/email/message/{self.cur.pk}/preview/").content.decode()
+        self.assertIn(f'data-ref="msg:{self.old.pk}:0"', pv)
+        self.assertIn('onclick="pvAttRef(this)"', pv)
+        self.assertIn('id="pv-att-orderdocs"', pv)
