@@ -656,6 +656,12 @@ class PackagingMaterial(models.Model):
                                  null=True, blank=True)
     notes  = models.TextField('Нотатки', blank=True, default='')
     is_active = models.BooleanField('Активна', default=True)
+    merged_into = models.ForeignKey(
+        'self', on_delete=models.SET_NULL, null=True, blank=True, related_name='merged_from',
+        verbose_name='Злито в',
+        help_text='Коробку злили в іншу («📊 Використання й схожі»): її відправлення рахуються й списуються як ціль. '
+                  'Повернули з архіву — знову окрема коробка.')
+    merged_at = models.DateTimeField('Коли злито', null=True, blank=True)
 
     # ── Запас на складі (shipping/services/packaging_stock.py) ────────────────
     track_stock = models.BooleanField(
@@ -696,6 +702,10 @@ class PackagingMaterial(models.Model):
             self.stock_since = timezone.now()
         elif not self.track_stock:
             self.stock_since = None
+        if self.is_active and self.merged_into_id:          # повернули з архіву — знову окрема коробка
+            self.merged_into, self.merged_at = None, None
+            if kwargs.get('update_fields') is not None:
+                kwargs['update_fields'] = set(kwargs['update_fields']) | {'merged_into', 'merged_at'}
         super().save(*args, **kwargs)
 
     @staticmethod
@@ -792,6 +802,33 @@ class PackagingMovement(models.Model):
 
     def __str__(self):
         return f'{self.material} {self.qty:+d} → {self.balance}'
+
+
+class PackagingMerge(models.Model):
+    """🔀 Злиття коробок (shipping/services/packaging_usage.merge): що злили в яку, скільки кожна мала до злиття
+    (`snapshot`) і все, що потрібно для «↩ Відкотити» (`undo_data`)."""
+    target = models.ForeignKey(PackagingMaterial, on_delete=models.SET_NULL, null=True, related_name='merges',
+                               verbose_name='Ціль')
+    boxes = models.ManyToManyField(PackagingMaterial, related_name='merged_in', blank=True,
+                                   verbose_name='Злиті коробки')
+    created_at = models.DateTimeField('Коли', auto_now_add=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+                             related_name='+', verbose_name='Хто')
+    via = models.CharField('Звідки', max_length=20, blank=True, default='')
+    snapshot = models.JSONField('До злиття', default=dict, blank=True)
+    result = models.JSONField('Що зроблено', default=dict, blank=True)
+    undo_data = models.JSONField('Для відкату', default=dict, blank=True)
+    undone_at = models.DateTimeField('Відкочено', null=True, blank=True)
+    undone_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+                                  related_name='+', verbose_name='Хто відкотив')
+
+    class Meta:
+        verbose_name        = 'Злиття коробок'
+        verbose_name_plural = 'Злиття коробок'
+        ordering            = ['-created_at', '-pk']
+
+    def __str__(self):
+        return f'#{self.pk} → {self.target}'
 
 
 class ProductPackaging(models.Model):

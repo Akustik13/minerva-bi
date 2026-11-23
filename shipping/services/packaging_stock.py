@@ -45,10 +45,15 @@ def needed(shipment, pool=None) -> dict:
     out = {}
     when = _when(shipment)
     for box in packaging.shipment_boxes(shipment, pool):
-        m = box.packaging
+        orig = box.packaging
+        m = packaging.merged_target(orig)                   # злита коробка — списує ціль
         if m is None or not m.track_stock:
             continue
-        if m.stock_since and when and when < m.stock_since:
+        if m is not orig and orig.merged_at and when and when < orig.merged_at:
+            # до злиття — як тоді: лише те, що списувала злита (тепер — за ціллю), без списань заднім числом
+            if not orig.track_stock or (orig.stock_since and when < orig.stock_since):
+                continue
+        elif m.stock_since and when and when < m.stock_since:
             continue
         out[m.pk] = out.get(m.pk, 0) + max(1, int(box.qty or 1))
     return out
@@ -69,13 +74,29 @@ def _move(material_pk, delta, kind, *, shipment=None, note="", user=None):
 
 def _pool(have) -> list:
     """Коробки для впізнавання: уже списані цим відправленням (і архівні — першими: однаковий розмір лишається за
-    тією самою коробкою) + активні."""
+    тією самою коробкою) + активні + злиті в іншу (`merged_into`: їхні розміри списують ціль)."""
     from shipping.models import PackagingMaterial
     from shipping.services import packaging
     used = [m for m in PackagingMaterial.objects.filter(pk__in=[pk for pk, q in have.items() if q > 0])
             .order_by("pk")]
     seen = {m.pk for m in used}
-    return used + [m for m in packaging.materials() if m.pk not in seen]
+    pool = used + [m for m in packaging.materials() if m.pk not in seen]
+    seen |= {m.pk for m in pool}
+    return pool + [m for m in PackagingMaterial.objects.filter(is_active=False, merged_into__isnull=False)
+                   .order_by("pk") if m.pk not in seen]
+
+
+def _merged_have(have) -> dict:
+    """Уже списане відправленням — за коробкою, у яку злили (повернення / повтор — на ціль, без подвійного)."""
+    from shipping.models import PackagingMaterial
+    from shipping.services import packaging
+    boxes = {m.pk: m for m in PackagingMaterial.objects.filter(pk__in=list(have)).select_related("merged_into")}
+    out = {}
+    for pk, q in have.items():
+        m = packaging.merged_target(boxes.get(pk)) if pk in boxes else None
+        key = m.pk if m is not None else pk
+        out[key] = out.get(key, 0) + q
+    return out
 
 
 def sync_shipment(shipment) -> list:
@@ -90,6 +111,7 @@ def sync_shipment(shipment) -> list:
         have = {r["material"]: -(r["q"] or 0) for r in PackagingMovement.objects.filter(shipment=s)
                 .values("material").annotate(q=Sum("qty"))}
         want = needed(s, _pool(have))
+        have = _merged_have(have)
         tracked = set(PackagingMaterial.objects.filter(pk__in=set(want) | set(have), track_stock=True)
                       .values_list("pk", flat=True))
         label = s.tracking_number or f"#{s.pk}"

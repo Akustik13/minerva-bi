@@ -329,3 +329,32 @@ class MergeTests(PackagingBase):
         self.assertEqual(self.client.post(f"{URL}merge/", {"target": box.pk, "merge": []}, format="json").status_code,
                          400)
         self.assertTrue(PackagingMaterial.objects.get(pk=envelope.pk).is_active)
+
+
+class MergeHistoryApiTests(PackagingBase):
+    def test_history_and_undo(self):
+        target = self.box(30, 20, 15, track_stock=True, stock=2)
+        other = self.box(30.5, 20, 15, track_stock=True, stock=3)
+        ProductPackaging.objects.create(product=self.p1, packaging=other, qty_per_box=4)
+        merge_id = self.client.post(f"{URL}merge/", {"target": target.pk, "merge": [other.pk]},
+                                    format="json").json()["merge_id"]
+        r = self.client.get(f"{URL}merges/")
+        self.assertEqual(r.status_code, 200, r.content)
+        h = r.json()["merges"][0]
+        self.assertEqual((h["id"], h["target_id"], h["box_ids"], h["via"], h["can_undo"]),
+                         (merge_id, target.pk, [other.pk], "api", True))
+        self.assertEqual([b["id"] for b in h["before"]], [target.pk, other.pk])
+        self.assertEqual(self.client.get(f"{URL}merges/?target={other.pk}").json()["merges"], [])
+
+        self.scopes("packaging:read")
+        self.assertEqual(self.client.post(f"{URL}merges/{merge_id}/undo/").status_code, 403)
+        self.scopes(*RW)
+        r = self.client.post(f"{URL}merges/{merge_id}/undo/")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual((r.json()["boxes"], r.json()["recs"], r.json()["stock"]), (1, 1, 3))
+        other.refresh_from_db()
+        self.assertEqual((other.is_active, other.merged_into_id, other.stock_qty, self.stock(target)), (True, None, 3, 2))
+        self.assertEqual(ProductPackaging.objects.get(product=self.p1).packaging_id, other.pk)
+        r = self.client.post(f"{URL}merges/{merge_id}/undo/")
+        self.assertEqual((r.status_code, r.json()["code"]), (409, "undo_refused"))
+        self.assertEqual(self.client.post(f"{URL}merges/999999/undo/").status_code, 404)

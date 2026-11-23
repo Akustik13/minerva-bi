@@ -10,6 +10,8 @@
     GET   /packaging/usage/?days=365   — скільки коробок кожного виду пішло, розміри без коробки
     GET   /packaging/similar/?tolerance=1&inactive=0 — групи схожих розмірів і в яку зливати
     POST  /packaging/merge/            — злити коробки в одну {target, merge: [id…]}
+    GET   /packaging/merges/?target=   — 🔀 історія злиттів: до злиття, зараз у цілі, після злиття, чи можна відкотити
+    POST  /packaging/merges/{id}/undo/ — ↩ відкотити злиття (лише останнє для цих коробок)
 
 Права ключа: packaging:read / packaging:write. Ключ сайту магазину — 403 shop_key_forbidden. DELETE — 405.
 Логіка — shipping/services/packaging_stock.py (запас) і shipping/services/packaging_usage.py (використання, схожі,
@@ -115,8 +117,9 @@ class PackagingSerializer(serializers.ModelSerializer):
         model = PackagingMaterial
         fields = ["id", "code", "name", "box_type", "size_class", "size_class_effective", "length_cm", "width_cm",
                   "height_cm", "fold_heights", "tare_weight_kg", "max_weight_kg", "cost", "is_active", "track_stock",
-                  "stock_qty", "min_stock", "own_min_stock", "reorder_qty", "is_low", "volume_cm3", "buy_url", "notes"]
-        read_only_fields = ["id", "stock_qty"]
+                  "stock_qty", "min_stock", "own_min_stock", "reorder_qty", "is_low", "volume_cm3", "buy_url", "notes",
+                  "merged_into"]
+        read_only_fields = ["id", "stock_qty", "merged_into"]
         extra_kwargs = {"length_cm": {"min_value": DIM_MIN}, "width_cm": {"min_value": DIM_MIN},
                         "height_cm": {"min_value": DIM_MIN}, "tare_weight_kg": {"min_value": Decimal("0")},
                         "max_weight_kg": {"min_value": Decimal("0")}, "cost": {"min_value": Decimal("0")}}
@@ -210,8 +213,17 @@ def _movement(mv):
 def _box(m, st=None) -> dict:
     st = st or {}
     return {"id": m.pk, "code": m.code, "name": str(m), "dims": pu.dims_text(m), "is_active": m.is_active,
-            "boxes": st.get("boxes", 0), "shipments": st.get("shipments", 0), "last": st.get("last"),
-            "recs": st.get("recs", 0), "orders": st.get("orders", 0)}
+            "boxes": st.get("boxes", 0), "merged_boxes": st.get("merged", 0), "shipments": st.get("shipments", 0),
+            "last": st.get("last"), "recs": st.get("recs", 0), "orders": st.get("orders", 0)}
+
+
+def _history_row(h) -> dict:
+    m = h["merge"]
+    return {"id": m.pk, "created_at": m.created_at, "user": getattr(h["user"], "username", None), "via": m.via,
+            "target_id": m.target_id, "box_ids": [b.pk for b in m.boxes.all()],
+            "before": h["before"], "total_before": h["total"], "target_now": h["now"], "after_merge": h["after"],
+            "result": m.result, "undone_at": m.undone_at, "undone_by": getattr(h["undone_by"], "username", None),
+            "can_undo": h["can_undo"], "blocked_by": h["blocked_by"].pk if h["blocked_by"] else None}
 
 
 # ── Адреси ────────────────────────────────────────────────────────────────────
@@ -406,8 +418,37 @@ class PackagingViewSet(NoDeleteMixin, viewsets.GenericViewSet):
             return _fail("Немає коробок: " + ", ".join(f"#{i}" for i in missing) + ".", "not_found",
                          status.HTTP_404_NOT_FOUND, missing=missing)
         try:
-            out = pu.merge(target, others, user=_who(request))
+            out = pu.merge(target, others, user=_who(request), via="api")
         except pu.MergeError as e:
             return _fail(str(e), "merge_refused")
         target.refresh_from_db()
         return Response({**out, "target": self._data(target)})
+
+    @action(detail=False, methods=["get"])
+    def merges(self, request):
+        """🔀 Історія злиттів (?target=id, ?limit= до 200): що злили, скільки кожна коробка мала до злиття, сума,
+        зараз у цілі й після злиття, чи відкочено і чи можна відкотити."""
+        p = request.query_params
+        target = None
+        if p.get("target"):
+            target = PackagingMaterial.objects.filter(pk=p.get("target") if str(p.get("target")).isdigit() else 0).first()
+            if target is None:
+                return _fail("Такої коробки немає.", "not_found", status.HTTP_404_NOT_FOUND)
+        try:
+            limit = max(1, min(int(p.get("limit") or 50), 200))
+        except ValueError:
+            return _fail("limit — ціле число від 1 до 200.", "bad_param")
+        return Response({"merges": [_history_row(h) for h in pu.history(target=target, limit=limit)]})
+
+    @action(detail=False, methods=["post"], url_path=r"merges/(?P<merge_id>\d+)/undo")
+    def merge_undo(self, request, merge_id=None):
+        """↩ Відкотити злиття: коробки, рекомендації товарів, «упаковано» й запас — як до злиття."""
+        from shipping.models import PackagingMerge
+        m = PackagingMerge.objects.filter(pk=merge_id).first()
+        if m is None:
+            return _fail(f"Злиття #{merge_id} немає.", "not_found", status.HTTP_404_NOT_FOUND)
+        try:
+            out = pu.undo(m, user=_who(request))
+        except pu.MergeError as e:
+            return _fail(str(e), "undo_refused", status.HTTP_409_CONFLICT)
+        return Response({"id": m.pk, "undone": True, **out})

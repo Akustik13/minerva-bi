@@ -255,7 +255,7 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
     list_filter   = (PackagingArchiveFilter, PackagingStockFilter, 'box_type', 'size_class')
     list_editable = ('is_active',)
     search_fields = ('name', 'code')
-    readonly_fields = ('stock_panel', 'movements_panel', 'fold_panel', 'label_panel')
+    readonly_fields = ('stock_panel', 'movements_panel', 'fold_panel', 'label_panel', 'merged_info')
 
     def changelist_view(self, request, extra_context=None):
         from labels_app.views import label_context
@@ -430,6 +430,30 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
                 path('usage/', self.admin_site.admin_view(self.usage_view),
                      name='shipping_packagingmaterial_usage')] + super().get_urls()
 
+    @admin.display(description=_('🔀 Злиття'))
+    def merged_info(self, obj):
+        """Куди злили цю коробку (її відправлення рахуються й списуються як ціль) і які злили в неї — з історії
+        (shipping/services/packaging_usage.history); «↩ Відкотити» — на сторінці «📊 Використання й схожі»."""
+        from django.utils.html import format_html_join
+        from .services import packaging_usage as pu
+        if not obj or not obj.pk:
+            return '—'
+        parts = []
+        target = getattr(obj, 'merged_into', None) if not obj.is_active else None
+        if target is not None:
+            parts.append(format_html('→ {} <a href="{}">{}</a> <span style="opacity:.7">({})</span>', _('злито в'),
+                                     reverse('admin:shipping_packagingmaterial_change', args=[target.pk]), target,
+                                     _('відправлення з розмірами цієї коробки рахуються й списуються як ціль')))
+        page = reverse('admin:shipping_packagingmaterial_usage')
+        rows = pu.history(target=obj, limit=10)
+        if rows:
+            parts.append(format_html_join('', '<div style="margin-top:4px">{} · {} {} — {} {} {} · <a href="{}#merge-{}">{}</a></div>', (
+                (timezone.localtime(h['at']).strftime('%d.%m.%Y'), _('злито'),
+                 ', '.join(f"{b.get('code') or '—'} {b.get('dims', '')}" for b in h['before'][1:]),
+                 _('до злиття разом'), h['total'].get('boxes', 0), str(_('шт')) + (' · ↩ ' + str(_('відкочено')) if h['undone'] else ''),
+                 page, h['merge'].pk, _('історія →')) for h in rows)))
+        return format_html_join('', '{}', ((p,) for p in parts)) if parts else '—'
+
     @admin.display(description=_('Використано за рік'))
     def usage_col(self, obj):
         """Скільки коробок цього виду пішло за 365 днів (shipping/services/packaging_usage.py, кеш 10 хв)."""
@@ -453,15 +477,29 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
         if request.method == 'POST':
             if not self.has_change_permission(request):
                 raise PermissionDenied
+            if request.POST.get('action') == 'undo':
+                from .models import PackagingMerge
+                m = PackagingMerge.objects.filter(pk=request.POST.get('merge') or 0).first()
+                if m is None:
+                    messages.error(request, _('Такого злиття немає.'))
+                else:
+                    try:
+                        out = pu.undo(m, user=request.user)
+                        messages.success(request, _('↩ Злиття #{} відкочено: коробок повернуто {}, рекомендацій товарів '
+                                                    '{} (+ відновлено {}), «упаковано» {}, запас {}.').format(
+                            m.pk, out['boxes'], out['recs'], out['dropped'], out['orders'], out['stock']))
+                    except pu.MergeError as e:
+                        messages.error(request, str(e))
+                return redirect(back + '#merges')
             target = PackagingMaterial.objects.filter(pk=request.POST.get('target') or 0).first()
             ids = [int(x) for x in request.POST.getlist('merge') if str(x).isdigit()]
-            others = list(PackagingMaterial.objects.filter(pk__in=ids, is_active=True).exclude(
+            others = list(PackagingMaterial.objects.filter(pk__in=ids).exclude(      # архівні теж
                 pk=getattr(target, 'pk', 0)))
             if target is None or not others:
                 messages.error(request, _('Виберіть коробку-ціль і хоча б одну, яку злити в неї.'))
             else:
                 try:
-                    out = pu.merge(target, others, user=request.user)
+                    out = pu.merge(target, others, user=request.user, via='admin')
                     messages.success(request, _('Злито в «{}»: {} коробки в архів, рекомендацій товарів перенесено {}, '
                                                 '«упаковано» {}, запас +{}.').format(
                         target, len(out['archived']), out['moved_recs'], out['moved_orders'], out['stock']))
@@ -490,6 +528,8 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
                    'title': _('Використання й схожі коробки'), 'rows': rows, 'data': data, 'groups': groups,
                    'days': days, 'tol': f'{tol.normalize():f}', 'inactive': inactive,
                    'can_merge': self.has_change_permission(request),
+                   'history': pu.history(limit=200 if request.GET.get('merges') == 'all' else 20),
+                   'all_merges': request.GET.get('merges') == 'all',
                    'back_url': reverse('admin:shipping_packagingmaterial_changelist')}
         return TemplateResponse(request, 'admin/shipping/packagingmaterial/usage.html', context)
 
@@ -559,7 +599,8 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('📦 Упаковка', {
-            'fields': ('box_type', 'name', ('code', 'size_class'), 'is_active', 'notes', 'label_panel'),
+            'fields': ('box_type', 'name', ('code', 'size_class'), 'is_active', 'merged_info', 'notes',
+                       'label_panel'),
         }),
         ('📐 Розміри', {
             'fields': (('length_cm', 'width_cm', 'height_cm'), 'fold_heights', 'fold_panel'),

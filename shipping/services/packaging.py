@@ -98,6 +98,17 @@ def materials():
     return list(PackagingMaterial.objects.filter(is_active=True).order_by("pk"))
 
 
+def merged_target(m, by_pk=None):
+    """Коробка, у яку злили m («📊 Використання й схожі» → `merged_into`), — ланцюжком до активної; активна (і
+    повернута з архіву) — сама m. by_pk {pk: коробка} — без запитів до бази."""
+    seen = set()
+    while m is not None and not m.is_active and m.merged_into_id and m.merged_into_id not in seen:
+        seen.add(m.pk)
+        nxt = by_pk.get(m.merged_into_id) if by_pk is not None else None
+        m = nxt if nxt is not None else m.merged_into
+    return m
+
+
 def material_for(obj, pool=None):
     """Активний пакувальний матеріал тих самих розмірів (±1 см, будь-яка орієнтація) — і складений до однієї з
     «Можна скласти до висоти». Кілька — найближчий за розмірами, при рівних — не складений."""

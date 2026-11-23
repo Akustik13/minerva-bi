@@ -141,6 +141,8 @@ SUMMARIES = {
     "PackagingViewSet.usage": "📊 Скільки коробок кожного виду використали",
     "PackagingViewSet.similar": "🔍 Групи схожих коробок (±см)",
     "PackagingViewSet.merge": "🔀 Злити коробки в одну",
+    "PackagingViewSet.merges": "🔀 Історія злиттів коробок",
+    "PackagingViewSet.merge_undo": "↩ Відкотити злиття коробок",
     "MeetingRedeemView.post": "RAG-ПК: обміняти одноразовий квиток вікна запису на нараду й ключ надсилання",
     "MeetingStatusView.post": "RAG-ПК: стан запису наради (згода, запис, розшифровка, готово, помилка)",
     "MeetingTranscriptView.post": "RAG-ПК: частина розшифровки наради",
@@ -167,7 +169,9 @@ EFFECTS = {
     "PackagingViewSet.receive": "Додає коробки до запасу на складі (рух «📥 Прихід»); може зняти «мало коробок».",
     "PackagingViewSet.count": "Встановлює фактичний запас коробки — рух «🧮 Інвентаризація» на різницю.",
     "PackagingViewSet.merge": "Рекомендації товарів, «упаковано» й запас злитих коробок переходять на ціль, злиті — "
-                              "в архів (нічого не видаляється).",
+                              "в архів (нічого не видаляється); злиття записується в історію, його можна відкотити.",
+    "PackagingViewSet.merge_undo": "Повертає все, що перенесло злиття: коробки з архіву, рекомендації товарів, "
+                                   "«упаковано» й запас. Лише останнє злиття цих коробок.",
     "StockViewSet.count": "Інвентаризація: встановлює фактичний залишок товару на локації — Minerva записує рух "
                           "«Коригування» на різницю.",
     "MovementViewSet.create": "Записує рух складу — прихід (+), списання (−) або коригування — і змінює залишок. "
@@ -326,6 +330,7 @@ PREVIEW = {
     "CustomerViewSet.list", "CustomerViewSet.retrieve", "WebhookViewSet.list", "WebhookViewSet.retrieve",
     "WebhookViewSet.deliveries", "PurchaseOrderViewSet.list", "PurchaseOrderViewSet.retrieve",
     "PackagingViewSet.list", "PackagingViewSet.retrieve", "PackagingViewSet.usage", "PackagingViewSet.similar",
+    "PackagingViewSet.merges",
     "ShopShippingView.get", "PaymentsStatusView.get",
 }
 NO_PREVIEW = {

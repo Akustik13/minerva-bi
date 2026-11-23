@@ -90,6 +90,16 @@ class ProposalTests(_Data):
         self.assertIn(f'/packagingmaterial/{self.big.pk}/', p.result_url)
         self.assertIn('Злити коробки', decide.describe(p)[0])
 
+    def test_archived_box_merges_into_active_but_not_the_other_way(self):
+        PackagingMaterial.objects.filter(pk=self.twin.pk).update(is_active=False)
+        ctx = self.ctx()
+        self.call('propose_packaging_merge', ctx, target='BX-1', merge=['BX-2'], evidence='архівний дубль')
+        p = AgentProposal.objects.get(task=ctx.task)
+        self.assertEqual(decide.apply_one(p, self.user), '')
+        self.assertIn(f'злито в #{self.big.pk}', PackagingMaterial.objects.get(pk=self.twin.pk).notes)
+        self.assertIn('в архіві', self.fails('propose_packaging_merge', target='BX-2', merge=['BX-1'],
+                                             evidence='x'))
+
     def test_merge_refuses_other_type(self):
         PackagingMaterial.objects.filter(pk=self.twin.pk).update(box_type=PackagingMaterial.BoxType.ENVELOPE)
         self.assertIn('різні типи', self.fails('propose_packaging_merge', target='BX-1', merge=['BX-2'],

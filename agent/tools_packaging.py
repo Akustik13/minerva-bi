@@ -43,7 +43,9 @@ SIMILAR = {'name': 'similar_packaging',
 MERGE = {'name': 'propose_packaging_merge',
          'description': 'Запропонувати злити коробки в одну (людина підтвердить ✓): рекомендації товарів і записи '
                         '«упаковано» переходять на ціль, запас — теж, злиті — в архів (нічого не видаляється). Лише '
-                        'один тип (коробка з коробкою). Після злиття посилки з розмірами злитої коробки її не списують.',
+                        'один тип (коробка з коробкою). Злити можна й архівну коробку, ціль — лише активна. Після '
+                        'злиття відправлення з розмірами злитої коробки рахуються й списуються як ціль. Злиття '
+                        'записується в історію (packaging_usage) — людина може його відкотити.',
          'input_schema': {'type': 'object', 'properties': {
              'target': _BOX, 'merge': {'type': 'array', 'items': {'type': 'string'}, 'description': 'Які злити'},
              'evidence': _EVIDENCE}, 'required': ['target', 'merge', 'evidence']}}
@@ -101,7 +103,7 @@ def _line(m, st=None) -> str:
         bits.append(f'на складі {m.stock_qty}' + (f' (мін. {m.effective_min})' if m.effective_min is not None else '')
                     + (' ⚠️ мало' if m.is_low else ''))
     if not m.is_active:
-        bits.append('🗄 архів')
+        bits.append('🗄 архів' + (f' → злито в #{m.merged_into_id}' if m.merged_into_id else ''))
     line = ' · '.join(bits)
     return line + (f'\n   використано за рік: {stats_line(st)}' if st is not None else '')
 
@@ -131,7 +133,7 @@ def list_packaging(ctx, args) -> str:
 
 def packaging_usage(ctx, args) -> str:
     from shipping.models import PackagingMaterial
-    from shipping.services.packaging_usage import stats_line, usage
+    from shipping.services.packaging_usage import history, stats_line, usage
     require(ctx.task.owner, VIEW_PERM)
     data = usage(clamp(args.get('days'), 365, 1, 3650))
     boxes = {m.pk: m for m in PackagingMaterial.objects.all()}
@@ -143,6 +145,14 @@ def packaging_usage(ctx, args) -> str:
     if idle:
         lines.append(f'\nАктивні, але не використовувались за цей час ({len(idle)}):')
         lines += [f'- #{m.pk} {m.code or "—"} {m}' for m in idle[:30]]
+    merges = history(limit=10)
+    if merges:
+        lines.append('\nОстанні злиття коробок (ціль ← злиті; до злиття разом → зараз у цілі):')
+        for h in merges:
+            done = ' · ↩ відкочено' if h['undone'] else ''
+            lines.append(f"- #{h['merge'].pk} {h['at']:%d.%m.%Y}: #{h['merge'].target_id} ← "
+                         + ', '.join(f"#{b.get('id')} {b.get('dims', '')}" for b in h['before'][1:])
+                         + f"; {h['total'].get('boxes', 0)} шт → {h['now']} шт{done}")
     if data['unmatched']:
         lines.append('\nРозміри посилок без коробки в каталозі (Д × Ш × В см, кандидати додати — propose_packaging):')
         lines += [f'- {u["dims"]}: {u["boxes"]} шт у {u["shipments"]} відправл.' for u in data['unmatched']]
@@ -176,7 +186,7 @@ def propose_merge(ctx, args):
     from agent.tools import ToolError
     from shipping.services.packaging_usage import dims_text
     require(ctx.task.owner, CHANGE_PERM)
-    target = _box(args.get('target'))
+    target = _box(args.get('target'), active_only=True)
     others = []
     for value in args.get('merge') or []:
         m = _box(value)
@@ -292,12 +302,12 @@ def apply(p, user) -> str:
             if not user.has_perm(CHANGE_PERM):
                 return 'немає права змінювати коробки'
             target = PackagingMaterial.objects.filter(pk=d.get('target')).first()
-            others = list(PackagingMaterial.objects.filter(pk__in=d.get('merge') or [], is_active=True))
+            others = list(PackagingMaterial.objects.filter(pk__in=d.get('merge') or []))     # архівні теж
             if target is None:
                 return 'коробки-цілі вже немає'
             if not others:
-                return 'коробки для злиття вже в архіві або видалені'
-            out = packaging_usage.merge(target, others, user=user)
+                return 'коробок для злиття вже немає'
+            out = packaging_usage.merge(target, others, user=user, via='agent')
             p.result_url = f'/admin/shipping/packagingmaterial/{target.pk}/change/'
             p.new_value = (f'{p.new_value} · рекомендацій перенесено {out["moved_recs"]}, '
                            f'«упаковано» {out["moved_orders"]}, запас +{out["stock"]}')[:2000]
