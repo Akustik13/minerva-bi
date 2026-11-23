@@ -876,7 +876,7 @@ def thread_preview_view(request, thread_pk):
         'mail_suppliers':  _mail_suppliers(request.user, emails, thread),
         'links':           links,
         'links_url':       links_url,
-        'attach_options':  _attach_options(emails, links),
+        'attach_options':  _attach_options(emails, links, thread, request.user),
         'reply_to_addr':   reply_to_addr,
         'reply_cc':        ', '.join(reply_cc),
         'thread':          thread,
@@ -984,7 +984,7 @@ def message_preview_view(request, message_pk):
         'mail_suppliers':  _mail_suppliers(request.user, [msg], msg.thread),
         'links':           links,
         'links_url':       links_url,
-        'attach_options':  _attach_options([msg], links),
+        'attach_options':  _attach_options([msg], links, msg.thread, request.user),
         'reply_to_addr':   reply_to_addr,
         'reply_cc':        ', '.join(reply_cc),
         'thread':          msg.thread,
@@ -1017,14 +1017,25 @@ def _projects_state(thread, user=None) -> str:
         return ''
 
 
-def _attach_options(emails, links):
-    """Документи замовлень і вкладення гілки для кнопки «📎 Вкладення» у відповіді."""
+def _attach_options(emails, links, thread=None, user=None):
+    """Файли запиту RFQ, документи замовлень і вкладення гілки для кнопки «📎 Вкладення» у відповіді."""
     from email_assistant.attachments import reply_options
     try:
-        return reply_options(emails, links)
+        return reply_options(emails, links, thread, user)
     except Exception as e:
         logger.warning('attach options: %s', e)
-        return {'order_docs': [], 'thread_files': []}
+        return {'rfq_files': [], 'order_docs': [], 'thread_files': []}
+
+
+def _compose_attach_options(user, msg):
+    """«📂 З Minerva» сторінки «Написати» для відповіді / пересилання: те саме, що «📎» швидкої відповіді в прев'ю
+    (файли запиту RFQ гілки, документи замовлень, вкладення листів гілки). Номери замовлень — лише з уже прочитаних
+    вкладень, без читання PDF і IMAP: сторінка відкривається одразу."""
+    if msg is None:
+        return {}
+    thread = msg.thread
+    emails = list(thread.messages.filter(is_deleted=False).order_by('sent_at')) if thread else [msg]
+    return _attach_options(emails, _mail_links(emails, read=False), thread, user)
 
 
 def _mail_suppliers(user, emails, thread):
@@ -1366,6 +1377,7 @@ def compose_view(request):
     reply_to    = None
     initial     = {}
     draft       = None
+    fwd         = None
 
     if draft_pk and request.method != 'POST':
         # «📝 Чернетки» → лист у формі: кому, копія, тема, текст, вкладення; відповідь — на свій лист
@@ -1474,6 +1486,7 @@ def compose_view(request):
         'draft':        draft,
         'reply_to':     reply_to,
         'initial':      initial,
+        'attach_options': _compose_attach_options(request.user, reply_to or fwd),
         'remind_choices': _FU_DAYS,
         'remind_sel':   (initial.get('opts') or {}).get('remind_days') or _FU_DEFAULT_DAYS,
         'signature':    sig,

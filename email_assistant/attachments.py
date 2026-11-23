@@ -4,8 +4,9 @@ email_assistant/attachments.py — вкладення для листа-відп
 Окрім файлів з комп'ютера, до відповіді можна додати:
   - документи замовлення, згаданого в листуванні (media/orders/{source}/{order_number}/ —
     інвойси, пакувальні листи, CN23…);
-  - вкладення з листів цієї гілки (з диска або, якщо ще не збережені, з IMAP).
-Браузер передає лише посилання «order:<pk>:<ім'я файлу>» / «msg:<pk>:<індекс>», файли читає сервер.
+  - вкладення з листів цієї гілки (з диска або, якщо ще не збережені, з IMAP);
+  - 📨 файли запиту постачальникам (RFQ), до якого належить гілка (ZIP з Gerber, BOM, стекап…) — «rfq:<pk файлу>».
+Браузер передає лише посилання «order:<pk>:<ім'я файлу>» / «msg:<pk>:<індекс>» / «rfq:<pk>», файли читає сервер.
 
 Чернетки (EmailDraft) і заплановані листи (ScheduledEmail) зберігають вкладення списком записів:
   - {file, name, content_type, size} — файл з комп'ютера, збережений у MEDIA_ROOT/email_outbox/<uuid>/;
@@ -25,6 +26,9 @@ from django.conf import settings
 logger = logging.getLogger('email_assistant')
 
 MAX_ORDER_DOCS = 20
+MAX_RFQ_FILES = 30
+RFQ_REQUESTS = 3                                  # запитів гілки (найновіші)
+RFQ_CODE_RE = re.compile(r'\bRFQ-\d{4}-\d{3,}\b', re.IGNORECASE)
 OUTBOX_DIR = 'email_outbox'   # MEDIA_ROOT/email_outbox/<uuid>/<файл> — вкладення чернеток і запланованих листів
 
 
@@ -135,6 +139,34 @@ def fetch_documents(msg, indexes) -> dict:
     return out
 
 
+def rfq_files(emails, thread=None, user=None) -> list:
+    """📨 Файли запиту постачальникам (RFQ), до якого належить ця гілка: [{ref, name, size, group}] — щоб вислати
+    їх ще раз у відповіді. Запит гілки — той самий, що в рядку «🏭 … 📨 RFQ-…» прев'ю (suppliers/services/mail_link.py):
+    лист запиту / відповідь на нього, гілка запиту чи прив'язана пізніше; ще — номер RFQ-… у темі листа.
+    Лише з правом бачити запити постачальникам."""
+    if user is None or not user.has_perm('suppliers.view_supplierrequest'):
+        return []
+    try:
+        from django.db.models import Q
+        from suppliers.models import SupplierRequest, SupplierRequestFile
+    except (ImportError, LookupError):   # без розділу постачальників
+        return []
+    emails = [m for m in emails or [] if getattr(m, 'pk', None)]
+    pks = [m.pk for m in emails]
+    cond = Q(recipients__reply_message_id__in=pks) | Q(recipients__sent_message_id__in=pks)
+    if thread is not None:
+        cond |= Q(recipients__thread_id=thread.pk) | Q(recipients__extra_threads=thread.pk)
+    codes = {c.upper() for m in emails for c in RFQ_CODE_RE.findall(m.subject or '')}
+    if codes:
+        cond |= Q(code__in=codes)
+    requests = list(SupplierRequest.objects.filter(cond).distinct().order_by('-created_at')[:RFQ_REQUESTS])
+    order = {r.pk: i for i, r in enumerate(requests)}
+    files = sorted(SupplierRequestFile.objects.filter(request__in=requests).select_related('request'),
+                   key=lambda f: (order[f.request_id], f.pk))
+    return [{'ref': f'rfq:{f.pk}', 'name': f.name, 'size': f.size, 'group': f.request.code}
+            for f in files[:MAX_RFQ_FILES]]
+
+
 def can_attach(account, kind: str) -> bool:
     """Документ Minerva у листі — лише якщо власник скриньки (той, хто надсилає) сам може бачити Angebote /
     замовлення (has_perm іде за ролями Minerva, core/permissions.py). Інакше будь-хто з поштою міг би вкласти
@@ -143,7 +175,7 @@ def can_attach(account, kind: str) -> bool:
     if user is None:
         return False
     perm = {'offer': 'offers.view_offer', 'offerint': 'offers.view_offer', 'order': 'sales.view_salesorder',
-            'invoice': 'sales.view_salesinvoice'}.get(kind)
+            'invoice': 'sales.view_salesinvoice', 'rfq': 'suppliers.view_supplierrequest'}.get(kind)
     return perm is None or user.has_perm(perm)
 
 
@@ -155,7 +187,7 @@ def load_ref(account, ref: str):
 
     kind, _, rest = (ref or '').partition(':')
     try:
-        if kind in ('offer', 'offerint', 'order', 'invoice') and not can_attach(account, kind):
+        if kind in ('offer', 'offerint', 'order', 'invoice', 'rfq') and not can_attach(account, kind):
             logger.warning('attachment ref %s: no permission for %s', ref, getattr(account, 'user', None))
             return None
         if kind == 'aifile':  # 📎 файл, доданий до запиту AI-відповіді, — лише цієї скриньки
@@ -172,6 +204,15 @@ def load_ref(account, ref: str):
         if kind == 'invoice':   # 🧾 рахунок (PDF, інакше DOCX) — sales/invoice_service.py
             from sales.invoice_service import attachment as invoice_attachment
             return invoice_attachment(int(rest))
+        if kind == 'rfq':   # 📨 файл запиту постачальникам — ще раз у листі (suppliers.SupplierRequestFile)
+            from suppliers.models import SupplierRequestFile
+            f = SupplierRequestFile.objects.filter(pk=int(rest)).first()
+            if f is None or not f.file:
+                return None
+            with f.file.open('rb') as fh:
+                content = fh.read()
+            return {'name': f.name, 'content': content,
+                    'content_type': mimetypes.guess_type(f.name)[0] or 'application/octet-stream'}
         if kind == 'order':
             pk, _, name = rest.partition(':')
             order = SalesOrder.objects.filter(pk=int(pk)).first()
@@ -358,9 +399,14 @@ def from_form(account, refs, names, files, draft=None, check=False):
     return out, ''
 
 
-def reply_options(emails, links) -> dict:
-    """Що можна швидко додати до відповіді: документи замовлень гілки і вкладення її листів."""
+def reply_options(emails, links, thread=None, user=None) -> dict:
+    """Що можна швидко додати до відповіді: файли запиту RFQ гілки, документи замовлень гілки і вкладення її листів."""
     docs = []
     for link in links or []:
         docs += order_documents(link['order'])
-    return {'order_docs': docs, 'thread_files': thread_attachments(emails)}
+    try:
+        rfq = rfq_files(emails, thread, user)
+    except Exception as e:  # noqa: BLE001 — без файлів запиту відповідь працює як була
+        logger.warning('rfq files: %s', e)
+        rfq = []
+    return {'rfq_files': rfq, 'order_docs': docs, 'thread_files': thread_attachments(emails)}

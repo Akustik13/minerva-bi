@@ -814,6 +814,14 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
           <div class="em-att-pick" id="pv-att-pick">
             <label class="em-att-opt">💻 {% trans "Файл з комп'ютера…" %}
               <input type="file" multiple style="display:none" onchange="pvAttFiles(this)"></label>
+            {% regroup attach_options.rfq_files by group as rfq_groups %}
+            {% for g in rfq_groups %}
+            <h5>📨 {% trans "Файли запиту" %} <span translate="no">{{ g.grouper }}</span></h5>
+            {% for d in g.list %}
+            <div class="em-att-opt" data-ref="{{ d.ref }}" data-name="{{ d.name }}" onclick="pvAttRef(this)">
+              📨 <span translate="no">{{ d.name }}</span><span class="sz">{{ d.size|filesizeformat }}</span></div>
+            {% endfor %}
+            {% endfor %}
             <div id="pv-att-orderdocs">{% include "email_assistant/_preview_order_docs.html" %}</div>
             {% if attach_options.thread_files %}
             <h5>📎 {% trans "Вкладення з цього листування" %}</h5>
@@ -1120,6 +1128,21 @@ window.pvAttRef = function(el) {
   _pvAtt.push({ref: el.dataset.ref, name: el.dataset.name});
   _pvAttRender();
 };
+// Текст з AI згадує файли з «📎» (файли запиту RFQ, документи замовлення, вкладення гілки: «im Anhang: …zip») —
+// одразу у вкладеннях; той самий файл з іншої групи — не вдруге
+function _pvAttMentioned() {   // MVAttNames — static/admin/js/mv_att_names.js (підключено в inbox.html)
+  var ed = document.getElementById('pv-reply-editor');
+  if (!ed || !window.MVAttNames) return;
+  var opts = Array.from(document.querySelectorAll('#pv-att-pick .em-att-opt[data-ref]'))
+    .map(function(o) { return {name: o.dataset.name || '', ref: o.dataset.ref}; });
+  var have = _pvAtt.map(function(a) { return MVAttNames.key(a.name); }), added = 0;
+  MVAttNames.mentioned(ed.innerText || ed.textContent, opts).forEach(function(o) {
+    var k = MVAttNames.key(o.name);
+    if (have.indexOf(k) >= 0 || _pvAtt.some(function(a) { return a.ref === o.ref; })) return;
+    _pvAtt.push({ref: o.ref, name: o.name}); have.push(k); added++;
+  });
+  if (added) _pvAttRender();
+}
 
 // ── Підказки адрес у «Кому» / «Копія»: адресна книга, клієнти CRM, усі, з ким листувались ──
 function _pvAutocomplete(inputId, listId) {
@@ -1224,6 +1247,7 @@ window.pvReplyAIUse = function() {
   var ed     = document.getElementById('pv-reply-editor');
   if (!result || !ed) return;
   ed.innerText = result.textContent;
+  _pvAttMentioned();
   ed.focus();
   document.getElementById('pv-reply-ai-box').style.display = 'none';
 };
@@ -2531,6 +2555,7 @@ window.pvUseAsReply = function(pk) {
   _pvEnsureReply((box && box._to) || _pvReplyDefaults.to,
                  (card && card.dataset.subject) || _pvReplyDefaults.subj, (box && box._cc) || '');
   ed.innerText = txt.textContent;
+  _pvAttMentioned();       // файли, згадані в тексті (файли запиту RFQ…), — у вкладеннях
   if (_pvAiAttachOn()) {   // 📎 файли до запиту — одразу у вкладеннях відповіді
     _pvAiFileList(pk).forEach(function(f) {
       if (!_pvAtt.some(function(a) { return a.ref === f.ref; })) _pvAtt.push({ref: f.ref, name: f.name, ai: f.id});

@@ -6,6 +6,7 @@
 
 {% block extrahead %}{{ block.super }}
 <script src="/static/admin/js/mv_img_resize.js?v=1" defer></script>{# 🖼 розмір картинки в тексті листа #}
+<script src="/static/admin/js/mv_att_names.js?v=1"></script>{# 📎 файли, названі в тексті листа #}
 <script src="{% static 'admin/js/mv_datetime_picker.js' %}"></script>
 <style>
 .em-compose { max-width:860px; margin:0 auto; }
@@ -50,6 +51,16 @@
 .em-att-list { font-size:12px; color:var(--text-muted); margin-top:6px; display:flex; flex-wrap:wrap; gap:6px; }
 .em-att-chip { padding:3px 10px; border-radius:12px; background:var(--bg-input); border:1px solid var(--border-strong); display:inline-flex; align-items:center; gap:4px; }
 .em-att-x { border:none; background:none; cursor:pointer; color:var(--text-dim); padding:0 0 0 2px; font-size:11px; line-height:1; }
+/* 📂 З Minerva: файли запиту RFQ, документи замовлення, вкладення гілки */
+.em-att-pick { display:none; margin-top:8px; padding:8px 10px; border-radius:8px; border:1px solid var(--border-strong); background:var(--bg-card); max-height:320px; overflow:auto; }
+.em-att-pick.open { display:block; }
+.em-att-pick h5 { margin:6px 0 4px; font-size:11px; color:var(--text-dim); font-weight:600; text-transform:uppercase; letter-spacing:.04em; display:flex; align-items:center; gap:8px; }
+.em-att-all { border:none; background:none; color:var(--accent); cursor:pointer; font-size:11px; font-weight:600; text-transform:none; letter-spacing:0; padding:0; }
+.em-att-opt { display:flex; gap:8px; align-items:center; padding:4px 6px; border-radius:5px; font-size:12px; cursor:pointer; color:var(--text); }
+.em-att-opt:hover { background:var(--bg-hover,#1e2d40); }
+.em-att-opt .sz { color:var(--text-dim); font-size:11px; margin-left:auto; white-space:nowrap; }
+.em-att-opt.added { opacity:.45; cursor:default; }
+.em-att-auto { margin-top:6px; font-size:12px; color:var(--text-muted); }
 .em-att-x:hover { color:var(--err,#e53935); }
 /* AI panel */
 #ai-panel {
@@ -219,14 +230,53 @@
         <button type="button" class="em-att-btn" onclick="document.getElementById('att-input').click()">
           📎 {% trans "Додати вкладення" %}
         </button>
+        {% if attach_options.rfq_files or attach_options.order_docs or attach_options.thread_files %}
+        <button type="button" class="em-att-btn" id="att-pick-btn" onclick="attPickToggle()"
+                title="{% trans "Файли запиту постачальникам, документи замовлення й вкладення з цього листування — файл додає сервер" %}">
+          📂 {% trans "З Minerva" %} ▾</button>
+        {% endif %}
         <input type="file" id="att-input" name="attachments" multiple
                style="display:none" onchange="showFiles(this)">
         <div id="files-list" class="em-att-list"></div>
         <div class="em-att-list" id="ref-list" style="margin-top:6px">
           {% for a in initial.att_refs %}
-          <span class="em-att-chip" title="{% trans "Документ Minerva або файл чернетки — додається на сервері" %}"><input type="hidden" name="att_ref" value="{{ a.ref }}"><input type="hidden" name="att_ref_name" value="{{ a.name }}">📎 {{ a.name }} <button type="button" class="em-att-x" onclick="this.parentNode.remove()" title="{% trans "Прибрати" %}">✕</button></span>
+          <span class="em-att-chip" title="{% trans "Документ Minerva або файл чернетки — додається на сервері" %}"><input type="hidden" name="att_ref" value="{{ a.ref }}"><input type="hidden" name="att_ref_name" value="{{ a.name }}">📎 {{ a.name }} <button type="button" class="em-att-x" onclick="_refX(this)" title="{% trans "Прибрати" %}">✕</button></span>
           {% endfor %}
         </div>
+        <div class="em-att-auto" id="att-auto-note" hidden></div>
+        {% if attach_options.rfq_files or attach_options.order_docs or attach_options.thread_files %}
+        <div class="em-att-pick" id="att-pick">
+          {% regroup attach_options.rfq_files by group as rfq_groups %}
+          {% for g in rfq_groups %}
+          <div class="em-att-grp">
+            <h5>📨 {% trans "Файли запиту" %} <span translate="no">{{ g.grouper }}</span>
+              <button type="button" class="em-att-all" onclick="attAddAll(this)">＋ {% trans "Додати всі" %}</button></h5>
+            {% for d in g.list %}
+            <div class="em-att-opt" data-ref="{{ d.ref }}" data-name="{{ d.name }}" onclick="attAdd(this)">
+              📨 <span translate="no">{{ d.name }}</span><span class="sz">{{ d.size|filesizeformat }}</span></div>
+            {% endfor %}
+          </div>
+          {% endfor %}
+          {% if attach_options.order_docs %}
+          <div class="em-att-grp">
+            <h5>📄 {% trans "Документи замовлення" %}</h5>
+            {% for d in attach_options.order_docs %}
+            <div class="em-att-opt" data-ref="{{ d.ref }}" data-name="{{ d.name }}" onclick="attAdd(this)">
+              📄 <span translate="no">{{ d.name }}</span><span class="sz" translate="no">{{ d.group }} · {{ d.size|filesizeformat }}</span></div>
+            {% endfor %}
+          </div>
+          {% endif %}
+          {% if attach_options.thread_files %}
+          <div class="em-att-grp">
+            <h5>📎 {% trans "Вкладення з цього листування" %}</h5>
+            {% for d in attach_options.thread_files %}
+            <div class="em-att-opt" data-ref="{{ d.ref }}" data-name="{{ d.name }}" onclick="attAdd(this)">
+              📎 <span translate="no">{{ d.name }}</span><span class="sz">{{ d.group }}{% if d.size %} · {{ d.size|filesizeformat }}{% endif %}</span></div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
       </div>
 
       <!-- ❗ Важливо / 📬 запит на прочитання / ⏰ нагадати, якщо немає реакції (email_assistant/followups.py) -->
@@ -377,10 +427,99 @@ function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'
 function showFiles(input) {
   var list = document.getElementById('files-list');
   list.innerHTML = Array.from(input.files).map(function(f){
-    return '<span class="em-att-chip">📎 ' + f.name +
+    return '<span class="em-att-chip">📎 ' + _esc(f.name) +
            ' <span style="color:var(--text-dim)">(' + (f.size/1024).toFixed(0) + ' KB)</span></span>';
   }).join('');
 }
+
+/* ── 📂 З Minerva: файли запиту RFQ, документи замовлення, вкладення гілки — посиланням, файл додає сервер.
+   Файли, назви яких є у вашому тексті («im Anhang: …zip»), додаються самі; прибраний ✕ — більше не додається. ── */
+var _refRemoved = {};
+function _attKey(s) { return window.MVAttNames ? MVAttNames.key(s) : String(s || '').toLowerCase(); }
+function _refList() { return document.getElementById('ref-list'); }
+function _refHas() {   // назви всього, що вже у вкладеннях (документи Minerva й файли з ПК)
+  var names = Array.from(document.querySelectorAll('#ref-list input[name=att_ref_name]')).map(function(i) { return i.value; });
+  var inp = document.getElementById('att-input');
+  Array.from((inp && inp.files) || []).forEach(function(f) { names.push(f.name); });
+  return {refs: Array.from(document.querySelectorAll('#ref-list input[name=att_ref]')).map(function(i) { return i.value; }),
+          keys: names.map(_attKey)};
+}
+function _refChip(a) {
+  var chip = document.createElement('span');
+  chip.className = 'em-att-chip';
+  chip.title = '{% trans "Документ Minerva або файл чернетки — додається на сервері" %}';
+  [['att_ref', a.ref], ['att_ref_name', a.name]].forEach(function(f) {
+    var inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = f[0]; inp.value = f[1] || '';
+    chip.appendChild(inp);
+  });
+  chip.appendChild(document.createTextNode('📎 ' + (a.name || '') + ' '));
+  var x = document.createElement('button');
+  x.type = 'button'; x.className = 'em-att-x'; x.textContent = '✕'; x.title = '{% trans "Прибрати" %}';
+  x.onclick = function() { _refX(x); };
+  chip.appendChild(x);
+  return chip;
+}
+function _refX(btn) {
+  var chip = btn.parentNode, name = chip.querySelector('input[name=att_ref_name]');
+  if (name) _refRemoved[_attKey(name.value)] = 1;
+  chip.remove();
+  _attMark();
+}
+function _attMark() {
+  var have = _refHas();
+  document.querySelectorAll('#att-pick .em-att-opt[data-ref]').forEach(function(o) {
+    o.classList.toggle('added', have.refs.indexOf(o.dataset.ref) >= 0 || have.keys.indexOf(_attKey(o.dataset.name)) >= 0);
+  });
+}
+function _attAddRef(ref, name) {
+  var have = _refHas();
+  if (have.refs.indexOf(ref) >= 0 || have.keys.indexOf(_attKey(name)) >= 0) return false;   // уже є (і з іншої групи)
+  _refList().appendChild(_refChip({ref: ref, name: name}));
+  delete _refRemoved[_attKey(name)];
+  return true;
+}
+function attPickToggle() {
+  var p = document.getElementById('att-pick');
+  if (p) p.classList.toggle('open');
+  _attMark();
+}
+function attAdd(el) { _attAddRef(el.dataset.ref, el.dataset.name); _attMark(); }
+function attAddAll(btn) {
+  btn.closest('.em-att-grp').querySelectorAll('.em-att-opt[data-ref]').forEach(function(o) {
+    _attAddRef(o.dataset.ref, o.dataset.name);
+  });
+  _attMark();
+}
+function _attMentioned(editor) {   // варіанти «📂 З Minerva», назви яких є у вашому тексті (без підпису й історії)
+  if (!editor || !window.MVAttNames) return [];
+  var c = editor.cloneNode(true);
+  c.querySelectorAll('.em-quote-in, .em-sig-in, blockquote').forEach(function(n) { n.remove(); });
+  var opts = Array.from(document.querySelectorAll('#att-pick .em-att-opt[data-ref]'))
+    .map(function(o) { return {name: o.dataset.name, el: o}; });
+  return MVAttNames.mentioned(c.textContent, opts).map(function(x) { return x.el; });
+}
+var _attAutoNames = [];
+function _attAuto() {
+  var added = [];
+  _attMentioned(document.getElementById('body-editor')).forEach(function(o) {
+    if (_refRemoved[_attKey(o.dataset.name)]) return;
+    if (_attAddRef(o.dataset.ref, o.dataset.name)) added.push(o.dataset.name);
+  });
+  if (!added.length) return;
+  _attAutoNames = _attAutoNames.concat(added);
+  var note = document.getElementById('att-auto-note');
+  note.textContent = '📎 {% trans "Файли, згадані в тексті листа, додано у вкладення" %}: ' + _attAutoNames.join(', ') +
+                     ' · {% trans "✕ біля файлу — прибрати" %}';
+  note.hidden = false;
+  _attMark();
+}
+(function() {
+  var ed = document.getElementById('body-editor'), t = null;
+  if (!ed || !document.getElementById('att-pick')) return;
+  ed.addEventListener('input', function() { clearTimeout(t); t = setTimeout(_attAuto, 900); });
+  setTimeout(_attAuto, 0);   // текст з AI («↩ Відповісти»), чернетка
+})();
 
 /* ── Schedule toggle ── */
 var _scheduleOn = false;
@@ -630,22 +769,8 @@ function dismissGrammar() {
 function _renderRefs(items) {
   var box = document.getElementById('ref-list');
   box.innerHTML = '';
-  (items || []).forEach(function(a) {
-    var chip = document.createElement('span');
-    chip.className = 'em-att-chip';
-    chip.title = '{% trans "Документ Minerva або файл чернетки — додається на сервері" %}';
-    [['att_ref', a.ref], ['att_ref_name', a.name]].forEach(function(f) {
-      var inp = document.createElement('input');
-      inp.type = 'hidden'; inp.name = f[0]; inp.value = f[1] || '';
-      chip.appendChild(inp);
-    });
-    chip.appendChild(document.createTextNode('📎 ' + (a.name || '') + ' '));
-    var x = document.createElement('button');
-    x.type = 'button'; x.className = 'em-att-x'; x.textContent = '✕'; x.title = '{% trans "Прибрати" %}';
-    x.onclick = function() { chip.remove(); };
-    chip.appendChild(x);
-    box.appendChild(chip);
-  });
+  (items || []).forEach(function(a) { box.appendChild(_refChip(a)); });
+  _attMark();
 }
 async function saveDraft() {
   _getBodyPayload();
