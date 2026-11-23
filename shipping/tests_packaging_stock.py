@@ -396,10 +396,23 @@ class AdminTests(Base):
                                    "min_stock": "2", "min_clear": "on"})
         self.assertContains(r, "Або вписати значення, або прибрати")
 
-    def test_min_stock_editable_in_list(self):
+    def test_min_stock_in_action_menu_not_in_list(self):
         page = self.client.get("/admin/shipping/packagingmaterial/")
-        self.assertContains(page, 'name="form-0-min_stock"')
-        self.assertContains(page, "3 (загальний)")
+        self.assertNotContains(page, 'name="form-0-min_stock"')
+        self.assertContains(page, "bulk_settings_selected")
+        card = self.client.get(f"/admin/shipping/packagingmaterial/{self.box.pk}/change/")
+        self.assertContains(card, 'name="min_stock"')
+        self.assertContains(card, "3 (загальний)")
+
+    def test_card_saves_several_fold_heights(self):
+        r = self.post_box(length_cm="30", width_cm="30", height_cm="30", fold_heights="30, 16, 22, 27")
+        self.assertEqual(r.status_code, 302)
+        m = PackagingMaterial.objects.get(pk=self.box.pk)
+        self.assertEqual(m.fold_heights, "27, 22, 16")                  # повна висота відкинута, від вищої
+        card = self.client.get(f"/admin/shipping/packagingmaterial/{self.box.pk}/change/")
+        self.assertContains(card, "Ще висота")
+        r = self.post_box(length_cm="30", width_cm="30", height_cm="30", fold_heights="35")
+        self.assertContains(r, "має бути меншою")
 
     def test_stock_report_action_keeps_selection(self):
         r = self.client.post("/admin/shipping/packagingmaterial/",

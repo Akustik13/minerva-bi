@@ -229,7 +229,10 @@ class FoldingBoxTests(Base):
         m = PackagingMaterial(length_cm=30, width_cm=30, height_cm=30, fold_heights="16;22 cm, 22")
         m.full_clean()
         self.assertEqual(m.fold_heights, "22, 16")
-        for bad in ("30", "35", "abc"):
+        m.fold_heights = "30/16/22"                          # повна висота в переліку — просто пропускається
+        m.full_clean()
+        self.assertEqual(m.fold_heights, "22, 16")
+        for bad in ("35", "abc"):
             m.fold_heights = bad
             with self.assertRaises(ValidationError):
                 m.full_clean()

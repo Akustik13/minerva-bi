@@ -715,9 +715,11 @@ class PackagingMaterial(models.Model):
         folds, bad = self.parse_fold_heights(self.fold_heights)
         if bad:
             raise ValidationError({'fold_heights': f'Не число: {", ".join(bad)}. Пишіть висоти через кому, напр. «22, 16».'})
-        if self.height_cm is not None and any(h >= self.height_cm for h in folds):
-            raise ValidationError({'fold_heights': 'Висота складеної коробки має бути меншою за «Висоту» '
-                                                   f'({self.height_cm} см).'})
+        if self.height_cm is not None:
+            folds = [h for h in folds if h != self.height_cm]        # повна висота в переліку — не помилка
+            if any(h > self.height_cm for h in folds):
+                raise ValidationError({'fold_heights': 'Висота складеної коробки має бути меншою за «Висоту» '
+                                                       f'({self.height_cm} см).'})
         self.fold_heights = ', '.join(f'{h.normalize():f}' for h in sorted(folds, reverse=True))
 
     @property

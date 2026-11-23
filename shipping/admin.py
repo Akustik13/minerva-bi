@@ -179,6 +179,43 @@ class PackagingBulkForm(forms.Form):
         return out
 
 
+class FoldHeightsWidget(forms.TextInput):
+    """«Можна скласти до висоти»: кожна висота — своє поле, «＋ Ще висота», ✕ (значення — у тексті «22, 16»;
+    без JS лишається звичайне текстове поле)."""
+
+    SCRIPT = """<script>(function(){
+var inp=document.getElementById(%s); if(!inp||inp.dataset.fh)return; inp.dataset.fh='1';
+inp.type='hidden';
+var box=document.createElement('div');
+box.style.cssText='display:flex;flex-wrap:wrap;gap:8px;align-items:center';
+inp.parentNode.insertBefore(box,inp.nextSibling);
+function sync(){inp.value=[].slice.call(box.querySelectorAll('input.fh-h')).map(function(i){return i.value.trim().replace(',','.');}).filter(Boolean).join(', ');}
+var add=document.createElement('button'); add.type='button'; add.className='button'; add.textContent=%s;
+function row(v){
+ var r=document.createElement('span'); r.style.cssText='display:inline-flex;gap:4px;align-items:center';
+ var i=document.createElement('input'); i.type='number'; i.step='0.1'; i.min='1'; i.className='fh-h vTextField';
+ i.style.width='6em'; i.value=v||''; i.addEventListener('input',sync);
+ var u=document.createElement('span'); u.textContent=%s;
+ var x=document.createElement('button'); x.type='button'; x.textContent='\\u2715'; x.title=%s;
+ x.style.cssText='background:none;border:none;cursor:pointer;color:var(--err,#f85149);font-size:14px';
+ x.addEventListener('click',function(){r.parentNode.removeChild(r);sync();});
+ r.appendChild(i); r.appendChild(u); r.appendChild(x); box.insertBefore(r,add); return i;
+}
+box.appendChild(add);
+add.addEventListener('click',function(){row('').focus();});
+var vals=inp.value.split(/[,;\\s\\/]+/).filter(Boolean);
+vals.forEach(function(v){row(v);}); if(!vals.length)row('');
+})();</script>"""
+
+    def render(self, name, value, attrs=None, renderer=None):
+        import json
+        html = super().render(name, value, attrs, renderer)
+        input_id = (attrs or {}).get('id') or self.attrs.get('id') or f'id_{name}'
+        return mark_safe(html + self.SCRIPT % (
+            json.dumps(input_id), json.dumps(str(_('＋ Ще висота'))), json.dumps(str(_('см'))),
+            json.dumps(str(_('Прибрати цю висоту')))))
+
+
 class PackagingMaterialForm(forms.ModelForm):
     """Прихід і інвентаризація — не поля моделі: кожна зміна запасу йде рухом (shipping/services/packaging_stock)."""
     receive_qty = forms.IntegerField(
@@ -193,7 +230,12 @@ class PackagingMaterialForm(forms.ModelForm):
     class Meta:
         model = PackagingMaterial
         exclude = ('stock_qty', 'stock_since', 'low_notified_at')
-        help_texts = {'is_active': _('Знято — коробка в архіві: не пропонується в упаковці відправлень, нові '
+        widgets = {'fold_heights': FoldHeightsWidget}
+        help_texts = {'fold_heights': _('Кожна нижча висота — окремим полем, «＋ Ще висота» додає ще одну. Довжина й '
+                                        'ширина ті самі; це та сама коробка — один запас на складі, посилка 30×30×16 '
+                                        'її теж списує, а рекомендація складає коробку до найменшої висоти, у яку '
+                                        'вміщується товар.'),
+                      'is_active': _('Знято — коробка в архіві: не пропонується в упаковці відправлень, нові '
                                      'відправлення її не списують, «мало коробок» про неї не надсилається. '
                                      'Список показує її лише з фільтром «🗄 В архіві».')}
 
@@ -208,10 +250,10 @@ class PackagingMaterialForm(forms.ModelForm):
 @admin.register(PackagingMaterial)
 class PackagingMaterialAdmin(admin.ModelAdmin):
     form = PackagingMaterialForm
-    list_display  = ('type_badge', 'name', 'dimensions_col', 'stock_col', 'min_stock', 'tare_weight_kg',
+    list_display  = ('type_badge', 'name', 'dimensions_col', 'stock_col', 'tare_weight_kg',
                      'max_weight_kg', 'volume_col', 'cost', 'is_active')
     list_filter   = (PackagingArchiveFilter, PackagingStockFilter, 'box_type')
-    list_editable = ('min_stock', 'is_active')
+    list_editable = ('is_active',)
     search_fields = ('name',)
     readonly_fields = ('stock_panel', 'movements_panel', 'fold_panel')
     actions = ('bulk_settings_selected', 'archive_selected', 'restore_selected', 'stock_report_selected')
@@ -226,7 +268,7 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
         return field
 
     def get_changelist_formset(self, request, **kwargs):
-        """Мінімум, змінений прямо в рядку списку, — одразу перевірка «мало коробок»."""
+        """«Активна», змінена прямо в рядку списку, — одразу перевірка «мало коробок»."""
         FormSet = super().get_changelist_formset(request, **kwargs)
         from .services import packaging_stock
 
