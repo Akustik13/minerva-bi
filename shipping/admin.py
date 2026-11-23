@@ -4243,6 +4243,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 "<style>html,body{margin:0;height:100%}iframe{border:0;width:100%;height:100%}</style></head>"
                 f"<body><iframe id='p' src='{_esc(pdf)}'></iframe><script>"
                 "var f=document.getElementById('p');f.addEventListener('load',function(){"
+                # не PDF (помилки збирання — сторінка діагностики) — показати її замість вікна друку
+                "try{var d=f.contentDocument;if(d&&d.contentType&&d.contentType.indexOf('pdf')<0){"
+                "location.replace(f.src+(f.src.indexOf('?')<0?'?':'&')+'debug=1');return;}}catch(e){}"
                 "setTimeout(function(){try{f.contentWindow.focus();f.contentWindow.print();}catch(e){}},400);});"
                 "</script></body></html>", content_type="text/html; charset=utf-8")
 
@@ -4374,7 +4377,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         def _debug_html(extra=""):
             rows = "".join(f"<li style='margin:3px 0'>{l}</li>" for l in log)
-            return HttpResponse(
+            resp = HttpResponse(
                 f"<html><head><meta charset='utf-8'><style>"
                 f"body{{font-family:monospace;font-size:13px;padding:20px;background:#0d1117;color:#c9d1d9}}"
                 f"li{{margin:2px 0}}</style></head><body>"
@@ -4382,6 +4385,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 f"<ul>{rows}</ul>{extra}</body></html>",
                 content_type="text/html; charset=utf-8",
             )
+            resp["X-Frame-Options"] = "SAMEORIGIN"     # сторінка ?print=1 показує її у своєму фреймі
+            return resp
 
         if not pdf_paths:
             return _debug_html()
@@ -4431,6 +4436,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         response = HttpResponse(merged, content_type="application/pdf")
         response["Content-Disposition"] = f'inline; filename="PrintAll_{order_no}.pdf"'
+        # «🖨️ Друкувати всі документи» (?print=1) вбудовує цей PDF у фрейм своєї сторінки: без SAMEORIGIN
+        # Django відповідає X-Frame-Options: DENY і браузер показує порожнє вікно друку
+        response["X-Frame-Options"] = "SAMEORIGIN"
         return response
 
     # ── DHL Cancel ───────────────────────────────────────────────────────────

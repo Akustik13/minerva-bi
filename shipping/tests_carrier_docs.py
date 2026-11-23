@@ -263,6 +263,7 @@ class PrintAllTests(BookingBase):
             customs_url="/media/shipping/customs/dhl_invoice.pdf")
         r = self.client.get(f"/admin/shipping/shipment/{self.shipment.pk}/print-all/")
         self.assertEqual(r["Content-Type"], "application/pdf")
+        self.assertEqual(r["X-Frame-Options"], "SAMEORIGIN")     # інакше фрейм сторінки ?print=1 порожній
         from pypdf import PdfReader
         self.assertEqual(len(PdfReader(io.BytesIO(r.content)).pages), 1 + 3 * 2)     # етикетка + 3 × інвойс
         r = self.client.get(f"/admin/shipping/shipment/{self.shipment.pk}/print-all/?copies=1")
