@@ -1,6 +1,7 @@
 """🔌 OAuth для MCP — адреси й вікно «Дозволити» (логіка — api/oauth.py)."""
 import functools
 import json
+import logging
 from urllib.parse import quote, urlsplit
 
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
@@ -8,6 +9,8 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 
 from . import oauth
+
+logger = logging.getLogger(__name__)
 
 CORS = {'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Authorization, Content-Type, MCP-Protocol-Version',
@@ -24,6 +27,7 @@ def _json(data, status=200):
 
 
 def _error(e):
+    logger.warning('oauth: %s — %s', e.error, e.description)   # причина відмови — у журналі сервера (docker logs web)
     response = _json({'error': e.error, 'error_description': e.description}, status=e.status)
     if e.status == 401 and e.error == 'invalid_client':
         response['WWW-Authenticate'] = 'Basic realm="minerva"'

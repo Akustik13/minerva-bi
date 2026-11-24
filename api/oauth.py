@@ -369,7 +369,9 @@ def _from_code(request, client, data) -> dict:
     from .models import APIKey, OAuthToken
     now, failed, replay = timezone.now(), '', None
     with transaction.atomic():
-        tok = (OAuthToken.objects.select_for_update().select_related('api_key', 'user')
+        # FOR UPDATE — лише рядок коду: з select_related ключа (може бути NULL) PostgreSQL відмовляє («FOR UPDATE
+        # cannot be applied to the nullable side of an outer join»), ключ і людина читаються окремо
+        tok = (OAuthToken.objects.select_for_update()
                .filter(token_hash=digest(data.get('code')), kind=OAuthToken.CODE).first())
         if tok is None or tok.client_id != client.pk:
             failed = 'невідомий код дозволу'
@@ -406,7 +408,7 @@ def _from_refresh(client, data) -> dict:
     from .models import OAuthToken
     now, failed, replay = timezone.now(), '', None
     with transaction.atomic():
-        tok = (OAuthToken.objects.select_for_update().select_related('api_key', 'user')
+        tok = (OAuthToken.objects.select_for_update()       # лише рядок токена — див. _from_code
                .filter(token_hash=digest(data.get('refresh_token')), kind=OAuthToken.REFRESH).first())
         if tok is None or tok.client_id != client.pk:
             failed = 'невідомий токен оновлення'
