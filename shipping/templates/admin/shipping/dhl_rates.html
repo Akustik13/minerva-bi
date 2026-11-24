@@ -223,6 +223,9 @@
     </tbody>
   </table>
   {% endif %}
+  {% if unpriced and not dhl_error %}
+  <p class="dhl-empty" style="font-size:12px">ℹ️ {% trans "Без ціни для вашого акаунта DHL (не входить у договір, оформити не можна):" %} <span translate="no">{{ unpriced|join:", " }}</span></p>
+  {% endif %}
 
   <a href="{% url 'admin:shipping_shipment_change' shipment.pk %}" class="dhl-back">
     ← {% trans "Назад до відправлення" %}

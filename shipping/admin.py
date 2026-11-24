@@ -6978,6 +6978,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                                    packages=packages_raw or None, origin=_origin)
                     entry["products"] = r.get("products") or []
                     entry["error"]    = r.get("error")
+                    entry["unpriced"] = r.get("unpriced") or []
                 else:
                     entry["error"] = "API ключ не налаштовано"
 
@@ -7676,6 +7677,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "order":     order,
             "products":  result.get("products", []),
             "dhl_error": result.get("error"),
+            "unpriced":  result.get("unpriced") or [],
             "weight":    weight,
             "dims":      f"{length}×{width}×{height} см",
             "title":     f"DHL Тарифи — #{shipment.pk} → {shipment.recipient_name}",

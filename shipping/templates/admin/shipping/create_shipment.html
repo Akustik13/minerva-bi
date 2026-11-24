@@ -896,7 +896,8 @@ function renderComparison(carriers){
           display:flex;align-items:center;gap:6px">
         ${icon} ${esc(c.carrier_name)}
         ${c.products&&c.products.length?`<span style="color:var(--text-dim);font-weight:400">(${c.products.length} тарифів)</span>`:''}
-      </div>${c.dhl_account ? dhlAccountBar(c.dhl_account) : ''}${body}</div>`;
+      </div>${c.dhl_account ? dhlAccountBar(c.dhl_account) : ''}${body}${c.unpriced&&c.unpriced.length&&!c.error
+        ? `<div style="color:var(--text-dim);font-size:11.5px;padding:6px 2px 0">ℹ️ Без ціни для вашого акаунта DHL (не входить у договір, оформити не можна): <span translate="no">${esc(c.unpriced.join(', '))}</span></div>` : ''}</div>`;
   });
   return html;
 }

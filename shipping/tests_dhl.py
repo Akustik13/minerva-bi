@@ -72,6 +72,19 @@ class AccountTests(BookingBase):
         self.assertTrue(dhl.customs_needed("DE", "US"))
         self.assertTrue(dhl.customs_needed("CN", "DE"))      # імпорт до нас — теж митниця
 
+    def test_zero_price_products_are_not_rates(self):
+        resp = FakeResp(200, {"products": [
+            {"productName": "EXPRESS BREAKBULK", "productCode": "B",
+             "totalPrice": [{"priceType": "BILLC", "price": 0, "priceCurrency": "EUR"}]},
+            {"productName": "PARCEL PRODUCT", "productCode": "9", "totalPrice": []},
+            {"productName": "EXPRESS WORLDWIDE", "productCode": "U",
+             "totalPrice": [{"priceType": "BASEC", "price": 150, "priceCurrency": "USD"},
+                            {"priceType": "BILLC", "price": 143.12, "priceCurrency": "EUR"}]}]})
+        with mock.patch("tabele.api_logger.logged_request", return_value=resp):
+            r = dhl.get_rates(carrier(), "US", "75001", "Plano", 5, 30, 20, 10)
+        self.assertEqual([(p["code"], p["price"], p["currency"]) for p in r["products"]], [("U", 143.12, "EUR")])
+        self.assertEqual(r["unpriced"], ["EXPRESS BREAKBULK", "PARCEL PRODUCT"])
+
     def test_rates_post_each_box_and_real_sender(self):
         resp = FakeResp(200, {"products": [{"productName": "EXPRESS WORLDWIDE", "productCode": "P",
                                             "totalPrice": [{"priceType": "BILLC", "price": 80, "priceCurrency": "EUR"}]}]})

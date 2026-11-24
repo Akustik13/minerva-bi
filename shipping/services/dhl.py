@@ -236,23 +236,17 @@ def get_rates(carrier, destination_country: str, destination_postal: str,
     except Exception as e:
         return {"products": [], "error": f"JSON parse error: {e}"}
 
-    products = []
+    products, unpriced = [], []
     for p in data.get("products") or []:
         name = p.get("productName") or p.get("localProductName") or p.get("productCode", "—")
         code = p.get("productCode", "")
 
-        # Ціна: шукаємо PUBLISHED або першу доступну
-        price_list = p.get("totalPrice") or []
-        price = None
-        currency = "EUR"
-        for tp in price_list:
-            if tp.get("priceType") in ("PUBLISHED", "ACCOUNT", "INCENTIVE"):
-                price    = tp.get("price") or tp.get("priceCurrency")
-                currency = tp.get("priceCurrency", "EUR")
-                break
-        if price is None and price_list:
-            price    = price_list[0].get("price")
-            currency = price_list[0].get("priceCurrency", "EUR")
+        price, currency = rate_price(p.get("totalPrice") or [])
+        if price is None:
+            # DHL повертає й продукти, на які в договорі акаунта немає тарифу (EXPRESS BREAKBULK, PARCEL PRODUCT…),
+            # з ціною 0 — оформити їх не можна, тож у список тарифів не беремо
+            unpriced.append(name)
+            continue
 
         # Транзитний час
         dc = p.get("deliveryCapabilities") or {}
@@ -262,7 +256,7 @@ def get_rates(carrier, destination_country: str, destination_postal: str,
         products.append({
             "name":          name,
             "code":          code,
-            "price":         float(price) if price is not None else None,
+            "price":         price,
             "currency":      currency,
             "transit_days":  transit_days,
             "delivery_date": delivery_date,
@@ -279,7 +273,26 @@ def get_rates(carrier, destination_country: str, destination_postal: str,
     # Сортуємо від найдешевшого
     products.sort(key=lambda x: x["price"] if x["price"] is not None else 9999)
 
-    return {"products": products, "error": None}
+    return {"products": products, "error": None, "unpriced": unpriced}
+
+
+# Яку з цін DHL брати: BILLC — у валюті рахунку акаунта, далі опубліковані / за договором
+_PRICE_ORDER = ("BILLC", "ACCOUNT", "INCENTIVE", "PUBLISHED", "PULCL", "BASEC")
+
+
+def rate_price(price_list):
+    """(ціна > 0, валюта) з `totalPrice` продукту DHL; немає додатної ціни — (None, "EUR")."""
+    def rank(tp):
+        t = tp.get("priceType")
+        return _PRICE_ORDER.index(t) if t in _PRICE_ORDER else len(_PRICE_ORDER)
+    for tp in sorted((tp for tp in price_list if isinstance(tp, dict)), key=rank):
+        try:
+            price = float(tp.get("price"))
+        except (TypeError, ValueError):
+            continue
+        if price > 0:
+            return price, tp.get("priceCurrency") or "EUR"
+    return None, "EUR"
 
 
 def get_tracking(carrier, tracking_number: str) -> dict:
