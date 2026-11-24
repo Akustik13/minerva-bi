@@ -1,0 +1,35 @@
+{# 📈 Стовпчики по місяцях для «📦 Що пакували» (картка коробки й сторінка packed.html); chart — PackagingMaterialAdmin._chart #}
+<style>
+  .pk-legend { font-size: 12px; color: var(--body-quiet-color, #8aa0b4); margin: 0 0 6px; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  .pk-sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 4px; }
+  .pk-sw.a, .pk-b.a { background: var(--accent, #79aec8); }
+  .pk-sw.p, .pk-b.p { background: rgba(127, 127, 127, .45); }
+  .pk-chart { display: flex; align-items: stretch; gap: 4px; height: 170px; padding-top: 18px; overflow-x: auto; }
+  .pk-col { flex: 1 1 0; min-width: 22px; display: flex; flex-direction: column; align-items: stretch;
+            text-decoration: none !important; color: inherit !important; border-radius: 4px; padding: 0 1px; }
+  .pk-col:hover, .pk-col:focus, .pk-col.on { background: rgba(121, 174, 200, .14); outline: none; }
+  .pk-bars { flex: 1 1 auto; display: flex; align-items: flex-end; justify-content: center; gap: 2px;
+             border-bottom: 1px solid var(--border-color, #2a3a4e); }
+  .pk-b { position: relative; width: 42%; max-width: 26px; border-radius: 3px 3px 0 0; }
+  .pk-v { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 700;
+          line-height: 16px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pk-lbl { font-size: 10.5px; text-align: center; color: var(--body-quiet-color, #8aa0b4); line-height: 18px;
+            white-space: nowrap; font-variant-numeric: tabular-nums; }
+</style>
+<div class="pk-legend">
+  <span><span class="pk-sw a"></span>коробок у відправленнях, шт</span>
+  <span><span class="pk-sw p"></span>«Упаковано» — записи в замовленнях, шт</span>
+  {% if chart.link %}<span>клік на місяць — його відправлення</span>{% endif %}
+</div>
+<div class="pk-chart">
+  {% for m in chart.months %}
+  <a class="pk-col" href="{{ chart.link }}&month={{ m.key }}#ships" data-month="{{ m.key }}"
+     title="{{ m.label }}: {{ m.boxes }} шт у {{ m.shipments }} відправл. · «Упаковано» {{ m.packed }} шт">
+    <span class="pk-bars">
+      <span class="pk-b a" style="height:{{ m.h_boxes }}%">{% if m.boxes %}<span class="pk-v">{{ m.boxes }}</span>{% endif %}</span>
+      <span class="pk-b p" style="height:{{ m.h_packed }}%"></span>
+    </span>
+    <span class="pk-lbl">{% if m.show_label %}{{ m.label }}{% endif %}</span>
+  </a>
+  {% endfor %}
+</div>

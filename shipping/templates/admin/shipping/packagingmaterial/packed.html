@@ -1,0 +1,136 @@
+{% extends "admin/base_site.html" %}
+{# 📦 Що пакували в цю коробку (PackagingMaterialAdmin.packed_view, shipping/services/packaging_usage.packed) #}
+
+{% block title %}{{ title }} — Minerva{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Головна</a> ›
+  <a href="{{ back_url }}">{{ opts.verbose_name_plural|capfirst }}</a> ›
+  <a href="{{ card_url }}" translate="no">{{ box }}</a> › {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .pu-box { padding: 14px 18px; border: 1px solid var(--border-strong, #243347); border-radius: 8px;
+            background: var(--bg-card, #1a2535); margin-bottom: 16px; }
+  .pu-box h2 { margin: 0 0 8px; font-size: 16px; background: none; color: inherit; padding: 0; }
+  .pu-muted { color: var(--body-quiet-color, #8aa0b4); font-size: 12px; }
+  .pu-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .pu-table th, .pu-table td { padding: 6px 10px; border-bottom: 1px solid var(--border-color, #2a3a4e);
+                               text-align: left; vertical-align: middle; }
+  .pu-table th + th, .pu-table td + td { border-left: 1px solid var(--border-color, #2a3a4e); }
+  .pu-table tr:nth-child(even) td { background: rgba(127, 127, 127, .07); }
+  .pu-table tr:hover td { background: rgba(121, 174, 200, .14); }
+  .pu-table th.n, .pu-table td.n, .pu-table th.c, .pu-table td.c { text-align: center; white-space: nowrap;
+                                                                    font-variant-numeric: tabular-nums; }
+  .pu-wrap { overflow-x: auto; }
+  .pu-form { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+  .pu-form input[type=number] { width: 90px; }
+  .pu-chip { display: inline-block; padding: 2px 10px; border-radius: 12px; border: 1px solid var(--border-color, #2a3a4e);
+             font-size: 12px; text-decoration: none !important; }
+  .pu-chip.on { background: var(--accent, #79aec8); color: #fff !important; border-color: transparent; }
+  .pk-filter { display: none; margin: 8px 0 0; font-size: 13px; }
+  .pk-hide { display: none; }
+</style>
+
+<div class="pu-box">
+  <div style="font-size:15px"><b translate="no">{{ box.code|default:"—" }}</b> <span translate="no">{{ box }}</span>
+    · <span translate="no">{{ dims }} см</span>{% if box.fold_heights %} <span class="pu-muted" translate="no">↧ {{ box.fold_heights }}</span>{% endif %}
+    {% if not box.is_active %} · 🗄 в архіві{% endif %}
+    · <a href="{{ card_url }}">картка коробки</a> · <a href="{{ usage_url }}?days={{ data.days }}">📊 усі коробки</a></div>
+  {% if data.target %}
+  <div style="margin-top:6px">🔀 Цю коробку злито в <a href="{% url 'admin:shipping_packagingmaterial_packed' data.target.pk %}?days={{ data.days }}" translate="no">{{ data.target.code|default:"—" }} {{ data.target }}</a>
+    — її відправлення тепер рахуються там.</div>
+  {% endif %}
+  <form method="get" class="pu-form" style="margin-top:10px">
+    <span>Період:</span>
+    {% for d, label in presets %}<a class="pu-chip{% if d == data.days %} on{% endif %}" href="?days={{ d }}">{{ label }}</a>{% endfor %}
+    <span><input type="number" name="days" min="1" max="3650" value="{{ data.days }}"> дн.</span>
+    <button type="submit" class="button">Показати</button>
+  </form>
+  <div style="margin-top:10px">За {{ data.days }} дн.: <b>{{ data.totals.boxes }} шт</b> у <b>{{ data.totals.shipments }}</b> відправленнях
+    · «Упаковано» <b>{{ data.totals.packed }} шт</b> у {{ data.totals.packed_orders }} замовленнях</div>
+</div>
+
+<div class="pu-box">
+  <h2>📈 По місяцях</h2>
+  {% include "admin/shipping/packagingmaterial/_packed_chart.html" %}
+  <div class="pk-filter" id="pk-filter">Показано лише <b id="pk-filter-m"></b> · <a href="#" id="pk-filter-x">✕ усі місяці</a></div>
+</div>
+
+<div class="pu-box" id="ships">
+  <h2>🚚 Відправлення з цією коробкою</h2>
+  <div class="pu-muted">Оформлені відправлення від нас; коробку впізнаємо за розмірами посилки (±1 см у будь-якій орієнтації, складену — і за її нижчими висотами). Ті самі числа, що «Штук» і «Відправлень» на сторінці «📊 Використання».</div>
+  {% if not data.shipments %}<div class="pu-muted" style="margin-top:8px">За цей період — жодного.</div>{% else %}
+  <div class="pu-wrap"><table class="pu-table" style="margin-top:8px">
+    <tr><th class="c">Дата</th><th>Відправлення</th><th>Статус</th><th>Перевізник</th><th>Замовлення</th><th>Отримувач</th>
+      <th class="n" title="Скільки таких коробок у цій посилці">Коробок, шт</th></tr>
+    {% for r in data.shipments %}
+    <tr data-month="{{ r.when|date:'Y-m' }}">
+      <td class="c">{{ r.when|date:"d.m.Y" }}</td>
+      <td>{% if can_ship %}<a href="{% url 'admin:shipping_shipment_detail' r.s.pk %}">#{{ r.s.pk }}</a>{% if r.s.tracking_number %} <span translate="no">{{ r.s.tracking_number }}</span>{% endif %}{% else %}#{{ r.s.pk }}{% endif %}</td>
+      <td>{{ r.s.get_status_display }}</td>
+      <td translate="no">{{ r.s.carrier|default:"—" }}</td>
+      <td>{% if r.s.order_id %}{% if can_order %}<a href="{% url 'admin:sales_salesorder_change' r.s.order_id %}" translate="no">{{ r.s.order.order_number }}</a>{% else %}<span translate="no">{{ r.s.order.order_number }}</span>{% endif %}{% else %}—{% endif %}</td>
+      <td translate="no">{% if can_ship %}{{ r.s.recipient_company|default:r.s.recipient_name|default:"—" }}{% if r.s.recipient_country %} · {{ r.s.recipient_country }}{% endif %}{% else %}—{% endif %}</td>
+      <td class="n"><b>{{ r.qty }}</b>{% if r.merged %}<br><span class="pu-muted" title="Розміри коробки, яку злили в цю">🔀 {{ r.merged }} — <span translate="no">{% for m in r.merged_from %}{{ m }}{% if not forloop.last %}, {% endif %}{% endfor %}</span></span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table></div>
+  {% if data.more_shipments %}<div class="pu-muted" style="margin-top:6px">Ще {{ data.more_shipments }} старіших — виберіть коротший період.</div>{% endif %}
+  {% endif %}
+</div>
+
+<div class="pu-box" id="packed">
+  <h2>📦 «Упаковано» — записи в замовленнях</h2>
+  <div class="pu-muted">Блок «📦 Фактична упаковка (статистика)» картки замовлення (заповнює «🤖 Застосувати рекомендацію» або людина). Це запис у замовленні, а не розміри відправлення — тому може не збігатися з відправленнями вище.</div>
+  {% if not can_order %}<div class="pu-muted" style="margin-top:8px">Немає права бачити замовлення — лише кількість: {{ data.totals.packed }} шт.</div>
+  {% elif not data.packed %}<div class="pu-muted" style="margin-top:8px">За цей період — жодного.</div>{% else %}
+  <div class="pu-wrap"><table class="pu-table" style="margin-top:8px">
+    <tr><th class="c">Записано</th><th>Замовлення</th><th>Клієнт</th><th class="n">Коробок, шт</th><th class="n">Вага посилки, г</th><th>Нотатки</th></tr>
+    {% for p in data.packed %}
+    <tr data-month="{{ p.created_at|date:'Y-m' }}">
+      <td class="c">{{ p.created_at|date:"d.m.Y" }}</td>
+      <td><a href="{% url 'admin:sales_salesorder_change' p.order_id %}" translate="no">{{ p.order.order_number }}</a></td>
+      <td translate="no">{{ p.order.client|default:p.order.contact_name|default:"—" }}</td>
+      <td class="n"><b>{{ p.qty_boxes }}</b></td>
+      <td class="n">{{ p.actual_weight_g|default:"—" }}</td>
+      <td translate="no">{{ p.notes|default:"" }}</td>
+    </tr>
+    {% endfor %}
+  </table></div>
+  {% if data.more_packed %}<div class="pu-muted" style="margin-top:6px">Ще {{ data.more_packed }} старіших — виберіть коротший період.</div>{% endif %}
+  {% endif %}
+</div>
+
+<script>
+(function () {
+  /* click on a month column -> show only that month's rows (no reload); ?month= opens with it */
+  var cols = document.querySelectorAll('.pk-col'), box = document.getElementById('pk-filter');
+  var label = document.getElementById('pk-filter-m');
+  function apply(month) {
+    cols.forEach(function (c) { c.classList.toggle('on', !!month && c.dataset.month === month); });
+    document.querySelectorAll('tr[data-month]').forEach(function (tr) {
+      tr.classList.toggle('pk-hide', !!month && tr.dataset.month !== month);
+    });
+    box.style.display = month ? 'block' : 'none';
+    if (month) { var p = month.split('-'); label.textContent = p[1] + '.' + p[0]; }
+    var u = new URL(location.href);
+    if (month) u.searchParams.set('month', month); else u.searchParams.delete('month');
+    history.replaceState(null, '', u.pathname + u.search + location.hash);
+  }
+  cols.forEach(function (c) {
+    c.addEventListener('click', function (e) {
+      e.preventDefault();
+      apply(c.classList.contains('on') ? '' : c.dataset.month);
+      if (c.classList.contains('on')) document.getElementById('ships').scrollIntoView({behavior: 'smooth'});
+    });
+  });
+  document.getElementById('pk-filter-x').addEventListener('click', function (e) { e.preventDefault(); apply(''); });
+  var start = new URLSearchParams(location.search).get('month');
+  if (start && /^\d{4}-\d{2}$/.test(start)) apply(start);
+})();
+</script>
+{% endblock %}

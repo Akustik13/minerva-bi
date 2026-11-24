@@ -301,3 +301,83 @@ class AfterMergeTests(Base):
         r = self.client.post(url, {"action": "undo", "merge": merge_id})
         self.assertEqual(r.status_code, 302)
         self.assertTrue(PackagingMaterial.objects.get(pk=self.twin.pk).is_active)
+
+
+class PackedTests(Base):
+    """📦 Що пакували в коробку — `pu.packed`, сторінка `…/<pk>/packed/`, блок у картці."""
+
+    def login(self, **perms):
+        from config.models import SystemSettings
+        SystemSettings.objects.update_or_create(pk=1, defaults={"is_onboarding_complete": True})
+        boss = User.objects.create_superuser(f"boss{self.n}", f"b{self.n}@x.y", "p")
+        self.client.force_login(boss)
+        return boss
+
+    def test_same_numbers_as_usage_with_months_and_merged(self):
+        a = self.shipment()                                                   # 1 × Big
+        b = self.shipment(rows=[{"length_cm": 30, "width_cm": 20, "height_cm": 10, "quantity": 3}])
+        self.shipment(dims=(15, 10, 5))                                       # Small — не сюди
+        self.shipment(status=Shipment.Status.DRAFT)                           # чернетка — ні
+        OrderPackaging.objects.create(order=a.order, packaging=self.big, qty_boxes=2)
+        data = pu.packed(self.big, 365, cached=False)
+        st = pu.usage(365)["materials"][self.big.pk]
+        self.assertEqual((data["totals"]["boxes"], data["totals"]["shipments"]), (st["boxes"], st["shipments"]))
+        self.assertEqual((data["totals"]["packed"], data["totals"]["packed_orders"]), (2, 1))
+        self.assertEqual({r["s"].pk: r["qty"] for r in data["shipments"]}, {a.pk: 1, b.pk: 3})
+        self.assertEqual(len(data["months"]), 13)                             # рік — 12 або 13 місяців
+        now = data["months"][-1]
+        self.assertEqual((now["boxes"], now["shipments"], now["packed"]), (4, 2, 2))
+        self.assertEqual(sum(m["boxes"] for m in data["months"]), 4)
+        self.assertIsNone(data["target"])
+        pu.merge(self.big, [self.twin])                                       # злита — у ціль
+        twin = PackagingMaterial.objects.get(pk=self.twin.pk)
+        c = self.shipment(dims=(Decimal("30.5"), 20, Decimal("10.5")))
+        rows = {r["s"].pk: r for r in pu.packed(self.big, 365, cached=False)["shipments"]}
+        self.assertEqual((rows[c.pk]["merged"], [m.pk for m in rows[c.pk]["merged_from"]]), (1, [twin.pk]))
+        mine = pu.packed(twin, 365, cached=False)
+        self.assertEqual((mine["target"].pk, mine["shipments"]), (self.big.pk, []))
+
+    def test_page_card_and_links(self):
+        s = self.shipment()
+        OrderPackaging.objects.create(order=s.order, packaging=self.big, qty_boxes=2, notes="двійка")
+        self.login()
+        url = reverse("admin:shipping_packagingmaterial_packed", args=[self.big.pk])
+        r = self.client.get(url + "?days=90")
+        self.assertContains(r, s.order.order_number)
+        self.assertContains(r, reverse("admin:shipping_shipment_detail", args=[s.pk]))
+        self.assertContains(r, 'class="pk-col"')
+        self.assertContains(r, "двійка")
+        card = self.client.get(reverse("admin:shipping_packagingmaterial_change", args=[self.big.pk]))
+        self.assertContains(card, "pk-chart")
+        self.assertContains(card, url)
+        usage = self.client.get(reverse("admin:shipping_packagingmaterial_usage"))
+        self.assertContains(usage, url + "?days=365#ships")
+        self.assertContains(usage, url + "?days=365#packed")
+        self.assertEqual(self.client.get(reverse("admin:shipping_packagingmaterial_packed", args=[99999])).status_code,
+                         404)
+
+    def test_orders_hidden_without_order_right(self):
+        s = self.shipment()
+        OrderPackaging.objects.create(order=s.order, packaging=self.big, qty_boxes=1, notes="таємне")
+        clerk = User.objects.create_user("clerk", password="x", is_staff=True)
+        clerk.profile.role = "warehouse"
+        clerk.profile.allowed_modules = ["shipping"]
+        clerk.profile.save()
+        clerk = User.objects.get(pk=clerk.pk)
+        self.assertTrue(clerk.has_perm("shipping.view_packagingmaterial"))
+        self.assertFalse(clerk.has_perm("sales.view_salesorder"))
+        from config.models import SystemSettings
+        SystemSettings.objects.update_or_create(pk=1, defaults={"is_onboarding_complete": True})
+        self.client.force_login(clerk)
+        r = self.client.get(reverse("admin:shipping_packagingmaterial_packed", args=[self.big.pk]))
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, "таємне")
+        self.assertNotContains(r, reverse("admin:sales_salesorder_change", args=[s.order_id]))
+        self.assertContains(r, "Немає права бачити замовлення")
+        nobody = User.objects.create_user("nobody", password="x", is_staff=True)
+        nobody.profile.role = "readonly"
+        nobody.profile.allowed_modules = ["crm"]
+        nobody.profile.save()
+        self.client.force_login(User.objects.get(pk=nobody.pk))
+        self.assertEqual(self.client.get(reverse("admin:shipping_packagingmaterial_packed",
+                                                 args=[self.big.pk])).status_code, 403)

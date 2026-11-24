@@ -67,7 +67,7 @@
         <td><input type="checkbox" name="merge" value="{{ r.m.pk }}" {% if not forloop.first %}checked{% endif %}></td>
         <td><a href="{% url 'admin:shipping_packagingmaterial_change' r.m.pk %}" translate="no">{{ r.m.code|default:"—" }}</a> {{ r.m }}{% if not r.m.is_active %} 🗄{% endif %}</td>
         <td class="c" translate="no">{{ r.dims }}{% if r.m.fold_heights %} <span class="pu-muted">↧ {{ r.m.fold_heights }}</span>{% endif %}</td>
-        <td class="n">{{ r.st.boxes|default:0 }} шт</td>
+        <td class="n"><a href="{% url 'admin:shipping_packagingmaterial_packed' r.m.pk %}?days={{ data.days }}#ships" title="Що пакували в цю коробку">{{ r.st.boxes|default:0 }} шт</a></td>
         <td class="n">{{ r.st.recs|default:0 }}</td>
         <td class="n">{% if r.m.track_stock %}{{ r.m.stock_qty }}{% else %}—{% endif %}</td>
       </tr>
@@ -87,11 +87,11 @@
     <tr class="{% if not r.m.is_active %}pu-arch{% endif %}">
       <td><a href="{% url 'admin:shipping_packagingmaterial_change' r.m.pk %}" translate="no">{{ r.m.code|default:"—" }}</a> {{ r.m }}{% if not r.m.is_active %} 🗄{% endif %}</td>
       <td class="c" translate="no">{{ r.dims }}</td>
-      <td class="n"><b>{{ r.st.boxes|default:0 }}</b>{% if r.st.merged %}<br><span class="pu-muted" title="З них — відправлення з розмірами коробок, злитих у цю">🔀 {{ r.st.merged }} зі злитих</span>{% endif %}</td>
-      <td class="n">{{ r.st.shipments|default:0 }}</td>
+      <td class="n"><a href="{% url 'admin:shipping_packagingmaterial_packed' r.m.pk %}?days={{ data.days }}#ships" title="Відправлення з цією коробкою, по місяцях"><b>{{ r.st.boxes|default:0 }}</b></a>{% if r.st.merged %}<br><span class="pu-muted" title="З них — відправлення з розмірами коробок, злитих у цю">🔀 {{ r.st.merged }} зі злитих</span>{% endif %}</td>
+      <td class="n"><a href="{% url 'admin:shipping_packagingmaterial_packed' r.m.pk %}?days={{ data.days }}#ships" title="Відправлення з цією коробкою, по місяцях">{{ r.st.shipments|default:0 }}</a></td>
       <td class="c">{{ r.st.last|date:"d.m.Y"|default:"—" }}</td>
       <td class="n">{{ r.st.recs|default:0 }}</td>
-      <td class="n">{{ r.st.orders|default:0 }}</td>
+      <td class="n"><a href="{% url 'admin:shipping_packagingmaterial_packed' r.m.pk %}?days={{ data.days }}#packed" title="Замовлення, де записано цю коробку">{{ r.st.orders|default:0 }}</a></td>
       <td class="n">{% if r.m.track_stock %}{{ r.m.stock_qty }}{% if r.m.is_low %} ⚠️{% endif %}{% else %}—{% endif %}</td>
     </tr>
     {% endfor %}

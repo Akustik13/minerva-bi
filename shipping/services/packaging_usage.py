@@ -5,7 +5,9 @@
   серед УСІХ, і архівних — історія лишається за нею; злита — `packaging.merged_target`: рахується в ціль), у скількох
   відправленнях, коли востаннє, скільки рекомендацій
   товарів (`ProductPackaging`) і записів «упаковано» (`OrderPackaging`) на неї посилаються; розміри, яким не
-  відповідає жодна коробка (`unmatched`) — кандидати в каталог.
+  відповідає жодна коробка (`unmatched`) — кандидати в каталог; `ships` — відправлення кожної коробки для `packed`.
+- `packed(material, days)` — «📦 Що пакували в цю коробку»: її відправлення (з того самого `usage`, кеш), записи
+  «упаковано» замовлень і стовпчики по місяцях.
 - `similar(tolerance_cm)` — групи коробок, де кожен вимір (у будь-якій орієнтації) відрізняється не більше ніж на
   ±tolerance від сусіда в групі (зв'язні групи); для кожної — пропозиція, у яку зливати (`suggest_target`: найчастіше
   вживана → з кодом → старіша; ціль — лише активна, архівних у групі — лише з include_inactive).
@@ -63,11 +65,13 @@ def usage(days=365) -> dict:
     unmatched = {}
     shipments = (Shipment.objects.filter(status__in=USED, created_at__gte=since)
                  .exclude(direction="in").prefetch_related("packages").order_by("-created_at")[:SCAN_MAX])
+    ships = {}                     # коробка pk → [(відправлення pk, коли, штук, з них зі злитих, злиті pk)] — `packed`
     n = 0
     for s in shipments:
         n += 1
         when = s.submitted_at or s.created_at
         seen = set()
+        here = {}
         for box in shipment_boxes(s, pool):
             qty = max(1, int(box.qty or 1))
             m = merged_target(box.packaging, by_pk)              # злита — рахується в ціль
@@ -81,12 +85,18 @@ def usage(days=365) -> dict:
                 continue
             st = stats[m.pk]
             st["boxes"] += qty
+            h = here.setdefault(m.pk, [0, 0, set()])
+            h[0] += qty
             if m is not box.packaging:
                 st["merged"] += qty                                # з них — з розмірами злитих коробок
+                h[1] += qty
+                h[2].add(box.packaging.pk)
             if m.pk not in seen:
                 st["shipments"] += 1
                 seen.add(m.pk)
             st["last"] = max(filter(None, (st["last"], when)), default=None)
+        for pk, (q, mq, orig) in here.items():
+            ships.setdefault(pk, []).append((s.pk, when, q, mq, tuple(sorted(orig))))
     for row in ProductPackaging.objects.values("packaging").annotate(n=Count("pk")):
         if row["packaging"] in stats:
             stats[row["packaging"]]["recs"] = row["n"]
@@ -96,7 +106,7 @@ def usage(days=365) -> dict:
             stats[row["packaging"]]["orders"] = row["n"] or 0
     top = sorted(unmatched.items(), key=lambda kv: -kv[1]["boxes"])[:UNMATCHED_MAX]
     return {"materials": stats, "unmatched": [{"dims": " × ".join(f"{d:f}" for d in reversed(k)), **v} for k, v in top],
-            "shipments": n, "since": since, "days": days}
+            "shipments": n, "since": since, "days": days, "ships": ships}
 
 
 CACHE_SECONDS = 600
@@ -116,6 +126,68 @@ def usage_cached(days=365) -> dict:
 def forget():
     from core.shared_cache import cache
     cache.delete_many([f"pack-usage:{d}" for d in (30, 90, 180, 365, 730)])
+
+
+# ── Що пакували в коробку ─────────────────────────────────────────────────────
+
+SHOW_MAX = 500                         # рядків відправлень / «упаковано» на сторінці (місяці — за всіма)
+
+
+def _month(dt):
+    d = timezone.localtime(dt) if timezone.is_aware(dt) else dt
+    return d.year, d.month
+
+
+def months_between(since, until) -> list:
+    """[(рік, місяць)] від місяця since до місяця until включно."""
+    y, m = _month(since)
+    end = _month(until)
+    out = []
+    while (y, m) <= end:
+        out.append((y, m))
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    return out
+
+
+def packed(material, days=365, cached=True) -> dict:
+    """📦 Що пакували в цю коробку за період — тим самим правилом, що `usage` («Штук» / «Відправлень» збігаються):
+    відправлення від нас (розміри посилки → коробка, злиті — у ціль), записи «упаковано» (`OrderPackaging` замовлень)
+    і по місяцях. → {days, since, target (злита — куди злили), shipments [{s, when, qty, merged, merged_from}],
+    packed [OrderPackaging], months [{year, month, boxes, shipments, packed}], totals, more_shipments, more_packed}."""
+    from shipping.models import OrderPackaging, PackagingMaterial, Shipment
+    from shipping.services.packaging import merged_target
+    days = max(1, min(int(days or 365), DAYS_MAX))
+    data = usage_cached(days) if cached else usage(days)
+    since = data["since"]
+    target = merged_target(material)
+    target = target if target is not None and target.pk != material.pk else None
+    raw = sorted(data.get("ships", {}).get(material.pk, []), key=lambda r: (r[1] is not None, r[1], r[0]),
+                 reverse=True)
+    objs = Shipment.objects.select_related("order", "carrier").in_bulk([r[0] for r in raw[:SHOW_MAX]])
+    from_pks = {pk for r in raw[:SHOW_MAX] for pk in r[4]}
+    boxes = PackagingMaterial.objects.in_bulk(list(from_pks)) if from_pks else {}
+    shipments = [{"s": objs[r[0]], "when": r[1], "qty": r[2], "merged": r[3],
+                  "merged_from": [boxes[pk] for pk in r[4] if pk in boxes]}
+                 for r in raw[:SHOW_MAX] if r[0] in objs]
+    rec_qs = (OrderPackaging.objects.filter(packaging=material, created_at__gte=since)
+              .select_related("order").order_by("-created_at"))
+    records = list(rec_qs[:SHOW_MAX])
+    per = {key: {"year": key[0], "month": key[1], "boxes": 0, "shipments": 0, "packed": 0}
+           for key in months_between(since, timezone.now())}
+    for _pk, when, q, _mq, _orig in raw:
+        row = per.get(_month(when)) if when else None
+        if row is not None:
+            row["boxes"] += q
+            row["shipments"] += 1
+    for created, q in rec_qs.values_list("created_at", "qty_boxes"):
+        row = per.get(_month(created))
+        if row is not None:
+            row["packed"] += q or 0
+    totals = {"boxes": sum(r[2] for r in raw), "shipments": len(raw),
+              "packed": sum(r["packed"] for r in per.values()), "packed_orders": rec_qs.count()}
+    return {"days": days, "since": since, "target": target, "shipments": shipments, "packed": records,
+            "months": list(per.values()), "totals": totals,
+            "more_shipments": max(0, len(raw) - SHOW_MAX), "more_packed": max(0, totals["packed_orders"] - SHOW_MAX)}
 
 
 # ── Схожі розміри ─────────────────────────────────────────────────────────────

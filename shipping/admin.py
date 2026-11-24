@@ -255,7 +255,7 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
     list_filter   = (PackagingArchiveFilter, PackagingStockFilter, 'box_type', 'size_class')
     list_editable = ('is_active',)
     search_fields = ('name', 'code')
-    readonly_fields = ('stock_panel', 'movements_panel', 'fold_panel', 'label_panel', 'merged_info')
+    readonly_fields = ('stock_panel', 'movements_panel', 'fold_panel', 'label_panel', 'merged_info', 'packed_panel')
 
     def changelist_view(self, request, extra_context=None):
         from labels_app.views import label_context
@@ -428,7 +428,97 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
         return [path('stock-report/', self.admin_site.admin_view(self.stock_report_view),
                      name='shipping_packagingmaterial_stock_report'),
                 path('usage/', self.admin_site.admin_view(self.usage_view),
-                     name='shipping_packagingmaterial_usage')] + super().get_urls()
+                     name='shipping_packagingmaterial_usage'),
+                path('<int:object_id>/packed/', self.admin_site.admin_view(self.packed_view),
+                     name='shipping_packagingmaterial_packed')] + super().get_urls()
+
+    # ── 📦 Що пакували в цю коробку ──────────────────────────────────────────
+
+    PACKED_PRESETS = ((30, '30 дн.'), (90, '90 дн.'), (365, 'рік'), (730, '2 роки'), (3650, 'усе'))
+
+    @staticmethod
+    def _chart(months, link):
+        """Стовпчики по місяцях (_packed_chart.html): висота — від найбільшого місяця, підпис «MM.YY»."""
+        top = max([1] + [max(m['boxes'], m['packed']) for m in months])
+        sparse = len(months) > 24                          # багато місяців — підпис лише січня й першого
+
+        def h(v):
+            return max(2, round(100 * v / top)) if v else 0
+        rows = [{**m, 'key': f"{m['year']}-{m['month']:02d}", 'label': f"{m['month']:02d}.{m['year'] % 100:02d}",
+                 'h_boxes': h(m['boxes']), 'h_packed': h(m['packed']),
+                 'show_label': not sparse or m['month'] == 1 or i == 0} for i, m in enumerate(months)]
+        return {'months': rows, 'link': link}
+
+    def get_object(self, request, object_id, from_field=None):
+        obj = super().get_object(request, object_id, from_field)
+        if obj is not None:
+            obj._viewer = request.user                     # для packed_panel: що показувати цій людині
+        return obj
+
+    def packed_view(self, request, object_id):
+        """📦 Що пакували в цю коробку: відправлення (за розмірами, як «📊 Використання»), записи «упаковано»
+        замовлень і стовпчики по місяцях. Замовлення — лише з правом їх бачити."""
+        from django.core.exceptions import PermissionDenied
+        from django.http import Http404
+        from django.template.response import TemplateResponse
+        from .services import packaging_usage as pu
+        box = PackagingMaterial.objects.filter(pk=object_id).first()
+        if box is None:
+            raise Http404
+        if not self.has_view_permission(request, box):
+            raise PermissionDenied
+        try:
+            days = max(1, min(int(request.GET.get('days') or 365), pu.DAYS_MAX))
+        except ValueError:
+            days = 365
+        data = pu.packed(box, days)
+        return TemplateResponse(request, 'admin/shipping/packagingmaterial/packed.html', {
+            **self.admin_site.each_context(request), 'opts': self.model._meta,
+            'title': _('📦 Що пакували в цю коробку'), 'box': box, 'dims': pu.dims_text(box), 'data': data,
+            'chart': self._chart(data['months'], f'?days={days}'), 'presets': self.PACKED_PRESETS,
+            'can_ship': request.user.has_perm('shipping.view_shipment'),
+            'can_order': request.user.has_perm('sales.view_salesorder'),
+            'card_url': reverse('admin:shipping_packagingmaterial_change', args=[box.pk]),
+            'usage_url': reverse('admin:shipping_packagingmaterial_usage'),
+            'back_url': reverse('admin:shipping_packagingmaterial_changelist'),
+        })
+
+    @admin.display(description=_('За рік'))
+    def packed_panel(self, obj):
+        """Картка коробки: стовпчики за 12 місяців, останні відправлення й «упаковано», «Усі →» — packed_view."""
+        if not obj or not obj.pk:
+            return '—'
+        from django.template.loader import render_to_string
+        from .services import packaging_usage as pu
+        data = pu.packed(obj, 365)
+        page = reverse('admin:shipping_packagingmaterial_packed', args=[obj.pk])
+        if data['target'] is not None:
+            return format_html('🔀 {} <a href="{}" translate="no">{}</a> — {} <a href="{}?days=365">{} →</a>',
+                               _('Злито в'), reverse('admin:shipping_packagingmaterial_change',
+                                                     args=[data['target'].pk]), data['target'],
+                               _('її відправлення рахуються там.'),
+                               reverse('admin:shipping_packagingmaterial_packed', args=[data['target'].pk]),
+                               _('Що пакували в ціль'))
+        t = data['totals']
+        if not t['boxes'] and not t['packed']:
+            return format_html('{} <a href="{}?days=3650">{} →</a>', _('За рік — жодного відправлення й запису '
+                                                                       '«упаковано».'), page, _('За весь час'))
+        viewer = getattr(obj, '_viewer', None)
+        can_order = bool(viewer and viewer.has_perm('sales.view_salesorder'))
+        chart = mark_safe(render_to_string('admin/shipping/packagingmaterial/_packed_chart.html',
+                                           {'chart': self._chart(data['months'], f'{page}?days=365')}))
+        last = format_html_join('', '<div>{} · {} · <b>{}</b> {}</div>', (
+            (timezone.localtime(r['when']).strftime('%d.%m.%Y'),
+             format_html('<span translate="no">{}</span>', r['s'].order.order_number)
+             if (r['s'].order_id and can_order) else f"#{r['s'].pk}",
+             r['qty'], _('шт')) for r in data['shipments'][:5]))
+        return format_html(
+            '<div style="margin-bottom:6px">{} <b>{} {}</b> {} <b>{}</b> {} · «{}» <b>{} {}</b></div>{}'
+            '<div style="font-size:12px;margin-top:8px">{}{}</div><a href="{}?days=365" style="display:inline-block;'
+            'margin-top:6px">📦 {} →</a>',
+            _('За рік:'), t['boxes'], _('шт'), _('у'), t['shipments'], _('відправленнях'), _('Упаковано'),
+            t['packed'], _('шт'), chart, format_html('<b>{}</b>', _('Останні відправлення:')) if last else '', last,
+            page, _('Усі відправлення й «упаковано»'))
 
     @admin.display(description=_('🔀 Злиття'))
     def merged_info(self, obj):
@@ -461,8 +551,10 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
         st = usage_cached(365)['materials'].get(obj.pk) or {}
         if not st.get('boxes'):
             return format_html('<span style="opacity:.5">{}</span>', '—')
-        return format_html('<b>{}</b> {}<br><span style="font-size:11px;opacity:.75">{} {}</span>', st['boxes'],
-                           _('шт'), st['shipments'], _('відправл.'))
+        return format_html('<a href="{}?days=365" title="{}"><b>{}</b> {}<br><span style="font-size:11px;opacity:.75">'
+                           '{} {}</span></a>', reverse('admin:shipping_packagingmaterial_packed', args=[obj.pk]),
+                           _('Що пакували в цю коробку — відправлення по місяцях'), st['boxes'], _('шт'),
+                           st['shipments'], _('відправл.'))
 
     def usage_view(self, request):
         """📊 Використання й схожі коробки: GET — статистика за період, розміри без коробки, групи схожих (±см);
@@ -620,6 +712,11 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
             'description': 'Оформлене відправлення з коробкою цих розмірів (±1 см) списує її, скасоване — '
                            'повертає. Коли залишиться «Мінімальний запас» або менше — повідомлення; кому й куди — '
                            '«Налаштування доставки» → «📦 Запас коробок».',
+        }),
+        ('📦 Що пакували', {
+            'fields': ('packed_panel',),
+            'description': 'Відправлення з цією коробкою (за розмірами посилки) і записи «упаковано» в замовленнях — '
+                           'по місяцях. Клік на місяць — його відправлення.',
         }),
     )
 
