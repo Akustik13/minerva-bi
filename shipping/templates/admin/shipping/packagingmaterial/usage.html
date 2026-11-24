@@ -32,6 +32,10 @@
   .pu-group { border: 1px solid var(--border-color, #2a3a4e); border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
   .pu-arch { opacity: .55; }
   .pu-wrap { overflow-x: auto; }
+  {# підказка колонки — наведіть на заголовок (той самий плаваючий блок, що в «?» Minerva) #}
+  .pu-table th.pu-h { cursor: help; }
+  .pu-table th.pu-h .mtip-body { display: none; }
+  .pu-table th.pu-h:hover, .pu-table th.pu-h:focus { color: var(--accent, #79aec8); outline: none; }
   .pu-bar { display: inline-block; height: 8px; border-radius: 4px; background: var(--accent, #79aec8); vertical-align: middle; }
 </style>
 
@@ -56,7 +60,7 @@
     <div class="pu-muted">Різниця Д / Ш / В: {{ g.spread|join:" / " }} см · ціль — найчастіше вживана активна, можна вибрати іншу активну; архівну (🗄) можна злити в ціль</div>
     {% if not g.target.is_active %}<div class="pu-muted">⚠️ Усі коробки групи в архіві — злити нікуди: спершу поверніть одну з архіву.</div>{% endif %}
     <div class="pu-wrap"><table class="pu-table">
-      <tr><th>Ціль</th><th>Злити</th><th>Коробка</th><th class="c">Розміри, см</th><th class="n">За період</th><th class="n">Рекомендацій товарів</th><th class="n">На складі</th></tr>
+      <tr><th class="pu-h" tabindex="0">Ціль<span class="mtip-body">Коробка, у яку зливаються інші: вона забирає їхні рекомендації товарів, запас і відправлення. Ціллю може бути лише активна коробка.</span></th><th class="pu-h" tabindex="0">Злити<span class="mtip-body">Галочка — ця коробка зіллється в ціль і піде в архів (нічого не видаляється, злиття можна відкотити).</span></th><th class="pu-h" tabindex="0">Коробка<span class="mtip-body">Код і назва коробки, клік — картка коробки. «—» — коду ще немає (дайте його дією «🏷 Класифікація, назви й коди…»), 🗄 — коробка в архіві.</span></th><th class="pu-h c" tabindex="0">Розміри, см<span class="mtip-body">Довжина × ширина × висота коробки в сантиметрах.</span></th><th class="pu-h n" tabindex="0">За період<span class="mtip-body">Скільки коробок цього розміру пішло у відправленнях від нас за період, разом. Три однакові коробки в одному відправленні — 3 шт. Коробку впізнаємо за розмірами посилки: ±1 см у будь-якій орієнтації, складену — і за її нижчими висотами; злиті коробки рахуються в ту, у яку їх злили.</span></th><th class="pu-h n" tabindex="0">Рекомендацій товарів<span class="mtip-body">Скільки товарів мають цю коробку в «Рекомендованій упаковці» (картка товару) — зараз, незалежно від періоду. Ці товари Minerva пропонує пакувати в цю коробку.</span></th><th class="pu-h n" tabindex="0">На складі<span class="mtip-body">Скільки цих коробок зараз на складі. ⚠️ — менше за мінімальний запас; «—» — запас цієї коробки не ведеться.</span></th></tr>
       {% for r in g.rows %}
       <tr class="{% if not r.m.is_active %}pu-arch{% endif %}">
         <td>{% if r.m.is_active %}<input type="radio" name="target" value="{{ r.m.pk }}" {% if forloop.first %}checked{% endif %}>{% else %}<span title="Архівна коробка не може бути ціллю">—</span>{% endif %}</td>
@@ -78,7 +82,7 @@
 <div class="pu-box">
   <h2>📊 Використання за {{ data.days }} дн.</h2>
   <div class="pu-wrap"><table class="pu-table">
-    <tr><th>Коробка</th><th class="c">Розміри, см</th><th class="n">Штук</th><th class="n">Відправлень</th><th class="c">Востаннє</th><th class="n">Рекомендацій товарів</th><th class="n">«Упаковано»</th><th class="n">На складі</th></tr>
+    <tr><th class="pu-h" tabindex="0">Коробка<span class="mtip-body">Код і назва коробки, клік — картка коробки. «—» — коду ще немає (дайте його дією «🏷 Класифікація, назви й коди…»), 🗄 — коробка в архіві.</span></th><th class="pu-h c" tabindex="0">Розміри, см<span class="mtip-body">Довжина × ширина × висота коробки в сантиметрах.</span></th><th class="pu-h n" tabindex="0">Штук<span class="mtip-body">Скільки коробок цього розміру пішло у відправленнях від нас за період, разом. Три однакові коробки в одному відправленні — 3 шт. Коробку впізнаємо за розмірами посилки: ±1 см у будь-якій орієнтації, складену — і за її нижчими висотами; злиті коробки рахуються в ту, у яку їх злили.</span></th><th class="pu-h n" tabindex="0">Відправлень<span class="mtip-body">У скількох відправленнях за період була хоча б одна така коробка. Три однакові коробки в одному відправленні — 1 відправлення. Рахуються оформлені відправлення від нас: передано перевізнику, етикетка готова, у дорозі, доставлено.</span></th><th class="pu-h c" tabindex="0">Востаннє<span class="mtip-body">Дата останнього відправлення з цією коробкою.</span></th><th class="pu-h n" tabindex="0">Рекомендацій товарів<span class="mtip-body">Скільки товарів мають цю коробку в «Рекомендованій упаковці» (картка товару) — зараз, незалежно від періоду. Ці товари Minerva пропонує пакувати в цю коробку.</span></th><th class="pu-h n" tabindex="0">«Упаковано»<span class="mtip-body">Скільки коробок записано за період у замовленнях, у блоці «📦 Фактична упаковка (статистика)» картки замовлення (заповнює «🤖 Застосувати рекомендацію» або людина). Це запис у замовленні, а не розміри відправлення, тож може не збігатися зі «Штук»: замовлення, відправлене не через Minerva, ще не відправлене або відправлене в іншій коробці.</span></th><th class="pu-h n" tabindex="0">На складі<span class="mtip-body">Скільки цих коробок зараз на складі. ⚠️ — менше за мінімальний запас; «—» — запас цієї коробки не ведеться.</span></th></tr>
     {% for r in rows %}
     <tr class="{% if not r.m.is_active %}pu-arch{% endif %}">
       <td><a href="{% url 'admin:shipping_packagingmaterial_change' r.m.pk %}" translate="no">{{ r.m.code|default:"—" }}</a> {{ r.m }}{% if not r.m.is_active %} 🗄{% endif %}</td>
@@ -103,7 +107,7 @@
       → ціль {% if h.target %}<a href="{% url 'admin:shipping_packagingmaterial_change' h.target.pk %}" translate="no">{{ h.target.code|default:"—" }}</a> <span translate="no">{{ h.target }}</span>{% else %}(видалено){% endif %}
       {% if h.undone %} · <b>↩ відкочено</b> {{ h.undone|date:"d.m.Y H:i" }}{% if h.undone_by %} <span translate="no">{{ h.undone_by.get_full_name|default:h.undone_by.username }}</span>{% endif %}{% endif %}</div>
     <div class="pu-wrap"><table class="pu-table" style="margin-top:6px">
-      <tr><th>До злиття (за весь час)</th><th class="c">Розміри, см</th><th class="n">Штук</th><th class="n">Відправлень</th><th class="c">Востаннє</th><th class="n">Рекомендацій товарів</th><th class="n">«Упаковано»</th><th class="n">На складі</th></tr>
+      <tr><th class="pu-h" tabindex="0">До злиття (за весь час)<span class="mtip-body">🎯 — коробка-ціль, 🔀 — коробки, злиті в неї. Числа — як були перед злиттям, за весь час.</span></th><th class="pu-h c" tabindex="0">Розміри, см<span class="mtip-body">Довжина × ширина × висота коробки в сантиметрах.</span></th><th class="pu-h n" tabindex="0">Штук<span class="mtip-body">Скільки коробок пішло у відправленнях за весь час до злиття. Три однакові коробки в одному відправленні — 3 шт.</span></th><th class="pu-h n" tabindex="0">Відправлень<span class="mtip-body">У скількох відправленнях за весь час до злиття була хоча б одна така коробка.</span></th><th class="pu-h c" tabindex="0">Востаннє<span class="mtip-body">Дата останнього відправлення з цією коробкою перед злиттям.</span></th><th class="pu-h n" tabindex="0">Рекомендацій товарів<span class="mtip-body">Скільки товарів мали цю коробку в «Рекомендованій упаковці» перед злиттям.</span></th><th class="pu-h n" tabindex="0">«Упаковано»<span class="mtip-body">Скільки коробок було записано в «📦 Фактична упаковка (статистика)» замовлень до злиття.</span></th><th class="pu-h n" tabindex="0">На складі<span class="mtip-body">Запас перед злиттям; «—» — запас цієї коробки не вели.</span></th></tr>
       {% for b in h.before %}
       <tr><td>{% if forloop.first %}🎯 {% else %}🔀 {% endif %}<span translate="no">{{ b.code|default:"—" }} {{ b.name }}</span></td>
         <td class="c" translate="no">{{ b.dims }}</td><td class="n">{{ b.boxes }}</td><td class="n">{{ b.shipments }}</td>
@@ -129,7 +133,7 @@
   <h2>❔ Розміри посилок без коробки в каталозі</h2>
   <div class="pu-muted">Такі розміри вписували у відправлення, але жодна активна коробка їм не відповідає — можливо, варто додати коробку.</div>
   <div class="pu-wrap"><table class="pu-table">
-    <tr><th class="c">Д × Ш × В, см</th><th class="n">Штук</th><th class="n">Відправлень</th><th class="c">Востаннє</th></tr>
+    <tr><th class="pu-h c" tabindex="0">Д × Ш × В, см<span class="mtip-body">Розміри посилки, як їх вписали у відправлення, від більшого виміру до меншого.</span></th><th class="pu-h n" tabindex="0">Штук<span class="mtip-body">Скільки посилок таких розмірів пішло за період (три однакові коробки в одному відправленні — 3).</span></th><th class="pu-h n" tabindex="0">Відправлень<span class="mtip-body">У скількох відправленнях за період були такі розміри.</span></th><th class="pu-h c" tabindex="0">Востаннє<span class="mtip-body">Дата останнього відправлення з такими розмірами.</span></th></tr>
     {% for u in data.unmatched %}
     <tr><td class="c" translate="no">{{ u.dims }}</td><td class="n">{{ u.boxes }}</td><td class="n">{{ u.shipments }}</td><td class="c">{{ u.last|date:"d.m.Y"|default:"—" }}</td></tr>
     {% endfor %}
@@ -137,4 +141,39 @@
   <div style="margin-top:8px"><a class="button" href="{% url 'admin:shipping_packagingmaterial_add' %}">＋ Додати коробку</a></div>
 </div>
 {% endif %}
+<script>
+(function () {
+  /* column hint: hover or focus a header -> #mtip-float (base_site) */
+  var fl = document.getElementById('mtip-float'), cur = null;
+  if (!fl) return;
+  function show(th, x, y) {
+    var body = th.querySelector('.mtip-body');
+    if (!body) return;
+    cur = th; fl.innerHTML = body.innerHTML; fl.style.display = 'block'; place(x, y);
+  }
+  function hide() { cur = null; fl.style.display = 'none'; }
+  function place(x, y) {
+    var gap = 14, w = fl.offsetWidth || 340, h = fl.offsetHeight || 200;
+    var left = x + gap, top = y - h - gap;
+    if (left + w > window.innerWidth - 8) left = Math.max(8, x - w - gap);
+    if (top < 8) top = y + gap;
+    fl.style.left = left + 'px'; fl.style.top = top + 'px';
+  }
+  document.addEventListener('mouseover', function (e) {
+    var th = e.target.closest ? e.target.closest('th.pu-h') : null;
+    if (th === cur) return;
+    if (th) show(th, e.clientX, e.clientY); else if (cur) hide();
+  });
+  document.addEventListener('mousemove', function (e) { if (cur) place(e.clientX, e.clientY); });
+  document.addEventListener('mouseout', function (e) { if (cur && !e.relatedTarget) hide(); });
+  document.addEventListener('focusin', function (e) {
+    var th = e.target.closest ? e.target.closest('th.pu-h') : null;
+    if (!th) { if (cur) hide(); return; }
+    var r = th.getBoundingClientRect();
+    show(th, r.left, r.top);
+  });
+  document.addEventListener('focusout', function (e) { if (cur && e.target === cur) hide(); });
+  document.addEventListener('keydown', function (e) { if (cur && e.key === 'Escape') hide(); });
+})();
+</script>
 {% endblock %}
