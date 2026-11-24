@@ -4851,8 +4851,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         for _doc in (doc_label, doc_customs, doc_packlist):
             if _doc is None:
                 continue
-            for _ in range(copies if _doc is doc_customs else 1):
-                pdf_paths.append(_doc)
+            if _doc is doc_customs and not copies:
+                continue
+            pdf_paths.append(_doc)      # інвойс — один раз: примірники рахує злиття (у файлі їх може бути вже 3)
 
         log.append(f"pdf_paths ({len(pdf_paths)}): {[p.name for p in pdf_paths]}")
         log.append(f"errors ({len(errors)}): {errors}")
@@ -4885,8 +4886,16 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             for p in pdf_paths:
                 try:
                     reader = PdfReader(str(p))
-                    writer.add_page(reader.pages[0] if len(reader.pages) == 1 else reader.pages[0])
-                    for page in reader.pages[1:]:
+                    if p is doc_customs:
+                        # рівно copies примірників: перевізник віддає то один, то вже три — береться один
+                        unit = carrier_docs.copy_pages(reader)
+                        for _ in range(copies):
+                            for page in reader.pages[:unit]:
+                                writer.add_page(page)
+                        log.append(f"[MERGE] ✅ {p.name} ({len(reader.pages)} стор., у файлі примірників: "
+                                   f"{len(reader.pages) // unit if unit else 0}, друк: {copies} × {unit} стор.)")
+                        continue
+                    for page in reader.pages:
                         writer.add_page(page)
                     log.append(f"[MERGE] ✅ {p.name} ({len(reader.pages)} стор.)")
                 except Exception as e:

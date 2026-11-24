@@ -175,6 +175,36 @@ def paperless(shipment) -> bool:
     return False
 
 
+_COPY_WORDS = {"copy", "copie", "kopie", "original", "duplicate", "triplicate", "of", "von", "page", "seite"}
+
+
+def _page_words(page) -> set:
+    import re
+    try:
+        text = page.extract_text() or ""
+    except Exception:
+        return set()
+    return {w for w in re.findall(r"\w+", text.lower()) if not w.isdigit() and w not in _COPY_WORDS}
+
+
+def copy_pages(reader) -> int:
+    """Скільки сторінок в одному примірнику PDF інвойсу. Перевізник віддає то один примірник, то одразу три
+    (UPS: «Page 1» тричі) — сторінки повторюються з кроком k. Тексту немає / не повторюється — увесь файл."""
+    pages = list(reader.pages)
+    n = len(pages)
+    if n < 2:
+        return n
+    words = [_page_words(p) for p in pages]
+    if not all(words):
+        return n
+    for k in range(1, n // 2 + 1):
+        if n % k:
+            continue
+        if all(len(words[i] & words[i + k]) / len(words[i] | words[i + k]) >= 0.9 for i in range(n - k)):
+            return k
+    return n
+
+
 def invoice_copies(shipment) -> int:
     """Скільки примірників інвойсу класти в «🖨️ Друкувати всі документи»: без митниці — 0, електронно — 1
     (для себе), на папері — INVOICE_COPIES."""

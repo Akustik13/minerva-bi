@@ -33,6 +33,17 @@ def _pdf(pages=1):
     return out.getvalue()
 
 
+def _text_pdf(texts):
+    from reportlab.pdfgen import canvas
+    out = io.BytesIO()
+    c = canvas.Canvas(out)
+    for t in texts:
+        c.drawString(50, 700, t)
+        c.showPage()
+    c.save()
+    return out.getvalue()
+
+
 class FakeResp:
     def __init__(self, status, data=None):
         self.status_code, self._data = status, data or {}
@@ -270,3 +281,32 @@ class PrintAllTests(BookingBase):
         self.assertEqual(len(PdfReader(io.BytesIO(r.content)).pages), 3)
         page = self.client.get(f"/admin/shipping/shipment/{self.shipment.pk}/print-all/?print=1")
         self.assertContains(page, "contentWindow.print()")
+
+    def test_invoice_with_copies_inside_is_not_multiplied(self):
+        """UPS / DHL віддають інвойс то одним примірником, то одразу трьома — друкується рівно 3."""
+        from pypdf import PdfReader
+        label = self.media / "labels" / "dhl" / "1234567890.pdf"
+        label.parent.mkdir(parents=True)
+        label.write_bytes(_pdf(1))
+        inv = self.media / "shipping" / "customs" / "dhl_invoice.pdf"
+        inv.parent.mkdir(parents=True)
+        Shipment.objects.filter(pk=self.shipment.pk).update(
+            status=Shipment.Status.LABEL_READY, tracking_number="1234567890", sender_country="CN",
+            recipient_country="DE", label_url="/media/labels/dhl/1234567890.pdf",
+            customs_url="/media/shipping/customs/dhl_invoice.pdf")
+        url = f"/admin/shipping/shipment/{self.shipment.pk}/print-all/"
+        one = ["Invoice Waybill Coaxial Cables Ship To Quasonix Page 1"]
+        two = one + ["Invoice continued Declaration Statement Shipper Page 2"]
+        for copy_pages, copies_in_file in ((one, 1), (one, 3), (two, 1), (two, 3)):
+            inv.write_bytes(_text_pdf(copy_pages * copies_in_file))
+            r = self.client.get(url)
+            self.assertEqual(len(PdfReader(io.BytesIO(r.content)).pages), 1 + 3 * len(copy_pages),
+                             (len(copy_pages), copies_in_file))
+
+    def test_copy_pages(self):
+        from pypdf import PdfReader
+        read = lambda texts: PdfReader(io.BytesIO(_text_pdf(texts)))
+        self.assertEqual(carrier_docs.copy_pages(read(["A b c", "A b c", "A b c"])), 1)
+        self.assertEqual(carrier_docs.copy_pages(read(["Copy 1 of 3 x y", "Copy 2 of 3 x y"])), 1)
+        self.assertEqual(carrier_docs.copy_pages(read(["Alpha beta", "Gamma delta"])), 2)
+        self.assertEqual(carrier_docs.copy_pages(read(["a b", "c d", "a b", "c d"])), 2)
