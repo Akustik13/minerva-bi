@@ -1,19 +1,25 @@
-"""«Що звідки йде» — карта листів магазину для картки магазину (блок «✉️ Пошта магазину»).
+"""«Хто що кому шле» — карта пошти магазину (картка магазину → блок «✉️ Пошта магазину»).
 
-Кожен рядок: який лист, хто надсилає (Minerva чи сайт), з якої адреси, кому і де це змінити (поле картки —
-перехід data-go, або сторінка: скринька, сповіщення, шаблони, адмінка сайту). Лише читає налаштування й
-останній звіт сайту про пошту (Shop.site_mail_reports); нічого не надсилає.
+Три частини:
+① скриньки — з якої адреси йде кожна група листів (меню «З якої скриньки» → save_routes: mail_sender,
+  mail_routes, site_mail_managed) і куди відповідають покупці;
+② листи покупцю і ③ листи команді — кожен лист окремим рядком: хто надсилає (Minerva чи сайт) і від якої адреси,
+  коли, чи надсилається, кому, копія (CC) і прихована копія (BCC; лише покупцю). Копії — поля mlc__<лист> /
+  mlb__<лист> → ShopForm._clean_letter_copies → Shop.mail_letters (shop/mail.py copies; сайт отримує їх у
+  GET /shop/site-mail/ → letters).
+Лише читає налаштування й останній звіт сайту про пошту (Shop.site_mail_reports); нічого не надсилає.
 """
 from __future__ import annotations
 
+from email.utils import formataddr
 from urllib.parse import urlsplit
 
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
+from django.utils.html import format_html, format_html_join
+from django.utils.safestring import mark_safe
 
 from . import mail, site_mail
 from .models import Shop
-
-SITE_MAIL = "сайт /admin/ → «✉️ Пошта»"
 
 
 def _go(field: str, label: str) -> dict:
@@ -42,7 +48,7 @@ def _notifications() -> dict:
         from config.models import NotificationSettings
         ns = NotificationSettings.get()
     except Exception:
-        return {"to": [], "sender": "", "telegram": False}
+        return {"to": [], "sender": "", "telegram": False, "bot": False, "chat": ""}
     on = bool(getattr(ns, "email_enabled", False))
     return {"to": mail.addresses(ns.email_to) if on else [], "sender": (ns.email_from or ns.email_host_user or "") if on else "",
             "telegram": bool(getattr(ns, "telegram_enabled", False) and getattr(ns, "telegram_chat_id", "")),
@@ -74,119 +80,322 @@ def _choice(name, value, options, note=""):
     return {"name": name, "value": value, "options": options, "note": note}
 
 
-def _check(label, field, on, title=""):
-    return {"type": "check", "label": label, "sync": field, "on": bool(on), "title": title}
+def _templates(shop: Shop, kind: str = "") -> dict:
+    url = reverse("admin:shop_shopmailtemplate_changelist") + f"?shop__id__exact={shop.pk}"
+    return _url(url + (f"&kind__exact={kind}" if kind else ""), "📝 Текст")
 
 
-def _pick(kind, field, value, empty, label=""):
-    return {"type": "pick", "kind": kind, "sync": field, "value": value or "", "empty": empty, "label": label}
+def _invoice_auto() -> bool | None:
+    try:
+        from sales.models_invoice import InvoiceSettings
+        return bool(InvoiceSettings.get().auto_send)
+    except Exception:  # noqa: BLE001 — без рахунків
+        return None
 
 
-def rows(shop: Shop) -> list[dict]:
-    """[{mail, who, sender, to, change, route, edit}] — route {name, value, options [(значення, підпис)], note}: меню
-    «З якої адреси» (зберігає ShopAdmin.save_model → save_routes); edit — поля «Кому» ([_check | _pick], поле
-    картки, яке JS змінює: mv_notify_pick.js). У порядку важливості."""
-    missing = "❌ не задано: оберіть скриньку або SMTP у «Налаштування → Сповіщення»"
-    sender = _minerva_sender(shop) or missing
-    acc = shop.mail_sender
-    smtp = ([_url(reverse("admin:email_assistant_emailaccount_change", args=[acc.pk]), f"SMTP скриньки {acc.email_address}")]
-            if acc is not None else [])
-    templates = _url(reverse("admin:shop_shopmailtemplate_changelist") + f"?shop__id__exact={shop.pk}", "📝 Шаблони листів")
-    notifications = _url(reverse("admin:config_notificationsettings_changelist"), "Налаштування → Сповіщення")
-    add_box = _url(reverse("admin:email_assistant_emailaccount_add"), "➕ Додати скриньку в Minerva")
+def site_state(shop: Shop) -> dict:
+    """Як зараз пише сайт: зі скриньки Minerva (managed) чи зі своїх налаштувань (звіт сайту)."""
+    host, report = _site_report(shop)
+    acc = site_mail.sender_account(shop)
+    managed = shop.site_mail_managed and acc is not None
     team = mail.addresses(shop.team_emails)
+    if managed:
+        sender = formataddr((shop.mail_from_name or acc.display_name or shop.name, acc.email_address))
+        confirm, notify = shop.site_order_confirmation, ", ".join(team) or (
+            f"{report.get('notify') or '—'} (як на сайті: адрес команди в Minerva немає)")
+    elif report:
+        sender = f"{report.get('from') or '—'} ({report.get('host') or 'SMTP не задано'}) — налаштування сайту"
+        confirm, notify = report.get("confirmation"), report.get("notify") or "—"
+    else:
+        sender, confirm, notify = "невідомо — сайт ще не звітував про пошту", None, "—"
+    return {"host": host, "report": report, "managed": managed, "sender": sender, "confirm": confirm,
+            "notify": notify, "recipient": report.get("recipient") or "—", "letters_ok": site_mail.supports_letters(report),
+            "admin": _site_admin(shop), "who": f"🌐 сайт {host}" if host else "🌐 сайт"}
+
+
+def senders(shop: Shop, st: dict | None = None) -> list[dict]:
+    """① З якої скриньки: [{key, title, letters, route, sender, note}] — меню «З якої скриньки» на кожне
+    призначення (shop/mail.py ROUTED) і адреса, з якої лист піде насправді."""
+    missing = "❌ не задано: оберіть скриньку або SMTP у «Налаштування → Сповіщення»"
+    acc = shop.mail_sender
     ns = _notifications()
-    reply = f" · відповіді — на {shop.mail_reply_to}" if shop.mail_reply_to else ""
-    bcc = mail.addresses(shop.mail_bcc)
     boxes = [(f"acc:{a.pk}", _box_label(a)) for a in _boxes()]
-    ns_label = (f"{ns['sender']} — SMTP сповіщень Minerva" if ns["sender"] else "SMTP сповіщень Minerva")
+    ns_label = f"{ns['sender']} — SMTP сповіщень Minerva" if ns["sender"] else "SMTP сповіщень Minerva"
     main_value = f"acc:{acc.pk}" if mail.usable(acc) else ""
     if acc is not None and not mail.usable(acc):   # вибрана, але вимкнена / без SMTP — показати, щоб було видно
         boxes.append((f"acc:{acc.pk}", f"{acc.email_address} — ⚠ вимкнена або без SMTP"))
-    same = f"як «Підтвердження email…» ({sender if main_value else ns_label})"
-    notices_sender = _minerva_sender(shop, "notices") or missing
+    sender = _minerva_sender(shop) or missing
+    same = f"як «🔑 Кабінет покупця» ({sender if main_value else ns_label})"
 
     def routed(purpose):
         r = mail.route_of(shop, purpose)
         return r if r == "ns" or r.startswith("acc:") else ""
 
-    out = [
-        {"mail": "Підтвердження email, новий пароль, запрошення від менеджера", "who": "Minerva", "sender": sender,
-         "to": "покупцю (без прихованої копії — в листі одноразове посилання)",
-         "route": _choice("route_account", main_value, [("", ns_label)] + boxes),
-         "edit": [],
-         "change": [_go("mail_from_name", "Ім'я відправника"), *smtp, add_box, templates]},
-        {"mail": "«Willkommen», «Zahlung erhalten», пароль змінено, акаунт видалено", "who": "Minerva",
-         "sender": notices_sender + reply,
-         "to": "покупцю" + (f" · прихована копія: {', '.join(bcc)}" if bcc else ""),
-         "route": _choice("route_notices", routed("notices"), [("", same), ("ns", ns_label)] + boxes),
-         "edit": [_check("«Ласкаво просимо»", "mail_welcome", shop.mail_welcome),
-                  _pick("email", "mail_bcc", shop.mail_bcc, "без прихованої копії", "покупцю · прихована копія:")],
-         "change": [_go("mail_reply_to", "Відповіді покупців"), _go("mail_bcc", "Прихована копія"),
-                    _go("mail_welcome", "Лист «Ласкаво просимо»"), templates]},
-    ]
-    if team:
-        team_sender, team_to, team_note = _minerva_sender(shop, "team") or missing, ", ".join(team), ""
-    else:
-        team_sender = ns["sender"] or "SMTP сповіщень Minerva"
-        team_to = ", ".join(ns["to"]) or "нікому — email у «Налаштування → Сповіщення» вимкнено або без адрес"
-        team_note = "вибір діє, коли задано «Сповіщення команді — на адреси»; зараз — SMTP сповіщень"
-    chats = mail.team_chats(shop)
-    tg = shop.team_notify_telegram and ns["bot"] and bool(chats or ns["chat"])
-    out.append({"mail": "Команді: оплата отримана, новий акаунт покупця", "who": "Minerva", "sender": team_sender,
-                "to": team_to + (" · Telegram" if tg else ""),
-                "route": _choice("route_team", routed("team"), [("", same), ("ns", ns_label)] + boxes, team_note),
-                "edit": [_check("💳 оплата", "", True, "оплату отримано — завжди"),
-                         _check("👤 новий акаунт", "team_notify_registration", shop.team_notify_registration),
-                         _pick("email", "team_emails", shop.team_emails,
-                               "як «Кому (email)» сповіщень: " + (", ".join(ns["to"]) or "нікому"), "✉️ на адреси:"),
-                         _check("💬 Telegram", "team_notify_telegram", shop.team_notify_telegram),
-                         _pick("tg", "team_telegram", shop.team_telegram,
-                               ("основний чат сповіщень: " + ns["chat"]) if ns["chat"] else "основний чат — не задано",
-                               "")],
-                "change": [_go("team_emails", "Сповіщення команді — на адреси"),
-                           _go("team_notify_registration", "Команді: новий акаунт покупця"), notifications]})
-
-    host, report = _site_report(shop)
-    site_admin = _site_admin(shop)
-    on_site = [_url(site_admin, SITE_MAIL, external=True)] if site_admin else []
-    who = f"сайт {host}" if host else "сайт"
-    site_acc = site_mail.sender_account(shop)
-    managed = shop.site_mail_managed and site_acc is not None
+    team = mail.addresses(shop.team_emails)
+    st = st or site_state(shop)
+    report = st["report"]
     files = (f"налаштування сайту: {report.get('from') or '—'} ({report.get('host') or 'SMTP не задано'})"
              if report else "налаштування сайту (/admin/ → «✉️ Пошта»)")
     site_value = "files" if not shop.site_mail_managed else routed("site").replace("ns", "")
-    site_same = f"як «Підтвердження email…» ({sender})" if main_value else "як «Підтвердження email…» — ⚠ там не скринька"
-    site_route = _choice("route_site", site_value, [("files", files), ("", site_same)] + boxes,
-                         "одна скринька для всіх листів сайту")
-    if managed:
-        site_sender = f"{site_acc.email_address} (з Minerva)"
-        confirm = shop.site_order_confirmation
-        notify = ", ".join(team) or ((report.get("notify") or "—") + " (як на сайті)")
-        change = [*on_site]
-    elif report:
-        site_sender = f"{report.get('from') or '—'} ({report.get('host') or 'SMTP не задано'}) — файли сайту"
-        confirm = report.get("confirmation")
-        notify = report.get("notify") or "—"
-        change = [*on_site]
-    else:
-        site_sender = "невідомо — сайт ще не звітував про пошту"
-        confirm, notify = None, "—"
-        change = [*on_site]
-    out += [
-        {"mail": "Підтвердження замовлення покупцю", "who": who, "sender": site_sender,
-         "to": "невідомо" if confirm is None else ("покупцю" if confirm else "не надсилається"), "route": site_route,
-         "edit": [_check("покупцю", "site_order_confirmation", shop.site_order_confirmation)] if managed else [],
-         "change": change + ([_go("site_order_confirmation", "Сайт надсилає покупцю підтвердження")] if managed else [])},
-        {"mail": "Команді: нове замовлення з сайту", "who": who, "sender": site_sender, "to": notify,
-         "route": None, "same_as": "Підтвердження замовлення покупцю",
-         "edit_note": "ті самі адреси, що «Команді: оплата…» вище" if managed and team else "",
-         "change": ([_go("team_emails", "Сповіщення команді — на адреси")] if managed else []) + change},
-        {"mail": "Контактна форма сайту", "who": who, "sender": site_sender,
-         "to": report.get("recipient") or "—", "route": None, "same_as": "Підтвердження замовлення покупцю",
-         "change": on_site and [_url(site_admin, SITE_MAIL + " → «Отримувач запитів з форми»", external=True)]},
+    site_same = f"як «🔑 Кабінет покупця» ({sender})" if main_value else "як «🔑 Кабінет покупця» — ⚠ там не скринька"
+    return [
+        {"key": "account", "title": "🔑 Кабінет покупця",
+         "letters": "підтвердження email, новий пароль, запрошення, «Konto existiert bereits»",
+         "route": _choice("route_account", main_value, [("", ns_label)] + boxes), "sender": sender, "note": ""},
+        {"key": "notices", "title": "✉️ Інші листи покупцю від Minerva",
+         "letters": "«Willkommen», «Zahlung erhalten», пароль змінено, акаунт видалено, рахунок",
+         "route": _choice("route_notices", routed("notices"), [("", same), ("ns", ns_label)] + boxes),
+         "sender": _minerva_sender(shop, "notices") or missing, "note": ""},
+        {"key": "team", "title": "👥 Команді від Minerva", "letters": "оплату отримано, новий акаунт покупця",
+         "route": _choice("route_team", routed("team"), [("", same), ("ns", ns_label)] + boxes),
+         "sender": (_minerva_sender(shop, "team") or missing) if team else (ns["sender"] or "SMTP сповіщень Minerva"),
+         "note": "" if team else "адрес команди ще немає (③) — зараз ідуть з SMTP сповіщень Minerva"},
+        {"key": "site", "title": "🌐 Листи сайту",
+         "letters": "підтвердження замовлення й запиту пропозиції; команді — замовлення, запит, контактна форма",
+         "route": _choice("route_site", site_value, [("files", files), ("", site_same)] + boxes),
+         "sender": st["sender"], "note": "одна скринька на всі листи сайту; сайт перевіряє раз на хвилину"},
     ]
-    return out
+
+
+def _check(sync, on, label="так"):
+    return {"type": "check", "sync": sync, "on": bool(on), "label": label}
+
+
+def _text(text):
+    return {"type": "text", "text": text}
+
+
+def customer_rows(shop: Shop, st: dict | None = None) -> list[dict]:
+    """② Листи покупцю: [{key, title, when, who, sender, send, copy, note, text, site}]. copy False — без копій."""
+    st = st or site_state(shop)
+    notices = _minerva_sender(shop, "notices") or "❌ не задано"
+    account = _minerva_sender(shop) or "❌ не задано"
+    minerva = "🏛 Minerva"
+    auto = _invoice_auto()
+    site_text = [_url(st["admin"], "📨 Листи сайту", external=True)] if st["admin"] else []
+    if st["managed"]:
+        site_send = _check("site_order_confirmation", shop.site_order_confirmation)
+    else:
+        site_send = _text({True: "так — налаштування сайту", False: "ні — налаштування сайту"}
+                          .get(st["confirm"], "невідомо"))
+    try:
+        invoices = reverse("sales_invoice_list") + "#auto"
+    except NoReverseMatch:
+        invoices = ""
+    return [
+        {"key": "", "title": "🔑 Підтвердження email · новий пароль · запрошення",
+         "when": "реєстрація в кабінеті, «Passwort vergessen», менеджер створив акаунт", "who": minerva,
+         "sender": account, "send": _text("завжди"), "copy": False,
+         "note": "без копій: в листі одноразове посилання", "text": [_templates(shop)]},
+        {"key": "exists", "title": "ℹ️ «Konto existiert bereits»", "when": "реєстрація на email, для якого акаунт уже є",
+         "who": minerva, "sender": account, "send": _text("завжди"), "copy": True, "text": [_templates(shop, "exists")]},
+        {"key": "welcome", "title": "👋 «Willkommen»",
+         "when": "після підтвердження реєстрації або першого пароля за запрошенням", "who": minerva, "sender": notices,
+         "send": _check("mail_welcome", shop.mail_welcome), "copy": True, "text": [_templates(shop, "welcome")]},
+        {"key": "paid", "title": "💳 «Zahlung erhalten»", "when": "онлайн-оплату (Stripe) отримано", "who": minerva,
+         "sender": notices, "send": _text("завжди"), "copy": True, "text": [_templates(shop, "paid")]},
+        {"key": "changed", "title": "🔒 «Passwort geändert»", "when": "покупець змінив пароль", "who": minerva,
+         "sender": notices, "send": _text("завжди"), "copy": True, "text": [_templates(shop, "changed")]},
+        {"key": "deleted", "title": "🗑 «Konto gelöscht»", "when": "акаунт покупця видалено", "who": minerva,
+         "sender": notices, "send": _text("завжди"), "copy": True, "text": [_templates(shop, "deleted")]},
+        {"key": "invoice", "title": "🧾 Рахунок (Rechnung, PDF)",
+         "when": "Vorkasse, рахунок, Nachnahme — одразу після замовлення; Stripe — після оплати", "who": minerva,
+         "sender": notices,
+         "send": _text("невідомо" if auto is None else ("сам — так" if auto else "сам — ні (лише кнопкою в 🧾 Рахунках)")),
+         "send_go": _go("invoice_auto_send", "змінити"), "copy": True,
+         "text": [_url(invoices, "🧾 Рахунки")] if invoices else []},
+        {"key": "order_customer", "title": "🛒 Підтвердження замовлення (Bestellbestätigung)",
+         "when": "одразу після замовлення в кошику; текст про оплату — за способом оплати", "who": st["who"],
+         "sender": st["sender"], "send": site_send, "copy": True, "site": True, "text": site_text},
+        {"key": "quote_customer", "title": "📝 Підтвердження запиту пропозиції",
+         "when": "покупець надіслав запит пропозиції (товари без ціни на сайті)", "who": st["who"],
+         "sender": st["sender"], "send": _text("як підтвердження замовлення ↑"), "copy": True, "site": True,
+         "text": site_text},
+    ]
+
+
+def team_rows(shop: Shop, st: dict | None = None) -> list[dict]:
+    """③ Листи команді: [{key, title, when, who, sender, send, to, copy, text, site}]."""
+    st = st or site_state(shop)
+    ns = _notifications()
+    team = mail.addresses(shop.team_emails)
+    chats = mail.team_chats(shop)
+    tg = shop.team_notify_telegram and ns["bot"] and bool(chats or ns["chat"])
+    minerva_to = (", ".join(team) if team else
+                  (", ".join(ns["to"]) + " (як «Кому» сповіщень)" if ns["to"] else
+                   "нікому — email у «Налаштування → Сповіщення» вимкнено або без адрес")) + (" · 💬 Telegram" if tg else "")
+    team_sender = (_minerva_sender(shop, "team") or "❌ не задано") if team else (ns["sender"] or "SMTP сповіщень Minerva")
+    site_text = [_url(st["admin"], "📨 Листи сайту", external=True)] if st["admin"] else []
+    minerva = "🏛 Minerva"
+    return [
+        {"key": "team_paid", "title": "💳 Оплату отримано", "when": "покупець оплатив онлайн (Stripe)", "who": minerva,
+         "sender": team_sender, "send": _text("завжди"), "to": minerva_to, "copy": True,
+         "text": [_templates(shop, "team_paid")]},
+        {"key": "team_registered", "title": "👤 Новий акаунт покупця", "when": "покупець підтвердив реєстрацію",
+         "who": minerva, "sender": team_sender, "send": _check("team_notify_registration", shop.team_notify_registration),
+         "to": minerva_to, "copy": True, "text": [_templates(shop, "team_registered")]},
+        {"key": "order_team", "title": "🛒 Нове замовлення з сайту",
+         "when": "кожне замовлення в кошику; «Відповісти» — пише покупцю", "who": st["who"], "sender": st["sender"],
+         "send": _text("завжди"), "to": st["notify"], "copy": True, "site": True, "text": site_text},
+        {"key": "quote_team", "title": "📝 Новий запит пропозиції з сайту",
+         "when": "кожен запит пропозиції; «Відповісти» — пише покупцю", "who": st["who"], "sender": st["sender"],
+         "send": _text("завжди"), "to": st["notify"], "copy": True, "site": True, "text": site_text},
+        {"key": "contact_team", "title": "💬 Контактна форма сайту",
+         "when": "форма «Kontakt»; «Відповісти» — пише тому, хто заповнив", "who": st["who"], "sender": st["sender"],
+         "send": _text("завжди"), "to": st["recipient"],
+         "to_note": "змінюється на сайті: /admin/ → «✉️ Пошта» → «Отримувач запитів з форми»", "copy": True,
+         "site": True, "text": site_text},
+    ]
+
+
+def warnings(shop: Shop, st: dict | None = None) -> list[str]:
+    """Чому копії листів сайту зараз можуть не діяти."""
+    st = st or site_state(shop)
+    used = any((shop.mail_letters or {}).get(k) for k in mail.SITE_LETTERS)
+    if not used:
+        return []
+    if st["managed"] and st["report"] and not st["letters_ok"]:
+        return ["Сайт ще не додає копії окремо для кожного листа — потрібне оновлення файлів сайту. До того сайт бере "
+                "лише приховану копію «Підтвердження замовлення» (для обох листів покупцю), інші копії листів сайту "
+                "не діють."]
+    if not st["managed"]:
+        return ["Копії листів сайту діють, коли листи сайту йдуть зі скриньки Minerva (① «🌐 Листи сайту»). "
+                "Зараз сайт пише зі своїх налаштувань."]
+    return []
+
+
+# ── HTML блоку (картка магазину, ShopAdmin.mail_map_col) ─────────────────────
+
+def _links(items) -> str:
+    return format_html_join(" · ", "{}", ((
+        format_html('<a href="#" data-nt-go="{}">{} ↓</a>', i["go"], i["label"]) if i.get("go") else
+        format_html('<a href="{}"{}>{} {}</a>', i["url"], format_html(' target="_blank" rel="noopener"')
+                    if i.get("external") else "", i["label"], "↗" if i.get("external") else "→"),)
+        for i in items or [] if i))
+
+
+def _what(r) -> str:
+    return format_html('<b>{}</b><div class="nt-when">{}</div>', r["title"], r["when"])
+
+
+def _from(r) -> str:
+    return format_html('{}<div class="nt-when" translate="no">{}</div>', r["who"], r["sender"])
+
+
+def _send(r, w, synced) -> str:
+    s = r["send"]
+    if s["type"] == "check":
+        synced.append(s["sync"])
+        cell = w.check(s["label"], s["on"], sync="id_" + s["sync"], role="main")
+    else:
+        cell = format_html('<span>{}</span>', s["text"])
+    if r.get("send_go"):
+        cell = format_html('{} <a href="#" data-nt-go="{}">{} ↓</a>', cell, r["send_go"]["go"], r["send_go"]["label"])
+    return cell
+
+
+def _copy(shop, r, w, field) -> str:
+    """Поле копії листа: field cc | bcc → mlc__<лист> / mlb__<лист>."""
+    item = (shop.mail_letters or {}).get(r["key"])
+    value = item.get(field) or "" if isinstance(item, dict) else ""
+    return w.picker("email", value, name=("mlc__" if field == "cc" else "mlb__") + r["key"], compact=True,
+                    empty="без копії" if field == "cc" else "без прихованої копії")
+
+
+def _copies(shop, r, w) -> str:
+    """Клітинки «Копія» і «Прихована копія» рядка листа покупцю (без копій — одна клітинка на дві колонки)."""
+    if not r["copy"]:
+        return format_html('<td colspan="2"><span class="nt-empty">{}</span></td>', r.get("note") or "—")
+    return format_html('<td>{}</td><td>{}</td>', _copy(shop, r, w, "cc"), _copy(shop, r, w, "bcc"))
+
+
+def render(shop: Shop) -> str:
+    """Блок «Хто що кому шле»: ① скриньки, ② листи покупцю, ③ листи команді."""
+    from dashboard import notify_routes, notify_widgets as w
+    try:
+        from config.models import NotificationSettings
+        ns = NotificationSettings.get()
+    except Exception:  # noqa: BLE001
+        ns = None
+    synced = ["mail_reply_to", "team_emails", "team_notify_telegram", "team_telegram"]
+    st = site_state(shop)
+
+    def route(c):
+        options = format_html_join("", '<option value="{}"{}>{}</option>', (
+            (v, format_html(" selected") if v == c["value"] else "", label) for v, label in c["options"]))
+        return format_html('<select name="{}" class="mm-route">{}</select>', c["name"], options)
+
+    box_rows = format_html_join("", '<tr><td><b>{}</b><div class="nt-when">{}</div></td><td>{}</td>'
+                                    '<td><span translate="no">{}</span><div class="nt-when">{}</div></td></tr>', (
+        (s["title"], s["letters"], route(s["route"]), s["sender"], s["note"]) for s in senders(shop, st)))
+    reply = format_html(
+        '{}<div class="nt-when">{} <span translate="no">{}</span> · <a href="#" data-nt-go="mail_from_name">{} ↓</a></div>',
+        w.picker("email", shop.mail_reply_to, sync="id_mail_reply_to", empty="на адресу відправника"),
+        "Ім'я відправника:", shop.mail_from_name or shop.name, "змінити")
+    boxes = format_html(
+        '<div class="mm-wrap"><table class="nt-table mm-table"><tr class="nt-sec"><td colspan="3">{}</td></tr>'
+        '<tr><th>Листи</th><th>З якої скриньки</th><th>Отримувач бачить «Від»</th></tr>{}'
+        '<tr><td><b>{}</b><div class="nt-when">{}</div></td><td colspan="2">{}</td></tr></table></div>',
+        "① З якої адреси — скриньки", box_rows, "↩ Відповіді покупців (Reply-To)",
+        "листи покупцю від Minerva й сайту; у листах команді «Відповісти» пише покупцю", reply)
+
+    cust = format_html_join("", '<tr data-nt-row="{}"><td class="nt-what">{}</td><td>{}</td><td>{}</td>{}'
+                                '<td>{}</td></tr>', (
+        (r["key"] or "links", _what(r), _from(r), _send(r, w, synced), _copies(shop, r, w), _links(r["text"]))
+        for r in customer_rows(shop, st)))
+    customer = format_html(
+        '<div class="mm-wrap"><table class="nt-table mm-table"><tr class="nt-sec"><td colspan="6">{}</td></tr>'
+        '<tr><th>Лист і коли</th><th>Хто надсилає · від</th><th>Надсилається</th><th class="mm-copy">{}</th>'
+        '<th class="mm-copy">{}</th><th>Текст</th></tr>{}</table></div>',
+        "② Листи покупцю — кому: покупцю (email із замовлення або кабінету)", "Копія (CC) — адресу видно покупцю",
+        "Прихована копія (BCC)", cust)
+
+    team_cells = format_html_join("", '<tr data-nt-row="{}"><td class="nt-what">{}</td><td>{}</td><td>{}</td>'
+                                      '<td><span translate="no">{}</span>{}</td><td>{}</td><td>{}</td></tr>', (
+        (r["key"], _what(r), _from(r), _send(r, w, synced), r["to"],
+         format_html('<div class="nt-when">{}</div>', r["to_note"]) if r.get("to_note") else "",
+         _copy(shop, r, w, "cc"), _links(r["text"])) for r in team_rows(shop, st)))
+    chat = notify_routes.default_chat(ns) if ns is not None else ""
+    team_head = format_html(
+        '<div class="nt-when">{}</div>{}<div style="margin-top:6px">{}</div>{}',
+        "✉️ Адреси команди — «Кому» всіх листів нижче, крім контактної форми "
+        "(порожньо — як «Кому (email)» у «Налаштування → Сповіщення»):",
+        w.picker("email", shop.team_emails, sync="id_team_emails",
+                 empty="як «Кому» сповіщень: " + (", ".join(_notifications()["to"]) or "нікому")),
+        w.check("💬 Telegram — оплата й новий акаунт (листи від Minerva)", shop.team_notify_telegram,
+                sync="id_team_notify_telegram"),
+        w.picker("tg", shop.team_telegram, sync="id_team_telegram",
+                 empty=f"основний чат сповіщень: {chat}" if chat else "основний чат — не задано"))
+    team = format_html(
+        '<div class="mm-wrap"><table class="nt-table mm-table"><tr class="nt-sec"><td colspan="6">{}</td></tr>'
+        '<tr><td colspan="6">{}</td></tr>'
+        '<tr><th>Лист і коли</th><th>Хто надсилає · від</th><th>Надсилається</th><th>Кому</th>'
+        '<th class="mm-copy">{}</th><th>Текст</th></tr>{}</table></div>',
+        "③ Листи команді", team_head, "Копія (CC)", team_cells)
+
+    warn = format_html_join("", '<div class="mm-warn">⚠ {}</div>', ((t,) for t in warnings(shop, st)))
+    other = format_html(
+        '<div class="help">{} <a href="{}">{} →</a></div>',
+        "Також покупцям магазину пише Minerva (налаштовується не тут): 📧 «посилку відправлено» і 📥 «замовлення "
+        "отримано» — з копією, у",
+        reverse("admin:config_notificationsettings_changelist"), "Налаштування → Сповіщення → «👤 Клієнтам»")
+    return format_html(
+        '{}<input type="hidden" name="mail_letters_form" value="1">{}{}{}{}'
+        '<div class="help">{}</div>{}<span data-nt-hide="{}"></span>',
+        w.assets(notify_routes.email_options(ns), notify_routes.chat_options(ns)) + STYLE, warn, boxes, customer, team,
+        "Скриньки, «Кому», копії й галочки змінюються тут (адреса — «＋ адреса з Minerva» або своя й Enter) і "
+        "зберігаються кнопкою «Зберегти» внизу сторінки. Копія (CC) — адресу видно отримувачу, прихована копія (BCC) — "
+        "ні. Листи з одноразовими посиланнями не копіюються. Дані сайту — з його останнього звіту; «📝 Текст» — "
+        "шаблони листів Minerva, «📨 Листи сайту» — тексти сайту з тестовим надсиланням.",
+        other, " ".join(dict.fromkeys(synced)))
+
+
+STYLE = mark_safe("<style>" + (
+    ".mm-table{margin-bottom:12px}.mm-table select.mm-route{width:280px;max-width:100%}"
+    ".mm-wrap{overflow-x:auto;margin-bottom:12px}.mm-wrap .mm-table{margin-bottom:0}"
+    ".mm-table th.mm-copy{min-width:190px}.mm-table td{vertical-align:top}.mm-table td.nt-what{min-width:200px}"
+    ".mm-warn{background:#fff3e0;color:#6d3500;border-left:3px solid #ef6c00;border-radius:4px;padding:4px 8px;"
+    "margin:0 0 8px;line-height:1.45}") + "</style>")
 
 
 def save_routes(shop: Shop, post) -> list[str]:

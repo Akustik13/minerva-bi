@@ -424,7 +424,7 @@ class AutoSendTests(_Base):
         ns = NotificationSettings.get()
         ns.email_host, ns.email_from = "smtp.example.com", "shop@example.com"
         ns.save()
-        self.shop.mail_bcc = "buchhaltung@example.com"
+        self.shop.mail_letters = {"invoice": {"bcc": "buchhaltung@example.com"}}
         self.shop.save()
         svc.BACKGROUND = False
         self.addCleanup(setattr, svc, "BACKGROUND", True)

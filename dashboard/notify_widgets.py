@@ -11,7 +11,7 @@ from django.templatetags.static import static
 from django.utils.html import format_html, format_html_join, json_script
 from django.utils.safestring import mark_safe
 
-ASSETS_VERSION = "3"
+ASSETS_VERSION = "4"
 
 
 def assets(email_options, chat_options) -> str:
@@ -20,14 +20,17 @@ def assets(email_options, chat_options) -> str:
         '<script src="{}?v={}" defer></script>', static("admin/js/mv_notify_pick.js"), ASSETS_VERSION) + STYLE
 
 
-def picker(kind: str, value: str, *, name: str = "", sync: str = "", empty: str = "", hint: str = "") -> str:
-    """kind email | tg. name — поле форми (своє), sync — id поля картки. empty — що діє, коли порожньо."""
+def picker(kind: str, value: str, *, name: str = "", sync: str = "", empty: str = "", hint: str = "",
+           compact: bool = False) -> str:
+    """kind email | tg. name — поле форми (своє), sync — id поля картки. empty — що діє, коли порожньо.
+    compact — «＋ з Minerva» і своя адреса з'являються після «＋» (таблиці з багатьма полями)."""
     attrs = format_html(' name="{}"', name) if name else format_html(' data-sync="{}" disabled', sync)
     return format_html(
-        '<div class="nt-pick" data-kind="{}" data-empty="{}">'
+        '<div class="nt-pick" data-kind="{}" data-empty="{}"{}>'
         '<input type="text" class="nt-in" value="{}"{} placeholder="{}" autocomplete="off" '
         'style="width:100%;box-sizing:border-box">{}</div>',
-        kind, empty, value, attrs, "a@firma.de, b@firma.de" if kind == "email" else "Chat ID, напр. -1001234567890",
+        kind, empty, format_html(' data-compact="1"') if compact else "", value, attrs,
+        "a@firma.de, b@firma.de" if kind == "email" else "Chat ID, напр. -1001234567890",
         format_html('<div class="help">{}</div>', hint) if hint else "")
 
 
@@ -133,5 +136,10 @@ STYLE = mark_safe("""<style>
 .nt-tools select,.nt-tools input{font-size:12px;max-width:100%}
 .nt-tools input{flex:1 1 140px;min-width:120px}
 .nt-bad{outline:2px solid #d32f2f}
+.nt-add{border:1px dashed var(--hairline-color,#bbb);background:none;color:inherit;border-radius:12px;padding:0 8px;
+  cursor:pointer;font-size:12px;line-height:18px}
+.nt-add:hover{border-style:solid}
+.nt-pick[data-compact] .nt-tools{display:none}
+.nt-pick[data-compact].nt-open .nt-tools{display:flex}
 .nt-flash{outline:3px solid var(--accent,#79aec8);outline-offset:2px;transition:outline-color .4s}
 </style>""")

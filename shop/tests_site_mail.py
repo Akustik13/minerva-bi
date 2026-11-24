@@ -21,7 +21,11 @@ class SiteMailTests(TestCase):
             smtp_username="info@sevskiy.de", smtp_password="smtp-secret")
         self.shop = Shop.objects.create(name="Web", slug="webshop", is_default=True, url="https://shop.example.com",
                                         mail_sender=self.acc, mail_reply_to="service@sevskiy.de",
-                                        mail_bcc="archiv@sevskiy.de", team_emails="team@sevskiy.de, chef@sevskiy.de")
+                                        mail_letters={"order_customer": {"bcc": "archiv@sevskiy.de"},
+                                                      "quote_customer": {"cc": "angebote@sevskiy.de"},
+                                                      "contact_team": {"cc": "kontakt@sevskiy.de"},
+                                                      "welcome": {"cc": "nicht-fuer-site@sevskiy.de"}},
+                                        team_emails="team@sevskiy.de, chef@sevskiy.de")
         self.key = APIKey.objects.create(name="Сайт", scopes=["products:read"], shop=self.shop)
         self.c = APIClient()
         self.c.credentials(HTTP_AUTHORIZATION="Token " + self.key.key)
@@ -41,6 +45,11 @@ class SiteMailTests(TestCase):
         self.assertEqual((d["from"], d["from_name"], d["reply_to"], d["bcc"], d["notify"], d["confirmation"]),
                          ("info@sevskiy.de", "Sevskiy Shop", "service@sevskiy.de", ["archiv@sevskiy.de"],
                           ["team@sevskiy.de", "chef@sevskiy.de"], False))
+        self.assertEqual(d["letters"], {   # копії кожного листа сайту (листи Minerva сайту не передаються)
+            "order_customer": {"cc": [], "bcc": ["archiv@sevskiy.de"]},
+            "quote_customer": {"cc": ["angebote@sevskiy.de"], "bcc": []},
+            "order_team": {"cc": [], "bcc": []}, "quote_team": {"cc": [], "bcc": []},
+            "contact_team": {"cc": ["kontakt@sevskiy.de"], "bcc": []}})
 
     def test_password_only_for_bound_key_and_needs_sender(self):
         Shop.objects.filter(pk=self.shop.pk).update(site_mail_managed=True)
@@ -61,8 +70,9 @@ class SiteMailTests(TestCase):
         self.get(mail_site="bad host!", mail_host="x")
         self.shop.refresh_from_db()
         rep = self.shop.site_mail_reports["web.example.com"]
-        self.assertEqual((rep["host"], rep["password"], rep["notify"], rep["confirmation"]),
-                         ("smtp.ionos.de", True, "sergey@sevskiy.de", True))
+        self.assertEqual((rep["host"], rep["password"], rep["notify"], rep["confirmation"], rep["letters"]),
+                         ("smtp.ionos.de", True, "sergey@sevskiy.de", True, False))
+
         self.assertEqual(list(self.shop.site_mail_reports), ["web.example.com"])
         from config.models import SystemSettings
         s = SystemSettings.objects.get_or_create(pk=1)[0]
@@ -70,10 +80,14 @@ class SiteMailTests(TestCase):
         s.save()
         self.client.force_login(User.objects.create_superuser("adm", "adm@example.com", "p"))
         page = self.client.get(f"/admin/shop/shop/{self.shop.pk}/change/")
-        self.assertContains(page, "файли сайту: info@sevskiy.de (smtp.ionos.de)")
+        self.assertContains(page, "налаштування сайту: info@sevskiy.de (smtp.ionos.de)")
         self.assertContains(page, "Сайт надсилає листи з цієї ж скриньки")
         self.assertNotContains(page, "smtp-secret")
         Shop.objects.filter(pk=self.shop.pk).update(site_mail_managed=True)
         page = self.client.get(f"/admin/shop/shop/{self.shop.pk}/change/")
         self.assertContains(page, "скринька Minerva info@sevskiy.de (smtp.ionos.de)")
         self.assertContains(page, "team@sevskiy.de, chef@sevskiy.de")
+        self.assertContains(page, "ні — старі файли сайту")
+        self.get(mail_site="web.example.com", mail_letters="1")   # новий сайт: копії кожного листа
+        self.shop.refresh_from_db()
+        self.assertTrue(self.shop.site_mail_reports["web.example.com"]["letters"])

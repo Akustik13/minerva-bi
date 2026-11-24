@@ -15,17 +15,32 @@ from .tests_accounts import LINK, PASSWORD, REG, AccountTestCase, token_from
 class MailHeadersTests(AccountTestCase):
     def setUp(self):
         super().setUp()
-        Shop.objects.filter(pk=self.shop.pk).update(mail_reply_to="info@sevskiy.de",
-                                                    mail_bcc="archiv@sevskiy.de, chef@sevskiy.de")
+        Shop.objects.filter(pk=self.shop.pk).update(mail_reply_to="info@sevskiy.de", mail_letters={
+            "paid": {"cc": "vertrieb@sevskiy.de, kunde@firma.de", "bcc": "archiv@sevskiy.de, chef@sevskiy.de"},
+            "verify": {"cc": "x@sevskiy.de", "bcc": "x@sevskiy.de"}})   # одноразові посилання — копій не буває
         self.shop.refresh_from_db()
 
-    def test_reply_to_and_bcc_only_without_one_time_links(self):
+    def test_reply_to_and_copies_only_without_one_time_links(self):
         mail.send(self.shop, "kunde@firma.de", "paid", "de", name="Anna", number="WS-1", amount="10 EUR")
         m = outbox.outbox[-1]
-        self.assertEqual((m.reply_to, m.bcc), (["info@sevskiy.de"], ["archiv@sevskiy.de", "chef@sevskiy.de"]))
+        self.assertEqual((m.reply_to, m.cc, m.bcc),   # адреса з «Кому» в копії не дублюється
+                         (["info@sevskiy.de"], ["vertrieb@sevskiy.de"], ["archiv@sevskiy.de", "chef@sevskiy.de"]))
+        mail.send(self.shop, "kunde@firma.de", "changed", "de", name="Anna")   # у цього листа копій немає
+        self.assertEqual((outbox.outbox[-1].cc, outbox.outbox[-1].bcc), ([], []))
         for kind in ("verify", "reset", "invite"):
             mail.send(self.shop, "kunde@firma.de", kind, "de", name="Anna", link=LINK + "#x")
-            self.assertEqual((outbox.outbox[-1].reply_to, outbox.outbox[-1].bcc), (["info@sevskiy.de"], []), kind)
+            m = outbox.outbox[-1]
+            self.assertEqual((m.reply_to, m.cc, m.bcc), (["info@sevskiy.de"], [], []), kind)
+
+    def test_clean_copies(self):
+        letters, errors = mail.clean_copies({
+            "welcome": {"cc": "a@b.de; a@B.de", "bcc": ""}, "order_team": {"cc": "t@b.de", "bcc": "nur-kunde@b.de"},
+            "verify": {"cc": "x@b.de"}, "unknown": {"cc": "y@b.de"}, "paid": {"cc": "kein-email"}})
+        self.assertEqual(letters, {"welcome": {"cc": "a@b.de"}, "order_team": {"cc": "t@b.de"}})   # команді — лише CC
+        self.assertEqual(len(errors), 1)
+        self.assertIn("«Zahlung erhalten» — копія: не схоже на email: kein-email", errors[0])
+        many = ", ".join(f"a{i}@b.de" for i in range(mail.COPY_MAX + 1))
+        self.assertTrue(mail.clean_copies({"welcome": {"bcc": many}})[1])
 
     def test_team_mail_goes_to_shop_team_addresses_or_notifications(self):
         self.assertEqual(mail.send_team(self.shop, "team_registered", email="a@b.de", company="X", name="Y"), "")
@@ -45,7 +60,21 @@ class MailHeadersTests(AccountTestCase):
         m = outbox.outbox[-1]
         self.assertEqual(m.to, ["shop-team@sevskiy.de", "vertrieb@sevskiy.de"])
         self.assertIn("Firma X", m.subject)
-        self.assertEqual((m.reply_to, m.bcc), ([], []))   # команді — без Reply-To покупцям і без копії
+        self.assertEqual((m.reply_to, m.cc, m.bcc), ([], [], []))   # команді — без Reply-To покупцям і без копії
+        Shop.objects.filter(pk=self.shop.pk).update(mail_letters={"team_registered": {"cc": "chef@sevskiy.de",
+                                                                                      "bcc": "nie@sevskiy.de"}})
+        self.shop.refresh_from_db()
+        mail.send_team(self.shop, "team_registered", email="a@b.de", company="Firma X", name="Y")
+        self.assertEqual((outbox.outbox[-1].cc, outbox.outbox[-1].bcc), (["chef@sevskiy.de"], []))   # лише CC
+        Shop.objects.filter(pk=self.shop.pk).update(team_emails="")   # без адрес команди — SMTP сповіщень + копія
+        self.shop.refresh_from_db()
+        outbox.outbox.clear()
+        from django.core.mail import get_connection
+        with mock.patch("dashboard.notifications._smtp_connection",
+                        return_value=get_connection("django.core.mail.backends.locmem.EmailBackend")):
+            self.assertEqual(mail.send_team(self.shop, "team_registered", email="a@b.de", company="X", name="Y"),
+                             "notifications")
+        self.assertEqual((outbox.outbox[-1].to, outbox.outbox[-1].cc), (["zentrale@sevskiy.de"], ["chef@sevskiy.de"]))
 
     def test_addresses_helper(self):
         self.assertEqual(mail.addresses(" a@b.de; c@d.de ,a@B.de,, "), ["a@b.de", "c@d.de"])
@@ -114,15 +143,13 @@ class MailAdminTests(TestCase):
 
     def test_mail_block_and_validation(self):
         page = self.client.get(f"/admin/shop/shop/{self.shop.pk}/change/")
-        for text in ("✉️ Пошта магазину", "Відповіді покупців", "Сповіщення команді: team@sevskiy.de",
+        for text in ("✉️ Пошта магазину", "Відповіді покупців", 'value="team@sevskiy.de"',
                      "✉️ Надіслати тестовий лист собі", "➕ Додати скриньку в Minerva"):
             self.assertContains(page, text)
         from .admin_payments import ShopForm
         f = ShopForm(instance=self.shop)
-        f.cleaned_data = {"team_emails": "a@b.de; c@d.de", "mail_bcc": "kein-email"}
+        f.cleaned_data = {"team_emails": "a@b.de; c@d.de"}
         self.assertEqual(f.clean_team_emails(), "a@b.de, c@d.de")
-        with self.assertRaises(Exception):
-            f.clean_mail_bcc()
 
 
 class MailMapTests(TestCase):
@@ -144,48 +171,69 @@ class MailMapTests(TestCase):
     def rows(self):
         from . import mail_map
         self.shop.refresh_from_db()
-        return {r["mail"]: r for r in mail_map.rows(self.shop)}
+        st = mail_map.site_state(self.shop)
+        out = {r["key"]: r for r in mail_map.customer_rows(self.shop, st) + mail_map.team_rows(self.shop, st)}
+        out.update({f"box:{b['key']}": b for b in mail_map.senders(self.shop, st)})
+        return out
 
     def test_without_sender_and_from_site_files(self):
         r = self.rows()
-        self.assertIn("❌ не задано", r["Підтвердження email, новий пароль, запрошення від менеджера"]["sender"])
-        self.assertIn("нікому", r["Команді: оплата отримана, новий акаунт покупця"]["to"])
-        order = r["Підтвердження замовлення покупцю"]
-        self.assertEqual((order["who"], order["to"]), ("сайт www.sevskiy.de", "покупцю"))
-        self.assertIn("info@sevskiy.de (smtp.ionos.de) — файли сайту", order["sender"])
-        self.assertEqual(r["Команді: нове замовлення з сайту"]["to"], "sergey@sevskiy.de")
-        contact = r["Контактна форма сайту"]
+        self.assertIn("❌ не задано", r["box:account"]["sender"])
+        self.assertIn("нікому", r["team_paid"]["to"])
+        order = r["order_customer"]
+        self.assertEqual(order["who"], "🌐 сайт www.sevskiy.de")
+        self.assertEqual(order["send"], {"type": "text", "text": "так — налаштування сайту"})
+        self.assertIn("info@sevskiy.de (smtp.ionos.de) — налаштування сайту", order["sender"])
+        self.assertEqual(r["order_team"]["to"], "sergey@sevskiy.de")
+        self.assertEqual(r["quote_team"]["to"], "sergey@sevskiy.de")
+        contact = r["contact_team"]
         self.assertEqual(contact["to"], "kontakt@sevskiy.de")
-        self.assertEqual(contact["change"][0]["url"], "https://www.sevskiy.de/admin/")   # адмінка — корінь домену
+        self.assertEqual(contact["text"][0]["url"], "https://www.sevskiy.de/admin/")   # адмінка — корінь домену
+        self.assertEqual(r[""]["copy"], False)   # одноразові посилання — без копій
 
     def test_shop_mailbox_team_and_site_from_minerva(self):
         Shop.objects.filter(pk=self.shop.pk).update(
             mail_sender=self.acc, mail_from_name="Sevskiy Shop", mail_reply_to="vertrieb@sevskiy.de",
-            mail_bcc="archiv@sevskiy.de", team_emails="sergey@sevskiy.de, slava@sevskiy.de",
-            site_mail_managed=True, site_order_confirmation=False)
+            team_emails="sergey@sevskiy.de, slava@sevskiy.de", site_mail_managed=True, site_order_confirmation=False)
         r = self.rows()
-        verify = r["Підтвердження email, новий пароль, запрошення від менеджера"]
-        self.assertEqual(verify["sender"], "Sevskiy Shop <info@sevskiy.de>")
-        self.assertIn(f"/admin/email_assistant/emailaccount/{self.acc.pk}/change/", [c.get("url") for c in verify["change"]])
-        customer = r["«Willkommen», «Zahlung erhalten», пароль змінено, акаунт видалено"]
-        self.assertIn("відповіді — на vertrieb@sevskiy.de", customer["sender"])
-        self.assertIn("прихована копія: archiv@sevskiy.de", customer["to"])
-        self.assertEqual(r["Команді: оплата отримана, новий акаунт покупця"]["to"], "sergey@sevskiy.de, slava@sevskiy.de")
-        order = r["Підтвердження замовлення покупцю"]
-        self.assertEqual((order["sender"], order["to"]), ("info@sevskiy.de (з Minerva)", "не надсилається"))
-        self.assertIn("site_order_confirmation", [c.get("go") for c in order["change"]])
-        self.assertEqual(r["Команді: нове замовлення з сайту"]["to"], "sergey@sevskiy.de, slava@sevskiy.de")
+        self.assertEqual(r["box:account"]["sender"], "Sevskiy Shop <info@sevskiy.de>")
+        self.assertEqual(r["welcome"]["sender"], "Sevskiy Shop <info@sevskiy.de>")
+        self.assertEqual(r["team_paid"]["to"], "sergey@sevskiy.de, slava@sevskiy.de")
+        order = r["order_customer"]
+        self.assertEqual(order["sender"], "Sevskiy Shop <info@sevskiy.de>")
+        self.assertEqual(order["send"], {"type": "check", "sync": "site_order_confirmation", "on": False, "label": "так"})
+        self.assertEqual(r["order_team"]["to"], "sergey@sevskiy.de, slava@sevskiy.de")
+        self.assertEqual(r["contact_team"]["to"], "kontakt@sevskiy.de")   # отримувач форми — на сайті
+
+    def test_site_copies_warning(self):
+        from . import mail_map
+        Shop.objects.filter(pk=self.shop.pk).update(mail_letters={"order_team": {"cc": "chef@sevskiy.de"}})
+        self.shop.refresh_from_db()
+        self.assertIn("зі скриньки Minerva", mail_map.warnings(self.shop)[0])   # сайт пише зі своїх налаштувань
+        Shop.objects.filter(pk=self.shop.pk).update(mail_sender=self.acc, site_mail_managed=True)
+        self.shop.refresh_from_db()
+        self.assertIn("оновлення файлів сайту", mail_map.warnings(self.shop)[0])   # старий сайт без letters
+        reports = self.shop.site_mail_reports
+        reports["www.sevskiy.de"]["letters"] = True
+        Shop.objects.filter(pk=self.shop.pk).update(site_mail_reports=reports)
+        self.shop.refresh_from_db()
+        self.assertEqual(mail_map.warnings(self.shop), [])
 
     def test_card_shows_the_map(self):
         from config.models import SystemSettings
         s = SystemSettings.objects.get_or_create(pk=1)[0]
         s.is_onboarding_complete = True
         s.save()
+        Shop.objects.filter(pk=self.shop.pk).update(mail_letters={"welcome": {"cc": "chef@sevskiy.de"}})
         self.client.force_login(self.user)
         page = self.client.get(f"/admin/shop/shop/{self.shop.pk}/change/")
-        for text in ("Що звідки йде", "Хто надсилає", 'name="route_account"', "Контактна форма сайту",
+        for text in ("Хто що кому шле", "① З якої адреси", "② Листи покупцю", "③ Листи команді", 'name="route_account"',
+                     "Контактна форма сайту", 'name="mlc__welcome"', 'value="chef@sevskiy.de"', 'name="mlb__invoice"',
+                     'name="mlc__contact_team"', 'name="mail_letters_form" value="1"',
                      'href="https://www.sevskiy.de/admin/" target="_blank" rel="noopener"'):
             self.assertContains(page, text)
+        self.assertNotContains(page, 'name="mlb__order_team"')   # команді — лише копія
+        self.assertNotContains(page, 'name="mlc__verify"')
 
 
 class MailRouteTests(TestCase):
@@ -281,6 +329,21 @@ class MailRouteTests(TestCase):
         self.assertIsNone(self.shop.mail_sender)                            # основні — SMTP сповіщень
         self.assertEqual(self.shop.mail_routes, {"notices": f"acc:{self.kasse.pk}"})
 
+    def test_copies_save_with_the_form(self):
+        r = self.post(mail_letters_form="1", mlc__welcome="chef@sevskiy.de; chef@sevskiy.de",
+                      mlb__welcome="archiv@sevskiy.de", mlc__order_team="lager@sevskiy.de", mlb__order_team="x@y.de",
+                      mlc__verify="nie@sevskiy.de", mlc__invoice="")
+        self.assertEqual(r.status_code, 302, getattr(r, "context", None) and r.context["adminform"].form.errors)
+        self.assertEqual(self.shop.mail_letters, {"welcome": {"cc": "chef@sevskiy.de", "bcc": "archiv@sevskiy.de"},
+                                                  "order_team": {"cc": "lager@sevskiy.de"}})
+        r = self.post(mail_letters_form="1", mlc__welcome="kein-email")   # помилка — нічого не зберігається
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "«Willkommen» — копія: не схоже на email: kein-email")
+        self.assertEqual(self.shop.mail_letters["welcome"]["cc"], "chef@sevskiy.de")
+        r = self.post(route_site="files")   # форма без таблиці копій — копії лишаються
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("order_team", self.shop.mail_letters)
+
     def test_test_mail_once_per_box(self):
         from . import mail_map
         mail_map.save_routes(self.shop, {"route_notices": f"acc:{self.kasse.pk}"})
@@ -327,11 +390,12 @@ class TeamTelegramTests(AccountTestCase):
         from config.models import SystemSettings
         from . import mail_map
         SystemSettings.objects.update_or_create(pk=1, defaults={"is_onboarding_complete": True})
-        team = next(r for r in mail_map.rows(self.shop) if r["mail"].startswith("Команді: оплата"))
-        self.assertEqual([e.get("sync") for e in team["edit"]],
-                         ["", "team_notify_registration", "team_emails", "team_notify_telegram", "team_telegram"])
+        registered = next(r for r in mail_map.team_rows(self.shop) if r["key"] == "team_registered")
+        self.assertEqual(registered["send"]["sync"], "team_notify_registration")
+        self.assertIn("💬 Telegram", registered["to"])
         self.client.force_login(User.objects.create_superuser("tgadm", "tgadm@example.com", "p"))
         page = self.client.get(f"/admin/shop/shop/{self.shop.pk}/change/")
-        for text in ('data-sync="id_team_emails"', 'data-sync="id_team_telegram"', 'data-sync="id_mail_bcc"',
+        for text in ('data-sync="id_team_emails"', 'data-sync="id_team_telegram"', 'data-sync="id_mail_reply_to"',
+                     'data-sync="id_team_notify_registration"', 'data-sync="id_mail_welcome"',
                      'name="team_telegram"', "data-nt-hide=", "mv_notify_pick.js"):
             self.assertContains(page, text)

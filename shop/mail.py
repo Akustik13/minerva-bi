@@ -244,7 +244,24 @@ TEXTS["team_registered"] = {
 GREETING = {"de": "Guten Tag {name},", "en": "Hello {name},"}
 NO_GREETING = ("team_paid", "team_registered")
 TEAM_KINDS = ("team_paid", "team_registered")
-SECRET_KINDS = ("verify", "reset", "invite")   # одноразові посилання — без прихованої копії
+SECRET_KINDS = ("verify", "reset", "invite")   # одноразові посилання — без копій
+
+# ── Копії кожного листа (Shop.mail_letters {лист: {"cc": "a@x, b@y", "bcc": "…"}}) ──
+# Ключ листа Minerva = kind (exists, welcome, paid, changed, deleted, team_paid, team_registered), рахунок — invoice
+# (sales/invoice_service.send_mail); листи сайту — ключі його /admin/ → «📨 Листи» (api/admin/index.php ADMIN_LETTERS).
+# Покупцю — копія (CC, адресу видно) і прихована копія (BCC); команді — лише копія. Таблиця — mail_map.py.
+CUSTOMER_LETTERS = ("exists", "welcome", "paid", "changed", "deleted", "invoice", "order_customer", "quote_customer")
+TEAM_LETTERS = ("team_paid", "team_registered", "order_team", "quote_team", "contact_team")
+SITE_LETTERS = ("order_customer", "quote_customer", "order_team", "quote_team", "contact_team")
+COPY_MAX = 10   # адрес у копії одного листа (кожне поле)
+LETTER_TITLES = {
+    "exists": "«Konto existiert bereits»", "welcome": "«Willkommen»", "paid": "«Zahlung erhalten»",
+    "changed": "«Passwort geändert»", "deleted": "«Konto gelöscht»", "invoice": "Рахунок (Rechnung)",
+    "order_customer": "Підтвердження замовлення", "quote_customer": "Підтвердження запиту пропозиції",
+    "team_paid": "Команді: оплату отримано", "team_registered": "Команді: новий акаунт покупця",
+    "order_team": "Команді: нове замовлення з сайту", "quote_team": "Команді: новий запит пропозиції",
+    "contact_team": "Контактна форма сайту",
+}
 
 # Поля, які можна вставити в шаблон (адмінка показує їх і перевіряє шаблон)
 PLACEHOLDERS = {
@@ -267,6 +284,50 @@ def addresses(value) -> list[str]:
         if part and part.lower() not in (a.lower() for a in out):
             out.append(part)
     return out
+
+
+def copies(shop, letter: str, to=()) -> tuple[list[str], list[str]]:
+    """(CC, BCC) листа з Shop.mail_letters; без адрес, що вже в «Кому» (to). Одноразові посилання й тестовий лист —
+    без копій, листи команді — лише CC."""
+    if letter not in CUSTOMER_LETTERS and letter not in TEAM_LETTERS:
+        return [], []
+    item = (getattr(shop, "mail_letters", None) or {}).get(letter)
+    item = item if isinstance(item, dict) else {}
+    seen = {a.lower() for a in addresses(", ".join(to))}
+    cc = [a for a in addresses(item.get("cc")) if a.lower() not in seen]
+    seen |= {a.lower() for a in cc}
+    bcc = [a for a in addresses(item.get("bcc")) if a.lower() not in seen] if letter in CUSTOMER_LETTERS else []
+    return cc, bcc
+
+
+def clean_copies(raw: dict) -> tuple[dict, list[str]]:
+    """{лист: {"cc": текст, "bcc": текст}} з форми → (mail_letters, помилки). Лише відомі листи й поля,
+    адреси — validate_email, до COPY_MAX у полі; порожні записи не зберігаються."""
+    from django.core.exceptions import ValidationError
+    from django.core.validators import validate_email
+    out, errors = {}, []
+    for letter, fields in (raw or {}).items():
+        if letter not in CUSTOMER_LETTERS and letter not in TEAM_LETTERS or not isinstance(fields, dict):
+            continue
+        item = {}
+        for field in ("cc", "bcc") if letter in CUSTOMER_LETTERS else ("cc",):
+            items = addresses(fields.get(field))
+            bad = []
+            for a in items:
+                try:
+                    validate_email(a)
+                except ValidationError:
+                    bad.append(a)
+            what = f"{LETTER_TITLES.get(letter, letter)} — {'копія' if field == 'cc' else 'прихована копія'}"
+            if bad:
+                errors.append(f"{what}: не схоже на email: {', '.join(bad)}")
+            elif len(items) > COPY_MAX:
+                errors.append(f"{what}: більше {COPY_MAX} адрес")
+            elif items:
+                item[field] = ", ".join(items)
+        if item:
+            out[letter] = item
+    return out, errors
 
 
 class _Keep(dict):
@@ -342,10 +403,11 @@ def send(shop, to: str, kind: str, lang: str, purpose: str = "", **kwargs) -> No
     subject, text, body = compose(shop, kind, lang, **kwargs)
     cfg = smtp_settings(shop, purpose or purpose_of(kind))
     customer_mail = kind not in TEAM_KINDS and kind != "test"
+    cc, bcc = copies(shop, kind, [to])   # копії цього листа (одноразові посилання й тест — без копій)
     msg = EmailMultiAlternatives(
         subject=subject, body=text, from_email=cfg["from"], to=[to], connection=_connection(cfg),
         reply_to=[shop.mail_reply_to] if shop.mail_reply_to and customer_mail else None,
-        bcc=addresses(shop.mail_bcc) if customer_mail and kind not in SECRET_KINDS else None)
+        cc=cc or None, bcc=bcc or None)
     msg.attach_alternative(body, "text/html")
     _deliver(msg, cfg)
     logger.info("Shop mail %s → %s (%s)", kind, to, shop.slug)
@@ -360,19 +422,32 @@ def send_team(shop, kind: str, **vars) -> str:
     if to:
         cfg = smtp_settings(shop, "team")
         msg = EmailMultiAlternatives(subject=subject, body=details, from_email=cfg["from"], to=to,
-                                     connection=_connection(cfg))
+                                     cc=copies(shop, kind, to)[0] or None, connection=_connection(cfg))
         msg.attach_alternative(f'<p style="white-space:pre-line">{_html.escape(details)}</p>', "text/html")
         _deliver(msg, cfg)
         return "team"
     try:
-        from dashboard.notifications import _get_ns, _send_event_email
+        from dashboard.notifications import _get_ns, _send_event_email, recipients
         ns = _get_ns()
     except Exception:
         return ""
     if ns is None or not getattr(ns, "email_enabled", False) or not (ns.email_to or "").strip():
         return ""
-    _send_event_email(ns, subject, f"<p>{_html.escape(subject)}</p>"
-                                   f"<p style=\"white-space:pre-line\">{_html.escape(details)}</p>")
+    html_body = (f"<p>{_html.escape(subject)}</p>"
+                 f"<p style=\"white-space:pre-line\">{_html.escape(details)}</p>")
+    cc = copies(shop, kind, recipients(ns))[0]
+    if not cc:
+        _send_event_email(ns, subject, html_body)
+        return "notifications"
+    # Копія цього листа — тим самим SMTP сповіщень, що й без адрес команди в магазині
+    from dashboard.notifications import _smtp_connection, outlook_safe
+    to = recipients(ns)
+    if not to:
+        return ""
+    msg = EmailMultiAlternatives(subject=subject, body="", to=to, cc=cc, connection=_smtp_connection(ns),
+                                 from_email=(ns.email_from or ns.email_host_user or "noreply@minerva.local").strip())
+    msg.attach_alternative(outlook_safe(html_body), "text/html")
+    msg.send()
     return "notifications"
 
 

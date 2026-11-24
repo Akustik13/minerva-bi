@@ -108,9 +108,6 @@ class ShopForm(forms.ModelForm):
             raise forms.ValidationError(f"Некоректні адреси: {', '.join(bad)}")
         return ", ".join(items)
 
-    def clean_mail_bcc(self):
-        return self._clean_addresses("mail_bcc")
-
     def clean_team_emails(self):
         return self._clean_addresses("team_emails")
 
@@ -122,8 +119,25 @@ class ShopForm(forms.ModelForm):
             raise forms.ValidationError(error)
         return url
 
+    def _clean_letter_copies(self):
+        """Копії листів з таблиці «Хто що кому шле» (поля mlc__<лист> / mlb__<лист> поза формою моделі; таблиця
+        ставить mail_letters_form=1) → instance.mail_letters; немає таблиці на сторінці — без змін."""
+        if self.data.get("mail_letters_form") != "1":
+            return
+        from .mail import clean_copies
+        raw = {}
+        for name in self.data:
+            if name.startswith(("mlc__", "mlb__")):
+                raw.setdefault(name[5:], {})["cc" if name.startswith("mlc__") else "bcc"] = self.data.get(name)
+        letters, errors = clean_copies(raw)
+        for e in errors:
+            self.add_error(None, e)
+        if not errors:
+            self.instance.mail_letters = letters
+
     def clean(self):
         d = super().clean()
+        self._clean_letter_copies()
         if "payment_methods" not in self.fields:
             return d
         if d.get("stripe_clear"):

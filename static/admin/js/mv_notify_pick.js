@@ -69,11 +69,21 @@
       }
       draw();
     }
+    var compact = box.hasAttribute('data-compact');   // інструменти — після «＋»
+    function plus() {
+      if (!compact || box.classList.contains('nt-open')) return;
+      var b = el('button', 'nt-add', '＋');
+      b.type = 'button';
+      b.title = kind === 'tg' ? 'Додати чат' : 'Додати адресу';
+      b.addEventListener('click', function () { box.classList.add('nt-open'); b.remove(); own.focus(); });
+      chips.appendChild(b);
+    }
     function draw() {
       chips.textContent = '';
       var list = split(input.value);
       if (!list.length) {
         chips.appendChild(el('span', 'nt-empty', box.getAttribute('data-empty') || '—'));
+        plus();
         return;
       }
       list.forEach(function (v) {
@@ -91,6 +101,7 @@
         chip.appendChild(x);
         chips.appendChild(chip);
       });
+      plus();
     }
     function add(v) {
       v = String(v || '').trim().replace(/^<|>$/g, '');

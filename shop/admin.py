@@ -291,17 +291,14 @@ class ShopAdmin(admin.ModelAdmin):
                            "Швидкий старт: «🌍 Створити базові зони» або «⬇️ Імпортувати з DigiKey».",
         }),
         ("✉️ Пошта магазину", {
-            "fields": ["mail_map_col", "mail_from_name", "mail_reply_to", "mail_bcc", "team_emails",
-                       "mail_welcome",
-                       "team_notify_registration", "team_notify_telegram", "team_telegram",
-                       "mail_footer", "team_lang", "mail_tools",
-                       "site_order_confirmation", "site_mail_col"],
-            "description": "З якої скриньки Minerva пише покупцям цього магазину (кабінет, «Ласкаво просимо», «Оплату "
-                           "отримано»), куди приходять відповіді і кому з команди — сповіщення. Скриньку магазину "
-                           "додайте в Minerva як акаунт пошти (Email → Акаунти): тоді відповіді покупців потрапляють у "
-                           "пошту Minerva й прив'язуються до клієнта в CRM. Тексти — «Шаблони листів». Підтвердження "
-                           "замовлення й контактну форму надсилає сайт: з «Сайт надсилає листи з цієї ж скриньки» — "
-                           "з цієї самої скриньки, інакше — з власних налаштувань сайту (/admin/ → «Пошта»).",
+            # mail_reply_to … site_order_confirmation — керує таблиця «Хто що кому шле» (рядки форми JS ховає)
+            "fields": ["mail_map_col", "mail_from_name", "mail_footer", "team_lang", "mail_tools", "site_mail_col",
+                       "mail_reply_to", "team_emails", "mail_welcome", "team_notify_registration",
+                       "team_notify_telegram", "team_telegram", "site_order_confirmation"],
+            "description": "Усі листи магазину в одній таблиці: ① з якої скриньки йде кожна група листів, ② листи "
+                           "покупцю і ③ листи команді — хто надсилає (Minerva чи сайт), від якої адреси, кому, копія "
+                           "й прихована копія. Скриньку магазину додайте в Minerva як акаунт пошти (Email → Акаунти): "
+                           "тоді відповіді покупців потрапляють у пошту Minerva й прив'язуються до клієнта в CRM.",
         }),
         ("👤 Особистий кабінет покупців", {
             "fields": ["accounts_enabled", "accounts_tools"],
@@ -478,72 +475,13 @@ class ShopAdmin(admin.ModelAdmin):
                 reverse("admin:rag_assistant_ragsettings_change", args=[1])),
             format_html_join(", ", "«{}» ×{}", zero) if zero else "—", report)
 
-    @admin.display(description="Що звідки йде")
+    @admin.display(description="Хто що кому шле")
     def mail_map_col(self, obj):
-        """Карта листів магазину (shop/mail_map.py): хто надсилає, з якої адреси, кому, де змінити."""
+        """Карта пошти магазину (shop/mail_map.py): скриньки, кожен лист — хто, від кого, кому, копії."""
         if not obj or not obj.pk:
             return "Спершу збережіть магазин."
         from . import mail_map
-
-        def route(r):
-            if not r.get("route"):
-                return format_html('{}<div class="help">{}</div>', format_html('<span translate="no">{}</span>', r["sender"]),
-                                   f"як у рядку «{r.get('same_as', '')}»" if r.get("same_as") else "")
-            c = r["route"]
-            options = format_html_join("", '<option value="{}"{}>{}</option>', (
-                (v, format_html(" selected") if v == c["value"] else "", label) for v, label in c["options"]))
-            return format_html('<select name="{}" class="mm-route" style="max-width:100%;width:260px">{}</select>'
-                               '<div class="help">{} <span translate="no">{}</span>{}</div>', c["name"], options,
-                               "зараз:", r["sender"], format_html(" · {}", c["note"]) if c["note"] else "")
-
-        def links(items):
-            return format_html_join(" · ", "{}", ((
-                format_html('<a href="#" data-go="{}">{} ↓</a>', i["go"], i["label"]) if i.get("go") else
-                format_html('<a href="{}"{}>{} →</a>', i["url"],
-                            format_html(' target="_blank" rel="noopener"') if i.get("external") else "", i["label"]),)
-                for i in items or []))
-        from dashboard import notify_routes, notify_widgets as w
-        synced = []
-
-        def to_cell(r):
-            """«Кому»: поля, що змінюють адреси / чати / прапорці картки (dashboard/notify_widgets.py)."""
-            edit = r.get("edit") or []
-            if not edit:
-                return format_html('{}{}', r["to"], format_html('<div class="help">{}</div>', r["edit_note"])
-                                   if r.get("edit_note") else "")
-            parts = []
-            for e in edit:
-                if e["type"] == "check":
-                    if e["sync"]:
-                        synced.append(e["sync"])
-                        parts.append(w.check(e["label"], e["on"], sync="id_" + e["sync"], title=e["title"]))
-                    else:
-                        parts.append(format_html('<span class="nt-chk" title="{}">✅ {}</span>', e["title"], e["label"]))
-                    continue
-                synced.append(e["sync"])
-                if e["label"]:
-                    parts.append(format_html('<div class="nt-when">{}</div>', e["label"]))
-                parts.append(w.picker(e["kind"], e["value"], sync="id_" + e["sync"], empty=e["empty"]))
-            return format_html_join("", "{}", ((part,) for part in parts))
-
-        data = mail_map.rows(obj)
-        rows = format_html_join("", "<tr><td><b>{}</b></td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>", (
-            (r["mail"], r["who"], route(r), to_cell(r), links(r["change"])) for r in data))
-        try:
-            from config.models import NotificationSettings
-            ns = NotificationSettings.get()
-        except Exception:
-            ns = None
-        return format_html(
-            '{}<table class="mm-table" style="font-size:12px;width:100%"><tr><th>Лист</th><th>Хто надсилає</th>'
-            '<th>З якої адреси</th><th style="min-width:260px">Кому</th><th>Де змінити</th></tr>{}</table>'
-            '<span data-nt-hide="{}"></span>'
-            '<div class="help">«З якої адреси» і «Кому» — змініть тут (адреси й Telegram-чати — «＋ з Minerva» або '
-            'своя, Enter) і натисніть «Зберегти» внизу сторінки. «↓» — до поля на цій сторінці, «→» — інша сторінка; '
-            'дані сайту — з його останнього звіту. Решта сповіщень — {}.</div>',
-            w.assets(notify_routes.email_options(ns), notify_routes.chat_options(ns)), rows, " ".join(synced),
-            format_html('<a href="{}">Налаштування → Сповіщення → «🗺 Хто що отримує»</a>',
-                        reverse("admin:config_notificationsettings_changelist")))
+        return mail_map.render(obj)
 
     @admin.display(description="Пошта сайтів")
     def site_mail_col(self, obj):
@@ -567,33 +505,33 @@ class ShopAdmin(admin.ModelAdmin):
                         + ("" if r.get("password") else ", без пароля") + ")")
                 notify, confirm = r.get("notify") or "—", r.get("confirmation")
             rows.append((host, uses, notify, "так" if confirm else "ні", r.get("recipient") or "—",
+                         "так" if site_mail.supports_letters(r) else "ні — старі файли сайту",
                          f"{timezone.localtime(at):%d.%m %H:%M}" if at else "—"))
         warn = site_mail.problem(obj)
         table = format_html(
             '<table style="font-size:12px"><tr><th>Сайт</th><th>Листи йдуть з</th><th>Сповіщення про замовлення</th>'
-            '<th>Підтвердження покупцю</th><th>Контактна форма → </th><th>Звіт</th></tr>{}</table>',
-            format_html_join("", "<tr>" + "<td>{}</td>" * 6 + "</tr>", rows)) if rows else format_html(
+            '<th>Підтвердження покупцю</th><th>Контактна форма → </th><th>Копії кожного листа</th><th>Звіт</th></tr>'
+            '{}</table>',
+            format_html_join("", "<tr>" + "<td>{}</td>" * 7 + "</tr>", rows)) if rows else format_html(
             '<div class="help">{}</div>', "Сайти ще не звітували про пошту (звіт — разом із запитом налаштувань, "
                                          "раз на хвилину, коли на сайті щось надсилається або перевіряють зв'язок).")
         return format_html('{}{}', format_html('<div style="background:#ffebee;color:#8e1b1b;border-left:3px solid #d32f2f;border-radius:4px;padding:2px 8px;display:inline-block;line-height:1.5;margin-bottom:6px">⚠ {}</div>', warn)
                            if warn else "", table)
 
-    @admin.display(description="Зараз")
+    @admin.display(description="Перевірка")
     def mail_tools(self, obj):
-        """Через що підуть листи, куди відповіді й сповіщення, тестовий лист, шаблони."""
+        """Сервер листів Minerva, тестовий лист з кожної скриньки, шаблони."""
         if not obj or not obj.pk:
             return "Спершу збережіть магазин."
         from . import mail
-        team = mail.addresses(obj.team_emails)
         return format_html(
-            '<div>Відправник: {}</div><div style="margin-top:4px">Відповіді покупців: {}</div>'
-            '<div style="margin-top:4px">Прихована копія: {}</div><div style="margin-top:4px">Сповіщення команді: {}</div>'
+            '<div>{} <span translate="no">{}</span></div>'
             '<div style="margin-top:8px"><button type="submit" class="button" formaction="{}" formnovalidate>'
             '✉️ Надіслати тестовий лист собі</button> <a class="button" href="{}">📝 Шаблони листів</a> '
             '<a class="button" href="{}">➕ Додати скриньку в Minerva</a> '
-            '<span class="help">незбережені зміни на сторінці не зберігаються</span></div>',
-            mail.describe_sender(obj), obj.mail_reply_to or "на адресу відправника",
-            obj.mail_bcc or "немає", ", ".join(team) if team else "email з «Налаштування → Сповіщення»",
+            '<span class="help">з кожної різної скриньки ① — по листу; незбережені зміни на сторінці не '
+            'зберігаються</span></div>',
+            "Кабінет покупця — через:", mail.describe_sender(obj),
             reverse("admin:shop_shop_test_mail", args=[obj.pk]),
             reverse("admin:shop_shopmailtemplate_changelist") + f"?shop__id__exact={obj.pk}",
             reverse("admin:email_assistant_emailaccount_add"))

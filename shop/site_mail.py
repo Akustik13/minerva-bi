@@ -3,7 +3,7 @@
 Сайт (api/shop/_lib.php shop_mail_remote) раз на хвилину читає GET /api/v1/shop/site-mail/ своїм ключем:
 - «Сайт надсилає листи з цієї ж скриньки» вимкнено (managed = false) — сайт бере пошту з private/contact-config.php
   і /admin/ → «Пошта», як раніше;
-- увімкнено — SMTP, відправник, ім'я, «Відповіді покупців» і «Прихована копія» беруться з картки магазину;
+- увімкнено — SMTP, відправник, ім'я, «Відповіді покупців» і копії кожного листа (letters) — з картки магазину;
   підтвердження замовлення покупцю — «Сайт надсилає покупцю підтвердження замовлення», сповіщення про нові
   замовлення — «Сповіщення команді — на адреси» (порожньо — як на сайті).
 У тому самому запиті сайт повідомляє, що в його власних налаштуваннях пошти (без пароля), — це видно в картці.
@@ -38,11 +38,28 @@ def public_config(shop: Shop, key=None) -> dict:
         "from": acc.email_address,
         "from_name": shop.mail_from_name or acc.display_name or shop.name,
         "reply_to": shop.mail_reply_to,
-        "bcc": addresses(shop.mail_bcc),   # прихована копія листів покупцям (як у листах Minerva)
+        # Копії кожного листа сайту (ключі — сайт /admin/ → «📨 Листи»); сайт без підтримки бере лише bcc
+        "letters": letters(shop),
+        "bcc": letters(shop)["order_customer"]["bcc"],   # старі версії сайту: одна прихована копія листів покупцю
         "notify": addresses(shop.team_emails),
         "confirmation": bool(shop.site_order_confirmation),
     })
     return out
+
+
+def letters(shop: Shop) -> dict:
+    """{лист сайту: {cc: [...], bcc: [...]}} — копії з таблиці «Хто що кому шле» (shop.mail.copies)."""
+    from .mail import SITE_LETTERS, copies
+    out = {}
+    for key in SITE_LETTERS:
+        cc, bcc = copies(shop, key)
+        out[key] = {"cc": cc, "bcc": bcc}
+    return out
+
+
+def supports_letters(report: dict) -> bool:
+    """Сайт уже додає копії окремо для кожного листа (звітує mail_letters=1)."""
+    return bool((report or {}).get("letters"))
 
 
 def problem(shop: Shop) -> str:
@@ -56,6 +73,7 @@ def problem(shop: Shop) -> str:
 
 def record_report(shop: Shop, params, key=None) -> None:
     """Що в пошті сайту (його файли / /admin/): ?mail_site=…&mail_host=…&mail_user=…&mail_from=…&mail_password=1…
+    mail_letters=1 — сайт додає копії окремо для кожного листа (інакше — лише bcc листам покупцю).
     key — ключ API, яким сайт звернувся (дорожня карта показує, який сайт яким ключем працює)."""
     host = str(params.get("mail_site") or "").strip().lower()[:120]
     if not host or not all(c.isalnum() or c in ".-:" for c in host):
@@ -64,7 +82,8 @@ def record_report(shop: Shop, params, key=None) -> None:
     report = {"at": timezone.now().isoformat(timespec="seconds"), "source": text("mail_source", 20),
               "host": text("mail_host"), "user": text("mail_user"), "from": text("mail_from"),
               "password": params.get("mail_password") == "1", "notify": text("mail_notify", 300),
-              "confirmation": params.get("mail_confirmation") == "1", "recipient": text("mail_recipient")}
+              "confirmation": params.get("mail_confirmation") == "1", "recipient": text("mail_recipient"),
+              "letters": params.get("mail_letters") == "1"}
     if key is not None:
         report["key"] = key.pk
     reports = dict(shop.site_mail_reports or {})

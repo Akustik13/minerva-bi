@@ -860,16 +860,18 @@ def default_shop():
 
 def send_mail(inv: SalesInvoice, to: str, shop, *, subject_prefix: str = "", files: list | None = None) -> None:
     """Лист покупцю з рахунком у вкладенні — з пошти магазину (призначення «notices», як «Оплату отримано»:
-    скринька магазину або SMTP сповіщень), Reply-To і прихована копія — як у листах магазину. Помилки — винятком."""
+    скринька магазину або SMTP сповіщень), Reply-To як у листах магазину, копії — листа «Рахунок»
+    (Shop.mail_letters["invoice"]). Помилки — винятком."""
     import html
     from django.core.mail import EmailMultiAlternatives
     from shop import mail as shop_mail
     subject, body = mail_text(inv)
     cfg = shop_mail.smtp_settings(shop, "notices")
+    cc, bcc = shop_mail.copies(shop, "invoice", [to])   # копії листа «Рахунок» (картка магазину → «✉️ Пошта»)
     msg = EmailMultiAlternatives(
         subject=subject_prefix + subject, body=body, from_email=cfg["from"], to=[to],
         connection=shop_mail._connection(cfg), reply_to=[shop.mail_reply_to] if shop.mail_reply_to else None,
-        bcc=shop_mail.addresses(shop.mail_bcc) or None)
+        cc=cc or None, bcc=bcc or None)
     msg.attach_alternative('<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.45">'
                            + html.escape(body).replace("\n", "<br>") + "</div>", "text/html")
     for item in files if files is not None else [attachment(inv.pk)]:
