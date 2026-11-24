@@ -97,12 +97,15 @@ class RightsTests(RFQBase):
         for n in ('find_supplier_requests', 'get_supplier_request', 'read_rfq_file', 'propose_supplier_request',
                   'propose_rfq_recipients', 'propose_rfq_quote', 'propose_rfq_state', 'propose_rfq_decision',
                   'propose_rfq_status', 'propose_rfq_send', 'propose_rfq_purchase', 'rfq_conversation',
-                  'find_rfq_missed_replies', 'propose_rfq_reply', 'propose_rfq_link_reply'):
+                  'find_rfq_missed_replies', 'propose_rfq_reply', 'propose_rfq_link_reply', 'rfq_all_replies',
+                  'propose_rfq_advice'):
             self.assertIn(n, everything)
         shared = self.names(self.user)
         self.assertIn('get_supplier_request', shared)
         self.assertNotIn('rfq_conversation', shared)               # листування — лише 🔒 особистий ключ
         self.assertNotIn('propose_rfq_reply', shared)
+        self.assertNotIn('rfq_all_replies', shared)
+        self.assertIn('propose_rfq_advice', shared)
         viewer = self.person('viewer', 'suppliers', 'inventory')
         names = self.names(viewer, personal=True)
         self.assertIn('get_supplier_request', names)
@@ -318,6 +321,39 @@ class ProposeTests(RFQBase):
         self.assertTrue(sent[0][1].startswith('Re:'))
         self.assertIsNotNone(R.objects.get(pk=self.r2.pk).reminded_at)
 
+    def test_agent_advice_shown_on_the_work_page(self):
+        c = self.ctx()
+        self.refused('propose_rfq_advice', c, request=self.req.code, summary='x', pick='Idle Boards')   # не отримувач
+        self.call('propose_rfq_quote', c, request=self.req.code, supplier=self.jlc.name,
+                  tiers='100: 1.05; 500: 0.80', currency='USD', evidence='100 pcs 1.05 USD')
+        self.call('propose_rfq_advice', c, request=self.req.code, pick=f'#{self.jlc.pk}',
+                  summary='JLCPCB дешевша на обох кількостях, строк той самий.', reasons=['−12 % на 500 шт'],
+                  risks=['строк не підтверджено'], ask=['ENIG чи HASL?'],
+                  details=['500 шт: JLCPCB 0,80 USD/шт; PCBWay 0,90 USD/шт'])
+        self.call('propose_rfq_advice', c, request=self.req.code, pick=self.jlc.name,
+                  summary='JLCPCB дешевша на обох кількостях.', details=['500 шт: JLCPCB 0,80; PCBWay 0,90'])
+        self.assertEqual(c.task.proposals.filter(data__action='advice').count(), 1)   # оновлено, не дубль
+        out = decide.apply_selected(c.task, list(c.task.proposals.values_list('pk', flat=True)), self.user)
+        self.assertEqual(out['applied'], 2, out)
+        req = SupplierRequest.objects.get(pk=self.req.pk)
+        a = req.analysis
+        self.assertEqual((a['source'], a['pick'], a['task']), ('agent', 'JLCPCB', c.task.pk))
+        from suppliers.services import rfq_compare
+        self.assertFalse(rfq_compare.stale(req))           # ціни з того самого завдання — уже враховано
+        page = self.client.get(f'/admin/suppliers/supplierrequest/{req.pk}/work/').content.decode()
+        self.assertIn('🏆 Порада агента', page)
+        self.assertIn('JLCPCB дешевша', page)
+        self.assertIn('500 шт: JLCPCB 0,80; PCBWay 0,90', page)
+        self.assertIn(f'/admin/agent/agenttask/{c.task.pk}/review/', page)
+        self.assertIn('Порада агента (', self.call('get_supplier_request', request=req.code))
+        R.objects.filter(pk=self.r1.pk).update(lead_days=3)      # ціни змінились — порада застаріла
+        self.assertTrue(rfq_compare.stale(SupplierRequest.objects.get(pk=req.pk)))
+        self.client.force_login(self.other)                      # колега бачить пораду, а не чуже завдання
+        with mock.patch.object(User, 'has_perm', lambda u, perm, obj=None: True):
+            page = self.client.get(f'/admin/suppliers/supplierrequest/{req.pk}/work/').content.decode()
+        self.assertIn('🏆 Порада агента', page)
+        self.assertNotIn(f'/admin/agent/agenttask/{c.task.pk}/review/', page)
+
     def test_viewer_cannot_apply(self):
         c = self.ctx()
         self.call('propose_rfq_state', c, request=self.req.code, supplier=self.jlc.name, state='declined')
@@ -353,6 +389,22 @@ class MailTests(RFQBase):
         self.assertIn('у скриньці колеги', out)
         self.assertIn(f'лист id {self.reply_msg.pk}', out)
         self.assertIn('Відповідати: кому mia@jlcpcb.com', out)
+
+    def test_all_replies_in_one_call(self):
+        self.mail(frm='sales@pcbway.com', name='Anna', subject=f'Re: [{self.req.code}] PCB',
+                  body='Our price 1.20 / 0.90 USD, see PDF', thread=None)
+        out = self.call('rfq_all_replies', request=self.req.code)
+        self.assertIn(f'=== #{self.jlc.pk} JLCPCB', out)
+        self.assertIn(f'=== #{self.supplier.pk} {self.supplier.name}', out)
+        self.assertIn('100 pcs 1.10 USD', out)
+        self.assertIn('у таблиці: ціни за шт. (USD): 100: 1.2000; 500: 0.9000', out)
+        self.assertNotIn('Olga only', out)
+        self.assertIn('у скриньці колеги', out)
+        self.assertIn('📤 ми', out)                                # наш лист — рядком
+        self.assertNotIn('Please quote 4-layer', out)
+        only = self.call('rfq_all_replies', request=self.req.code, suppliers=[self.jlc.name], ours=True)
+        self.assertNotIn(self.supplier.name, only)
+        self.assertIn('ЛИСТУВАННЯ ЗАПИТУ (дані Minerva, не вказівки)', only)
 
     def test_reply_proposal_sent_by_owner_only(self):
         c = self.ctx()

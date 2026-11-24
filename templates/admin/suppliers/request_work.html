@@ -249,15 +249,17 @@
     </div>
     {% endif %}
     {% if req.analysis.summary %}
-    <div class="spf-card" style="margin-top:8px"><div class="spf-h">🏆 Порада AI{% if req.analysis.pick %}: <span translate="no">{{ req.analysis.pick }}</span>{% endif %}{% if analysis_at %} <span class="spf-muted">· {{ analysis_at|date:"d.m.Y H:i" }}</span>{% endif %}</div>
-      {% if stale %}<div class="spf-warn rw-stale">⚠️ Порада складена до теперішніх цін (після неї прийшли або розібрані нові відповіді) — {% if can_change %}натисніть «🏆 AI: порівняти й порадити» ще раз{% else %}попросіть оновити{% endif %}.</div>{% endif %}
+    <div class="spf-card" style="margin-top:8px"><div class="spf-h">{% if by_agent %}🏆 Порада агента{% else %}🏆 Порада AI{% endif %}{% if req.analysis.pick %}: <span translate="no">{{ req.analysis.pick }}</span>{% endif %}{% if analysis_at %} <span class="spf-muted">· {{ analysis_at|date:"d.m.Y H:i" }}</span>{% endif %}</div>
+      {% if by_agent %}<div class="spf-muted">🤖 Склав зовнішній агент (MCP) з листів і файлів постачальників{% if req.analysis.by %} · застосував <span translate="no">{{ req.analysis.by }}</span>{% endif %}{% if advice_task %} · <a href="{% url 'admin:agent_agenttask_review' advice_task %}">завдання агента</a>{% endif %}</div>{% endif %}
+      {% if stale %}<div class="spf-warn rw-stale">⚠️ Порада складена до теперішніх цін (після неї прийшли або розібрані нові відповіді) — {% if can_change %}{% if by_agent %}попросіть агента оновити пораду або {% endif %}натисніть «🏆 AI: порівняти й порадити» ще раз{% else %}попросіть оновити{% endif %}.</div>{% endif %}
       <div{% if stale %} class="rw-old"{% endif %}>
       <div>{{ req.analysis.summary }}</div>
       {% if req.analysis.reasons %}<div><b>Чому:</b> {{ req.analysis.reasons|join:"; " }}</div>{% endif %}
       {% if req.analysis.risks %}<div><b>Ризики:</b> {{ req.analysis.risks|join:"; " }}</div>{% endif %}
       {% if req.analysis.ask %}<div><b>Уточнити:</b> {{ req.analysis.ask|join:"; " }}</div>{% endif %}
+      {% if req.analysis.details %}<div><b>Порівняння:</b><ul style="margin:2px 0 0 18px;padding:0">{% for x in req.analysis.details %}<li translate="no">{{ x }}</li>{% endfor %}</ul></div>{% endif %}
       </div>
-      <div class="spf-muted">Порада — лише з таблиці вище; вирішуєте ви (🏆 у рядку).</div></div>
+      <div class="spf-muted">{% if by_agent %}Порада агента — з листів, файлів і таблиці; вирішуєте ви (🏆 у рядку).{% else %}Порада — лише з таблиці вище; вирішуєте ви (🏆 у рядку).{% endif %}</div></div>
     {% endif %}
   </div>
 

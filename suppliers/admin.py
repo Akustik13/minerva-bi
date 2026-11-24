@@ -663,6 +663,12 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             analysis_at = datetime.datetime.fromisoformat(str((req.analysis or {}).get("at") or ""))
         except ValueError:
             analysis_at = None
+        # 🏆 порада зовнішнього агента (MCP, agent/tools_rfq.py) — той самий блок; посилання на завдання — лише власнику
+        by_agent = (req.analysis or {}).get("source") == "agent"
+        advice_task = None
+        if by_agent and str((req.analysis or {}).get("task") or "").isdigit():
+            from agent.models import AgentTask
+            advice_task = AgentTask.objects.filter(pk=int(req.analysis["task"]), owner=request.user)                 .values_list("pk", flat=True).first()
         from inventory.models import Supplier
         in_req = {row["recipient"].supplier_id for row in rows}
         more = Supplier.objects.exclude(pk__in=in_req).exclude(status=Supplier.STATUS_BLOCKED)
@@ -687,7 +693,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             letters_pending=SupplierRequestLetter.objects.filter(request=req, user=request.user, sent_at=None).count(),
             chat_url_json=_js(reverse("admin:suppliers_supplierrequest_chat", args=[req.pk, 0])),
             colleagues=self._colleagues(),
-            analysis_at=analysis_at,
+            analysis_at=analysis_at, by_agent=by_agent, advice_task=advice_task,
             reparse=len(self._to_parse(req, False)), scope_choices=rfq_compare.SCOPE,
             planned=sum(1 for row in rows if row["recipient"].state in (SupplierRequestRecipient.PLANNED,
                                                                           SupplierRequestRecipient.FAILED))))
