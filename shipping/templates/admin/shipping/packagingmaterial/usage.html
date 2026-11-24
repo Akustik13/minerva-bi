@@ -17,8 +17,15 @@
   .pu-box h2 { margin: 0 0 8px; font-size: 16px; background: none; color: inherit; padding: 0; }
   .pu-muted { color: var(--body-quiet-color, #8aa0b4); font-size: 12px; }
   .pu-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .pu-table th, .pu-table td { padding: 5px 8px; border-bottom: 1px solid var(--border-color, #2a3a4e); text-align: left; }
-  .pu-table td.n { text-align: right; white-space: nowrap; }
+  .pu-table th, .pu-table td { padding: 6px 10px; border-bottom: 1px solid var(--border-color, #2a3a4e);
+                               text-align: left; vertical-align: middle; }
+  {# смужки між колонками й через рядок — щоб око не з'їжджало по довгому рядку #}
+  .pu-table th + th, .pu-table td + td { border-left: 1px solid var(--border-color, #2a3a4e); }
+  .pu-table tr:nth-child(even) td { background: rgba(127, 127, 127, .07); }
+  .pu-table tr:hover td { background: rgba(121, 174, 200, .14); }
+  {# числа, дати й розміри — по центру і в заголовку, і в комірці #}
+  .pu-table th.n, .pu-table td.n, .pu-table th.c, .pu-table td.c { text-align: center; white-space: nowrap;
+                                                                    font-variant-numeric: tabular-nums; }
   .pu-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
   .pu-form label { display: block; float: none; width: auto; padding: 0; font-size: 12px; }
   .pu-form input[type=number] { width: 90px; }
@@ -49,13 +56,13 @@
     <div class="pu-muted">Різниця Д / Ш / В: {{ g.spread|join:" / " }} см · ціль — найчастіше вживана активна, можна вибрати іншу активну; архівну (🗄) можна злити в ціль</div>
     {% if not g.target.is_active %}<div class="pu-muted">⚠️ Усі коробки групи в архіві — злити нікуди: спершу поверніть одну з архіву.</div>{% endif %}
     <div class="pu-wrap"><table class="pu-table">
-      <tr><th>Ціль</th><th>Злити</th><th>Коробка</th><th>Розміри, см</th><th class="n">За період</th><th class="n">Рекомендацій товарів</th><th class="n">На складі</th></tr>
+      <tr><th>Ціль</th><th>Злити</th><th>Коробка</th><th class="c">Розміри, см</th><th class="n">За період</th><th class="n">Рекомендацій товарів</th><th class="n">На складі</th></tr>
       {% for r in g.rows %}
       <tr class="{% if not r.m.is_active %}pu-arch{% endif %}">
         <td>{% if r.m.is_active %}<input type="radio" name="target" value="{{ r.m.pk }}" {% if forloop.first %}checked{% endif %}>{% else %}<span title="Архівна коробка не може бути ціллю">—</span>{% endif %}</td>
         <td><input type="checkbox" name="merge" value="{{ r.m.pk }}" {% if not forloop.first %}checked{% endif %}></td>
         <td><a href="{% url 'admin:shipping_packagingmaterial_change' r.m.pk %}" translate="no">{{ r.m.code|default:"—" }}</a> {{ r.m }}{% if not r.m.is_active %} 🗄{% endif %}</td>
-        <td translate="no">{{ r.dims }}{% if r.m.fold_heights %} <span class="pu-muted">↧ {{ r.m.fold_heights }}</span>{% endif %}</td>
+        <td class="c" translate="no">{{ r.dims }}{% if r.m.fold_heights %} <span class="pu-muted">↧ {{ r.m.fold_heights }}</span>{% endif %}</td>
         <td class="n">{{ r.st.boxes|default:0 }} шт</td>
         <td class="n">{{ r.st.recs|default:0 }}</td>
         <td class="n">{% if r.m.track_stock %}{{ r.m.stock_qty }}{% else %}—{% endif %}</td>
@@ -71,14 +78,14 @@
 <div class="pu-box">
   <h2>📊 Використання за {{ data.days }} дн.</h2>
   <div class="pu-wrap"><table class="pu-table">
-    <tr><th>Коробка</th><th>Розміри, см</th><th class="n">Штук</th><th class="n">Відправлень</th><th>Востаннє</th><th class="n">Рекомендацій товарів</th><th class="n">«Упаковано»</th><th class="n">На складі</th></tr>
+    <tr><th>Коробка</th><th class="c">Розміри, см</th><th class="n">Штук</th><th class="n">Відправлень</th><th class="c">Востаннє</th><th class="n">Рекомендацій товарів</th><th class="n">«Упаковано»</th><th class="n">На складі</th></tr>
     {% for r in rows %}
     <tr class="{% if not r.m.is_active %}pu-arch{% endif %}">
       <td><a href="{% url 'admin:shipping_packagingmaterial_change' r.m.pk %}" translate="no">{{ r.m.code|default:"—" }}</a> {{ r.m }}{% if not r.m.is_active %} 🗄{% endif %}</td>
-      <td translate="no">{{ r.dims }}</td>
+      <td class="c" translate="no">{{ r.dims }}</td>
       <td class="n"><b>{{ r.st.boxes|default:0 }}</b>{% if r.st.merged %}<br><span class="pu-muted" title="З них — відправлення з розмірами коробок, злитих у цю">🔀 {{ r.st.merged }} зі злитих</span>{% endif %}</td>
       <td class="n">{{ r.st.shipments|default:0 }}</td>
-      <td>{{ r.st.last|date:"d.m.Y"|default:"—" }}</td>
+      <td class="c">{{ r.st.last|date:"d.m.Y"|default:"—" }}</td>
       <td class="n">{{ r.st.recs|default:0 }}</td>
       <td class="n">{{ r.st.orders|default:0 }}</td>
       <td class="n">{% if r.m.track_stock %}{{ r.m.stock_qty }}{% if r.m.is_low %} ⚠️{% endif %}{% else %}—{% endif %}</td>
@@ -96,11 +103,11 @@
       → ціль {% if h.target %}<a href="{% url 'admin:shipping_packagingmaterial_change' h.target.pk %}" translate="no">{{ h.target.code|default:"—" }}</a> <span translate="no">{{ h.target }}</span>{% else %}(видалено){% endif %}
       {% if h.undone %} · <b>↩ відкочено</b> {{ h.undone|date:"d.m.Y H:i" }}{% if h.undone_by %} <span translate="no">{{ h.undone_by.get_full_name|default:h.undone_by.username }}</span>{% endif %}{% endif %}</div>
     <div class="pu-wrap"><table class="pu-table" style="margin-top:6px">
-      <tr><th>До злиття (за весь час)</th><th>Розміри, см</th><th class="n">Штук</th><th class="n">Відправлень</th><th>Востаннє</th><th class="n">Рекомендацій товарів</th><th class="n">«Упаковано»</th><th class="n">На складі</th></tr>
+      <tr><th>До злиття (за весь час)</th><th class="c">Розміри, см</th><th class="n">Штук</th><th class="n">Відправлень</th><th class="c">Востаннє</th><th class="n">Рекомендацій товарів</th><th class="n">«Упаковано»</th><th class="n">На складі</th></tr>
       {% for b in h.before %}
       <tr><td>{% if forloop.first %}🎯 {% else %}🔀 {% endif %}<span translate="no">{{ b.code|default:"—" }} {{ b.name }}</span></td>
-        <td translate="no">{{ b.dims }}</td><td class="n">{{ b.boxes }}</td><td class="n">{{ b.shipments }}</td>
-        <td>{{ b.last|slice:":10"|default:"—" }}</td><td class="n">{{ b.recs }}</td><td class="n">{{ b.orders }}</td>
+        <td class="c" translate="no">{{ b.dims }}</td><td class="n">{{ b.boxes }}</td><td class="n">{{ b.shipments }}</td>
+        <td class="c">{{ b.last|slice:":10"|default:"—" }}</td><td class="n">{{ b.recs }}</td><td class="n">{{ b.orders }}</td>
         <td class="n">{% if b.stock is not None %}{{ b.stock }}{% else %}—{% endif %}</td></tr>
       {% endfor %}
       <tr><td><b>Разом до злиття</b></td><td></td><td class="n"><b>{{ h.total.boxes|default:0 }}</b></td><td class="n"><b>{{ h.total.shipments|default:0 }}</b></td><td></td><td class="n">{{ h.total.recs|default:0 }}</td><td class="n">{{ h.total.orders|default:0 }}</td><td></td></tr>
@@ -122,9 +129,9 @@
   <h2>❔ Розміри посилок без коробки в каталозі</h2>
   <div class="pu-muted">Такі розміри вписували у відправлення, але жодна активна коробка їм не відповідає — можливо, варто додати коробку.</div>
   <div class="pu-wrap"><table class="pu-table">
-    <tr><th>Д × Ш × В, см</th><th class="n">Штук</th><th class="n">Відправлень</th><th>Востаннє</th></tr>
+    <tr><th class="c">Д × Ш × В, см</th><th class="n">Штук</th><th class="n">Відправлень</th><th class="c">Востаннє</th></tr>
     {% for u in data.unmatched %}
-    <tr><td translate="no">{{ u.dims }}</td><td class="n">{{ u.boxes }}</td><td class="n">{{ u.shipments }}</td><td>{{ u.last|date:"d.m.Y"|default:"—" }}</td></tr>
+    <tr><td class="c" translate="no">{{ u.dims }}</td><td class="n">{{ u.boxes }}</td><td class="n">{{ u.shipments }}</td><td class="c">{{ u.last|date:"d.m.Y"|default:"—" }}</td></tr>
     {% endfor %}
   </table></div>
   <div style="margin-top:8px"><a class="button" href="{% url 'admin:shipping_packagingmaterial_add' %}">＋ Додати коробку</a></div>
