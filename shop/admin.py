@@ -904,7 +904,31 @@ class ShopAdmin(admin.ModelAdmin):
             path("<int:pk>/review-done/", self.admin_site.admin_view(self._review_done_view),
                  name="shop_shop_review_done"),
             path("<int:pk>/rag-model/", self.admin_site.admin_view(self._rag_model_view), name="shop_shop_rag_model"),
+            path("<int:pk>/mail-preview/", self.admin_site.admin_view(self._mail_preview_view),
+                 name="shop_shop_mail_preview"),
         ] + super().get_urls()
+
+    def _mail_preview_view(self, request, pk):
+        """POST → JSON «👁 Приклад» листа (shop/mail_preview.py): від кого, кому, копії, тема, текст. Значення таблиці
+        зі сторінки (ще не збережені) — лише людині з правом змінювати магазин; нічого не зберігає й не надсилає."""
+        from django.core.exceptions import PermissionDenied
+        from django.http import JsonResponse
+        from django.shortcuts import get_object_or_404
+        from . import mail_preview
+        shop = get_object_or_404(Shop, pk=pk)
+        if request.method != "POST" or not self.has_view_permission(request, shop):
+            raise PermissionDenied
+        p = request.POST
+        shop_now, errors = mail_preview.apply_form(shop, p if self.has_change_permission(request, shop) else None)
+        try:
+            data = mail_preview.preview(shop_now, p.get("pv_letter", ""), p.get("pv_lang") or "de",
+                                        p.get("pv_method") or "prepayment", p.get("pv_variant") or "")
+        except mail_preview.PreviewError as e:
+            return JsonResponse({"ok": False, "error": str(e)}, status=400)
+        data["notes"] = [f"Неправильна адреса в копії — у прикладі не врахована: {e}" for e in errors] + data["notes"]
+        if mail_preview.unsaved(shop, shop_now):
+            data["notes"].insert(0, "Показано зі змінами на сторінці, які ще не збережено (кнопка «Зберегти» внизу).")
+        return JsonResponse({"ok": True, **data})
 
     def _rag_model_view(self, request, pk):
         """POST → JSON: яка модель зараз відповідає на RAG-ПК (search_assist.rag_now)."""

@@ -300,6 +300,15 @@ def copies(shop, letter: str, to=()) -> tuple[list[str], list[str]]:
     return cc, bcc
 
 
+def copies_from_post(post) -> dict:
+    """Поля таблиці «Хто що кому шле» mlc__<лист> / mlb__<лист> → {лист: {"cc": текст, "bcc": текст}}."""
+    raw = {}
+    for name in post:
+        if name.startswith(("mlc__", "mlb__")):
+            raw.setdefault(name[5:], {})["cc" if name.startswith("mlc__") else "bcc"] = post.get(name)
+    return raw
+
+
 def clean_copies(raw: dict) -> tuple[dict, list[str]]:
     """{лист: {"cc": текст, "bcc": текст}} з форми → (mail_letters, помилки). Лише відомі листи й поля,
     адреси — validate_email, до COPY_MAX у полі; порожні записи не зберігаються."""

@@ -124,12 +124,8 @@ class ShopForm(forms.ModelForm):
         ставить mail_letters_form=1) → instance.mail_letters; немає таблиці на сторінці — без змін."""
         if self.data.get("mail_letters_form") != "1":
             return
-        from .mail import clean_copies
-        raw = {}
-        for name in self.data:
-            if name.startswith(("mlc__", "mlb__")):
-                raw.setdefault(name[5:], {})["cc" if name.startswith("mlc__") else "bcc"] = self.data.get(name)
-        letters, errors = clean_copies(raw)
+        from .mail import clean_copies, copies_from_post
+        letters, errors = clean_copies(copies_from_post(self.data))
         for e in errors:
             self.add_error(None, e)
         if not errors:

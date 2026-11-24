@@ -275,7 +275,9 @@ def _links(items) -> str:
 
 
 def _what(r) -> str:
-    return format_html('<b>{}</b><div class="nt-when">{}</div>', r["title"], r["when"])
+    return format_html('<b>{}</b><div class="nt-when">{}</div>'
+                       '<button type="button" class="mm-pv" data-letter="{}" title="{}">👁 {}</button>',
+                       r["title"], r["when"], r["key"], "Від кого, кому, копії, тема й текст — приклад", "Приклад")
 
 
 def _from(r) -> str:
@@ -379,10 +381,14 @@ def render(shop: Shop) -> str:
         "Також покупцям магазину пише Minerva (налаштовується не тут): 📧 «посилку відправлено» і 📥 «замовлення "
         "отримано» — з копією, у",
         reverse("admin:config_notificationsettings_changelist"), "Налаштування → Сповіщення → «👤 Клієнтам»")
+    from django.templatetags.static import static
     return format_html(
-        '{}<input type="hidden" name="mail_letters_form" value="1">{}{}{}{}'
+        '{}<input type="hidden" name="mail_letters_form" value="1">'
+        '<div id="mm-pv-root" data-url="{}" hidden></div><script src="{}?v={}" defer></script>{}{}{}{}'
         '<div class="help">{}</div>{}<span data-nt-hide="{}"></span>',
-        w.assets(notify_routes.email_options(ns), notify_routes.chat_options(ns)) + STYLE, warn, boxes, customer, team,
+        w.assets(notify_routes.email_options(ns), notify_routes.chat_options(ns)) + STYLE,
+        reverse("admin:shop_shop_mail_preview", args=[shop.pk]), static("admin/js/mv_mail_preview.js"),
+        PREVIEW_VERSION, warn, boxes, customer, team,
         "Скриньки, «Кому», копії й галочки змінюються тут (адреса — «＋ адреса з Minerva» або своя й Enter) і "
         "зберігаються кнопкою «Зберегти» внизу сторінки. Копія (CC) — адресу видно отримувачу, прихована копія (BCC) — "
         "ні. Листи з одноразовими посиланнями не копіюються. Дані сайту — з його останнього звіту; «📝 Текст» — "
@@ -390,12 +396,30 @@ def render(shop: Shop) -> str:
         other, " ".join(dict.fromkeys(synced)))
 
 
+PREVIEW_VERSION = "1"   # static/admin/js/mv_mail_preview.js — підняти при зміні
+
 STYLE = mark_safe("<style>" + (
     ".mm-table{margin-bottom:12px}.mm-table select.mm-route{width:280px;max-width:100%}"
     ".mm-wrap{overflow-x:auto;margin-bottom:12px}.mm-wrap .mm-table{margin-bottom:0}"
     ".mm-table th.mm-copy{min-width:190px}.mm-table td{vertical-align:top}.mm-table td.nt-what{min-width:200px}"
     ".mm-warn{background:#fff3e0;color:#6d3500;border-left:3px solid #ef6c00;border-radius:4px;padding:4px 8px;"
-    "margin:0 0 8px;line-height:1.45}") + "</style>")
+    "margin:0 0 8px;line-height:1.45}"
+    ".mm-pv{margin-top:4px;border:1px solid var(--hairline-color,#ccc);background:var(--body-bg,#fff);color:inherit;"
+    "border-radius:12px;padding:1px 10px;font-size:12px;cursor:pointer}.mm-pv:hover{border-color:var(--link-fg,#447e9b)}"
+    "#mm-pv-dlg{width:min(860px,96vw);max-height:92vh;border:1px solid var(--hairline-color,#ccc);border-radius:10px;"
+    "padding:0;background:var(--body-bg,#fff);color:var(--body-fg,#333)}#mm-pv-dlg::backdrop{background:rgba(0,0,0,.45)}"
+    "#mm-pv-dlg .pv-head{display:flex;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid "
+    "var(--hairline-color,#ddd);position:sticky;top:0;background:inherit}#mm-pv-dlg .pv-head b{flex:1}"
+    "#mm-pv-dlg .pv-body{padding:10px 14px;overflow:auto;max-height:calc(92vh - 52px)}"
+    "#mm-pv-dlg .pv-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}"
+    "#mm-pv-dlg table{width:100%;border-collapse:collapse;font-size:13px}#mm-pv-dlg th{text-align:left;"
+    "white-space:nowrap;padding:3px 10px 3px 0;vertical-align:top;color:var(--body-quiet-color,#666);font-weight:600}"
+    "#mm-pv-dlg td{padding:3px 0;word-break:break-word}#mm-pv-dlg .pv-chip{border-radius:10px;padding:1px 8px;"
+    "font-size:12px}#mm-pv-dlg .pv-on{background:#e8f5e9;color:#1b5e20}#mm-pv-dlg .pv-off{background:#ffebee;color:#8e1b1b}"
+    "#mm-pv-dlg .pv-note{background:#fff3e0;color:#6d3500;border-left:3px solid #ef6c00;border-radius:4px;"
+    "padding:4px 8px;margin:6px 0}#mm-pv-dlg pre{white-space:pre-wrap;font-size:13px;background:var(--darkened-bg,#f6f6f6);"
+    "padding:10px;border-radius:6px;margin:8px 0 0}#mm-pv-dlg iframe{width:100%;height:420px;border:1px solid "
+    "var(--hairline-color,#ddd);border-radius:6px;background:#fff;margin-top:8px}") + "</style>")
 
 
 def save_routes(shop: Shop, post) -> list[str]:
