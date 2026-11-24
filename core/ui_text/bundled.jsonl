@@ -202,6 +202,7 @@
 {"uk": "(+{0} після попереднього кроку)", "en": "(+{0} after the previous step)", "de": "(+{0} nach dem vorherigen Schritt)"}
 {"uk": "(1 {0} = {1} {2} — ціни на DigiKey не зміняться)", "en": "(1 {0} = {1} {2} — prices on DigiKey will not change)", "de": "(1 {0} = {1} {2} — die Preise auf DigiKey ändern sich nicht)"}
 {"uk": "(2 літери)", "en": "(2 letters)", "de": "(2 Buchstaben)"}
+{"uk": "(= файл постачальника #{0}, текст нижче)", "en": "(= supplier's file #{0}, text below)", "de": "(= Datei des Lieferanten #{0}, Text unten)"}
 {"uk": "(?:(?<![\\w./-])(\\d{1,7}(?:[.,]\\d+)?)\\s*(?:pcs|pc|stk\\.?|stück|st\\.|шт\\.?|units?|x|×)(?!\\w))|(?:(?:x|×|qty:?|menge:?)\\s*(\\d{1,7})(?!\\w))", "en": "(?:(?<![\\w./-])(\\d{1,7}(?:[.,]\\d+)?)\\s*(?:pcs|pc|stk\\.?|stück|st\\.|шт\\.?|units?|x|×)(?!\\w))|(?:(?:x|×|qty:?|menge:?)\\s*(\\d{1,7})(?!\\w))", "de": "(?:(?<![\\w./-])(\\d{1,7}(?:[.,]\\d+)?)\\s*(?:pcs|pc|stk\\.?|stück|st\\.|шт\\.?|units?|x|×)(?!\\w))|(?:(?:x|×|qty:?|menge:?)\\s*(\\d{1,7})(?!\\w))"}
 {"uk": "(?:schrieb|wrote|geschrieben|написав|написал)\\s*:\\s", "en": "(?:schrieb|wrote|geschrieben|написав|написал)\\s*:\\s", "de": "(?:schrieb|wrote|geschrieben|написав|написал)\\s*:\\s"}
 {"uk": "(?<![\\w.,/-])(\\d{1,6}(?:[.,]\\d{1,3})?)\\s*(?:x\\s*)?(?:units?|pcs\\.?|pieces?|stk\\.?|stück|st\\.|шт\\.?|штук\\w*|items?|ea)(?!\\w)", "en": "(?<![\\w.,/-])(\\d{1,6}(?:[.,]\\d{1,3})?)\\s*(?:x\\s*)?(?:units?|pcs\\.?|pieces?|stk\\.?|stück|st\\.|шт\\.?|штук\\w*|items?|ea)(?!\\w)", "de": "(?<![\\w.,/-])(\\d{1,6}(?:[.,]\\d{1,3})?)\\s*(?:x\\s*)?(?:units?|pcs\\.?|pieces?|stk\\.?|stück|st\\.|шт\\.?|штук\\w*|items?|ea)(?!\\w)"}
@@ -17903,6 +17904,7 @@
 {"uk": "Текст розшифровки {0} в {1} (Anthropic, США) {2} — учасники погодились (підтвердив той, хто записав)", "en": "Transcript text {0} in {1} (Anthropic, USA) {2} — participants agreed (confirmed by the person who recorded)", "de": "Transkripttext {0} in {1} (Anthropic, USA) {2} — Teilnehmende haben zugestimmt (bestätigt von der Person, die aufgenommen hat)"}
 {"uk": "Текст сторінки за посиланням (Minerva забирає сама)", "en": "Text of the page at the link (Minerva fetches it itself)", "de": "Text der Seite unter dem Link (Minerva holt ihn selbst ab)"}
 {"uk": "Текст файлу запиту (наш: креслення, BOM, стекап, ZIP з Gerber — назви й README) або файлу, який надіслав постачальник (його пропозиція, PI): file — id з get_supplier_request («файл #N» — наш, «файл постачальника #N» — kind=reply). PDF, DOCX, XLSX, CSV, TXT, ZIP.", "en": "Text of a request file (ours: drawing, BOM, stack-up, ZIP with Gerber — names and README) or of a file the supplier sent (their offer, PI): file — id from get_supplier_request («файл #N» — ours, «файл постачальника #N» — kind=reply). PDF, DOCX, XLSX, CSV, TXT, ZIP.", "de": "Text einer Datei der Anfrage (unsere: Zeichnung, BOM, Lagenaufbau, ZIP mit Gerber – Namen und README) oder einer Datei des Lieferanten (sein Angebot, PI): file – ID aus get_supplier_request („файл #N“ – unsere, „файл постачальника #N“ – kind=reply). PDF, DOCX, XLSX, CSV, TXT, ZIP."}
+{"uk": "Текст файлів постачальника (за замовчуванням — так)", "en": "Text of the supplier's files (default — yes)", "de": "Text der Dateien des Lieferanten (Standard – ja)"}
 {"uk": "Текст із форми листа разом із підписом і цитатою; порожньо — лише текст (AI)", "en": "Text from the email form with signature and quote; empty — text only (AI)", "de": "Text aus dem E-Mail-Formular samt Signatur und Zitat; leer — nur Text (KI)"}
 {"uk": "Текст — можна свій, у будь-якому вигляді", "en": "Text — your own, in any form", "de": "Text — eigener, in beliebiger Form"}
 {"uk": "Текст, який читали вголос", "en": "Text that was read aloud", "de": "Vorgelesener Text"}
@@ -18987,6 +18989,7 @@
 {"uk": "Файли нашого запиту ({0})", "en": "Files of our request ({0})", "de": "Dateien unserer Anfrage ({0})"}
 {"uk": "Файли не вибрані", "en": "No files selected", "de": "Keine Dateien ausgewählt"}
 {"uk": "Файли не знайдено. Відкрийте DevTools (F12) → Console і скопіюйте вивід «Order files debug»", "en": "No files found. Open DevTools (F12) → Console and copy the output of “Order files debug”", "de": "Keine Dateien gefunden. Öffnen Sie DevTools (F12) → Console und kopieren Sie die Ausgabe von „Order files debug“"}
+{"uk": "Файли постачальника ({0})", "en": "Supplier's files ({0})", "de": "Dateien des Lieferanten ({0})"}
 {"uk": "Файли постачальників", "en": "Supplier files", "de": "Dateien der Lieferanten"}
 {"uk": "Файли разом завеликі для листа (понад {0} МБ) — зніміть «📎 Додати файли» або приберіть частину файлів", "en": "The files together are too large for an e-mail (over {0} MB) — untick «📎 Attach files» or remove some files", "de": "Die Dateien sind zusammen zu groß für eine E-Mail (über {0} MB) — «📎 Dateien anhängen» abwählen oder einige Dateien entfernen"}
 {"uk": "Файли разом понад {0} МБ — більшість пошт не прийме. Стисніть у ZIP або дайте посилання в тексті.", "en": "Files together exceed {0} MB — most mail servers will not accept them. Compress into a ZIP or put a link in the text.", "de": "Dateien zusammen über {0} MB — die meisten Mailserver nehmen das nicht an. In ZIP komprimieren oder Link in den Text."}
@@ -25008,6 +25011,9 @@
 {"uk": "файл не збережено в Minerva — лише на поштовому сервері", "en": "file not saved in Minerva — only on the mail server", "de": "Datei nicht in Minerva gespeichert – nur auf dem Mailserver"}
 {"uk": "файл не прив’язано до товару складу", "en": "file not linked to a stock product", "de": "Datei nicht mit einem Lagerartikel verknüpft"}
 {"uk": "файл постачальника #{0} {1} ({2})", "en": "supplier's file #{0} {1} ({2})", "de": "Datei des Lieferanten #{0} {1} ({2})"}
+{"uk": "файл постачальника #{0} {1} {2}", "en": "supplier's file #{0} {1} {2}", "de": "Datei des Lieferanten #{0} {1} {2}"}
+{"uk": "файл постачальника #{0} {1} {2}: без тексту (скан, картинка, креслення) — відкрийте в Minerva", "en": "supplier's file #{0} {1} {2}: no text (scan, picture, drawing) — open it in Minerva", "de": "Datei des Lieferanten #{0} {1} {2}: ohne Text (Scan, Bild, Zeichnung) – öffnen Sie sie in Minerva"}
+{"uk": "файл постачальника #{0} {1}: уже немає на диску", "en": "supplier's file #{0} {1}: no longer on disk", "de": "Datei des Lieferanten #{0} {1}: nicht mehr auf dem Datenträger"}
 {"uk": "файл сайту", "en": "site file", "de": "Website-Datei"}
 {"uk": "файл товару в Minerva", "en": "product file in Minerva", "de": "Artikeldatei in Minerva"}
 {"uk": "файл у Minerva", "en": "file in Minerva", "de": "Datei in Minerva"}
@@ -25355,6 +25361,7 @@
 {"uk": "ще потрібно: {0}", "en": "still needed: {0}", "de": "noch erforderlich: {0}"}
 {"uk": "ще раз", "en": "again", "de": "erneut"}
 {"uk": "ще раз — лише пропущений лист або лист з помилкою", "en": "again — only a skipped or failed email", "de": "erneut — nur eine übersprungene oder fehlerhafte E-Mail"}
+{"uk": "ще файли (read_rfq_file kind=reply)", "en": "more files (read_rfq_file kind=reply)", "de": "weitere Dateien (read_rfq_file kind=reply)"}
 {"uk": "ще файлів: {0} — у картці", "en": "{0} more files — in the card", "de": "weitere Dateien: {0} — in der Karte"}
 {"uk": "що в картці лістингу", "en": "what is in the listing card", "de": "was in der Listing-Karte steht"}
 {"uk": "що вже є в базі (можливо, виправлений вручну), замінюється тільки після підтвердження.", "en": "that is already in the database (possibly corrected manually) is replaced only after confirmation.", "de": "die bereits in der Datenbank vorhanden ist (möglicherweise manuell korrigiert), wird erst nach Bestätigung ersetzt."}
@@ -25575,6 +25582,7 @@
 {"uk": "… і ще {0}", "en": "… and {0} more", "de": "… und {0} weitere"}
 {"uk": "… і ще {0} товарів — за тими самими курсами.", "en": "… and {0} more products — at the same rates.", "de": "… und {0} weitere Artikel — zu denselben Kursen."}
 {"uk": "… і ще пропущено {0}", "en": "… and {0} more skipped", "de": "… und {0} weitere übersprungen"}
+{"uk": "…(далі — read_rfq_file kind=reply)", "en": "…(more — read_rfq_file kind=reply)", "de": "…(weiter – read_rfq_file kind=reply)"}
 {"uk": "…(обрізано — звузьте пошук)", "en": "…(truncated — narrow the search)", "de": "…(gekürzt — Suche eingrenzen)"}
 {"uk": "…(обрізано — решту візьміть rfq_conversation або suppliers=…)", "en": "…(cut — get the rest with rfq_conversation or suppliers=…)", "de": "…(gekürzt – den Rest mit rfq_conversation oder suppliers=… holen)"}
 {"uk": "…(обрізано)", "en": "…(обрізано)", "de": "…(обрізано)"}

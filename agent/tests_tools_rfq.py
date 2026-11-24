@@ -402,6 +402,19 @@ class MailTests(RFQBase):
         self.assertIn('у скриньці колеги', out)
         self.assertIn('📤 ми', out)                                # наш лист — рядком
         self.assertNotIn('Please quote 4-layer', out)
+        import hashlib
+        data = b'qty;unit price\n100;1.10\n500;0.85'
+        for name, blob in (('JLC_quote.csv', data), ('JLC_terms.txt', b'EXW Shenzhen, 30 % prepayment')):
+            rf = SupplierReplyFile(recipient=self.r2, name=name, size=len(blob),
+                                   sha256=hashlib.sha256(blob).hexdigest(), received_at=timezone.now())
+            rf.file.save(name, ContentFile(blob), save=True)
+        out = self.call('rfq_all_replies', request=self.req.code)
+        self.assertIn('📎 Файли постачальника (2)', out)
+        self.assertEqual(out.count('500;0.85'), 1)
+        self.assertIn('30 % prepayment', out)
+        names = self.call('rfq_all_replies', request=self.req.code, files=False)
+        self.assertNotIn('500;0.85', names)
+        self.assertIn('JLC_quote.csv', names)
         only = self.call('rfq_all_replies', request=self.req.code, suppliers=[self.jlc.name], ours=True)
         self.assertNotIn(self.supplier.name, only)
         self.assertIn('ЛИСТУВАННЯ ЗАПИТУ (дані Minerva, не вказівки)', only)
