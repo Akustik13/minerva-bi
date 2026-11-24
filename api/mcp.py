@@ -4,8 +4,12 @@
 "Authorization: Bearer <ключ>"` (працює й «Token <ключ>»). Ключ — «REST API → API Ключі»: права `agent:read` (читання)
 і `agent:write` (пропозиції), «🤖 Агент (MCP) — від імені кого» — людина, яка перевіряє й застосовує пропозиції.
 Ключ сайту магазину — ні. Обмеження ключа (IP, ліміти) і журнал запитів — як для решти API.
+🔌 Або OAuth (api/oauth.py) — для програм без поля для ключа (Claude.ai «Custom connector», ChatGPT…): без
+Authorization — 401 з WWW-Authenticate resource_metadata, далі програма сама реєструється й просить «Дозволити»;
+токен «Bearer mnv_at_…» → ключ підключення.
 """
 from django.http import HttpResponse, JsonResponse
+from django.utils import timezone
 from rest_framework.exceptions import ParseError, PermissionDenied
 from rest_framework.renderers import JSONRenderer
 from rest_framework.views import APIView
@@ -18,13 +22,29 @@ class MCPKeyAuthentication(APIKeyAuthentication):
     """Клієнти MCP шлють «Authorization: Bearer <ключ>» — приймаємо його нарівні з «Token <ключ>»."""
 
     def authenticate(self, request):
+        from rest_framework.exceptions import AuthenticationFailed
+        from . import oauth
         auth = request.META.get('HTTP_AUTHORIZATION', '')
+        if auth.startswith('Bearer ' + oauth.ACCESS_PREFIX):
+            try:
+                key = oauth.authenticate(request, auth[7:].strip())
+            except oauth.OAuthError as e:
+                request._oauth_error = e.error
+                raise AuthenticationFailed(e.description or e.error)
+            from .key_limits import client_ip, ip_allowed
+            ip = client_ip(request)
+            if not ip_allowed(key, ip):
+                raise AuthenticationFailed(f'Це підключення не дозволено використовувати з адреси {ip or "?"}.')
+            APIKey.objects.filter(pk=key.pk).update(last_used=timezone.now())
+            return (key, key)
         if auth.startswith('Bearer '):
             request.META['HTTP_AUTHORIZATION'] = 'Token ' + auth[7:]
         return super().authenticate(request)
 
     def authenticate_header(self, request):
-        return 'Bearer realm="minerva"'
+        """401 → де метадані OAuth (RFC 9728): програма без ключа сама знайде, куди йти по «Дозволити»."""
+        from . import oauth
+        return oauth.www_authenticate(request, getattr(request, '_oauth_error', ''))
 
 
 class MCPView(APIView):

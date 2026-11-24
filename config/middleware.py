@@ -12,6 +12,8 @@ EXEMPT_PREFIXES = [
     "/api/",
     "/api-auth/",
     "/privacy/",   # публічна сторінка конфіденційності (застосунок Google OAuth)
+    "/oauth/",     # 🔌 OAuth MCP: «Дозволити» й токени (api/oauth.py)
+    "/.well-known/",
 ]
 
 

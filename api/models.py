@@ -108,6 +108,11 @@ class APIKey(models.Model):
                   'можуть (на випадок витоку). Лише особистий ключ з «🤖 Агент (MCP)» = власник дає агенту вашу пошту, '
                   'календар і робочий час. Не ставте для ключа сайту магазину, RAG чи інтеграцій — їх ведуть кілька '
                   'людей.')
+    # 🔌 Підключення програми через OAuth (api/oauth.py): ключ створює Minerva після «Дозволити»; сам ключ не діє —
+    # лише токени OAuth, що на нього посилаються. Вимкнути підключення — зняти «Активний».
+    oauth_client = models.ForeignKey(
+        'OAuthClient', null=True, blank=True, on_delete=models.CASCADE, related_name='keys', editable=False,
+        verbose_name='🔌 Підключення OAuth')
 
     class Meta:
         verbose_name = 'API Ключ'
@@ -130,7 +135,10 @@ class APIKey(models.Model):
         return bool(self.private and (user is None or self.owner_id != user.pk))
 
     def personal_ok(self) -> bool:
-        """Чи можна через цей ключ особисте (пошта, календар, робочий час): особистий ключ, агент — сам власник."""
+        """Чи можна через цей ключ особисте (пошта, календар, робочий час): особистий ключ, агент — сам власник.
+        🔌 OAuth — ще й лише якщо людина дозволила це у вікні «Дозволити» (токен ставить `oauth_personal`)."""
+        if self.oauth_client_id and not getattr(self, 'oauth_personal', False):
+            return False
         return bool(self.private and self.owner_id and self.agent_user_id == self.owner_id)
 
     @property
@@ -140,6 +148,49 @@ class APIKey(models.Model):
     @property
     def is_anonymous(self):
         return False
+
+
+class OAuthClient(models.Model):
+    """🔌 Програма, що підключається до MCP через OAuth (Claude.ai, Claude Code, ChatGPT…). Реєструється сама
+    (RFC 7591, api/oauth.py); доступ дає людина у вікні «Дозволити» — кожне підключення стає 🔒 ключем API."""
+    client_id = models.CharField('ID програми', max_length=64, unique=True, editable=False)
+    secret_hash = models.CharField(max_length=64, blank=True, default='', editable=False)
+    name = models.CharField('Назва (як програма себе назвала)', max_length=100)
+    redirect_uris = models.JSONField('Адреси повернення', default=list)
+    client_uri = models.CharField('Сайт програми', max_length=300, blank=True, default='')
+    created_at = models.DateTimeField('Зареєстровано', auto_now_add=True)
+    created_ip = models.CharField('З адреси', max_length=45, blank=True, default='')
+
+    class Meta:
+        verbose_name = '🔌 Програма OAuth (MCP)'
+        verbose_name_plural = '🔌 Програми OAuth (MCP)'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.name
+
+
+class OAuthToken(models.Model):
+    """Код дозволу, токен доступу й токен оновлення OAuth (api/oauth.py) — у базі лише SHA-256."""
+    CODE, ACCESS, REFRESH = 'code', 'access', 'refresh'
+    KINDS = [(CODE, 'Код дозволу'), (ACCESS, 'Токен доступу'), (REFRESH, 'Токен оновлення')]
+    kind = models.CharField(max_length=8, choices=KINDS)
+    token_hash = models.CharField(max_length=64, unique=True)
+    client = models.ForeignKey(OAuthClient, on_delete=models.CASCADE, related_name='tokens')
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='+')
+    api_key = models.ForeignKey(APIKey, null=True, blank=True, on_delete=models.CASCADE, related_name='oauth_tokens')
+    scopes = models.JSONField(default=list)
+    personal = models.BooleanField(default=False)          # дозволено пошту, календар, робочий час
+    redirect_uri = models.CharField(max_length=500, blank=True, default='')
+    code_challenge = models.CharField(max_length=128, blank=True, default='')
+    resource = models.CharField(max_length=300, blank=True, default='')
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)  # код і токен оновлення — одноразові
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Токен OAuth'
+        verbose_name_plural = 'Токени OAuth'
 
 
 def _webhook_secret():

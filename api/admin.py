@@ -5,11 +5,12 @@ from django.http import HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from django.contrib import messages
 from django.utils import timezone
 
-from .models import APIKey, APIRequestLog, SCOPE_CHOICES, Webhook, WebhookDelivery, WEBHOOK_EVENTS
+from .models import (APIKey, APIRequestLog, OAuthClient, OAuthToken, SCOPE_CHOICES, Webhook, WebhookDelivery,
+                     WEBHOOK_EVENTS)
 
 
 class APIKeyForm(forms.ModelForm):
@@ -42,6 +43,8 @@ class APIKeyForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if self.instance.pk:
             self.fields['scopes_input'].initial = self.instance.scopes
+            if self.instance.oauth_client_id:      # 🔌 OAuth: права — ті, що людина дозволила у вікні «Дозволити»
+                self.fields['scopes_input'].disabled = True
 
     request_user = None           # хто зберігає (APIKeyAdmin.get_form) — власник нового ключа
 
@@ -70,7 +73,8 @@ class APIKeyAdmin(admin.ModelAdmin):
     list_filter   = ['is_active', 'private']
     search_fields = ['name']
     readonly_fields = ['key_display', 'key_hidden_display', 'owner_display', 'created_at', 'last_used',
-                       'usage_display', 'activity_panel', 'insight_panel']
+                       'usage_display', 'activity_panel', 'insight_panel', 'oauth_display']
+    OAUTH_LOCKED = ('agent_user', 'private', 'shop', 'default_source')
     actions = ['action_deactivate']
 
     fieldsets = [
@@ -122,7 +126,36 @@ class APIKeyAdmin(admin.ModelAdmin):
         if obj is not None and obj.hidden_from(request.user):     # чужий особистий — без повного ключа на сторінці
             sets = [(title, {**opts, 'fields': ['key_hidden_display' if f == 'key_display' else f
                                                 for f in opts['fields']]}) for title, opts in sets]
+        if obj is not None and obj.oauth_client_id:               # 🔌 OAuth: сам ключ не діє — лише токени
+            sets = [(title, {**opts, 'fields': ([] if i else ['oauth_display']) + [
+                f for f in opts['fields'] if f not in ('key_display', 'key_hidden_display')]})
+                for i, (title, opts) in enumerate(sets)]
         return sets
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = list(super().get_readonly_fields(request, obj))
+        if obj is not None and obj.oauth_client_id:
+            fields += [f for f in self.OAUTH_LOCKED if f not in fields]
+        return fields
+
+    @admin.display(description='🔌 Підключення OAuth')
+    def oauth_display(self, obj):
+        from django.utils import timezone as tz
+        c = obj.oauth_client if obj and obj.oauth_client_id else None
+        if c is None:
+            return '—'
+        live = obj.oauth_tokens.filter(kind=OAuthToken.REFRESH, used_at__isnull=True, expires_at__gt=tz.now())
+        last = obj.oauth_tokens.exclude(kind=OAuthToken.CODE).order_by('-created_at').first()
+        hosts = ', '.join(sorted({(u.split('://', 1)[-1].split('/', 1)[0] or u) for u in c.redirect_uris}))
+        allowed = ['👁 бачити дані'] + (['✍️ пропонувати зміни'] if 'agent:write' in obj.scopes else []) + (
+            ['🔒 пошта, календар, робочий час'] if last is not None and last.personal else [])
+        return format_html(
+            '<b translate="no">{}</b> · повернення на <code translate="no">{}</code> · зареєстровано {}<br>'
+            'Дозволено: {} · {}<div style="margin-top:6px;font-size:12px;opacity:.8">Підключено через «Дозволити» в '
+            'Minerva — права змінити не можна: підключіть програму знову. Вимкнути — зніміть «Активний» (токени '
+            'перестануть діяти одразу).</div>',
+            c.name, hosts or '—', tz.localtime(c.created_at).strftime('%d.%m.%Y %H:%M'), ' · '.join(allowed),
+            'підключення діє' if live.exists() else 'токенів немає — програма має підключитись знову')
 
     def has_change_permission(self, request, obj=None):
         if obj is not None and obj.hidden_from(request.user):
@@ -142,7 +175,7 @@ class APIKeyAdmin(admin.ModelAdmin):
     @admin.display(description='Власник')
     def owner_col(self, obj):
         who = (obj.owner.get_full_name() or obj.owner.get_username()) if obj.owner_id else '—'
-        return format_html('{}{}', '🔒 ' if obj.private else '', who)
+        return format_html('{}{}{}', '🔌 ' if obj.oauth_client_id else '', '🔒 ' if obj.private else '', who)
 
     @admin.display(description='Власник')
     def owner_display(self, obj):
@@ -370,6 +403,36 @@ class WebhookForm(forms.ModelForm):
         if commit:
             instance.save()
         return instance
+
+
+@admin.register(OAuthClient)
+class OAuthClientAdmin(admin.ModelAdmin):
+    """🔌 Програми, що зареєструвались для OAuth MCP (api/oauth.py). Підключення людей — у «🔑 API ключі» (🔌);
+    видалити програму — видалити й усі її підключення."""
+    list_display = ['name', 'hosts_col', 'keys_col', 'created_at', 'created_ip']
+    search_fields = ['name', 'client_id']
+    readonly_fields = ['name', 'client_id', 'redirect_uris', 'client_uri', 'created_at', 'created_ip', 'keys_col']
+    fields = readonly_fields
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description='Адреси повернення')
+    def hosts_col(self, obj):
+        return ', '.join(sorted({(u.split('://', 1)[-1].split('/', 1)[0] or u) for u in obj.redirect_uris}))
+
+    @admin.display(description='Підключення')
+    def keys_col(self, obj):
+        keys = list(obj.keys.select_related('owner'))
+        if not keys:
+            return 'ще ніхто не дозволив'
+        return format_html_join(', ', '<a href="{}">{}{}</a>', (
+            (reverse('admin:api_apikey_change', args=[k.pk]),
+             (k.owner.get_full_name() or k.owner.get_username()) if k.owner_id else '?',
+             '' if k.is_active else ' (вимкнено)') for k in keys))
 
 
 @admin.register(Webhook)

@@ -20,6 +20,9 @@ class APIKeyAuthentication(BaseAuthentication):
 
         target = getattr(request, '_request', request)
         target.api_key_seen = api_key          # для журналу — навіть якщо далі відмова
+        if api_key.oauth_client_id:            # 🔌 підключення OAuth: сам ключ не діє — лише токен (api/oauth.py)
+            target.api_log_note = 'ключ підключення OAuth — діє лише токен OAuth'
+            raise AuthenticationFailed('Це підключення OAuth: ключ сам не діє, лише токен OAuth.')
         if api_key.expires_at and api_key.expires_at < timezone.now().date():
             target.api_log_note = 'ключ прострочений'
             raise AuthenticationFailed('Токен прострочений.')

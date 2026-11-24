@@ -6,7 +6,8 @@ from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from django.urls import path, include
+from django.urls import path, include, re_path
+from api import oauth_views
 from django.shortcuts import render
 from django.conf import settings
 from django.conf.urls.static import static
@@ -62,6 +63,14 @@ urlpatterns = [
     path("", root_views.landing_view, name="landing"),
     path("contact/", root_views.contact_view, name="contact"),
     path("privacy/", root_views.privacy_view, name="privacy"),   # публічна: її вимагає застосунок Google OAuth
+    # 🔌 OAuth для MCP-сервера (api/oauth.py): метадані RFC 9728 / RFC 8414, реєстрація програми, «Дозволити», токени
+    re_path(r"^\.well-known/oauth-protected-resource(?P<path>/api/v1/mcp/?)?$", oauth_views.protected_resource,
+            name="oauth_resource_metadata"),
+    path(".well-known/oauth-authorization-server", oauth_views.authorization_server, name="oauth_server_metadata"),
+    re_path(r"^oauth/register/?$", oauth_views.register_view, name="oauth_register"),
+    path("oauth/authorize/", oauth_views.authorize_view, name="oauth_authorize"),
+    re_path(r"^oauth/token/?$", oauth_views.token_view, name="oauth_token"),
+    re_path(r"^oauth/revoke/?$", oauth_views.revoke_view, name="oauth_revoke"),
     path("theme-profiles/", theme_profiles_list, name="theme_profiles_list"),
     path("theme-profiles/<str:name>/", theme_profiles_load, name="theme_profiles_load"),
     path("register/",         root_views.register_view,         name="register"),

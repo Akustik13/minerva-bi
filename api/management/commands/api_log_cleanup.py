@@ -12,3 +12,7 @@ class Command(BaseCommand):
         from api.key_limits import LOG_DAYS, cleanup
         n = cleanup(options["days"])
         self.stdout.write(f"Журнал API: видалено {n} записів старших за {options['days'] or LOG_DAYS} днів")
+        from api.oauth import cleanup as oauth_cleanup
+        n = oauth_cleanup()
+        if n:
+            self.stdout.write(f"OAuth: видалено прострочених кодів і токенів: {n}")

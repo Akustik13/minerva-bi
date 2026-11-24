@@ -537,6 +537,7 @@
 {"uk": ") потім стоїть у кожному замовленні як «Джерело», за ним видно, звідки прийшов продаж.", "en": ") then appears in every order as “Source”, showing where the sale came from.", "de": ") steht anschließend in jedem Auftrag als „Quelle“, daran erkennt man, woher der Verkauf kam."}
 {"uk": ") прохань щодо відправки немає.", "en": ") no shipping requests.", "de": ") keine Versandwünsche."}
 {"uk": ") та обери потрібні scopes (чекбокси)", "en": ") and select the required scopes (checkboxes)", "de": ") und wählen Sie die benötigten Scopes (Kontrollkästchen)"}
+{"uk": ") через агента (MCP).", "en": ") through the agent (MCP).", "de": ") über den Agenten (MCP)."}
 {"uk": ") щохвилини перевіряє цей час і надсилає брифінг раз на день — у «Час відправки» за часом Берліна (якщо сервер у цей час не працював — ще протягом 3 годин). «📤 Тестова відправка» нижче надсилає одразу й розкладу не змінює.", "en": ") checks this time every minute and sends the briefing once a day — at “Send time”, in Berlin time (if the server was not running at that time — still within 3 hours). “📤 Test send” below sends immediately and does not change the schedule.", "de": ") prüft diese Zeit jede Minute und sendet das Briefing einmal täglich — zur „Sendezeit“ nach Berliner Zeit (falls der Server zu dieser Zeit nicht lief — noch innerhalb von 3 Stunden). „📤 Testversand“ unten sendet sofort und ändert den Zeitplan nicht."}
 {"uk": ") і додати", "en": ") and add", "de": ") und hinzufügen"}
 {"uk": ") і надсилає звіт раз на день.", "en": ") and sends the report once a day.", "de": ") und sendet den Bericht einmal täglich."}
@@ -1712,6 +1713,7 @@
 {"uk": "ID об'єкта", "en": "Object ID", "de": "Objekt-ID"}
 {"uk": "ID офера", "en": "Offer ID", "de": "Offer-ID"}
 {"uk": "ID офера не записано / інший", "en": "Offer ID not recorded / different", "de": "Offer-ID nicht erfasst / abweichend"}
+{"uk": "ID програми", "en": "App ID", "de": "App-ID"}
 {"uk": "ID тарифу Jumingo", "en": "Jumingo rate ID", "de": "Jumingo-Tarif-ID"}
 {"uk": "ID товару (альтернатива sku)", "en": "Product ID (alternative to sku)", "de": "Artikel-ID (Alternative zu sku)"}
 {"uk": "ID транзакції PayPal/Stripe або призначення платежу", "en": "PayPal/Stripe transaction ID or payment reference", "de": "PayPal/Stripe-Transaktions-ID oder Verwendungszweck"}
@@ -1986,6 +1988,8 @@
 {"uk": "Number of Positions — кількість контактів", "en": "Number of Positions — number of contacts", "de": "Number of Positions — Anzahl der Kontakte"}
 {"uk": "OAuth Token (технічний)", "en": "OAuth token (technical)", "de": "OAuth-Token (technisch)"}
 {"uk": "OAuth помилка: {0}", "en": "OAuth error: {0}", "de": "OAuth-Fehler: {0}"}
+{"uk": "OAuth у цій Minerva вимкнено", "en": "OAuth is turned off in this Minerva", "de": "OAuth ist in dieser Minerva ausgeschaltet"}
+{"uk": "OAuth: видалено прострочених кодів і токенів: {0}", "en": "OAuth: expired codes and tokens deleted: {0}", "de": "OAuth: abgelaufene Codes und Tokens gelöscht: {0}"}
 {"uk": "OK · API v{0} · документів: {1}", "en": "OK · API v{0} · documents: {1}", "de": "OK · API v{0} · Dokumente: {1}"}
 {"uk": "OK · працівників: {0} · проєктів: {1}", "en": "OK · employees: {0} · projects: {1}", "de": "OK · Mitarbeiter: {0} · Projekte: {1}"}
 {"uk": "Offer (Пропозиція)", "en": "Offer (Proposal)", "de": "Offer (Angebot)"}
@@ -2731,6 +2735,7 @@
 {"uk": "client_secret сесії embedded_page — сайт відкриває нею форму Stripe.", "en": "client_secret of the embedded_page session — the site opens the Stripe form with it.", "de": "client_secret der embedded_page-Sitzung — damit öffnet die Website das Stripe-Formular."}
 {"uk": "cnt + ' невідом' + (cnt === 1 ? 'е поле' : 'их полів') + '", "en": "cnt + ' unknown ' + (cnt === 1 ? 'field' : 'fields') + '", "de": "cnt + ' unbekannte' + (cnt === 1 ? 's Feld' : ' Felder') + '"}
 {"uk": "code | назва | … (значення — точно як у списку)", "en": "code | name | … (values — exactly as in the list)", "de": "code | Name | … (Werte — genau wie in der Liste)"}
+{"uk": "code_verifier не відповідає code_challenge", "en": "code_verifier does not match code_challenge", "de": "code_verifier passt nicht zu code_challenge"}
 {"uk": "collectstatic timeout (>120с)", "en": "collectstatic timeout (>120s)", "de": "collectstatic-Timeout (>120 s)"}
 {"uk": "collectstatic готово!", "en": "collectstatic done!", "de": "collectstatic abgeschlossen!"}
 {"uk": "collectstatic помилка", "en": "collectstatic error", "de": "collectstatic-Fehler"}
@@ -2831,6 +2836,7 @@
 {"uk": "git pull → static → migrate → переклади → reload", "en": "git pull → static → migrate → translations → reload", "de": "git pull → static → migrate → Übersetzungen → reload"}
 {"uk": "git не знайдено в контейнері. Потрібен --rebuild образу.", "en": "git not found in the container. An image --rebuild is required.", "de": "git wurde im Container nicht gefunden. Ein --rebuild des Images ist erforderlich."}
 {"uk": "git не знайдено.", "en": "git not found.", "de": "git wurde nicht gefunden."}
+{"uk": "grant_type — authorization_code або refresh_token", "en": "grant_type — authorization_code or refresh_token", "de": "grant_type – authorization_code oder refresh_token"}
 {"uk": "group_by — один з", "en": "group_by — one of", "de": "group_by — einer von"}
 {"uk": "hosted_page — сторінка Stripe; embedded_page — форма на сторінці сайту.", "en": "hosted_page — Stripe page; embedded_page — form on the site page.", "de": "hosted_page — Stripe-Seite; embedded_page — Formular auf der Website."}
 {"uk": "hs_code — 6…10 цифр (з даташита / сторінки виробника; якщо класифікуєш сам — confidence low і поясни в source); country_of_origin — ISO-2; net_weight_g — грами за 1 шт (вагу упаковки чи кількох штук поділи й поясни в source)", "en": "hs_code — 6…10 digits (from the datasheet / manufacturer page; if you classify it yourself — confidence low and explain in source); country_of_origin — ISO-2; net_weight_g — grams per piece (divide a package or multi-piece weight and explain in source)", "de": "hs_code — 6…10 Ziffern (aus Datenblatt / Herstellerseite; bei eigener Klassifizierung — confidence low und in source begründen); country_of_origin — ISO-2; net_weight_g — Gramm pro Stück (Verpackungs- oder Mehrstückgewicht teilen und in source erklären)"}
@@ -2936,16 +2942,21 @@
 {"uk": "quiet_to — блокує через північ.", "en": "quiet_to — blocks across midnight.", "de": "quiet_to — sperrt über Mitternacht hinaus."}
 {"uk": "quotation|\\bquote|angebot|offer|price[ _-]?list|preisliste|прайс|пропозиці|предложени", "en": "quotation|\\bquote|angebot|offer|price[ _-]?list|preisliste|прайс|пропозиці|предложени", "de": "quotation|\\bquote|angebot|offer|price[ _-]?list|preisliste|прайс|пропозиці|предложени"}
 {"uk": "quote, nocat, sort) у порядку закріплення — завжди зверху", "en": "quote, nocat, sort) in pinned order — always on top", "de": "quote, nocat, sort) in der Reihenfolge des Anheftens — immer oben"}
+{"uk": "redirect_uri не той, що в запиті дозволу", "en": "redirect_uri is not the one in the authorization request", "de": "redirect_uri ist nicht die aus der Autorisierungsanfrage"}
+{"uk": "redirect_uris — список з 1–{0} адрес", "en": "redirect_uris — a list of 1–{0} addresses", "de": "redirect_uris – eine Liste mit 1–{0} Adressen"}
 {"uk": "reply — лише текст тіла: без теми, без прощання й підпису (додаються самі), без Markdown.", "en": "reply — лише текст тіла: без теми, без прощання й підпису (додаються самі), без Markdown.", "de": "reply — лише текст тіла: без теми, без прощання й підпису (додаються самі), без Markdown."}
 {"uk": "reply_by поза розумними межами — перевірте рік", "en": "reply_by is out of reasonable range — check the year", "de": "reply_by liegt außerhalb sinnvoller Grenzen – prüfen Sie das Jahr"}
 {"uk": "reply_to_id — число (id листа)", "en": "reply_to_id — a number (e-mail id)", "de": "reply_to_id — eine Zahl (id der E-Mail)"}
 {"uk": "request — наш файл, reply — файл постачальника", "en": "request — our file, reply — the supplier's file", "de": "request – unsere Datei, reply – Datei des Lieferanten"}
+{"uk": "resource не той, на який дано дозвіл", "en": "resource is not the one access was granted for", "de": "resource ist nicht die, für die der Zugriff erteilt wurde"}
+{"uk": "response_types — лише code", "en": "response_types — only code", "de": "response_types – nur code"}
 {"uk": "restock (true — повернути товар на склад, false — лише зняти резерв)", "en": "restock (true — return the goods to stock, false — only release the reservation)", "de": "restock (true — Ware ins Lager zurückbuchen, false — nur Reservierung aufheben)"}
 {"uk": "return el && el.closest('[id^=dkTask_]') && el.textContent.indexOf('Запущено') === 0", "en": "return el && el.closest('[id^=dkTask_]') && el.textContent.indexOf('Started') === 0", "de": "return el && el.closest('[id^=dkTask_]') && el.textContent.indexOf('Gestartet') === 0"}
 {"uk": "sandbox-api.digikey.com — для тестування без реальних замовлень", "en": "sandbox-api.digikey.com — for testing without real orders", "de": "sandbox-api.digikey.com — zum Testen ohne echte Aufträge"}
 {"uk": "sb_bg — фон панелі. sb_head_bg — фон кнопок-заголовків груп (--mg-header). sb_border — лінії між секціями. sb_border_accent — кольорова вертикальна смужка зліва від заголовка групи.", "en": "sb_bg — panel background. sb_head_bg — background of the group header buttons (--mg-header). sb_border — lines between sections. sb_border_accent — colored vertical stripe to the left of the group header.", "de": "sb_bg — Hintergrund der Leiste. sb_head_bg — Hintergrund der Gruppenkopf-Schaltflächen (--mg-header). sb_border — Linien zwischen den Abschnitten. sb_border_accent — farbiger vertikaler Streifen links neben dem Gruppenkopf."}
 {"uk": "scenario: крок 15 із зупинкою сервера 8010", "en": "scenario: step 15 with server 8010 stopped", "de": "scenario: Schritt 15 mit angehaltenem Server 8010"}
 {"uk": "scenario: шлях JSON-звіту", "en": "scenario: path of the JSON report", "de": "scenario: Pfad des JSON-Berichts"}
+{"uk": "scope ширший, ніж дозволено", "en": "scope is wider than allowed", "de": "scope ist weiter als erlaubt"}
 {"uk": "scopes (права)", "en": "scopes (permissions)", "de": "scopes (Berechtigungen)"}
 {"uk": "search: лише листи проєкту ANT-2400", "en": "search: only e-mails of project ANT-2400", "de": "search: nur E-Mails des Projekts ANT-2400"}
 {"uk": "search_datasheets (якщо є) — пошук по ВСІХ даташитах у RAG, і тих, яких немає в картці Minerva: щоб знайти кандидатів (товари з потрібним параметром, аналоги). Підстава пропозиції — точна цитата: з read_datasheet, коли даташит товару є в Minerva; інакше — з фрагмента RAG, а в source — документ і сторінка («RAG: AN5800.pdf, стор. 2»).", "en": "search_datasheets (if available) — search across ALL datasheets in RAG, including those not in a Minerva card: to find candidates (products with the required parameter, equivalents). The basis of a proposal is an exact quote: from read_datasheet when the product's datasheet exists in Minerva; otherwise from a RAG fragment, and in source — the document and page (“RAG: AN5800.pdf, p. 2”).", "de": "search_datasheets (falls vorhanden) – Suche in ALLEN Datenblättern im RAG, auch in denen, die nicht in einer Minerva-Karte vorhanden sind: um Kandidaten zu finden (Artikel mit dem gewünschten Parameter, Äquivalente). Die Begründung eines Vorschlags ist ein genaues Zitat: aus read_datasheet, wenn das Datenblatt des Artikels in Minerva vorhanden ist; sonst aus einem RAG-Fragment, und in source – Dokument und Seite („RAG: AN5800.pdf, S. 2“)."}
@@ -4463,6 +4474,7 @@
 {"uk": "Агент продовжить з того самого місця; знайдене лишається", "en": "The agent will continue from the same point; what was found is kept", "de": "Der Agent macht an derselben Stelle weiter; das Gefundene bleibt erhalten"}
 {"uk": "Агент продовжує", "en": "The agent continues", "de": "Der Agent macht weiter"}
 {"uk": "Агент проходить вибрані товари по одному (для сотень товарів). Лист у цьому режимі не готує.", "en": "The agent goes through the selected products one by one (for hundreds of products). It does not prepare an e-mail in this mode.", "de": "Der Agent geht die ausgewählten Artikel einzeln durch (für Hunderte von Artikeln). In diesem Modus bereitet er keine E-Mail vor."}
+{"uk": "Агент сам нічого не змінює й не надсилає: кожна пропозиція чекає вашого ✓ у «🧩 Завдання агенту».", "en": "The agent changes and sends nothing by itself: each proposal waits for your ✓ in «🧩 Agent tasks».", "de": "Der Agent ändert und sendet nichts selbst: Jeder Vorschlag wartet auf Ihr ✓ in „🧩 Agentenaufgaben“."}
 {"uk": "Агент читає й листи колег (переслані), знаходить замовлення чи закупівлю й пропонує зміни на сторінці завдання; коли закінчить — повідомить.", "en": "The agent also reads colleagues' (forwarded) emails, finds the order or purchase order and proposes changes on the task page; it notifies you when done.", "de": "Der Agent liest auch E-Mails von Kollegen (weitergeleitet), findet den Auftrag oder die Bestellung und schlägt Änderungen auf der Aufgabenseite vor; wenn fertig, meldet er sich."}
 {"uk": "Агент, завдання #{0}: «{1}»", "en": "Agent, task #{0}: “{1}”", "de": "Agent, Aufgabe #{0}: „{1}“"}
 {"uk": "Агент: завдання виконано, регулярні звіти", "en": "Agent: task done, regular reports", "de": "Agent: Aufgabe erledigt, regelmäßige Berichte"}
@@ -4519,6 +4531,7 @@
 {"uk": "Адреса одним рядком (Billing address)", "en": "Address on one line (Billing address)", "de": "Adresse in einer Zeile (Billing address)"}
 {"uk": "Адреса отримувача (повна)", "en": "Recipient address (full)", "de": "Empfängeradresse (vollständig)"}
 {"uk": "Адреса повернення ({0}) не збігається з «Адреса сайту» магазину ({1}).", "en": "The return address ({0}) does not match the shop's “Site address” ({1}).", "de": "Die Rücksprungadresse ({0}) stimmt nicht mit der „Website-Adresse“ des Shops ({1}) überein."}
+{"uk": "Адреса повернення не та, що програма зареєструвала.", "en": "The return address is not the one the app registered.", "de": "Die Rücksprungadresse ist nicht die, die die App registriert hat."}
 {"uk": "Адреса помічника (RAG)", "en": "Assistant address (RAG)", "de": "Adresse des Assistenten (RAG)"}
 {"uk": "Адреса приватного API RAG", "en": "Private RAG API address", "de": "Adresse der privaten RAG-API"}
 {"uk": "Адреса сайту", "en": "Site address", "de": "Website-Adresse"}
@@ -4536,6 +4549,7 @@
 {"uk": "Адреси команди — «Кому» всіх листів нижче, крім контактної форми (порожньо — як «Кому (email)» у «Налаштування → Сповіщення»)", "en": "Team addresses — «To» of all e-mails below except the contact form (empty — as «To (email)» in «Settings → Notifications»)", "de": "Team-Adressen – „An“ aller E-Mails unten außer dem Kontaktformular (leer – wie „An (E-Mail)“ in „Einstellungen → Benachrichtigungen“)"}
 {"uk": "Адреси по одній у рядку (або через кому) — у копію кожного листа агента: відповіді й листа клієнту.", "en": "Addresses one per line (or comma-separated) — CC of every agent email: replies and customer emails.", "de": "Adressen eine pro Zeile (oder mit Komma) — in CC jeder Agent-E-Mail: Antworten und Kunden-E-Mails."}
 {"uk": "Адреси по одній у рядку або через кому. Порожньо — вам (email з профілю, інакше ваша скринька).", "en": "Addresses one per line or separated by commas. Empty — to you (e-mail from your profile, otherwise your mailbox).", "de": "Adressen eine pro Zeile oder durch Komma getrennt. Leer — an Sie (E-Mail aus dem Profil, sonst Ihr Postfach)."}
+{"uk": "Адреси повернення", "en": "Return addresses", "de": "Rücksprungadressen"}
 {"uk": "Адреси через кому або з нового рядка.", "en": "Addresses separated by commas or on new lines.", "de": "Adressen durch Komma getrennt oder jeweils in einer neuen Zeile."}
 {"uk": "Адреси через кому. Порожньо — використовувати alert_email із загальних налаштувань.", "en": "Comma-separated addresses. If empty — alert_email from the general settings is used.", "de": "Adressen durch Komma getrennt. Wenn leer — wird alert_email aus den allgemeinen Einstellungen verwendet."}
 {"uk": "Адресна етикетка з доставки", "en": "Address label from shipping", "de": "Adressetikett aus dem Versand"}
@@ -4810,6 +4824,7 @@
 {"uk": "Батьківський проєкт", "en": "Parent project", "de": "Übergeordnetes Projekt"}
 {"uk": "Бахрейн", "en": "Bahrain", "de": "Bahrain"}
 {"uk": "Бачать усі", "en": "Everyone sees", "de": "Alle sehen"}
+{"uk": "Бачити дані Minerva через агента", "en": "See Minerva data through the agent", "de": "Minerva-Daten über den Agenten sehen"}
 {"uk": "Бачить журнал аудиту", "en": "Can see the audit log", "de": "Sieht das Audit-Protokoll"}
 {"uk": "Без", "en": "Without", "de": "Ohne"}
 {"uk": "Без /rest/api у кінці.", "en": "Without /rest/api at the end.", "de": "Ohne /rest/api am Ende."}
@@ -7299,6 +7314,7 @@
 {"uk": "Додає стовпець з tech_attributes до таблиці в листі.", "en": "Adds a column with tech_attributes to the table in the e-mail.", "de": "Fügt der Tabelle in der E-Mail eine Spalte mit tech_attributes hinzu."}
 {"uk": "Додає частину розшифровки; коли є всі частини — розшифровка наради готова.", "en": "Adds a transcript part; once all parts are in, the meeting transcript is ready.", "de": "Fügt einen Teil des Transkripts hinzu; sind alle Teile da, ist das Besprechungstranskript fertig."}
 {"uk": "Додається колонка Unit Price та Total у таблицю позицій.", "en": "Adds the Unit Price and Total columns to the items table.", "de": "Fügt der Positionstabelle die Spalten Unit Price und Total hinzu."}
+{"uk": "Дозволено: {0} · {1}", "en": "Allowed: {0} · {1}", "de": "Erlaubt: {0} · {1}"}
 {"uk": "Дозволені", "en": "Allowed", "de": "Erlaubt"}
 {"uk": "Дозволені IP-адреси", "en": "Allowed IP addresses", "de": "Erlaubte IP-Adressen"}
 {"uk": "Дозволені корені", "en": "Allowed roots", "de": "Erlaubte Wurzelverzeichnisse"}
@@ -7699,6 +7715,7 @@
 {"uk": "З QR-коду", "en": "From QR code", "de": "Aus QR-Code"}
 {"uk": "З БД", "en": "From DB", "de": "Aus DB"}
 {"uk": "З ПДВ (Німеччина / покупець без USt-IdNr)", "en": "With VAT (Germany / buyer without VAT ID)", "de": "Mit MwSt. (Deutschland / Käufer ohne USt-IdNr.)"}
+{"uk": "З адреси", "en": "From address", "de": "Von Adresse"}
 {"uk": "З блоком bench — оновлює «RAG-ПК на зв'язку»; хід обробки нарад, які ще йдуть.", "en": "With the bench block — updates “RAG PC online”; progress of meetings still being processed.", "de": "Mit dem bench-Block — aktualisiert „RAG-PC erreichbar“; Fortschritt noch laufender Besprechungen."}
 {"uk": "З будь-якої адреси.", "en": "From any address.", "de": "Von jeder Adresse."}
 {"uk": "З валюти", "en": "From currency", "de": "Von Währung"}
@@ -9900,6 +9917,7 @@
 {"uk": "Код виробництва", "en": "Production code", "de": "Fertigungscode"}
 {"uk": "Код джерела з довідника «Джерела замовлень».", "en": "Source code from the “Order sources” list.", "de": "Quellcode aus der Liste „Auftragsquellen“."}
 {"uk": "Код для наклейки й штрихкоду, напр. BX-M-02", "en": "Code for the label and barcode, e.g. BX-M-02", "de": "Code für Etikett und Barcode, z. B. BX-M-02"}
+{"uk": "Код дозволу", "en": "Authorization code", "de": "Autorisierungscode"}
 {"uk": "Код діє {0} хв і лише один раз.", "en": "The code is valid for {0} min and only once.", "de": "Der Code gilt {0} Min. und nur einmal."}
 {"uk": "Код закупівлі, напр. PO-12", "en": "Purchase order code, e.g. PO-12", "de": "Bestellcode, z. B. PO-12"}
 {"uk": "Код категорії DigiKey (напр. \"29\" для RF Filters). Знайти в DigiKey Marketplace Portal → Product Catalog", "en": "DigiKey category code (e.g. \"29\" for RF Filters). Find it in the DigiKey Marketplace Portal → Product Catalog", "de": "DigiKey-Kategoriecode (z. B. \"29\" für RF Filters). Zu finden im DigiKey Marketplace Portal → Product Catalog"}
@@ -10687,6 +10705,7 @@
 {"uk": "Лише в меню", "en": "In the menu only", "de": "Nur im Menü"}
 {"uk": "Лише в цьому магазині", "en": "Only in this shop", "de": "Nur in diesem Shop"}
 {"uk": "Лише важливі моменти, фази й віхи, терміни й зустрічі, ваші наради", "en": "Only key moments, phases and milestones, deadlines and meetings, your meetings", "de": "Nur wichtige Momente, Phasen und Meilensteine, Termine und Besprechungen, Ihre Besprechungen"}
+{"uk": "Лише ваші скриньки й ваш календар — агент зможе читати листи й готувати відповіді.", "en": "Only your mailboxes and your calendar — the agent will be able to read e-mails and prepare replies.", "de": "Nur Ihre Postfächer und Ihr Kalender – der Agent kann E-Mails lesen und Antworten vorbereiten."}
 {"uk": "Лише ви бачите цю візитку", "en": "Only you see this business card", "de": "Nur Sie sehen diese Visitenkarte"}
 {"uk": "Лише вибрані вручну", "en": "Only manually selected", "de": "Nur manuell ausgewählte"}
 {"uk": "Лише вибрані коробки.", "en": "Only the selected boxes.", "de": "Nur die ausgewählten Kartons."}
@@ -11180,6 +11199,7 @@
 {"uk": "Моя буква в календарі команди", "en": "My letter in the team calendar", "de": "Mein Buchstabe im Teamkalender"}
 {"uk": "Моя компанія", "en": "My company", "de": "Meine Firma"}
 {"uk": "Моя мова (мікрофон)", "en": "My language (microphone)", "de": "Meine Sprache (Mikrofon)"}
+{"uk": "Моя пошта, календар і робочий час", "en": "My mail, calendar and working time", "de": "Meine E-Mails, mein Kalender und meine Arbeitszeit"}
 {"uk": "Мої", "en": "Mine", "de": "Meine"}
 {"uk": "Мої знімки: лише на телефоні", "en": "My shots: only on the phone", "de": "Meine Aufnahmen: nur auf dem Telefon"}
 {"uk": "Мої знімки: у Minerva, AI прочитав", "en": "My shots: in Minerva, AI has read it", "de": "Meine Aufnahmen: in Minerva, AI hat gelesen"}
@@ -11568,6 +11588,7 @@
 {"uk": "Назва (DK)", "en": "Name (DK)", "de": "Name (DK)"}
 {"uk": "Назва (EN/DE) для документів", "en": "Name (EN/DE) for documents", "de": "Bezeichnung (EN/DE) für Dokumente"}
 {"uk": "Назва (необов'язково)", "en": "Name (optional)", "de": "Name (optional)"}
+{"uk": "Назва (як програма себе назвала)", "en": "Name (as the app called itself)", "de": "Name (wie sich die App selbst genannt hat)"}
 {"uk": "Назва EN/DE: {0}", "en": "Name EN/DE: {0}", "de": "Name EN/DE: {0}"}
 {"uk": "Назва sheet в Excel файлі", "en": "Name of the sheet in the Excel file", "de": "Name des Blatts in der Excel-Datei"}
 {"uk": "Назва аркуша", "en": "Sheet name", "de": "Blattname"}
@@ -12055,6 +12076,7 @@
 {"uk": "Не вдалося прочитати зображення", "en": "Could not read the image", "de": "Bild konnte nicht gelesen werden"}
 {"uk": "Не вдалося прочитати офери з DigiKey: {0}", "en": "Could not read the offers from DigiKey: {0}", "de": "Die Offers konnten nicht von DigiKey gelesen werden: {0}"}
 {"uk": "Не вдалося прочитати: {0}", "en": "Could not read: {0}", "de": "Lesen fehlgeschlagen: {0}"}
+{"uk": "Не вдалося підключити програму", "en": "Could not connect the app", "de": "Die App konnte nicht verbunden werden"}
 {"uk": "Не вдалося розібрати файл: {0}", "en": "Could not parse the file: {0}", "de": "Die Datei konnte nicht verarbeitet werden: {0}"}
 {"uk": "Не вдалося скласти лист — спробуйте ще раз.", "en": "Could not build the e-mail — try again.", "de": "Die E-Mail konnte nicht erstellt werden — bitte erneut versuchen."}
 {"uk": "Не вдалося скласти підсумок — спробуйте ще раз.", "en": "Could not write the summary — please try again.", "de": "Die Zusammenfassung konnte nicht erstellt werden — bitte erneut versuchen."}
@@ -12080,6 +12102,7 @@
 {"uk": "Не вказано SMTP Host", "en": "SMTP Host not set", "de": "SMTP-Host nicht angegeben"}
 {"uk": "Не вказано Supplier UUID у налаштуваннях DigiKey («🪪 Отримати Supplier UUID»)", "en": "Supplier UUID is not specified in the DigiKey settings (“🪪 Get Supplier UUID”)", "de": "Supplier UUID ist in den DigiKey-Einstellungen nicht angegeben („🪪 Supplier UUID abrufen“)"}
 {"uk": "Не вказано адресу отримувача", "en": "Recipient address not specified", "de": "Empfängeradresse nicht angegeben"}
+{"uk": "Не вказано адресу повернення.", "en": "No return address given.", "de": "Keine Rücksprungadresse angegeben."}
 {"uk": "Не вказано місце в записі", "en": "No place in the recording given", "de": "Keine Stelle in der Aufnahme angegeben"}
 {"uk": "Не вказано отримувача (Кому)", "en": "No recipient specified (To)", "de": "Kein Empfänger angegeben (An)"}
 {"uk": "Не вказано постачальника (supplier).", "en": "Supplier (supplier) not specified.", "de": "Lieferant (supplier) nicht angegeben."}
@@ -12105,6 +12128,7 @@
 {"uk": "Не групувати", "en": "Do not group", "de": "Nicht gruppieren"}
 {"uk": "Не дасть опублікувати", "en": "Blocks publishing", "de": "Verhindert die Veröffentlichung"}
 {"uk": "Не додавати (пропозиція AI)", "en": "Don't add (AI suggestion)", "de": "Nicht hinzufügen (AI-Vorschlag)"}
+{"uk": "Не дозволяти", "en": "Do not allow", "de": "Nicht erlauben"}
 {"uk": "Не дозволяти автоматичному трекінгу знижувати статус замовлення з «Доставлено» назад до «Відправлено». Рекомендовано: увімкнено.", "en": "Do not allow automatic tracking to lower the order status from “Delivered” back to “Shipped”. Recommended: enabled.", "de": "Automatischem Tracking nicht erlauben, den Auftragsstatus von „Zugestellt“ zurück auf „Versendet“ zu senken. Empfohlen: aktiviert."}
 {"uk": "Не доставлено", "en": "Not delivered", "de": "Nicht zugestellt"}
 {"uk": "Не з магазинів", "en": "Not from shops", "de": "Nicht aus Shops"}
@@ -12245,6 +12269,7 @@
 {"uk": "Невідома категорія.", "en": "Unknown category.", "de": "Unbekannte Kategorie."}
 {"uk": "Невідома мова перекладу", "en": "Unknown translation language", "de": "Unbekannte Übersetzungssprache"}
 {"uk": "Невідома помилка", "en": "Unknown error", "de": "Unbekannter Fehler"}
+{"uk": "Невідома програма — підключіть її в програмі знову.", "en": "Unknown app — connect it again in the app.", "de": "Unbekannte App – verbinden Sie sie in der App erneut."}
 {"uk": "Невідоме значення", "en": "Unknown value", "de": "Unbekannter Wert"}
 {"uk": "Невідоме значення «{0}».", "en": "Unknown value “{0}”.", "de": "Unbekannter Wert „{0}“."}
 {"uk": "Невідоме налаштування", "en": "Unknown setting", "de": "Unbekannte Einstellung"}
@@ -15546,9 +15571,12 @@
 {"uk": "Прогнозу немає.", "en": "No forecast.", "de": "Keine Prognose."}
 {"uk": "Прогнозування попиту, автоматична сегментація клієнтів, розумні рекомендації reorder на базі ML.", "en": "Demand forecasting, automatic customer segmentation, smart reorder recommendations based on ML.", "de": "Bedarfsprognose, automatische Kundensegmentierung, intelligente Nachbestellempfehlungen auf ML-Basis."}
 {"uk": "Програма", "en": "Application", "de": "Anwendung"}
+{"uk": "Програма OAuth (MCP)", "en": "OAuth app (MCP)", "de": "OAuth-App (MCP)"}
 {"uk": "Програма «Пошта Minerva» для Windows: та сама пошта, що в браузері, у власному вікні — значок у треї", "en": "The «Minerva Mail» app for Windows: the same mail as in the browser, in its own window — tray icon", "de": "Die App «Minerva Mail» für Windows: dieselbe E-Mail wie im Browser, im eigenen Fenster — Symbol im Infobereich"}
 {"uk": "Програма «Пошта Minerva» для Windows: та сама пошта, що в браузері, у власному вікні — значок у треї, сповіщення про нові листи, mailto:. Підключення — кнопкою з браузера, без пароля.", "en": "The «Minerva Mail» app for Windows: the same mail as in the browser, in its own window — tray icon, notifications about new e-mails, mailto:. Connect with a button from the browser, no password.", "de": "Die App «Minerva Mail» für Windows: dieselbe E-Mail wie im Browser, im eigenen Fenster — Symbol im Infobereich, Benachrichtigungen über neue E-Mails, mailto:. Verbinden per Schaltfläche im Browser, ohne Passwort."}
+{"uk": "Програма не дізнається вашого пароля. Підключення з’явиться в «🔑 API ключі» як", "en": "The app does not learn your password. The connection will appear in «🔑 API keys» as", "de": "Die App erfährt Ihr Passwort nicht. Die Verbindung erscheint unter „🔑 API-Schlüssel“ als"}
 {"uk": "Програми (User-Agent)", "en": "Applications (User-Agent)", "de": "Anwendungen (User-Agent)"}
+{"uk": "Програми OAuth (MCP)", "en": "OAuth apps (MCP)", "de": "OAuth-Apps (MCP)"}
 {"uk": "Програмне забезпечення «Minerva Business Intelligence System» (далі — «ПЗ») є власністю", "en": "The software “Minerva Business Intelligence System” (hereinafter the “Software”) is the property of", "de": "Die Software „Minerva Business Intelligence System“ (nachfolgend „Software“) ist Eigentum von"}
 {"uk": "Програмне забезпечення «Minerva Business Intelligence System» (далі — «ПЗ») є власністю Viacheslav Pryimak (prym.via@gmail.com) та захищене законами про авторське право.", "en": "The software “Minerva Business Intelligence System” (hereinafter the “Software”) is the property of Viacheslav Pryimak (prym.via@gmail.com) and is protected by copyright law.", "de": "Die Software „Minerva Business Intelligence System“ (nachfolgend „Software“) ist Eigentum von Viacheslav Pryimak (prym.via@gmail.com) und urheberrechtlich geschützt."}
 {"uk": "Прогрес", "en": "Progress", "de": "Fortschritt"}
@@ -15631,6 +15659,7 @@
 {"uk": "Пропозиції прив'язок · {0}", "en": "Link suggestions · {0}", "de": "Zuordnungsvorschläge · {0}"}
 {"uk": "Пропозиції — на сторінці кожного нового завдання; застосовуєте ви ✓.", "en": "Proposals are on the page of each new task; you apply them ✓.", "de": "Vorschläge stehen auf der Seite jeder neuen Aufgabe; Sie übernehmen sie mit ✓."}
 {"uk": "Пропозиції — під пунктами. ✓ — ☑ і «що вирішили» (ваш текст не перезаписується), ✕ — не те. Не обговорене лишається відкритим і запропонується до наступної наради.", "en": "Suggestions are under the items. ✓ — ☑ and “what was decided” (your text is not overwritten), ✕ — not right. What was not discussed stays open and will be suggested for the next meeting.", "de": "Vorschläge stehen unter den Punkten. ✓ — ☑ und „Was beschlossen wurde“ (Ihr Text wird nicht überschrieben), ✕ — nicht zutreffend. Nicht Besprochenes bleibt offen und wird für die nächste Besprechung vorgeschlagen."}
+{"uk": "Пропонувати зміни", "en": "Propose changes", "de": "Änderungen vorschlagen"}
 {"uk": "Пропонувати підтвердити відправлення в магазині", "en": "Suggest confirming the shipment in the shop", "de": "Bestätigung der Sendung im Shop vorschlagen"}
 {"uk": "Пропонують {0} варіанти зустрічі (запрошення в чужій скриньці) — чекають вибору", "en": "{0} meeting options proposed (invitation in someone else's mailbox) — waiting for a choice", "de": "{0} Terminoptionen vorgeschlagen (Einladung in einem fremden Postfach) — warten auf Auswahl"}
 {"uk": "Пропонують {0} варіанти зустрічі «{1}» ({2}) — оберіть і підтвердіть", "en": "{0} options proposed for the meeting «{1}» ({2}) — choose one and confirm", "de": "{0} Optionen für den Termin «{1}» vorgeschlagen ({2}) — eine wählen und bestätigen"}
@@ -15862,6 +15891,7 @@
 {"uk": "Підключений календар", "en": "Connected calendar", "de": "Verbundener Kalender"}
 {"uk": "Підключення", "en": "Connection", "de": "Verbindung"}
 {"uk": "Підключення DigiKey", "en": "DigiKey connection", "de": "DigiKey-Verbindung"}
+{"uk": "Підключення OAuth", "en": "OAuth connection", "de": "OAuth-Verbindung"}
 {"uk": "Підключення RAG", "en": "RAG connection", "de": "RAG-Anbindung"}
 {"uk": "Підключення до RAG API", "en": "Connection to the RAG API", "de": "Verbindung zur RAG-API"}
 {"uk": "Підключення до askDANTE", "en": "Connection to askDANTE", "de": "Verbindung zu askDANTE"}
@@ -15874,14 +15904,18 @@
 {"uk": "Підключено ({0}). Отримано тарифів: {1}.", "en": "Connected ({0}). Rates received: {1}.", "de": "Verbunden ({0}). Erhaltene Tarife: {1}."}
 {"uk": "Підключено {0}: календарів {1}.", "en": "Connected {0}: calendars {1}.", "de": "{0} verbunden: Kalender {1}."}
 {"uk": "Підключено «{0}» — подій: {1}. Видно в календарі Minerva й у «Повному вигляді»; оновлюється кожні 15 хв.", "en": "Connected “{0}” — events: {1}. Visible in the Minerva calendar and in the “Full view”; refreshed every 15 min.", "de": "„{0}“ verbunden — Termine: {1}. Sichtbar im Minerva-Kalender und in der „Vollansicht“; Aktualisierung alle 15 Min."}
+{"uk": "Підключено через «Дозволити» в Minerva — права змінити не можна: підключіть програму знову. Вимкнути — зніміть «Активний» (токени перестануть діяти одразу).", "en": "Connected through «Allow» in Minerva — the rights cannot be changed: connect the app again. To turn it off, untick «Active» (the tokens stop working at once).", "de": "Über „Erlauben“ in Minerva verbunden – die Rechte können nicht geändert werden: Verbinden Sie die App erneut. Ausschalten – „Aktiv“ abwählen (die Tokens gelten sofort nicht mehr)."}
 {"uk": "Підключені календарі", "en": "Connected calendars", "de": "Verbundene Kalender"}
 {"uk": "Підключені телефони", "en": "Connected phones", "de": "Verbundene Handys"}
 {"uk": "Підключити Telegram-сповіщення", "en": "Connect Telegram notifications", "de": "Telegram-Benachrichtigungen verbinden"}
 {"uk": "Підключити вручну: адреса й код", "en": "Connect manually: address and code", "de": "Manuell verbinden: Adresse und Code"}
 {"uk": "Підключити до проєкту", "en": "Link to a project", "de": "Mit Projekt verknüpfen"}
+{"uk": "Підключити програму · Minerva", "en": "Connect an app · Minerva", "de": "App verbinden · Minerva"}
+{"uk": "Підключити програму до Minerva", "en": "Connect an app to Minerva", "de": "Eine App mit Minerva verbinden"}
 {"uk": "Підключити сайт (код)", "en": "Connect site (code)", "de": "Website verbinden (Code)"}
 {"uk": "Підключити телефон", "en": "Connect phone", "de": "Telefon verbinden"}
 {"uk": "Підключити цей телефон? Ім'я, роль, email", "en": "Connect this phone? Name, role, email", "de": "Dieses Telefon verbinden? Name, Rolle, E-Mail"}
+{"uk": "Підключіть програму до Minerva знову — у самій програмі (напр. у Claude: «Connectors» → «Connect»).", "en": "Connect the app to Minerva again — in the app itself (e.g. in Claude: «Connectors» → «Connect»).", "de": "Verbinden Sie die App erneut mit Minerva – in der App selbst (z. B. in Claude: „Connectors“ → „Connect“)."}
 {"uk": "Підключіть сайт", "en": "Connect the website", "de": "Website verbinden"}
 {"uk": "Підкреслений", "en": "Underline", "de": "Unterstrichen"}
 {"uk": "Підкреслені посилання видно й без розрізнення кольорів.", "en": "Underlined links are visible even without telling colors apart.", "de": "Unterstrichene Links sind auch ohne Farbunterscheidung erkennbar."}
@@ -16022,6 +16056,7 @@
 {"uk": "Після «Зберегти» — одразу оновити ціну на DigiKey (з новими базовими цінами, правила — «💲 Налаштування цін DigiKey»)", "en": "After “Save” — update the price on DigiKey immediately (with the new base prices, rules from “💲 DigiKey price settings”)", "de": "Nach „Speichern“ — den Preis sofort auf DigiKey aktualisieren (mit den neuen Basispreisen, Regeln aus „💲 DigiKey-Preiseinstellungen“)"}
 {"uk": "Після «Створити» / «Додати до нього» Minerva одразу збере листування з ними з вашої пошти: теми, файли, PI.", "en": "After «Create» / «Add to it» Minerva immediately collects the correspondence with them from your mail: topics, files, PI.", "de": "Nach «Anlegen» / «Hinzufügen» sammelt Minerva sofort die Korrespondenz mit ihnen aus Ihrer Post: Themen, Dateien, PI."}
 {"uk": "Після впровадження", "en": "After implementation", "de": "Nach der Einführung"}
+{"uk": "Після дозволу Minerva поверне вас на", "en": "After you allow it, Minerva will return you to", "de": "Nach der Erlaubnis leitet Minerva Sie zurück zu"}
 {"uk": "Після завершення можна застосувати ціни прямо тут.", "en": "Once finished, you can apply the prices right here.", "de": "Nach Abschluss können Sie die Preise direkt hier übernehmen."}
 {"uk": "Після закінчення кешу каталогу на сайті (", "en": "After the catalog cache on the website expires (", "de": "Nach Ablauf des Katalog-Caches auf der Website ("}
 {"uk": "Після затвердження DigiKey, наступна авто-перевірка (", "en": "After DigiKey approves it, the next automatic check (", "de": "Nach der Freigabe durch DigiKey wird die nächste automatische Prüfung ("}
@@ -16640,6 +16675,7 @@
 {"uk": "Сайт повідомляє її сам; лише на домені «Адреса сайту» магазину.", "en": "The site reports it by itself; only on the domain of the shop's “Site address”.", "de": "Die Website meldet sie selbst; nur auf der Domain der „Website-Adresse“ des Shops."}
 {"uk": "Сайт почне забирати перевірені файли; до того можна проіндексувати й переглянути результат", "en": "The site will start fetching the checked files; until then you can index and review the result", "de": "Die Website beginnt, die geprüften Dateien abzuholen; bis dahin können Sie indexieren und das Ergebnis ansehen"}
 {"uk": "Сайт прийняв підписаний ping (HTTP {0}) — секрет збігається.", "en": "The site accepted the signed ping (HTTP {0}) — the secret matches.", "de": "Die Website hat den signierten Ping akzeptiert (HTTP {0}) – das Secret stimmt überein."}
+{"uk": "Сайт програми", "en": "App website", "de": "Website der App"}
 {"uk": "Сайт підключається ключем API, який видає лише Minerva: Адмін → REST API → API Токени → поле «Магазин». На сайті ключ лежить у private/shop-config.php ('minerva_token').", "en": "The site connects with an API key that only Minerva issues: Admin → REST API → API Tokens → “Shop” field. On the site the key is stored in private/shop-config.php ('minerva_token').", "de": "Die Website wird mit einem API-Schlüssel verbunden, den nur Minerva ausstellt: Admin → REST API → API-Token → Feld „Shop“. Auf der Website liegt der Schlüssel in private/shop-config.php ('minerva_token')."}
 {"uk": "Сайт підключено", "en": "Site connected", "de": "Website verbunden"}
 {"uk": "Сайт ще не додає копії окремо для кожного листа — потрібне оновлення файлів сайту. До того сайт бере лише приховану копію «Підтвердження замовлення» (для обох листів покупцю), інші копії листів сайту не діють.", "en": "The site does not yet add copies per e-mail — the site files need an update. Until then the site takes only the blind copy of «Order confirmation» (for both buyer e-mails); other copies of site e-mails do not apply.", "de": "Die Website fügt noch keine Kopien je E-Mail hinzu – die Website-Dateien müssen aktualisiert werden. Bis dahin nimmt die Website nur die Blindkopie der „Bestellbestätigung“ (für beide E-Mails an Käufer); andere Kopien der Website-E-Mails gelten nicht."}
@@ -18323,15 +18359,19 @@
 {"uk": "Той самий курс, яким Minerva рахує ціни для DigiKey: після переведення ціни на DigiKey лишаться такими самими", "en": "The same rate Minerva uses for DigiKey prices: after the conversion the prices on DigiKey stay the same", "de": "Derselbe Kurs, mit dem Minerva die DigiKey-Preise berechnet: nach der Umrechnung bleiben die Preise auf DigiKey gleich"}
 {"uk": "Той самий секрет — на сайті в private/shop-config.php (", "en": "The same secret — on the website in private/shop-config.php (", "de": "Dasselbe Secret — auf der Website in private/shop-config.php ("}
 {"uk": "Токен", "en": "Token", "de": "Token"}
+{"uk": "Токен OAuth", "en": "OAuth token", "de": "OAuth-Token"}
 {"uk": "Токен knowledge:read/write (значення не друкується): {0}", "en": "Token knowledge:read/write (value is not printed): {0}", "de": "Token knowledge:read/write (Wert wird nicht ausgegeben): {0}"}
 {"uk": "Токен або Chat ID відсутній", "en": "Token or Chat ID missing", "de": "Token oder Chat ID fehlt"}
 {"uk": "Токен від @BotFather", "en": "Token from @BotFather", "de": "Token von @BotFather"}
+{"uk": "Токен доступу", "en": "Access token", "de": "Zugriffstoken"}
 {"uk": "Токен дійсний до (UTC)", "en": "Token valid until (UTC)", "de": "Token gültig bis (UTC)"}
 {"uk": "Токен має вигляд", "en": "The token looks like", "de": "Der Token sieht so aus"}
+{"uk": "Токен оновлення", "en": "Refresh token", "de": "Aktualisierungstoken"}
 {"uk": "Токен отримано ({0} симв.)", "en": "Token received ({0} chars)", "de": "Token erhalten ({0} Zeichen)"}
 {"uk": "Токен прострочений.", "en": "Token expired.", "de": "Token abgelaufen."}
 {"uk": "Токен підтвердження", "en": "Confirmation token", "de": "Bestätigungstoken"}
 {"uk": "Токени DigiKey Marketplace у Minerva не змінено.", "en": "The DigiKey Marketplace tokens in Minerva have not been changed.", "de": "Die DigiKey-Marketplace-Tokens in Minerva wurden nicht geändert."}
+{"uk": "Токени OAuth", "en": "OAuth tokens", "de": "OAuth-Tokens"}
 {"uk": "Токени з правами доступу (scopes)", "en": "Tokens with access rights (scopes)", "de": "Token mit Zugriffsrechten (Scopes)"}
 {"uk": "Тонга", "en": "Tonga", "de": "Tonga"}
 {"uk": "Топ", "en": "Top", "de": "Top"}
@@ -18524,6 +18564,7 @@
 {"uk": "У вас немає поштової скриньки в Minerva — зберегти можна, надіслати — ні.", "en": "You have no mailbox in Minerva — you can save, but not send.", "de": "Sie haben kein Postfach in Minerva — speichern ja, senden nein."}
 {"uk": "У вас немає поштової скриньки в Minerva — підключіть її в «Пошта → Акаунти».", "en": "You have no mailbox in Minerva — connect it in «Mail → Accounts».", "de": "Sie haben kein Postfach in Minerva — verbinden Sie es unter «Post → Konten»."}
 {"uk": "У вас немає прав для перегляду цієї сторінки.", "en": "You do not have permission to view this page.", "de": "Sie haben keine Berechtigung, diese Seite anzuzeigen."}
+{"uk": "У вас немає права на завдання агенту — попросіть адміністратора Minerva.", "en": "You have no right to agent tasks — ask the Minerva administrator.", "de": "Sie haben kein Recht auf Agentenaufgaben – fragen Sie den Minerva-Administrator."}
 {"uk": "У ваших скриньках листів з цим клієнтом немає.", "en": "There are no emails with this customer in your mailboxes.", "de": "In Ihren Postfächern gibt es keine E-Mails mit diesem Kunden."}
 {"uk": "У вашого користувача Minerva не задано email.", "en": "Your Minerva user has no email set.", "de": "Für Ihren Minerva-Benutzer ist keine E-Mail-Adresse hinterlegt."}
 {"uk": "У вашому акаунті Minerva немає активної скриньки пошти.", "en": "Your Minerva account has no active mailbox.", "de": "Ihr Minerva-Konto hat kein aktives Postfach."}
@@ -18582,6 +18623,7 @@
 {"uk": "У магазині не вказано «Адреса сайту» — адресу повернення з оплати неможливо перевірити.", "en": "The shop has no “Site address” set — the return address from the payment cannot be verified.", "de": "Im Shop ist keine „Website-Adresse“ angegeben – die Rücksprungadresse von der Zahlung kann nicht geprüft werden."}
 {"uk": "У магазині не вказано «Адреса сайту» — посилання в листах кабінету неможливо перевірити.", "en": "The shop has no “Site address” set — links in account emails cannot be verified.", "de": "Im Shop ist keine „Website-Adresse“ angegeben — Links in den E-Mails des Kundenkontos können nicht geprüft werden."}
 {"uk": "У магазині не задано секретний ключ Stripe.", "en": "The shop has no Stripe secret key set.", "de": "Im Shop ist kein geheimer Stripe-Schlüssel festgelegt."}
+{"uk": "У межах ваших прав: товари, склад, замовлення, клієнти, закупівлі, запити постачальникам…", "en": "Within your rights: products, stock, orders, customers, purchases, supplier requests…", "de": "Im Rahmen Ihrer Rechte: Artikel, Lager, Aufträge, Kunden, Einkäufe, Lieferantenanfragen…"}
 {"uk": "У нараді немає учасників з адресою — впишіть адреси нижче (або додасте в листі).", "en": "The meeting has no participants with an address — enter addresses below (or add them in the e-mail).", "de": "Die Besprechung hat keine Teilnehmer mit Adresse — Adressen unten eintragen (oder in der E-Mail ergänzen)."}
 {"uk": "У новій вкладці", "en": "In a new tab", "de": "In neuem Tab"}
 {"uk": "У панелі", "en": "In the panel", "de": "Im Panel"}
@@ -19247,6 +19289,8 @@
 {"uk": "Це поле тут змінити не можна — відкрийте картку.", "en": "This field cannot be changed here — open the card.", "de": "Dieses Feld kann hier nicht geändert werden — öffnen Sie die Karte."}
 {"uk": "Це посилання HTML (для браузера). В Outlook після «Опублікувати» скопіюйте посилання ICS (закінчується на .ics).", "en": "This is an HTML link (for the browser). In Outlook, after “Publish”, copy the ICS link (ends with .ics).", "de": "Das ist ein HTML-Link (für den Browser). Kopieren Sie in Outlook nach „Veröffentlichen“ den ICS-Link (endet auf .ics)."}
 {"uk": "Це публічна адреса — Minerva побачить події, лише якщо календар відкрито для всіх. Для свого календаря краще «Секретна адреса у форматі iCal».", "en": "This is a public address — Minerva will see events only if the calendar is open to everyone. For your own calendar, “Secret address in iCal format” is better.", "de": "Das ist eine öffentliche Adresse — Minerva sieht Termine nur, wenn der Kalender für alle geöffnet ist. Für den eigenen Kalender ist die „Geheime Adresse im iCal-Format“ besser."}
+{"uk": "Це підключення OAuth: ключ сам не діє, лише токен OAuth.", "en": "This is an OAuth connection: the key does not work by itself, only the OAuth token.", "de": "Dies ist eine OAuth-Verbindung: Der Schlüssel selbst gilt nicht, nur das OAuth-Token."}
+{"uk": "Це підключення не дозволено використовувати з адреси {0}.", "en": "This connection may not be used from address {0}.", "de": "Diese Verbindung darf nicht von der Adresse {0} genutzt werden."}
 {"uk": "Це слова чи фраза, яка має буквально бути в тексті листа (по одній у рядку). Пояснення, що робити, — у «Що робити — інструкція агенту».", "en": "These are words or a phrase that must literally be in the email text (one per line). The explanation of what to do goes into «What to do — instruction for the agent».", "de": "Das sind Wörter oder eine Wendung, die wörtlich im E-Mail-Text stehen müssen (eins pro Zeile). Was zu tun ist, gehört in «Was tun — Anweisung für den Agenten»."}
 {"uk": "Це службовий ключ RAG / RAG-ПК (база знань чи наради) — у консолі не використовується: ним читаються чужі листи й розшифровки нарад", "en": "This is a RAG / RAG PC service key (knowledge base or meetings) — not used in the console: it reads other people’s e-mails and meeting transcripts", "de": "Das ist ein Dienstschlüssel für RAG / RAG-PC (Wissensdatenbank oder Besprechungen) — in der Konsole nicht verwendet: Damit werden fremde E-Mails und Besprechungstranskripte gelesen"}
 {"uk": "Це спам", "en": "This is spam", "de": "Das ist Spam"}
@@ -19496,6 +19540,7 @@
 {"uk": "Ціну {0} встановлено для {1} позицій", "en": "Price {0} set for {1} items", "de": "Preis {0} für {1} Positionen festgelegt"}
 {"uk": "Ціну розраховано від закупівлі (+{0} %): {1} позицій", "en": "Price calculated from purchase (+{0} %): {1} items", "de": "Preis ausgehend vom Einkauf berechnet (+{0} %): {1} Positionen"}
 {"uk": "Цією моделлю — усі дії AI на сторінці: 🧠 розібрати відповіді, 🏆 порада, «Що відповісти?», «Написати кожному». Вибір запам’ятовується.", "en": "This model is used for all AI actions on the page: 🧠 parse replies, 🏆 advice, «Що відповісти?», «Написати кожному». The choice is remembered.", "de": "Dieses Modell gilt für alle AI-Aktionen der Seite: 🧠 Antworten auswerten, 🏆 Empfehlung, «Що відповісти?», «Написати кожному». Die Wahl wird gespeichert."}
+{"uk": "Цієї адреси Minerva не знає. Дозволяйте, лише якщо ви самі щойно підключали цю програму.", "en": "Minerva does not know this address. Allow it only if you yourself have just connected this app.", "de": "Minerva kennt diese Adresse nicht. Erlauben Sie es nur, wenn Sie diese App gerade selbst verbunden haben."}
 {"uk": "Цієї підказки вже немає — оновіть список", "en": "This suggestion is no longer there — refresh the list", "de": "Diesen Vorschlag gibt es nicht mehr — Liste aktualisieren"}
 {"uk": "ЧАСОВИЙ ПОЯ", "en": "TIME ZONE", "de": "ZEITZONE"}
 {"uk": "ЧЕХІЯ", "en": "CZECHIA", "de": "TSCHECHIEN"}
@@ -20427,6 +20472,8 @@
 {"uk": "адреса має побічні дії", "en": "the address has side effects", "de": "die Adresse hat Nebenwirkungen"}
 {"uk": "адреса не в «Дозволених IP» ключа", "en": "address is not in the key’s “Allowed IPs”", "de": "Adresse nicht in den „Erlaubten IPs“ des Schlüssels"}
 {"uk": "адреса отримувача", "en": "recipient's address", "de": "Adresse des Empfängers"}
+{"uk": "адреса повернення порожня або задовга", "en": "the return address is empty or too long", "de": "die Rücksprungadresse ist leer oder zu lang"}
+{"uk": "адреса повернення — лише https (http — лише localhost): {0}", "en": "return address — only https (http — only localhost): {0}", "de": "Rücksprungadresse – nur https (http – nur localhost): {0}"}
 {"uk": "адреса покупця: компанія (або ім'я), «z. Hd. Herrn …», вулиця, індекс і місто, країна", "en": "buyer's address: company (or name), “z. Hd. Herrn …”, street, postcode and city, country", "de": "Adresse des Käufers: Firma (oder Name), „z. Hd. Herrn …“, Straße, PLZ und Ort, Land"}
 {"uk": "адреса постачальника", "en": "the supplier's address", "de": "Adresse des Lieferanten"}
 {"uk": "адреса рахунку", "en": "billing address", "de": "Rechnungsadresse"}
@@ -20525,6 +20572,7 @@
 {"uk": "банківські реквізити (немає, коли вже оплачено)", "en": "bank details (none when already paid)", "de": "Bankverbindung (keine, wenn bereits bezahlt)"}
 {"uk": "бачите лише ви", "en": "only you can see this", "de": "nur Sie sehen das"}
 {"uk": "бачите тільки ви, у додатку й у Minerva; інші, навіть адміністратор, — ні. Наприклад, особистий контакт.", "en": "only you see it, in the app and in Minerva; nobody else, not even an administrator. For example, a personal contact.", "de": "nur Sie sehen es, in der App und in Minerva; sonst niemand, auch kein Administrator. Zum Beispiel ein privater Kontakt."}
+{"uk": "бачити дані", "en": "see data", "de": "Daten sehen"}
 {"uk": "бачить крізь дані", "en": "sees through data", "de": "blickt durch Daten hindurch"}
 {"uk": "бежевий", "en": "beige", "de": "beige"}
 {"uk": "без AI", "en": "without AI", "de": "ohne AI"}
@@ -20810,6 +20858,7 @@
 {"uk": "вимкнено — сайт показує власні файли.", "en": "disabled — the site shows its own files.", "de": "deaktiviert — die Website zeigt eigene Dateien an."}
 {"uk": "вимкнено: {0}", "en": "disabled: {0}", "de": "deaktiviert: {0}"}
 {"uk": "вимкнути", "en": "turn off", "de": "deaktivieren"}
+{"uk": "вимкнути його можна там у будь-який момент (зніміть «Активний»).", "en": "you can turn it off there at any time (untick «Active»).", "de": "dort können Sie sie jederzeit ausschalten („Aktiv“ abwählen)."}
 {"uk": "вимкніть якщо статус керується трекінгом перевізника (UPS/DHL) або виставляється вручну. Зазвичай вмикають поки трекінг-номер ще не отримано.", "en": "turn off if the status is controlled by carrier tracking (UPS/DHL) or set manually. It is usually turned on while the tracking number has not yet been received.", "de": "deaktivieren Sie dies, wenn der Status über die Sendungsverfolgung des Versanddienstleisters (UPS/DHL) gesteuert oder manuell gesetzt wird. Üblicherweise ist es aktiviert, solange die Sendungsnummer noch nicht vorliegt."}
 {"uk": "виняток", "en": "exception", "de": "Ausnahme"}
 {"uk": "виправити", "en": "fix", "de": "korrigieren"}
@@ -21335,6 +21384,7 @@
 {"uk": "доступно не більше", "en": "available at most", "de": "höchstens verfügbar"}
 {"uk": "доступно після: {0}", "en": "available after: {0}", "de": "verfügbar nach: {0}"}
 {"uk": "доступно ≤ точки дозамовлення", "en": "available ≤ reorder point", "de": "verfügbar ≤ Meldebestand"}
+{"uk": "доступні права", "en": "available rights", "de": "verfügbare Rechte"}
 {"uk": "досягнуто ліміт {0} $ на одне заповнення", "en": "the limit of {0} $ per fill was reached", "de": "Limit von {0} $ pro Ausfüllen erreicht"}
 {"uk": "досягнуто ліміт витрат {0}", "en": "the spending limit of {0} reached", "de": "Ausgabenlimit von {0} erreicht"}
 {"uk": "друга візитка тієї ж фірми, флаєр, каталог / прайс, продукт / зразок, стенд. AI прочитає все разом.", "en": "another card of the same company, flyer, catalog / price list, product / sample, booth. AI reads everything together.", "de": "eine weitere Karte derselben Firma, Flyer, Katalog / Preisliste, Produkt / Muster, Stand. AI liest alles zusammen."}
@@ -21525,6 +21575,7 @@
 {"uk": "забагато кроків — спробуйте з меншою кількістю посилань", "en": "too many steps — try with fewer links", "de": "zu viele Schritte — mit weniger Links versuchen"}
 {"uk": "забагато переадресацій", "en": "too many redirects", "de": "zu viele Weiterleitungen"}
 {"uk": "забагато позицій (до {0})", "en": "too many lines (up to {0})", "de": "zu viele Positionen (bis {0})"}
+{"uk": "забагато реєстрацій з цієї адреси — спробуйте за годину", "en": "too many registrations from this address — try again in an hour", "de": "zu viele Registrierungen von dieser Adresse – versuchen Sie es in einer Stunde"}
 {"uk": "забагато учасників — не більше {0}", "en": "too many attendees — no more than {0}", "de": "zu viele Teilnehmer — höchstens {0}"}
 {"uk": "заблоковано — сторінка журналу буде недоступна.", "en": "blocked — the log page will be unavailable.", "de": "gesperrt — die Protokollseite ist nicht verfügbar."}
 {"uk": "заблоковано.", "en": "blocked.", "de": "gesperrt."}
@@ -21756,6 +21807,7 @@
 {"uk": "зараз тут", "en": "currently here", "de": "jetzt hier"}
 {"uk": "зараз іде запис", "en": "recording in progress", "de": "Aufnahme läuft gerade"}
 {"uk": "зараз — протягом хвилини, коли cron перевірить", "en": "now — within a minute, when cron checks", "de": "jetzt — innerhalb einer Minute, sobald cron prüft"}
+{"uk": "зареєстровано {0}", "en": "registered {0}", "de": "registriert {0}"}
 {"uk": "зареєстрував покупця", "en": "registered a buyer", "de": "hat einen Käufer registriert"}
 {"uk": "застосовано", "en": "applied", "de": "übernommen"}
 {"uk": "застосовано: {0}", "en": "applied: {0}", "de": "übernommen: {0}"}
@@ -22017,6 +22069,7 @@
 {"uk": "ключ не прийнято", "en": "key rejected", "de": "Schlüssel abgelehnt"}
 {"uk": "ключ приймається лише параметром адреси", "en": "the key is accepted only as a URL parameter", "de": "der Schlüssel wird nur als URL-Parameter akzeptiert"}
 {"uk": "ключ прострочений", "en": "key expired", "de": "Schlüssel abgelaufen"}
+{"uk": "ключ підключення OAuth — діє лише токен OAuth", "en": "OAuth connection key — only the OAuth token works", "de": "Schlüssel einer OAuth-Verbindung – nur das OAuth-Token gilt"}
 {"uk": "ключ сайту змінює лише поля оплати; решту Minerva відкидає (ignored_fields)", "en": "the website key changes only payment fields; Minerva discards the rest (ignored_fields)", "de": "der Website-Schlüssel ändert nur Zahlungsfelder; den Rest verwirft Minerva (ignored_fields)"}
 {"uk": "ключ сайту магазину не має доступу до упаковки", "en": "a shop site key has no access to packaging", "de": "ein Shop-Website-Schlüssel hat keinen Zugriff auf Verpackung"}
 {"uk": "ключ сайту не отримує", "en": "the website key does not receive", "de": "der Website-Schlüssel erhält nicht"}
@@ -22083,6 +22136,8 @@
 {"uk": "код {0}", "en": "code {0}", "de": "Code {0}"}
 {"uk": "код {0} в askDANTE", "en": "code {0} in askDANTE", "de": "Code {0} in askDANTE"}
 {"uk": "код {0} у листі", "en": "code {0} in the e-mail", "de": "Code {0} in der E-Mail"}
+{"uk": "код дозволу вже використано — підключення відкликано", "en": "the authorization code was already used — the connection is revoked", "de": "der Autorisierungscode wurde bereits verwendet – die Verbindung ist widerrufen"}
+{"uk": "код дозволу прострочено — дозвольте знову", "en": "the authorization code expired — allow again", "de": "der Autorisierungscode ist abgelaufen – erlauben Sie erneut"}
 {"uk": "код магазину", "en": "shop code", "de": "Shop-Code"}
 {"uk": "код проєкту", "en": "project code", "de": "Projektcode"}
 {"uk": "кожен запит пропозиції; «Відповісти» — пише покупцю", "en": "every quote request; «Reply» writes to the buyer", "de": "jede Angebotsanfrage; „Antworten“ schreibt dem Käufer"}
@@ -22333,6 +22388,7 @@
 {"uk": "лишаються як є. Після оновлення Minerva сама перевіряє, що нові ціни діють на DigiKey.", "en": "stay as they are. After the update, Minerva itself checks that the new prices are in effect on DigiKey.", "de": "bleiben unverändert. Nach der Aktualisierung prüft Minerva selbst, ob die neuen Preise bei DigiKey gelten."}
 {"uk": "лише PDF", "en": "PDF only", "de": "nur PDF"}
 {"uk": "лише Windows (скрипти e2e)", "en": "Windows only (e2e scripts)", "de": "nur Windows (e2e-Skripte)"}
+{"uk": "лише response_type=code", "en": "only response_type=code", "de": "nur response_type=code"}
 {"uk": "лише {0}", "en": "only {0}", "de": "nur {0}"}
 {"uk": "лише {0} шт.", "en": "only {0} pcs", "de": "nur {0} Stk."}
 {"uk": "лише адреса", "en": "address only", "de": "nur Adresse"}
@@ -22382,6 +22438,7 @@
 {"uk": "лише цей розділ (назва теки)", "en": "this section only (folder name)", "de": "nur dieser Bereich (Ordnername)"}
 {"uk": "лише ціни", "en": "prices only", "de": "nur Preise"}
 {"uk": "лише чернетка в «📝 Чернетках» — ви перевіряєте й надсилаєте", "en": "only a draft in «📝 Drafts» — you check and send", "de": "nur ein Entwurf in «📝 Entwürfe» — Sie prüfen und senden"}
+{"uk": "лише читання", "en": "read only", "de": "nur lesen"}
 {"uk": "лише я", "en": "only me", "de": "nur ich"}
 {"uk": "лише якщо минула доба від останньої звірки", "en": "only if a day has passed since the last reconciliation", "de": "nur, wenn seit dem letzten Abgleich ein Tag vergangen ist"}
 {"uk": "лише якщо сьогодні ще не запускалось", "en": "only if it has not run yet today", "de": "nur, wenn heute noch nicht ausgeführt"}
@@ -22398,6 +22455,7 @@
 {"uk": "лот {0}", "en": "lot {0}", "de": "Los {0}"}
 {"uk": "людина", "en": "human", "de": "Mensch"}
 {"uk": "людина вибирає 🌐 EN / DE, сторінки перекладаються зі словника — без AI й без витрат. Дані (листи, товари", "en": "someone selects 🌐 EN / DE, pages are translated from the dictionary — without AI and at no cost. Data (emails, products", "de": "eine Person 🌐 EN / DE wählt, werden die Seiten aus dem Wörterbuch übersetzt — ohne KI und ohne Kosten. Daten (E-Mails, Artikel"}
+{"uk": "людина не дозволила доступ", "en": "the person did not allow access", "de": "die Person hat den Zugriff nicht erlaubt"}
 {"uk": "людина перевірить і надішле", "en": "a person will review and send it", "de": "eine Person prüft und sendet es"}
 {"uk": "лют", "en": "Feb", "de": "Feb"}
 {"uk": "лютий", "en": "February", "de": "Februar"}
@@ -22907,10 +22965,14 @@
 {"uk": "невідоме право бази знань: {0}", "en": "unknown knowledge base permission: {0}", "de": "unbekannte Berechtigung der Wissensdatenbank: {0}"}
 {"uk": "невідоме рішення", "en": "unknown decision", "de": "unbekannte Entscheidung"}
 {"uk": "невідомий", "en": "unknown", "de": "unbekannt"}
+{"uk": "невідомий client_id", "en": "unknown client_id", "de": "unbekannte client_id"}
 {"uk": "невідомий {0}", "en": "unknown {0}", "de": "unbekannt {0}"}
 {"uk": "невідомий вид пропозиції", "en": "unknown proposal type", "de": "unbekannte Vorschlagsart"}
+{"uk": "невідомий код дозволу", "en": "unknown authorization code", "de": "unbekannter Autorisierungscode"}
 {"uk": "невідомий метод {0}", "en": "unknown method {0}", "de": "unbekannte Methode {0}"}
 {"uk": "невідомий рівень важливості", "en": "unknown importance level", "de": "unbekannte Wichtigkeitsstufe"}
+{"uk": "невідомий токен OAuth", "en": "unknown OAuth token", "de": "unbekanntes OAuth-Token"}
+{"uk": "невідомий токен оновлення", "en": "unknown refresh token", "de": "unbekanntes Aktualisierungstoken"}
 {"uk": "невідомий числовий Vendor ID DigiKey (як 3228) — впишіть Digi-Key P/N", "en": "unknown numeric DigiKey Vendor ID (like 3228) — enter the Digi-Key P/N", "de": "unbekannte numerische DigiKey Vendor ID (wie 3228) — Digi-Key P/N eintragen"}
 {"uk": "невідомий інструмент {0}", "en": "unknown tool {0}", "de": "unbekanntes Werkzeug {0}"}
 {"uk": "невідомо", "en": "unknown", "de": "unbekannt"}
@@ -23016,6 +23078,7 @@
 {"uk": "немає права змінювати проєкти", "en": "no permission to change projects", "de": "keine Berechtigung, Projekte zu ändern"}
 {"uk": "немає права змінювати товари", "en": "no permission to change products", "de": "keine Berechtigung, Artikel zu ändern"}
 {"uk": "немає права змінювати ціни на DigiKey", "en": "no permission to change prices on DigiKey", "de": "keine Berechtigung, Preise bei DigiKey zu ändern"}
+{"uk": "немає права на завдання агенту", "en": "no right to agent tasks", "de": "kein Recht auf Agentenaufgaben"}
 {"uk": "немає права на календар", "en": "no permission for the calendar", "de": "keine Berechtigung für den Kalender"}
 {"uk": "немає права на клієнтів CRM — шукайте без customer", "en": "no permission for CRM customers — search without customer", "de": "keine Berechtigung für CRM-Kunden – suchen Sie ohne customer"}
 {"uk": "немає права на пошук у базі знань", "en": "no permission to search the knowledge base", "de": "keine Berechtigung zur Suche in der Wissensdatenbank"}
@@ -23064,6 +23127,9 @@
 {"uk": "необов’язковий", "en": "optional", "de": "optional"}
 {"uk": "неповна", "en": "incomplete", "de": "unvollständig"}
 {"uk": "неповних: {0}", "en": "incomplete: {0}", "de": "unvollständig: {0}"}
+{"uk": "неправильна адреса повернення: {0}", "en": "invalid return address: {0}", "de": "ungültige Rücksprungadresse: {0}"}
+{"uk": "неправильний client_secret", "en": "wrong client_secret", "de": "falsches client_secret"}
+{"uk": "неправильний заголовок Basic", "en": "invalid Basic header", "de": "ungültiger Basic-Header"}
 {"uk": "неправильний період", "en": "invalid period", "de": "ungültiger Zeitraum"}
 {"uk": "непрочитаних листів {0}", "en": "unread emails {0}", "de": "ungelesene E-Mails {0}"}
 {"uk": "непрочитаних: {0}", "en": "unread: {0}", "de": "ungelesen: {0}"}
@@ -23377,6 +23443,7 @@
 {"uk": "очікує затвердження", "en": "awaiting approval", "de": "wartet auf Genehmigung"}
 {"uk": "очікує затвердження DigiKey", "en": "awaiting DigiKey approval", "de": "wartet auf Freigabe durch DigiKey"}
 {"uk": "очікується", "en": "expected", "de": "erwartet"}
+{"uk": "очікується JSON-об’єкт", "en": "a JSON object is expected", "de": "ein JSON-Objekt wird erwartet"}
 {"uk": "очікується {0}", "en": "expected {0}", "de": "erwartet {0}"}
 {"uk": "очікується {0} ({1}", "en": "expected {0} ({1}", "de": "erwartet {0} ({1}"}
 {"uk": "очікується {0} ({1}{2})", "en": "expected {0} ({1}{2})", "de": "erwartet {0} ({1}{2})"}
@@ -23534,6 +23601,7 @@
 {"uk": "по-різному", "en": "differently", "de": "unterschiedlich"}
 {"uk": "пов'язаного: {0}", "en": "linked: {0}", "de": "verknüpft: {0}"}
 {"uk": "поведінку клієнтів", "en": "customer behavior", "de": "das Kundenverhalten"}
+{"uk": "повернення на", "en": "returns to", "de": "Rücksprung zu"}
 {"uk": "повернення при скасуванні замовлення", "en": "return on order cancellation", "de": "Rückbuchung bei Stornierung des Auftrags"}
 {"uk": "повернення після скасування замовлення", "en": "return after order cancellation", "de": "Rückbuchung nach Auftragsstornierung"}
 {"uk": "повернено", "en": "refunded", "de": "erstattet"}
@@ -23771,6 +23839,7 @@
 {"uk": "поточний, ставиться сам", "en": "current, set automatically", "de": "aktuell, wird automatisch gesetzt"}
 {"uk": "потрапляє в журнал аудиту.", "en": "goes into the audit log.", "de": "wird im Audit-Protokoll festgehalten."}
 {"uk": "потребує уваги", "en": "needs attention", "de": "braucht Aufmerksamkeit"}
+{"uk": "потрібен PKCE: code_challenge з code_challenge_method=S256", "en": "PKCE is required: code_challenge with code_challenge_method=S256", "de": "PKCE ist erforderlich: code_challenge mit code_challenge_method=S256"}
 {"uk": "потрібен category_id", "en": "category_id is required", "de": "category_id ist erforderlich"}
 {"uk": "потрібен id листа", "en": "an e-mail id is needed", "de": "eine E-Mail-ID ist nötig"}
 {"uk": "потрібен вхід покупця", "en": "buyer login required", "de": "Anmeldung des Käufers erforderlich"}
@@ -23814,6 +23883,7 @@
 {"uk": "пошта вже в телефоні. Оновіть сторінку, щоб побачити його в списку.", "en": "mail is already on the phone. Reload the page to see it in the list.", "de": "die Mails sind schon auf dem Telefon. Laden Sie die Seite neu, um es in der Liste zu sehen."}
 {"uk": "пошта й календар — лише для того, хто дав завдання і має скриньку", "en": "пошта й календар — лише для того, хто дав завдання і має скриньку", "de": "пошта й календар — лише для того, хто дав завдання і має скриньку"}
 {"uk": "пошта — лише людині зі своєю скринькою в Minerva", "en": "e-mail — only for a person with their own mailbox in Minerva", "de": "E-Mail — nur für eine Person mit eigenem Postfach in Minerva"}
+{"uk": "пошта, календар, робочий час", "en": "mail, calendar, working time", "de": "E-Mail, Kalender, Arbeitszeit"}
 {"uk": "пошта: {0}", "en": "mail: {0}", "de": "E-Mail: {0}"}
 {"uk": "пошту вимкнено в «Налаштування → Сповіщення»", "en": "e-mail is off in \"Settings → Notifications\"", "de": "E-Mail ist in „Einstellungen → Benachrichtigungen“ deaktiviert"}
 {"uk": "пошту, розмови й особисті документи ця сторінка не показує й нічого не виконує від її імені.", "en": "mail, conversations and personal documents are not shown on this page, and nothing is executed on their behalf.", "de": "E-Mails, Gespräche und persönliche Dokumente zeigt diese Seite nicht an, und in ihrem Namen wird nichts ausgeführt."}
@@ -23921,6 +23991,7 @@
 {"uk": "прогноз {0} → {1}", "en": "forecast {0} → {1}", "de": "Prognose {0} → {1}"}
 {"uk": "прогноз {0}–{1}", "en": "forecast {0}–{1}", "de": "Prognose {0}–{1}"}
 {"uk": "програма", "en": "program", "de": "Programm"}
+{"uk": "програма на цьому комп’ютері (Claude Code, Claude Desktop…)", "en": "an app on this computer (Claude Code, Claude Desktop…)", "de": "eine App auf diesem Computer (Claude Code, Claude Desktop…)"}
 {"uk": "прогрес на панелі.", "en": "progress on the panel.", "de": "Fortschritt im Panel."}
 {"uk": "прогін {0}", "en": "run {0}", "de": "Durchlauf {0}"}
 {"uk": "продаж", "en": "sale", "de": "Verkauf"}
@@ -23944,6 +24015,8 @@
 {"uk": "пропозиція — підтвердіть у пульті проєкту (✓ / ✗)", "en": "suggestion — confirm it in the project cockpit (✓ / ✗)", "de": "Vorschlag — im Projekt-Cockpit bestätigen (✓ / ✗)"}
 {"uk": "пропозиція: {0}", "en": "offer: {0}", "de": "Angebot: {0}"}
 {"uk": "пропозиції зовнішнього агента (MCP) — доручення з них не буває", "en": "proposals of an external agent (MCP) — no agent rule can be made from them", "de": "Vorschläge eines externen Agenten (MCP) — daraus gibt es keine Agentenregel"}
+{"uk": "пропонувати зміни", "en": "propose changes", "de": "Änderungen vorschlagen"}
+{"uk": "пропонує зміни", "en": "proposes changes", "de": "schlägt Änderungen vor"}
 {"uk": "пропонує інший час", "en": "proposes another time", "de": "schlägt eine andere Zeit vor"}
 {"uk": "пропонує інший час: {0}", "en": "proposes another time: {0}", "de": "schlägt eine andere Zeit vor: {0}"}
 {"uk": "пропускай. \"date\" — коли це сталося (зазвичай дата листа), не пізніше {0}.", "en": "skip them. \"date\" — when it happened (usually the date of the email), not later than {0}.", "de": "überspringe sie. \"date\" — wann es passiert ist (meist das Datum der E-Mail), nicht später als {0}."}
@@ -23952,6 +24025,8 @@
 {"uk": "пропущено (розмір) {0}", "en": "skipped (size) {0}", "de": "übersprungen (Größe) {0}"}
 {"uk": "пропущено: {0}", "en": "skipped: {0}", "de": "übersprungen: {0}"}
 {"uk": "просили в ціні: {0}", "en": "asked to be included: {0}", "de": "im Preis angefragt: {0}"}
+{"uk": "просить доступ до Minerva від вашого імені", "en": "asks for access to Minerva on your behalf", "de": "bittet um Zugriff auf Minerva in Ihrem Namen"}
+{"uk": "просить доступ до Minerva від вашого імені (", "en": "asks for access to Minerva on your behalf (", "de": "bittet um Zugriff auf Minerva in Ihrem Namen ("}
 {"uk": "простий (без бланка)", "en": "simple (without letterhead)", "de": "einfach (ohne Briefbogen)"}
 {"uk": "прострочена закупівля", "en": "overdue purchase", "de": "überfälliger Einkauf"}
 {"uk": "прострочена. Закритий людиною ризик правило вже не відкриває.", "en": "is overdue. A rule does not reopen a risk closed by a person.", "de": "ist überfällig. Ein von einer Person geschlossenes Risiko öffnet eine Regel nicht wieder."}
@@ -24048,6 +24123,10 @@
 {"uk": "піде з", "en": "will be sent from", "de": "wird gesendet von"}
 {"uk": "підказки пошуку", "en": "search suggestions", "de": "Suchvorschläge"}
 {"uk": "підказки, повідомлення). Переклад робиться", "en": "hints, messages). Translation is done", "de": "Hinweise, Meldungen). Die Übersetzung erfolgt"}
+{"uk": "підключення OAuth вимкнено", "en": "the OAuth connection is turned off", "de": "die OAuth-Verbindung ist ausgeschaltet"}
+{"uk": "підключення вимкнено або прострочено — дозвольте знову", "en": "the connection is turned off or expired — allow again", "de": "die Verbindung ist ausgeschaltet oder abgelaufen – erlauben Sie erneut"}
+{"uk": "підключення вимкнено в «🔑 API ключі»", "en": "the connection is turned off in «🔑 API keys»", "de": "die Verbindung ist unter „🔑 API-Schlüssel“ ausgeschaltet"}
+{"uk": "підключення діє", "en": "the connection is active", "de": "die Verbindung ist aktiv"}
 {"uk": "підключення сайту кодом", "en": "connecting a website with a code", "de": "Verbinden einer Website per Code"}
 {"uk": "підключення, шифрування й вхід значеннями з форми (ще не збереженими теж), лист не надсилається", "en": "connection, encryption and login with the values in the form (unsaved too), no email is sent", "de": "Verbindung, Verschlüsselung und Anmeldung mit den Werten im Formular (auch ungespeicherten), keine E-Mail wird gesendet"}
 {"uk": "підключено", "en": "connected", "de": "verbunden"}
@@ -24702,9 +24781,14 @@
 {"uk": "той самий сайт / домен {0}", "en": "same website / domain {0}", "de": "gleiche Website / Domain {0}"}
 {"uk": "той, хто записав", "en": "the person who recorded", "de": "die aufnehmende Person"}
 {"uk": "токен", "en": "token", "de": "Token"}
+{"uk": "токен OAuth прострочено", "en": "the OAuth token expired", "de": "das OAuth-Token ist abgelaufen"}
+{"uk": "токен видано для іншого сервера", "en": "the token was issued for another server", "de": "das Token wurde für einen anderen Server ausgestellt"}
+{"uk": "токен оновлення вже використано — підключення відкликано, дозвольте знову", "en": "the refresh token was already used — the connection is revoked, allow again", "de": "das Aktualisierungstoken wurde bereits verwendet – die Verbindung ist widerrufen, erlauben Sie erneut"}
+{"uk": "токен прострочено — оновіть його", "en": "the token expired — refresh it", "de": "das Token ist abgelaufen – aktualisieren Sie es"}
 {"uk": "токен протермінований. Зайди в Налаштування DigiKey → Marketplace OAuth → авторизуй.", "en": "the token has expired. Go to DigiKey settings → Marketplace OAuth → authorize.", "de": "das Token ist abgelaufen. Zu den DigiKey-Einstellungen → Marketplace OAuth wechseln und autorisieren."}
 {"uk": "токенів", "en": "tokens", "de": "Tokens"}
 {"uk": "токенів (запит / відповідь)", "en": "tokens (request / response)", "de": "Tokens (Anfrage / Antwort)"}
+{"uk": "токенів немає — програма має підключитись знову", "en": "no tokens — the app has to connect again", "de": "keine Tokens – die App muss sich erneut verbinden"}
 {"uk": "тому", "en": "ago", "de": "her"}
 {"uk": "тому на DigiKey вийде", "en": "so on DigiKey it will come to", "de": "daher ergibt sich auf DigiKey"}
 {"uk": "топ", "en": "top", "de": "Top"}
@@ -24751,6 +24835,7 @@
 {"uk": "ті самі товари й кількості.", "en": "the same products and quantities.", "de": "dieselben Artikel und Mengen."}
 {"uk": "тіло", "en": "body", "de": "Body"}
 {"uk": "тіло закупівлі перевіряє сервіс закупівель лише під час запису (постачальник, позиції, доставки) — без наслідків не перевірити", "en": "the purchase order body is validated by the purchasing service only when writing (supplier, lines, deliveries) — cannot be checked without consequences", "de": "der Body der Bestellung wird vom Bestelldienst nur beim Schreiben geprüft (Lieferant, Positionen, Lieferungen) — nicht ohne Folgen prüfbar"}
+{"uk": "тіло запиту — JSON", "en": "the request body is JSON", "de": "der Anfragetext ist JSON"}
 {"uk": "тільки в Minerva", "en": "only in Minerva", "de": "nur in Minerva"}
 {"uk": "тільки в першому рядку.", "en": "only in the first row.", "de": "nur in der ersten Zeile."}
 {"uk": "тільки латинські літери та цифри", "en": "Latin letters and digits only", "de": "nur lateinische Buchstaben und Ziffern"}
@@ -24840,6 +24925,7 @@
 {"uk": "у листі немає трек-номера замовлень Minerva", "en": "the email has no tracking number of Minerva orders", "de": "die E-Mail enthält keine Sendungsnummer von Minerva-Aufträgen"}
 {"uk": "у листі номер або трек-номер замовлення з джерела {0}", "en": "the email contains an order or tracking number from source {0}", "de": "in der E-Mail steht eine Auftrags- oder Sendungsnummer aus Quelle {0}"}
 {"uk": "у листі трек-номери кількох замовлень (", "en": "the email has tracking numbers of several orders (", "de": "die E-Mail enthält Sendungsnummern mehrerer Aufträge ("}
+{"uk": "у людини вже немає права на завдання агенту", "en": "the person no longer has the right to agent tasks", "de": "die Person hat kein Recht mehr auf Agentenaufgaben"}
 {"uk": "у магазинах показується: {0}", "en": "shown in shops: {0}", "de": "in Webshops sichtbar: {0}"}
 {"uk": "у магазині", "en": "in the shop", "de": "im Webshop"}
 {"uk": "у магазині змінилось після пропозиції — запустіть завдання ще раз", "en": "it changed in the shop after the proposal — run the task again", "de": "im Shop hat sich nach dem Vorschlag etwas geändert – starten Sie die Aufgabe erneut"}
@@ -25114,6 +25200,7 @@
 {"uk": "цей ПК", "en": "this PC", "de": "dieser PC"}
 {"uk": "цей курс", "en": "this rate", "de": "dieser Kurs"}
 {"uk": "цей момент уже запропоновано в цьому завданні", "en": "this moment has already been proposed in this task", "de": "dieser Moment wurde in dieser Aufgabe bereits vorgeschlagen"}
+{"uk": "цей сервер дає доступ лише до свого MCP: {0}", "en": "this server gives access only to its own MCP: {0}", "de": "dieser Server gewährt nur Zugriff auf sein eigenes MCP: {0}"}
 {"uk": "цим ключем ще ніхто не звертався", "en": "nobody has used this key yet", "de": "dieser Schlüssel wurde noch von niemandem verwendet"}
 {"uk": "цитати з підсумку наради — для своїх; клієнту зазвичай досить «чому»", "en": "quotes from the meeting summary — for your team; for the customer «why» is usually enough", "de": "Zitate aus der Zusammenfassung — fürs Team; dem Kunden genügt meist das «Warum»"}
 {"uk": "цитати прибрано в {0}", "en": "quotes removed in {0}", "de": "Zitate entfernt in {0}"}
@@ -25370,6 +25457,7 @@
 {"uk": "ще немає — RAG-ПК не зможе передавати розшифровки", "en": "none yet — the RAG PC will not be able to send transcripts", "de": "noch keiner — der RAG-PC kann keine Transkripte senden"}
 {"uk": "ще ні", "en": "not yet", "de": "noch nicht"}
 {"uk": "ще ніхто", "en": "nobody yet", "de": "noch niemand"}
+{"uk": "ще ніхто не дозволив", "en": "nobody has allowed it yet", "de": "noch niemand hat es erlaubt"}
 {"uk": "ще один проєкт…", "en": "another project…", "de": "weiteres Projekt…"}
 {"uk": "ще подій {0}", "en": "{0} more events", "de": "noch {0} Ereignisse"}
 {"uk": "ще попереду", "en": "still ahead", "de": "noch offen"}

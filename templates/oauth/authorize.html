@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Підключити програму · Minerva</title>
+<style>
+:root { --bg:#080b0f; --card:#0d1117; --fg:#f5edd1; --muted:#c4bba3; --line:rgba(201,168,76,.25); --gold:#c9a84c;
+        --gold-fg:#e8d5a3; --warn-bg:rgba(224,160,60,.12); --warn:#f0c070; --ok:#8fd19e; --err:#ff8a8a; }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#f6f4ee; --card:#ffffff; --fg:#1d1b16; --muted:#5b564a; --line:#ddd6c4; --gold:#7a5a0e;
+          --gold-fg:#6b4e0a; --warn-bg:#fff4dc; --warn:#7a4b00; --ok:#1f6b33; --err:#a32020; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width:560px; margin:0 auto; padding:40px 16px 64px; }
+.brand { color:var(--gold-fg); letter-spacing:4px; font-size:12px; text-transform:uppercase; margin-bottom:10px; }
+h1 { font-size:1.45rem; margin:0 0 18px; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:20px; }
+.who { margin:0 0 14px; }
+.where { margin:0 0 6px; color:var(--muted); font-size:.95rem; }
+code { font-size:.92em; word-break:break-all; }
+.ok { color:var(--ok); font-size:.92rem; margin:0 0 14px; }
+.warn { background:var(--warn-bg); color:var(--warn); border-radius:8px; padding:10px 12px; font-size:.92rem; margin:0 0 14px; }
+.opt { display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-top:1px solid var(--line); }
+.opt input { margin-top:5px; width:18px; height:18px; flex:none; accent-color:var(--gold); }
+.opt small { display:block; color:var(--muted); font-size:.85rem; }
+.note { color:var(--muted); font-size:.85rem; margin:14px 0 0; }
+.btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:20px; }
+button { font:inherit; padding:11px 20px; border-radius:6px; cursor:pointer; border:1px solid var(--line); }
+.allow { background:var(--gold); color:var(--bg); border-color:var(--gold); font-weight:600; }
+.deny { background:transparent; color:var(--fg); }
+.error { color:var(--err); }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">Minerva</div>
+  {% if error %}
+    <h1>🔌 Не вдалося підключити програму</h1>
+    <div class="card"><p class="error" translate="no">{{ error }}</p>
+      <p class="note">Підключіть програму до Minerva знову — у самій програмі (напр. у Claude: «Connectors» → «Connect»).</p></div>
+  {% else %}
+    <h1>🔌 Підключити програму до Minerva</h1>
+    <form method="post" class="card">{% csrf_token %}
+      {% for k, v in params.items %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+      <p class="who"><b translate="no">{{ a.client.name }}</b> просить доступ до Minerva від вашого імені
+        (<span translate="no">{{ who }}</span>) через агента (MCP).</p>
+      <p class="where">Після дозволу Minerva поверне вас на: <code translate="no">{{ a.host }}</code></p>
+      {% if a.known %}<p class="ok">✓ <span translate="no">{{ a.known }}</span></p>
+      {% else %}<p class="warn">⚠️ Цієї адреси Minerva не знає. Дозволяйте, лише якщо ви самі щойно підключали цю програму.</p>{% endif %}
+      <label class="opt"><input type="checkbox" checked disabled>
+        <span>👁 Бачити дані Minerva через агента<small>У межах ваших прав: товари, склад, замовлення, клієнти, закупівлі, запити постачальникам…</small></span></label>
+      {% if write %}<label class="opt"><input type="checkbox" name="write" value="1" checked>
+        <span>✍️ Пропонувати зміни<small>Агент сам нічого не змінює й не надсилає: кожна пропозиція чекає вашого ✓ у «🧩 Завдання агенту».</small></span></label>{% endif %}
+      <label class="opt"><input type="checkbox" name="personal" value="1">
+        <span>🔒 Моя пошта, календар і робочий час<small>Лише ваші скриньки й ваш календар — агент зможе читати листи й готувати відповіді.</small></span></label>
+      <div class="btns">
+        <button class="allow" type="submit" name="decision" value="allow">Дозволити</button>
+        <button class="deny" type="submit" name="decision" value="deny">Не дозволяти</button>
+      </div>
+      <p class="note">Програма не дізнається вашого пароля. Підключення з’явиться в «🔑 API ключі» як 🔌 <span translate="no">{{ a.client.name }}</span> — вимкнути його можна там у будь-який момент (зніміть «Активний»).</p>
+    </form>
+  {% endif %}
+</main>
+</body>
+</html>

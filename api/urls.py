@@ -77,6 +77,7 @@ urlpatterns = [
     path("meetings/<int:meeting_id>/status/", mv.MeetingStatusView.as_view(), name="meetings-status"),
     path("meetings/<int:meeting_id>/transcript/", mv.MeetingTranscriptView.as_view(), name="meetings-transcript"),
     path("meetings/<int:meeting_id>/moments/", mv.MeetingMomentsView.as_view(), name="meetings-moments"),
-    path("mcp/", mcp.MCPView.as_view(), name="mcp"),   # 🤖 MCP-сервер для зовнішніх агентів (agent/mcp.py)
+    path("mcp/", mcp.MCPView.as_view(), name="mcp"),
+    path("mcp", mcp.MCPView.as_view(), name="mcp_no_slash"),   # клієнти, де адресу вписано без «/» у кінці   # 🤖 MCP-сервер для зовнішніх агентів (agent/mcp.py)
     path("", include(router.urls)),
 ]

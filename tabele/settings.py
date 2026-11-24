@@ -203,6 +203,8 @@ EMAIL_BACKEND = 'config.email_backend.NotificationSettingsEmailBackend'
 # всі акаунти в одній базі: зареєстрований сторонній бачив би дані цієї фірми. Тому за замовчуванням вимкнено;
 # увімкнено — реєстрація лише підтверджує email, доступ відкриває адміністратор вручну.
 PUBLIC_REGISTRATION = os.getenv("MINERVA_PUBLIC_REGISTRATION", "0") == "1"
+# 🔌 OAuth для MCP-сервера (api/oauth.py: Claude.ai «Custom connector», ChatGPT…); 0 — вимкнути
+MCP_OAUTH = os.getenv("MINERVA_MCP_OAUTH", "1") != "0"
 DEFAULT_FROM_EMAIL = 'Minerva BI <noreply@minerva-bi.local>'
 PASSWORD_RESET_TIMEOUT = 259200  # 3 дні
 
