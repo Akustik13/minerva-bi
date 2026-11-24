@@ -374,6 +374,7 @@ class AgentProposal(models.Model):
     OFFER = 'offer'
     CRM_NOTE, MOMENT, WORKTIME, DK_REPLY = 'crm_note', 'moment', 'worktime', 'dk_reply'   # agent/toolsets.py
     PACKAGING, PACK_MERGE = 'packaging', 'pack_merge'                                     # agent/tools_packaging.py
+    RFQ = 'rfq'                                       # agent/tools_rfq.py, tools_rfq_mail.py — дія в data.action
     KINDS = [(FIELD, 'Поле товару'), (ATTRIBUTE, 'Технічний параметр'), (MAIL, 'Лист'),
              (STOCK_IN, '📦 Прихід на склад'), (PRODUCT, '🆕 Новий товар'), (EVENT, '📅 Подія в календарі'),
              (SHOP, '🏪 Інтернет-магазин'), (DK_PRICES, '💲 Ціни на DigiKey'), (DK_LEAD, '⏱ Строк на DigiKey'),
@@ -381,7 +382,7 @@ class AgentProposal(models.Model):
              (PURCHASE, '🛒 Закупівля'), (PARCEL, '📥 Посилка до нас'), (OFFER, '📝 Чернетка Angebot'),
              (CRM_NOTE, '👤 Нотатка клієнту CRM'), (MOMENT, '📌 Момент проєкту'),
              (WORKTIME, '⏱ Час в askDANTE'), (DK_REPLY, '💬 Відповідь покупцю DigiKey'),
-             (PACKAGING, '📦 Коробка'), (PACK_MERGE, '📦 Злити коробки')]
+             (PACKAGING, '📦 Коробка'), (PACK_MERGE, '📦 Злити коробки'), (RFQ, '📨 Запит постачальникам')]
     PENDING, APPLIED, REJECTED, FAILED = 'pending', 'applied', 'rejected', 'failed'
     STATUSES = [(PENDING, '👀 Чекає'), (APPLIED, '✓ Застосовано'), (REJECTED, '✕ Відхилено'),
                 (FAILED, '⚠️ Не вдалося')]
