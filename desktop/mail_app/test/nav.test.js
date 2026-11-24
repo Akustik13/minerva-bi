@@ -16,6 +16,16 @@ test('normalizeServer: address only, https by default', () => {
   assert.equal(nav.normalizeServer('javascript:alert(1)'), null);
 });
 
+test('isPdfViewer: only the built-in PDF viewer frame', () => {
+  assert.equal(nav.isPdfViewer('chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/e8ffc6e9-90a8-412c-888f-c1a6cc922dc3'), true);
+  assert.equal(nav.isPdfViewer('chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/index.html'), true);
+  assert.equal(nav.isPdfViewer('chrome-extension://abcdefghijklmnopabcdefghijklmnop/index.html'), false);
+  assert.equal(nav.isPdfViewer(S + '/email/message/7/attachment/0/'), false);
+  assert.equal(nav.isPdfViewer('javascript:alert(1)'), false);
+  assert.equal(nav.isPdfViewer('not a url'), false);
+  assert.equal(nav.classify('chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/x', S), 'block');   // вікна й переходи — як були
+});
+
 test('classify: mail and login stay in the app, the rest goes to the browser', () => {
   for (const p of ['/email/', '/email/?msg=5&solo=1', '/email/compose/?to=a@b.c', '/email/message/7/attachment/0/',
     '/email/app/pair/?code=x', '/admin/login/?next=/email/', '/admin/logout/', '/admin/password_reset/',

@@ -287,7 +287,7 @@ function wire(wc) {
     if (isMain) guard(e, url);
   });
   wc.on('will-frame-navigate', (e) => {
-    if (e.isMainFrame) return;
+    if (e.isMainFrame || nav.isPdfViewer(e.url)) return;     // кадр документа в переглядачі PDF (👁 вкладення)
     const kind = nav.classify(e.url, server());
     if (kind === 'block' || kind === 'pair' || kind === 'mailto') { e.preventDefault(); route(kind, e.url); }
   });

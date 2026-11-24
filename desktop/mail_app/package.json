@@ -1,7 +1,7 @@
 {
   "name": "minerva-mail",
   "productName": "Minerva Mail",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Пошта Minerva — окрема програма з поштою Minerva для Windows",
   "main": "src/main.js",
   "author": "Minerva BI",

@@ -6,6 +6,8 @@
  *  normalizeServer(text)   — «sevskiy.minerva-bi.com» → «https://sevskiy.minerva-bi.com» (лише адреса сервера, без шляху);
  *  classify(url, server)   — 'app' (пошта й вхід — у вікні програми), 'home' (корінь / адмінка — показати пошту),
  *                            'browser' (решта Minerva й інші сайти — звичайний браузер), 'mailto', 'pair', 'block';
+ *  isPdfViewer(url)        — внутрішня адреса вбудованого переглядача PDF (chrome-extension://…/<id потоку>): кадр
+ *                            з нею не блокувати, інакше 👁 вкладення-PDF — порожнє вікно;
  *  mailtoToCompose(mailto, server) — mailto:… → <server>/email/compose/?to=&cc=&subject=&body=;
  *  parsePair(url)          — minerva-mail://pair?url=…&code=… → {server, code} або null;
  *  findArg(argv)           — mailto:… / minerva-mail:… серед аргументів запуску.
@@ -24,6 +26,9 @@ const IN_APP = [
 ];
 // Корінь і головна адмінки → пошта (наприклад, після входу без ?next=)
 const HOME = [/^\/$/, /^\/admin\/?$/];
+// Вбудований переглядач PDF Chromium — постійний ID розширення (extension_misc::kPdfExtensionId). Документ він
+// показує в кадрі з адресою chrome-extension://<ID>/<id потоку> (дані — з уже завантаженої відповіді Minerva)
+const PDF_VIEWER = 'mhjfbmdgcfjbbpaeojofohoefgiehjai';
 
 function normalizeServer(text) {
   let s = String(text || '').trim();
@@ -50,6 +55,12 @@ function classify(url, server) {
   if (!server || u.origin !== new URL(server).origin) return 'browser';
   if (HOME.some((re) => re.test(u.pathname))) return 'home';
   return IN_APP.some((re) => re.test(u.pathname)) ? 'app' : 'browser';
+}
+
+function isPdfViewer(url) {
+  let u;
+  try { u = new URL(url); } catch (e) { return false; }
+  return u.protocol === 'chrome-extension:' && u.hostname === PDF_VIEWER;   // origin у Node для chrome-extension: — 'null'
 }
 
 function mailtoToCompose(mailto, server) {
@@ -102,4 +113,6 @@ function pairUrl(server, code) {
   return server + '/email/app/pair/?code=' + encodeURIComponent(code);
 }
 
-module.exports = { IN_APP, normalizeServer, sameOrigin, classify, mailtoToCompose, parsePair, findArg, pairUrl };
+module.exports = {
+  IN_APP, normalizeServer, sameOrigin, classify, isPdfViewer, mailtoToCompose, parsePair, findArg, pairUrl,
+};
