@@ -18,7 +18,7 @@ from api.models import APIKey, OAuthClient, OAuthToken
 
 CALLBACK = 'https://claude.ai/api/mcp/auth_callback'
 MCP = '/api/v1/mcp/'
-RESOURCE = 'http://testserver/api/v1/mcp/'
+RESOURCE = 'http://testserver/api/v1/mcp'
 
 
 def pkce():
@@ -84,14 +84,15 @@ class OAuthTests(TestCase):
 
     # ── тести ──
     def test_discovery_without_login(self):
-        r = self.client.post(MCP, '{}', content_type='application/json')
-        self.assertEqual(r.status_code, 401)
-        self.assertIn('resource_metadata="http://testserver/.well-known/oauth-protected-resource/api/v1/mcp/"',
-                      r['WWW-Authenticate'])
-        prm = self.client.get('/.well-known/oauth-protected-resource/api/v1/mcp/').json()
-        self.assertEqual((prm['resource'], prm['authorization_servers']), (RESOURCE, ['http://testserver']))
-        self.assertEqual(self.client.get('/.well-known/oauth-protected-resource/api/v1/mcp').json()['resource'],
-                         'http://testserver/api/v1/mcp')
+        # метадані — для тієї самої адреси, яку вписано в програмі (Claude порівнює `resource` з адресою конектора)
+        for url in ('/api/v1/mcp/', '/api/v1/mcp'):
+            r = self.client.post(url, '{}', content_type='application/json')
+            self.assertEqual(r.status_code, 401)
+            meta = f'http://testserver/.well-known/oauth-protected-resource{url}'
+            self.assertIn(f'resource_metadata="{meta}"', r['WWW-Authenticate'])
+            prm = self.client.get(meta[len('http://testserver'):]).json()
+            self.assertEqual((prm['resource'], prm['authorization_servers']),
+                             (f'http://testserver{url}', ['http://testserver']))
         self.assertEqual(self.client.get('/.well-known/oauth-protected-resource').json()['resource'], RESOURCE)
         asm = self.client.get('/.well-known/oauth-authorization-server')
         self.assertEqual(asm['Access-Control-Allow-Origin'], '*')

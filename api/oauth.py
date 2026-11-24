@@ -67,7 +67,9 @@ def base_url(request) -> str:
 
 
 def resource_url(request) -> str:
-    return base_url(request) + MCP_PATH
+    """Адреса MCP без «/» у кінці: клієнти MCP перевіряють, що адреса сервера починається з `resource` метаданих —
+    так підходить і `…/mcp`, і `…/mcp/` (порівняння токенів — `same_resource`, без огляду на «/»)."""
+    return base_url(request) + MCP_PATH.rstrip('/')
 
 
 def same_resource(a, b) -> bool:
@@ -78,7 +80,12 @@ def same_resource(a, b) -> bool:
 
 
 def metadata_url(request) -> str:
-    return base_url(request) + '/.well-known/oauth-protected-resource' + MCP_PATH
+    """Метадані для тієї адреси MCP, на яку прийшов запит (зі «/» у кінці чи без): Claude порівнює `resource` з
+    адресою конектора — `…/mcp` з метаданими `…/mcp/` він відкидав («Autorisierung fehlgeschlagen»)."""
+    path = getattr(request, 'path', '') or ''
+    if path.rstrip('/') != MCP_PATH.rstrip('/'):
+        path = MCP_PATH.rstrip('/')
+    return base_url(request) + '/.well-known/oauth-protected-resource' + path
 
 
 def www_authenticate(request, error='') -> str:
@@ -94,7 +101,7 @@ def www_authenticate(request, error='') -> str:
 
 def resource_metadata(request, path='') -> dict:
     """RFC 9728. `resource` — точно та адреса, з якої клієнт її шукав (зі «/» у кінці чи без)."""
-    resource = base_url(request) + (path if path else MCP_PATH)
+    resource = base_url(request) + (path if path else MCP_PATH.rstrip('/'))
     return {'resource': resource, 'authorization_servers': [base_url(request)], 'scopes_supported': list(SCOPES),
             'bearer_methods_supported': ['header'], 'resource_name': 'Minerva MCP'}
 
