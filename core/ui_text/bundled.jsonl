@@ -2850,6 +2850,7 @@
 {"uk": "if(!res.ok){bar.style.width=\"0\";st.textContent=\"❌ \"+(res.d.error||\"Помилка завантаження\");return;}", "en": "if(!res.ok){bar.style.width=\"0\";st.textContent=\"❌ \"+(res.d.error||\"Upload error\");return;}", "de": "if(!res.ok){bar.style.width=\"0\";st.textContent=\"❌ \"+(res.d.error||\"Fehler beim Hochladen\");return;}"}
 {"uk": "img alt=\"Етикетка", "en": "img alt=\"Label", "de": "img alt=\"Etikett"}
 {"uk": "in (дюйм)", "en": "in (inch)", "de": "in (Zoll)"}
+{"uk": "includes — список із pcb / assembly / components", "en": "includes — a list of pcb / assembly / components", "de": "includes – eine Liste aus pcb / assembly / components"}
 {"uk": "index_shop_media: перевірено {0} · ✅ {1} · ⚠ файл {2} · — немає {3} · ❌ {4} · змінилось {5}", "en": "index_shop_media: checked {0} · ✅ {1} · ⚠ file {2} · — none {3} · ❌ {4} · changed {5}", "de": "index_shop_media: geprüft {0} · ✅ {1} · ⚠ Datei {2} · — keine {3} · ❌ {4} · geändert {5}"}
 {"uk": "infoEl.textContent = 'Запущено о ' + d.started + ' · ' + (d.progress || '...')", "en": "infoEl.textContent = 'Started at ' + d.started + ' · ' + (d.progress || '...')", "de": "infoEl.textContent = 'Gestartet um ' + d.started + ' · ' + (d.progress || '...')"}
 {"uk": "infoEl.textContent = 'Не запускалось'", "en": "infoEl.textContent = 'Not run'", "de": "infoEl.textContent = 'Nicht gestartet'"}
@@ -3010,6 +3011,13 @@
 {"uk": "template — одна з форм: {0}", "en": "template — one of the forms: {0}", "de": "template – eines der Formulare: {0}"}
 {"uk": "text-decoration:underline;font-size:13px;padding:0\">Перегенерувати", "en": "text-decoration:underline;font-size:13px;padding:0\">Regenerate", "de": "text-decoration:underline;font-size:13px;padding:0\">Neu erzeugen"}
 {"uk": "ticket (лише в тілі); відповідь — meeting {id, uid, title, мови, тексти згоди…}, push_token", "en": "ticket (body only); response — meeting {id, uid, title, languages, consent texts…}, push_token", "de": "ticket (nur im Body); Antwort — meeting {id, uid, title, Sprachen, Einwilligungstexte…}, push_token"}
+{"uk": "tiers {0} шт: потрібна unit_price (або total)", "en": "tiers {0} pcs: unit_price (or total) is required", "de": "tiers {0} Stk.: unit_price (oder total) ist erforderlich"}
+{"uk": "tiers {0} шт: сума {1} не більша за разові витрати {2} — вкажіть unit_price", "en": "tiers {0} pcs: the total {1} is not greater than the one-time costs {2} — give unit_price", "de": "tiers {0} Stk.: die Summe {1} ist nicht größer als die einmaligen Kosten {2} – geben Sie unit_price an"}
+{"uk": "tiers — до {0} кількостей", "en": "tiers — up to {0} quantities", "de": "tiers – bis zu {0} Mengen"}
+{"uk": "tiers.lead_days — ціле число днів", "en": "tiers.lead_days — a whole number of days", "de": "tiers.lead_days – eine ganze Zahl von Tagen"}
+{"uk": "tiers.parts — {pcb, assembly, components: ціна за шт.}", "en": "tiers.parts — {pcb, assembly, components: price per pc}", "de": "tiers.parts – {pcb, assembly, components: Preis pro Stk.}"}
+{"uk": "tiers.qty {0} — більше 0 і без повторів", "en": "tiers.qty {0} — greater than 0 and without repeats", "de": "tiers.qty {0} – größer als 0 und ohne Wiederholungen"}
+{"uk": "tiers.qty — ціле число штук", "en": "tiers.qty — a whole number of pieces", "de": "tiers.qty – eine ganze Stückzahl"}
 {"uk": "title=\"Вага нетто не вказана — заповніть тут або в картці товару (вага нетто, г)\"", "en": "title=\"Net weight not specified — fill it in here or in the product card (net weight, g)\"", "de": "title=\"Nettogewicht nicht angegeben — hier oder in der Artikelkarte ausfüllen (Nettogewicht, g)\""}
 {"uk": "title=\"У кошику, але ще не замовлено\"", "en": "title=\"In the cart but not ordered yet\"", "de": "title=\"Im Bestellkorb, aber noch nicht bestellt\""}
 {"uk": "tolerance — число сантиметрів від 0.", "en": "tolerance — centimetres, from 0.", "de": "tolerance — Zentimeter, ab 0."}
@@ -3435,6 +3443,7 @@
 {"uk": "{0} — або експортуйте без перекладу назв", "en": "{0} — or export without translating the names", "de": "{0} — oder ohne Übersetzung der Namen exportieren"}
 {"uk": "{0} — або надішліть агенду без перекладу", "en": "{0} — or send the agenda without translation", "de": "{0} — oder die Tagesordnung ohne Übersetzung senden"}
 {"uk": "{0} — або надішліть підсумок без перекладу", "en": "{0} — or send the summary without translation", "de": "{0} — oder senden Sie die Zusammenfassung ohne Übersetzung"}
+{"uk": "{0} — або нове значення, або clear, не разом", "en": "{0} — either a new value or clear, not both", "de": "{0} – entweder ein neuer Wert oder clear, nicht beides"}
 {"uk": "{0} — адміністратор і бачить усе; щоб обмежити, спершу змініть роль у профілі.", "en": "{0} is an administrator and sees everything; to restrict, first change the role in the profile.", "de": "{0} ist Administrator und sieht alles; um dies einzuschränken, ändern Sie zuerst die Rolle im Profil."}
 {"uk": "{0} — артикул товару (або «Даташит: спільний файл»), напр. https://sevskiy.i234.me/datasheets/download.php?file={1}.pdf", "en": "{0} — the product SKU (or “Datasheet: shared file”), e.g. https://sevskiy.i234.me/datasheets/download.php?file={1}.pdf", "de": "{0} — Artikelnummer des Artikels (oder „Datenblatt: gemeinsame Datei“), z. B. https://sevskiy.i234.me/datasheets/download.php?file={1}.pdf"}
 {"uk": "{0} — артикул товару (або «Даташит: спільний файл»); досить початку адреси — Minerva допише {1}.pdf.", "en": "{0} — the product SKU (or “Datasheet: shared file”); the beginning of the address is enough — Minerva will append {1}.pdf.", "de": "{0} — Artikelnummer des Artikels (oder „Datenblatt: gemeinsame Datei“); der Anfang der Adresse genügt — Minerva ergänzt {1}.pdf."}
@@ -3680,6 +3689,7 @@
 {"uk": "{0}: ще не перевірено", "en": "{0}: not checked yet", "de": "{0}: noch nicht geprüft"}
 {"uk": "{0}: ще немає даних — прочитайте AI або QR", "en": "{0}: no data yet — read it with AI or QR", "de": "{0}: noch keine Daten — mit KI oder QR lesen"}
 {"uk": "{0}: індекси вкладень повторюються", "en": "{0}: attachment indexes are repeated", "de": "{0}: Anhangsindizes wiederholen sich"}
+{"uk": "{0}: — (прибрати)", "en": "{0}: — (remove)", "de": "{0}: – (entfernen)"}
 {"uk": "{0}: ✓ як за правилом", "en": "{0}: ✓ same as by rule", "de": "{0}: ✓ wie nach Regel"}
 {"uk": "{0}:{1} · {2} · від {3}", "en": "{0}:{1} · {2} · from {3}", "de": "{0}:{1} · {2} · vom {3}"}
 {"uk": "{0}:{1} від {2} — {3}", "en": "{0}:{1} from {2} — {3}", "de": "{0}:{1} vom {2} — {3}"}
@@ -3892,6 +3902,7 @@
 {"uk": "«Як надрукувати етикетку замовлення?»", "en": "“How do I print an order label?”", "de": "„Wie drucke ich ein Auftragsetikett?“"}
 {"uk": "«Які замовлення ще не відправлені й у яких минув строк?»", "en": "“Which orders have not been shipped yet and are overdue?”", "de": "„Welche Aufträge sind noch nicht versendet und überfällig?“"}
 {"uk": "«зайнято»", "en": "“busy”", "de": "„ausgelastet“"}
+{"uk": "«кількість: ціна / строк дн; …» або [{qty, unit_price, total, total_with_one_time, includes, parts, lead_days}]", "en": "«quantity: price / lead days; …» or [{qty, unit_price, total, total_with_one_time, includes, parts, lead_days}]", "de": "„Menge: Preis / Lieferzeit Tage; …“ oder [{qty, unit_price, total, total_with_one_time, includes, parts, lead_days}]"}
 {"uk": "«кількість: ціна; …» або [{qty, unit_price, lead_days}]", "en": "«quantity: price; …» or [{qty, unit_price, lead_days}]", "de": "„Menge: Preis; …“ oder [{qty, unit_price, lead_days}]"}
 {"uk": "«кількість: ціна», через «;», строк — «/ 14 дн»", "en": "«quantity: price», separated by «;», lead time — «/ 14 дн»", "de": "«Menge: Preis», getrennt durch «;», Lieferzeit — «/ 14 дн»"}
 {"uk": "«назва сума; …» або [{name, amount, qty}]", "en": "«name amount; …» or [{name, amount, qty}]", "de": "„Name Betrag; …“ oder [{name, amount, qty}]"}
@@ -15354,6 +15365,7 @@
 {"uk": "Прибрати цю сторону", "en": "Remove this side", "de": "Diese Seite entfernen"}
 {"uk": "Прибрати цю сторону? Її фото видалиться назавжди, друга сторона лишиться.", "en": "Remove this side? Its photo will be deleted permanently, the other side stays.", "de": "Diese Seite entfernen? Ihr Foto wird dauerhaft gelöscht, die andere Seite bleibt."}
 {"uk": "Прибрати ці адреси з «Копія» кожного листа", "en": "Remove these addresses from «CC» of every letter", "de": "Diese Adressen aus «CC» jedes Briefs entfernen"}
+{"uk": "Прибрати ці поля (хибне значення)", "en": "Remove these fields (a wrong value)", "de": "Diese Felder entfernen (falscher Wert)"}
 {"uk": "Прибув на склад", "en": "Arrived in stock", "de": "Im Lager eingetroffen"}
 {"uk": "Прив'яжи упаковку нижче (inline) — буде відображатись як рекомендація на замовленні", "en": "Attach the packaging below (inline) — it will be shown as a recommendation on the order", "de": "Verknüpfen Sie unten die Verpackung (inline) — sie wird als Empfehlung im Auftrag angezeigt"}
 {"uk": "Прив'язано", "en": "Linked", "de": "Verknüpft"}
@@ -24101,6 +24113,7 @@
 {"uk": "разово {0}", "en": "one-time {0}", "de": "einmalig {0}"}
 {"uk": "разово: {0}", "en": "one-time: {0}", "de": "einmalig: {0}"}
 {"uk": "разом", "en": "total", "de": "gesamt"}
+{"uk": "разом {0}", "en": "total {0}", "de": "gesamt {0}"}
 {"uk": "разом {0} {1}", "en": "total {0} {1}", "de": "gesamt {0} {1}"}
 {"uk": "разом з неактивними товарами ({0})", "en": "including inactive products ({0})", "de": "einschließlich inaktiver Artikel ({0})"}
 {"uk": "раніше", "en": "earlier", "de": "früher"}
@@ -24310,6 +24323,7 @@
 {"uk": "склад: товар спишеться при {0}", "en": "stock: the goods will be written off upon {0}", "de": "Lager: Die Ware wird bei {0} ausgebucht"}
 {"uk": "складає підсумок… (зазвичай 1–2 хв; сторінку можна не тримати відкритою)", "en": "is writing the summary… (usually 1–2 min; you do not need to keep the page open)", "de": "erstellt die Zusammenfassung… (meist 1–2 Min.; die Seite muss nicht offen bleiben)"}
 {"uk": "складено {0}", "en": "compiled {0}", "de": "erstellt {0}"}
+{"uk": "складові за шт.", "en": "components per pc", "de": "Bestandteile pro Stk."}
 {"uk": "склала Minerva — вони складуться заново з нових даних після «💾 Зберегти» (новий номер, кількості, файли, дата).", "en": "was written by Minerva — it will be rebuilt from the new data after «💾 Save» (new number, quantities, files, date).", "de": "hat Minerva erstellt — es wird nach «💾 Speichern» aus den neuen Daten neu erstellt (neue Nummer, Mengen, Dateien, Datum)."}
 {"uk": "скопіюйте кнопкою вище, вставте в пошук на", "en": "copy it with the button above, paste it into the search on", "de": "kopieren Sie sie mit der Schaltfläche oben und fügen Sie sie ein in die Suche bei"}
 {"uk": "скоро", "en": "soon", "de": "bald"}
@@ -24883,6 +24897,7 @@
 {"uk": "у формі «{0}» немає полів {1} — є: {2}", "en": "the form «{0}» has no fields {1} — there are: {2}", "de": "das Formular „{0}“ hat keine Felder {1} – vorhanden: {2}"}
 {"uk": "у формі введено вручну", "en": "entered manually in the form", "de": "im Formular manuell eingegeben"}
 {"uk": "у цьому проєкті без позначених частин", "en": "no marked parts in this project", "de": "in diesem Projekt keine markierten Teile"}
+{"uk": "у ціні", "en": "in the price", "de": "im Preis"}
 {"uk": "у ціні немає", "en": "not included in the price", "de": "im Preis fehlt"}
 {"uk": "у ціні немає: {0} — для", "en": "price lacks: {0} — for", "de": "im Preis fehlt: {0} — für"}
 {"uk": "у ціні: {0}", "en": "included: {0}", "de": "im Preis: {0}"}

@@ -51,6 +51,10 @@ SET_STATES = ('sent', 'replied', 'quoted', 'declined', 'silent')
 DECISIONS = ('choose', 'award', 'reject', 'undecide')
 STATUS_ACTIONS = ('close', 'reopen', 'cancel', 'decision')
 SEND_ACTIONS = ('send', 'remind')
+# propose_rfq_quote clear — прибрати хибне значення (доставка 0 при EXW, «що входить» навпаки)
+CLEARED = {'tiers': [], 'one_time': '', 'includes': [], 'price': '', 'total': '', 'lead_days': None, 'shipping': '',
+           'valid_until': '', 'quote_note': ''}
+TIERS_MAX = 12
 EDIT_FIELDS = ('title', 'template', 'category', 'project', 'group', 'quantities', 'language', 'reply_by', 'specs',
                'notes', 'subject', 'body', 'cc', 'cc_contacts')
 QUOTE_FIELDS = ('tiers', 'one_time', 'includes', 'price', 'total', 'currency', 'lead_days', 'shipping',
@@ -129,21 +133,30 @@ PROPOSE_RECIPIENTS = {
 PROPOSE_QUOTE = {
     'name': 'propose_rfq_quote',
     'description': 'Запропонувати пропозицію постачальника з його листа / файлу (людина ✓ внесе в таблицю запиту): '
-                   'tiers — ціни за одиницю для кількостей «2500: 15,36; 5000: 14,80 / 21 дн» або '
-                   '[{qty, unit_price, lead_days}]; one_time — разові витрати «Stencil 30; NRE 150 @2500» (@N — лише '
-                   'для N шт) або [{name, amount, qty}]; includes — що входить у ціну: pcb / assembly / components; '
-                   'currency — ISO (USD, EUR, CNY); lead_days — строк у календарних днях; shipping — доставка; '
-                   'valid_until — YYYY-MM-DD; quote_note — умови (оплата, Incoterms, що не входить). Не вказане '
-                   'лишається як є. evidence — точна цитата.',
+                   'tiers — усі кількості (якої немає в списку — прибирається): «2500: 15,36; 5000: 14,80 / 21 '
+                   'дн» або [{qty, unit_price, total, '
+                   'total_with_one_time, includes, parts, lead_days}]: total — сума, як у постачальника '
+                   '(total_with_one_time=true — разом з разовими; без unit_price ціну за шт. порахує Minerva), '
+                   'includes — що входить саме в цю ціну, parts — ціни складових за шт. {pcb, assembly, components}, '
+                   'lead_days — строк цієї кількості; чого для кількості не назвали — лишається як було. one_time — '
+                   'разові витрати «Stencil 30; NRE 150 @2500» (@N — лише для N шт) або [{name, amount, qty}]; '
+                   'includes — що входить у ціну всіх кількостей: pcb / assembly / components; currency — ISO (USD, '
+                   'EUR, CNY); lead_days — строк; shipping — доставка; valid_until — YYYY-MM-DD; quote_note — умови '
+                   '(оплата, Incoterms, що не входить; інші варіанти того самого постачальника — інше покриття, PCBA: '
+                   'у таблиці один рядок на постачальника); clear — прибрати хибне значення (доставка 0 при EXW). Не '
+                   'вказане лишається як є. evidence — точна цитата.',
     'input_schema': {'type': 'object', 'properties': {
         'request': _REQUEST, 'supplier': _SUPPLIER,
-        'tiers': {'description': '«кількість: ціна; …» або [{qty, unit_price, lead_days}]'},
+        'tiers': {'description': '«кількість: ціна / строк дн; …» або [{qty, unit_price, total, '
+                                 'total_with_one_time, includes, parts, lead_days}]'},
         'one_time': {'description': '«назва сума; …» або [{name, amount, qty}]'},
         'includes': {'type': 'array', 'items': {'type': 'string', 'enum': ['pcb', 'assembly', 'components']}},
         'price': {'type': 'number', 'description': 'Ціна за шт. (якщо без ступенів)'},
         'total': {'type': 'number', 'description': 'Сума (якщо постачальник назвав)'},
         'currency': {'type': 'string'}, 'lead_days': {'type': 'integer', 'minimum': 0},
         'shipping': {'type': 'number'}, 'valid_until': {'type': 'string'}, 'quote_note': {'type': 'string'},
+        'clear': {'type': 'array', 'items': {'type': 'string', 'enum': list(CLEARED)},
+                  'description': 'Прибрати ці поля (хибне значення)'},
         'evidence': _EVIDENCE, 'source': _SOURCE}, 'required': ['request', 'supplier', 'evidence']}}
 PROPOSE_STATE = {
     'name': 'propose_rfq_state',
@@ -339,7 +352,7 @@ def offer_text(r) -> str:
     cur = r.currency or ''
     bits = []
     if r.tiers:
-        bits.append(f'ціни за шт. ({cur or "валюта ?"}): {rfq_compare.tiers_text(r.tiers)}')
+        bits.append(f'ціни за шт. ({cur or "валюта ?"}): {tiers_full_text(r.tiers)}')
     elif r.price is not None:
         bits.append(f'ціна {rfq.price_text(r.price)} {cur}/шт.'.replace(' /', '/'))
     if r.total is not None:
@@ -890,7 +903,9 @@ def propose_rfq_recipients(ctx, args) -> str:
 
 def quote_snapshot(r) -> dict:
     from suppliers.services import rfq, rfq_compare
-    return {'tiers': rfq_compare.tiers_text(r.tiers), 'one_time': rfq_compare.one_time_text(r.one_time),
+    return {'tiers': rfq_compare.tiers_text(r.tiers),
+            'tiers_full': [dict(t) for t in r.tiers or [] if isinstance(t, dict)],
+            'one_time': rfq_compare.one_time_text(r.one_time),
             'includes': list(rfq_compare.clean_includes(r.includes)),
             'price': rfq.price_text(r.price) if r.price is not None else '',
             'total': rfq.price_text(r.total) if r.total is not None else '', 'currency': r.currency or '',
@@ -912,20 +927,128 @@ def _num(value, label) -> str:
     return format(d.normalize(), 'f')
 
 
-def _tiers_in(value) -> str:
+def tiers_full_text(tiers) -> str:
+    """Ступені з усім, що в них є: «5: 0.5740 (разом 202.87 з разовими; у ціні: 🟩 плати) / 12 дн»."""
+    from suppliers.services import rfq_compare
+    out = []
+    for t in tiers or []:
+        if not isinstance(t, dict):
+            continue
+        extra = []
+        if t.get('total') not in (None, ''):
+            extra.append(f'разом {t["total"]} ' + ('з разовими' if t.get('total_ot') else 'без разових'))
+        if isinstance(t.get('includes'), list):
+            extra.append('у ціні: ' + (rfq_compare.scope_text(t['includes']) or 'не сказано'))
+        if isinstance(t.get('parts'), dict) and t['parts']:
+            extra.append('складові за шт.: ' + ', '.join(f'{k} {v}' for k, v in t['parts'].items()))
+        out.append(f'{t.get("qty")}: {t.get("unit_price")}' + (f' ({"; ".join(extra)})' if extra else '')
+                   + (f' / {t["lead_days"]} дн' if t.get('lead_days') not in (None, '') else ''))
+    return '; '.join(out)
+
+
+def _dec_arg(value, label, places='0.0001'):
+    from decimal import Decimal
+    s = _num(value, label)
+    return Decimal(s).quantize(Decimal(places)) if s else None
+
+
+def _includes_in(values) -> list:
+    from suppliers.services import rfq_compare
+    if not isinstance(values, list) or any(x not in rfq_compare.SCOPE_KEYS for x in values):
+        raise ToolError('includes — список із pcb / assembly / components')
+    return rfq_compare.clean_includes(values)
+
+
+def _tiers_in(value, old_tiers, one_time, row_includes=False) -> list:
+    """tiers з аргументів → ступені JSON (як після 🧠 розбору). Чого агент для кількості не назвав, лишається з
+    попереднього ступеня: строк і «що входить» — завжди (крім row_includes: тоді діє «що входить» усього рядка),
+    сума й складові — лише з тією самою ціною за шт."""
+    from decimal import Decimal
     from suppliers.services import rfq, rfq_compare
     if isinstance(value, list):
-        parts = []
-        for t in value:
-            if not isinstance(t, dict) or t.get('qty') in (None, '') or t.get('unit_price') in (None, ''):
-                raise ToolError('tiers — [{qty, unit_price, lead_days}]')
-            parts.append(f'{int(t["qty"])}: {_num(t["unit_price"], "unit_price")}'
-                         + (f' / {int(t["lead_days"])} дн' if t.get('lead_days') not in (None, '') else ''))
-        value = '; '.join(parts)
-    try:
-        return rfq_compare.tiers_text(rfq_compare.parse_tiers(str(value or '')))
-    except rfq.RFQError as e:
-        raise ToolError(str(e))
+        raw = value
+    else:
+        try:
+            raw = rfq_compare.parse_tiers(str(value or ''))
+        except rfq.RFQError as e:
+            raise ToolError(str(e))
+    old = {}
+    for t in old_tiers or []:
+        if isinstance(t, dict):
+            try:
+                old[int(Decimal(str(t.get('qty'))))] = t
+            except Exception:  # noqa: BLE001 — зіпсований ступінь не переносимо
+                continue
+    out, seen = [], set()
+    for t in raw:
+        if not isinstance(t, dict) or t.get('qty') in (None, ''):
+            raise ToolError('tiers — [{qty, unit_price, total, total_with_one_time, includes, parts, lead_days}]')
+        try:
+            qty = int(Decimal(str(t['qty']).replace(' ', '')))
+        except Exception:  # noqa: BLE001
+            raise ToolError('tiers.qty — ціле число штук')
+        if qty <= 0 or qty in seen:
+            raise ToolError(f'tiers.qty {qty} — більше 0 і без повторів')
+        seen.add(qty)
+        unit = _dec_arg(t.get('unit_price'), 'unit_price')
+        total = _dec_arg(t.get('total'), 'total', '0.01')
+        with_ot = bool(t.get('total_with_one_time', t.get('total_ot')))
+        parts = {}
+        if t.get('parts') not in (None, '', {}):
+            if not isinstance(t['parts'], dict) or any(k not in rfq_compare.SCOPE_KEYS for k in t['parts']):
+                raise ToolError('tiers.parts — {pcb, assembly, components: ціна за шт.}')
+            parts = {k: v for k, v in ((k, _dec_arg(v, f'parts.{k}')) for k, v in t['parts'].items())
+                     if v is not None}
+        if unit is None and parts:
+            unit = sum(parts.values(), Decimal(0))
+        if unit is None and total is not None:
+            ot = sum((Decimal(str(it['amount'])) for it in one_time if not it.get('qty') or it['qty'] == qty),
+                     Decimal(0)) if with_ot else Decimal(0)
+            if total <= ot:
+                raise ToolError(f'tiers {qty} шт: сума {total} не більша за разові витрати {ot} — вкажіть unit_price')
+            unit = (total - ot) / qty
+        if unit is None:
+            raise ToolError(f'tiers {qty} шт: потрібна unit_price (або total)')
+        unit = unit.quantize(Decimal('0.0001'))
+        tier = {'qty': qty, 'unit_price': str(unit)}
+        prev = old.get(qty) or {}
+        same = rfq_compare.dec(prev.get('unit_price')) == unit
+        if total is not None:
+            tier.update(total=str(total), total_ot=with_ot)
+        elif same:
+            tier.update({k: prev[k] for k in ('total', 'total_ot', 'fixed') if k in prev})
+        if parts:
+            tier['parts'] = {k: str(v) for k, v in parts.items()}
+        elif same and prev.get('parts'):
+            tier['parts'] = prev['parts']
+        if t.get('includes') is not None:
+            tier['includes'] = _includes_in(t['includes'])
+        elif parts:
+            tier['includes'] = rfq_compare.clean_includes(parts)
+        elif not row_includes and isinstance(prev.get('includes'), list):
+            tier['includes'] = prev['includes']
+        lead = t['lead_days'] if t.get('lead_days') not in (None, '') else prev.get('lead_days')
+        if lead not in (None, ''):
+            try:
+                tier['lead_days'] = max(0, int(lead))
+            except (TypeError, ValueError):
+                raise ToolError('tiers.lead_days — ціле число днів')
+        out.append(tier)
+    if len(out) > TIERS_MAX:
+        raise ToolError(f'tiers — до {TIERS_MAX} кількостей')
+    return sorted(out, key=lambda x: x['qty'])
+
+
+def _quote_label(k, v) -> str:
+    from suppliers.services import rfq_compare
+    k = 'tiers' if k == 'tiers_full' else k
+    if v in (None, '', []):
+        return f'{k}: — (прибрати)'
+    if k == 'tiers':
+        return f'tiers: {tiers_full_text(v)}'
+    if k == 'includes':
+        return f'includes: {rfq_compare.scope_text(v)}'
+    return f'{k}: {v}'
 
 
 def _one_time_in(value) -> str:
@@ -947,17 +1070,25 @@ def propose_rfq_quote(ctx, args) -> str:
     r = get_recipient(req, args.get('supplier'))
     evidence = _evidence(args, need=True)
     old = quote_snapshot(r)
+    clear = args.get('clear') or []
+    if isinstance(clear, str):
+        clear = [x.strip() for x in clear.split(',') if x.strip()]
+    if not isinstance(clear, list) or any(x not in CLEARED for x in clear):
+        raise ToolError('clear — ' + ' / '.join(CLEARED))
     new = {}
-    if args.get('tiers') not in (None, '', []):
-        new['tiers'] = _tiers_in(args['tiers'])
     if args.get('one_time') not in (None, '', []):
         new['one_time'] = _one_time_in(args['one_time'])
-    if args.get('includes') is not None:
+    row_includes = args.get('includes') is not None
+    if row_includes:
+        new['includes'] = _includes_in(args['includes'])
+    if args.get('tiers') not in (None, '', []):
         from suppliers.services import rfq_compare
-        bad = [x for x in args['includes'] if x not in rfq_compare.SCOPE_KEYS]
-        if bad:
-            raise ToolError('includes — pcb / assembly / components')
-        new['includes'] = rfq_compare.clean_includes(args['includes'])
+        one_time = (rfq_compare.parse_one_time(new['one_time']) if 'one_time' in new
+                    else rfq_compare.clean_one_time(r.one_time))
+        new['tiers_full'] = _tiers_in(args['tiers'], r.tiers, one_time, row_includes)
+    elif row_includes and any(isinstance(t, dict) and 'includes' in t for t in r.tiers or []):
+        # «що входить» усього рядка — і для кожної кількості (інакше діє те, що 🧠 розібрав для кількості)
+        new['tiers_full'] = [{k: v for k, v in t.items() if k != 'includes'} for t in r.tiers if isinstance(t, dict)]
     for k, label in (('price', 'price'), ('total', 'total'), ('shipping', 'shipping')):
         if args.get(k) not in (None, ''):
             new[k] = _num(args[k], label)
@@ -978,12 +1109,17 @@ def propose_rfq_quote(ctx, args) -> str:
         new['valid_until'] = day.isoformat()
     if str(args.get('quote_note') or '').strip():
         new['quote_note'] = str(args['quote_note']).strip()[:4000]
-    if ('tiers' in new or 'price' in new or 'total' in new) and not (new.get('currency') or old['currency']):
+    for k in clear:
+        key = 'tiers_full' if k == 'tiers' else k
+        if key in new and not (k == 'tiers' and args.get('tiers') in (None, '', [])):
+            raise ToolError(f'{k} — або нове значення, або clear, не разом')
+        new[key] = CLEARED[k]
+    if (new.get('tiers_full') or new.get('price') or new.get('total')) and not (new.get('currency') or old['currency']):
         raise ToolError('вкажіть валюту (currency) — у постачальника її ще немає')
     changed = {k: v for k, v in new.items() if old.get(k) != v}
     if not changed:
         return f'У {r.supplier.name} в запиті {req.code} уже так — змінювати нічого.'
-    text = ' · '.join(f'{k}: {v}' for k, v in changed.items())
+    text = ' · '.join(_quote_label(k, v) for k, v in changed.items())
     _propose(ctx, 'quote', req, {'recipient_id': r.pk, 'supplier': r.supplier.name, 'new': changed,
                                  'old': old}, new=text, old=offer_text(r), evidence=evidence,
              source=args.get('source'))
@@ -1277,24 +1413,35 @@ def _apply_recipients(p, req, d, user):
 
 
 def _apply_quote(p, req, d, user):
-    from suppliers.services import rfq
+    from suppliers.models import SupplierRequestRecipient as R
+    from suppliers.services import rfq, rfq_compare
     r = _recipient_of(req, d)
     old, new = d.get('old') or {}, d.get('new') or {}
     now = quote_snapshot(r)
-    moved = [k for k in list(new) + ['state'] if now.get(k) != old.get(k)]
+    moved = [k for k in list(new) + ['state'] if k in old and now.get(k) != old.get(k)]
     if moved:
-        return f'пропозицію {r.supplier.name} уже змінили ({", ".join(moved)}) — запропонуйте заново'
+        names = ', '.join('tiers' if k == 'tiers_full' else k for k in moved)
+        return f'пропозицію {r.supplier.name} уже змінили ({names}) — запропонуйте заново'
     data = {**now, **new}
-    form = {'price': data['price'], 'total': data['total'], 'tiers_text': data['tiers'],
+    # ступені — лише якщо агент їх змінює: інакше сума, «що входить» і складові з 🧠 розбору лишаються як є
+    form = {'price': data['price'], 'total': data['total'],
             'one_time_text': data['one_time'], 'includes_set': '1', 'includes': data['includes'],
             'shipping': data['shipping'], 'currency': data['currency'],
             'lead_days': '' if data['lead_days'] is None else str(data['lead_days']),
             'valid_until': data['valid_until'], 'quote_note': data['quote_note']}
-    if new.get('tiers') or new.get('price') or new.get('total'):
+    full = new.get('tiers_full')
+    if 'tiers' in new:                               # пропозиція, складена до 11.2026, — ступені текстом
+        form['tiers_text'] = data['tiers']
+    elif full is not None:
+        form['tiers_text'] = rfq_compare.tiers_text(full)
+    if new.get('tiers') or new.get('price') or new.get('total') or (
+            full and rfq_compare.tiers_text(full) != now['tiers']):
         form['state'] = r.QUOTED                      # ціна з листа — «💶 Є пропозиція», як після 🧠 розбору
     elif r.state != r.PLANNED:
         form['state'] = r.state                       # лише строк / умови — стан той самий
     rfq.set_quote(r, form)
+    if full is not None:
+        R.objects.filter(pk=r.pk).update(tiers=full)  # з сумою, «що входить» і складовими кожної кількості
     return ''
 
 

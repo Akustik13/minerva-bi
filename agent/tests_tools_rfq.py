@@ -250,6 +250,63 @@ class ProposeTests(RFQBase):
         self.r1.refresh_from_db()
         self.assertEqual((self.r1.lead_days, len(self.r1.tiers), self.r1.state), (7, 2, R.QUOTED))
 
+    def test_quote_per_quantity_sums_scope_and_clear(self):
+        # 🧠 розбір AI: «плати · монтаж · компоненти» для кожної кількості, сума за 100 шт без разових, доставка 0
+        R.objects.filter(pk=self.r1.pk).update(
+            tiers=[{'qty': 100, 'unit_price': '1.2000', 'total': '120.00', 'total_ot': False,
+                    'includes': ['pcb', 'assembly', 'components']},
+                   {'qty': 500, 'unit_price': '0.9000', 'includes': ['pcb', 'assembly', 'components'],
+                    'lead_days': 10}],
+            one_time=[{'name': 'Testing jig', 'amount': '200', 'qty': None}], shipping=0)
+        # лише умови — сума й «що входить» з розбору не стираються
+        c = self.ctx()
+        self.call('propose_rfq_quote', c, request=self.req.code, supplier=self.supplier.name, quote_note='EXW',
+                  evidence='Terms: EXW')
+        p, _res = self.apply_last(c)
+        self.assertEqual(p.status, AgentProposal.APPLIED, p.error)
+        self.r1.refresh_from_db()
+        self.assertEqual((self.r1.tiers[0]['total'], self.r1.tiers[1]['includes'], self.r1.quote_note),
+                         ('120.00', ['pcb', 'assembly', 'components'], 'EXW'))
+        self.assertIn('разом 120.00 без разових', self.call('get_supplier_request', request=self.req.code))
+        # сума з разовими (ціна за шт. — з неї), строк кожної кількості, лише плати, доставку прибрати
+        self.refused('propose_rfq_quote', request=self.req.code, supplier=self.supplier.name, shipping=5,
+                     clear=['shipping'], evidence='x')
+        self.refused('propose_rfq_quote', request=self.req.code, supplier=self.supplier.name, clear=['state'],
+                     evidence='x')
+        self.refused('propose_rfq_quote', request=self.req.code, supplier=self.supplier.name,
+                     tiers=[{'qty': 100, 'total': 150, 'total_with_one_time': True}], evidence='x')
+        c2 = self.ctx()
+        self.call('propose_rfq_quote', c2, request=self.req.code, supplier=self.supplier.name,
+                  tiers=[{'qty': 100, 'total': 320, 'total_with_one_time': True, 'lead_days': 12},
+                         {'qty': 500, 'unit_price': 0.9, 'lead_days': 30}],
+                  includes=['pcb'], clear=['shipping'], evidence='100 pcs subtotal 320.00 incl. testing fee')
+        p = c2.task.proposals.get()
+        self.assertIn('разом 320.00 з разовими', p.new_value)
+        self.assertIn('shipping: — (прибрати)', p.new_value)
+        p, _res = self.apply_last(c2)
+        self.assertEqual(p.status, AgentProposal.APPLIED, p.error)
+        self.r1.refresh_from_db()
+        t100, t500 = self.r1.tiers
+        self.assertEqual((t100['unit_price'], t100['total'], t100['total_ot'], t100['lead_days']),
+                         ('1.2000', '320.00', True, 12))
+        self.assertNotIn('includes', t100)
+        self.assertNotIn('includes', t500)
+        self.assertEqual((t500['lead_days'], self.r1.includes, self.r1.shipping, self.r1.state),
+                         (30, ['pcb'], None, R.QUOTED))
+        # складові за шт. (PCBA) — ціна = їх сума, «що входить» — з них; кількості, якої немає в списку, — прибрано
+        c3 = self.ctx()
+        self.call('propose_rfq_quote', c3, request=self.req.code, supplier=self.supplier.name,
+                  tiers=[{'qty': 100, 'parts': {'pcb': 0.5, 'assembly': 0.3, 'components': 2}}],
+                  evidence='PCBA 100 pcs: PCB 0.5 + SMT 0.3 + parts 2.0')
+        p, _res = self.apply_last(c3)
+        self.assertEqual(p.status, AgentProposal.APPLIED, p.error)
+        self.r1.refresh_from_db()
+        self.assertEqual(len(self.r1.tiers), 1)
+        t = self.r1.tiers[0]
+        self.assertEqual((t['unit_price'], t['includes'], t['lead_days']),
+                         ('2.8000', ['pcb', 'assembly', 'components'], 12))
+        self.assertNotIn('total', t)                  # ціна інша — сума постачальника за стару ціну не переноситься
+
     def test_same_proposal_updates_instead_of_duplicating(self):
         c = self.ctx()
         self.call('propose_rfq_state', c, request=self.req.code, supplier=self.jlc.name, state='declined')
