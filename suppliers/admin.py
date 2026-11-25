@@ -636,7 +636,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
     # ── сторінка запиту ──
     def work_view(self, request, pk):
         from suppliers.models import SupplierReplyFile
-        from suppliers.services import rfq_compare, rfq_copy, rfq_replies, rfq_stats, rfq_usage
+        from suppliers.services import rfq_compare, rfq_copy, rfq_marks, rfq_replies, rfq_stats, rfq_usage
         req = self._request(request, pk)
         for r in req.recipients.exclude(thread=None, reply_message=None):
             try:   # 📎 вкладення відповідей, що вже на диску (з пошти — панель рядка)
@@ -657,6 +657,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             row["files_n"] = n_files.get(r.pk, 0)
             row["timing"] = rfq_stats.timing(r)              # ⏱ за скільки відповів, останній лист, листів
             row["ai_info"] = rfq_usage.row_info(r)           # 🧠 яка модель розібрала, скільки коштувало
+            row["label"] = rfq_marks.view(r.label)          # 🏷 позначка рядка (правий клік)
             r.tiers_text = rfq_compare.tiers_text(r.tiers)          # форма ✏️
             r.one_time_text = rfq_compare.one_time_text(r.one_time)
         try:
@@ -690,6 +691,9 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             more=more, more_mail=sum(1 for s in more if s.f_email), events=events, quantities=rfq.parse_quantities(req.quantities),
             cmp=cmp, qtys=cmp["qtys"], ncols=max(len(cmp["qtys"]), 1) + 7, stale=rfq_compare.stale(req),
             st=rfq_stats.stats(req, cmp), ai_sum=rfq_usage.summary(req, rows),
+            marks_json=_js({"colors": [{"key": k, "icon": i, "name": n, "hex": h} for k, i, n, h in rfq_marks.COLORS],
+                            "stickers": [{"key": k, "icon": i, "name": n} for k, i, n in rfq_marks.STICKERS],
+                            "text_max": rfq_marks.TEXT_MAX}),
             letters_pending=SupplierRequestLetter.objects.filter(request=req, user=request.user, sent_at=None).count(),
             chat_url_json=_js(reverse("admin:suppliers_supplierrequest_chat", args=[req.pk, 0])),
             colleagues=self._colleagues(),
@@ -928,6 +932,20 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                         msg += " · не вдалося: " + "; ".join(failed)
                     return {"url": back, "message": msg}
                 return JsonResponse({"job": jobs.start(user, f"quotes {req.pk}", run, progress=True)})
+            elif do == "mark":                    # 🏷 позначка рядків: колір «№», наліпки, свій текст
+                from suppliers.services import rfq_marks
+                op = {}
+                if "color" in request.POST:
+                    op["color"] = request.POST.get("color", "")
+                if request.POST.get("sticker"):
+                    op.update(sticker=request.POST["sticker"], on=request.POST.get("on") == "1")
+                if "text" in request.POST:
+                    op["text"] = request.POST.get("text", "")
+                if request.POST.get("clear"):
+                    op["clear"] = True
+                rids = request.POST.getlist("rid") or str(request.POST.get("rids") or "").split(",")
+                return JsonResponse({"labels": {str(k): v for k, v in
+                                                rfq_marks.apply(req, rids, request.user, op).items()}})
             elif do in ("chat_brief", "chat_send", "chat_ai", "forward_plan", "forward_send", "each_compose",
                         "each_send", "each_save", "each_load"):
                 return self._talk(request, req, r, do)

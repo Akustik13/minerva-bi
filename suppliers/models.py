@@ -441,6 +441,8 @@ class SupplierRequestRecipient(models.Model):
     award = models.CharField("Що доручили", max_length=200, blank=True, default="",
                              help_text="Партія, кількість, строк: «партія 1 · 1500 шт · до 15.03»")
     reject_reason = models.CharField("Чому не взяли", max_length=255, blank=True, default="")
+    # 🏷 позначка рядка в таблиці пропозицій: {color, stickers, text, by, at} — suppliers/services/rfq_marks.py
+    label = models.JSONField("Позначка", default=dict, blank=True)
 
     class Meta:
         ordering = ["pk"]

@@ -80,6 +80,19 @@
   .rwe-ccall { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 14px 0; }
   .rwe-ccall .rwc-subjf { flex: 1 1 320px; }
   .rw-cmp .rw-n { white-space: nowrap; width: 1%; color: var(--text-muted, #888); }
+  /* 🏷 позначка рядка: колір клітинки «№», наліпки, свій текст */
+  .rw-cmp tr > td.rw-n.rw-lab { background: color-mix(in srgb, var(--rwl) 30%, transparent) !important; box-shadow: inset 5px 0 0 var(--rwl); }
+  .rw-labs { white-space: normal; font-size: 13px; line-height: 1.25; margin-top: 2px; }
+  .rw-labs:empty { display: none; }
+  .rw-lab-t { display: block; font-size: 11px; color: var(--body-fg, #222); max-width: 140px; overflow-wrap: anywhere; }
+  /* ↔ ширина колонок */
+  .rw-cmp tr.rw-head > th { position: relative; }
+  .rw-grip { position: absolute; top: 0; right: -4px; width: 8px; height: 100%; cursor: col-resize; z-index: 3; }
+  .rw-grip:hover, .rw-grip.on { background: rgba(91, 141, 239, .45); }
+  body.rw-resizing, body.rw-resizing * { cursor: col-resize !important; user-select: none; }
+  table.rw-cmp.rw-fixed { table-layout: fixed; }
+  table.rw-cmp.rw-fixed td, table.rw-cmp.rw-fixed th { overflow-wrap: anywhere; }
+  table.rw-cmp.rw-fixed tr.rw-head > th { box-sizing: border-box; }
   .rw-cmp .rw-n label { cursor: pointer; display: inline-flex; gap: 4px; align-items: center; }
   .rw-cmp tr.rw-picked > td { background: rgba(91, 141, 239, .12) !important; }
   .rw-after { color: var(--text-muted, #888); }
@@ -402,6 +415,131 @@
     });
     each.addEventListener('close', function(){ if (saveTimer) saveNow(); if (sentDone) location.reload(); });
   }
+
+  /* ── ↔ ширина колонок: тягнути край заголовка, двічі клацнути — як було; запам’ятовується (цей браузер) ── */
+  (function(){
+    var table = document.querySelector('table.rw-cmp'), head = table && table.querySelector('tr.rw-head');
+    if (!head) return;
+    var ths = Array.prototype.slice.call(head.cells), KEY = 'rw-colw';
+    function load() { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { return {}; } }
+    function store(o) { try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {} }
+    function key(th, i) { return th.getAttribute('data-col') || ('c' + i); }
+    function sizeTable() { var sum = 0; ths.forEach(function(th){ sum += parseFloat(th.style.width) || th.getBoundingClientRect().width; }); table.style.width = Math.round(sum) + 'px'; }
+    function fix() {          // зафіксувати теперішні ширини — далі кожна колонка міняється окремо
+      if (table.classList.contains('rw-fixed')) return;
+      var ws = ths.map(function(th){ return th.getBoundingClientRect().width; });
+      ths.forEach(function(th, i){ th.style.width = Math.round(ws[i]) + 'px'; });
+      table.classList.add('rw-fixed'); sizeTable();
+    }
+    function unfix() { table.classList.remove('rw-fixed'); table.style.width = ''; ths.forEach(function(th){ th.style.width = ''; }); }
+    var saved = load();
+    if (ths.some(function(th, i){ return saved[key(th, i)]; })) {
+      fix();
+      ths.forEach(function(th, i){ var w = saved[key(th, i)]; if (w) th.style.width = w + 'px'; });
+      sizeTable();
+    }
+    ths.forEach(function(th, i){
+      var g = document.createElement('span'); g.className = 'rw-grip';
+      g.title = 'Тягніть — ширина колонки · двічі клацніть — як було'; th.appendChild(g);
+      g.addEventListener('click', function(e){ e.stopPropagation(); e.preventDefault(); });
+      g.addEventListener('mousedown', function(e){
+        if (e.button !== 0) return;
+        e.preventDefault(); e.stopPropagation(); fix();
+        var x0 = e.clientX, w0 = th.getBoundingClientRect().width;
+        document.body.classList.add('rw-resizing'); g.classList.add('on');
+        function mv(ev) { th.style.width = Math.max(36, Math.round(w0 + ev.clientX - x0)) + 'px'; sizeTable(); }
+        function up() {
+          document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up);
+          document.body.classList.remove('rw-resizing'); g.classList.remove('on');
+          var s = load(); s[key(th, i)] = Math.round(parseFloat(th.style.width)); store(s);
+        }
+        document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+      });
+      g.addEventListener('dblclick', function(e){
+        e.stopPropagation(); var s = load(); delete s[key(th, i)]; store(s);
+        if (!Object.keys(s).length) { unfix(); return; }
+        unfix(); fix(); ths.forEach(function(t, j){ var w = s[key(t, j)]; if (w) t.style.width = w + 'px'; }); sizeTable();
+      });
+    });
+    head.addEventListener('contextmenu', function(e){
+      if (e.shiftKey || !window.MVMenu || e.target.closest('input, a')) return;
+      e.preventDefault();
+      MVMenu.open(e, [{label: 'Ширина колонок як була', icon: '↺', onSelect: function(){ store({}); unfix(); }},
+                      {type: 'hint', label: 'Тягніть правий край заголовка — ширина колонки; двічі клацніть — як була.'}],
+                  {title: 'Колонки'});
+    });
+  })();
+
+  /* ── 🏷 позначки рядків: правий клік — колір «№», наліпки, свій текст; кілька вибраних — усім ── */
+  (function(){
+    var M = {{ marks_json|safe }};
+    if (!document.querySelector('.rw-pick')) return;      // ставити — лише з правом change (MVMenu підключається пізніше)
+    function cellOf(rid) { return document.querySelector('tr.rw-row[data-rw-row="' + rid + '"] > td.rw-n'); }
+    function state(td) {
+      return {color: td.getAttribute('data-color') || '', text: td.getAttribute('data-text') || '',
+              stickers: (td.getAttribute('data-stickers') || '').split(',').filter(Boolean)};
+    }
+    function paint(rid, v) {
+      var td = cellOf(rid); if (!td) return;
+      td.setAttribute('data-color', v.color || ''); td.setAttribute('data-text', v.text || '');
+      td.setAttribute('data-stickers', (v.stickers || []).map(function(s){ return s.key; }).join(','));
+      td.classList.toggle('rw-lab', !!v.color);
+      if (v.color) td.style.setProperty('--rwl', v.hex); else td.style.removeProperty('--rwl');
+      var box = td.querySelector('.rw-labs'); box.innerHTML = '';
+      (v.stickers || []).forEach(function(s){ var sp = el('span', null, s.icon); sp.title = s.name; box.appendChild(sp); });
+      if (v.text) { var t = el('span', 'rw-lab-t', v.text); t.setAttribute('translate', 'no'); box.appendChild(t); }
+      td.title = v.by ? '🏷 ' + [v.color_name].concat((v.stickers || []).map(function(s){ return s.name; })).filter(Boolean).concat([v.by, v.at]).join(' · ') : '';
+    }
+    function targets(rid) {
+      var p = picked().map(function(c){ return c.value; });
+      return p.length > 1 && p.indexOf(String(rid)) >= 0 ? p : [String(rid)];
+    }
+    var queue = Promise.resolve();          // кліки по черзі: кожна відповідь — уже з попередньою зміною
+    function send(rids, op, ctx) {
+      queue = queue.then(function(){ return post(Object.assign({do: 'mark', rids: rids.join(',')}, op)); }).then(function(j){
+        Object.keys(j.labels || {}).forEach(function(k){ paint(k, j.labels[k]); });
+        if (ctx && ctx.refresh) ctx.refresh();
+      }).catch(function(){ if (window.MVMenu) MVMenu.toast('⚠️ Не збережено — немає зв’язку'); });
+      return queue;
+    }
+    document.querySelectorAll('tr.rw-row').forEach(function(tr){
+      tr.addEventListener('contextmenu', function(e){
+        if (e.shiftKey || !window.MVMenu || e.target.closest('a, input, textarea, select')) return;
+        e.preventDefault();
+        var rid = tr.getAttribute('data-rw-row'), rids = targets(rid), td = cellOf(rid);
+        if (!td) return;
+        var st = state(td), name = ((tr.cells[1] && tr.cells[1].querySelector('b')) || {}).textContent || '';
+        var items = [];
+        if (rids.length > 1) items.push({type: 'hint', label: '🏷 Для всіх вибраних: ' + rids.length});
+        items.push({type: 'radio', group: 'c', label: 'Без кольору', icon: '⚪', checked: function(){ return !st.color; },
+                    onSelect: function(ctx){ st.color = ''; send(rids, {color: ''}, ctx); }});
+        M.colors.forEach(function(c){
+          items.push({type: 'radio', group: 'c', label: c.name, icon: c.icon, checked: function(){ return st.color === c.key; },
+                      onSelect: function(ctx){ st.color = c.key; send(rids, {color: c.key}, ctx); }});
+        });
+        items.push({type: 'separator'});
+        M.stickers.forEach(function(s){
+          items.push({type: 'check', label: s.name, icon: s.icon, checked: function(){ return st.stickers.indexOf(s.key) >= 0; },
+                      onToggle: function(next, ctx){
+                        st.stickers = st.stickers.filter(function(k){ return k !== s.key; }); if (next) st.stickers.push(s.key);
+                        send(rids, {sticker: s.key, on: next ? '1' : ''}, ctx);
+                      }});
+        });
+        items.push({type: 'separator'});
+        items.push({label: st.text ? 'Змінити свою наліпку…' : 'Своя наліпка…', icon: '✏️', onSelect: function(){
+          var t = prompt('Своя наліпка (до 60 символів; порожньо — прибрати):', st.text);
+          if (t !== null) send(rids, {text: t});
+        }});
+        items.push({label: 'Зняти все', icon: '🧹', onSelect: function(){ send(rids, {clear: '1'}); }});
+        var chat = tr.querySelector('[data-rw-chat]'), aiB = tr.querySelector('[data-rw-ai]');
+        items.push({type: 'separator'});
+        if (chat) items.push({label: 'Листування', icon: '💬', onSelect: function(){ chat.click(); }});
+        items.push({label: 'Усе про пропозицію праворуч', icon: '📋', onSelect: function(){ tr.click(); }});
+        if (aiB) items.push({label: 'Прочитати AI', icon: '🧠', onSelect: function(){ aiB.click(); }});
+        MVMenu.open(e, items, {title: name, titleData: true});
+      });
+    });
+  })();
 
   /* ── ☑ вибір рядків і ↪ переслати колезі ── */
   var bar = document.getElementById('rw-selbar'), all = document.getElementById('rw-all');

@@ -159,12 +159,13 @@
     {% include "admin/suppliers/_request_stats.html" %}
     <div class="rw-scroll">
     <table class="spf-table rw-cmp">
-      <tr><th class="rw-n">{% if can_change and rows %}<label title="Вибрати всіх — переслати колезі"><input type="checkbox" id="rw-all"> №</label>{% else %}№{% endif %}</th><th>Постачальник</th><th>Стан</th>
-        {% for q in qtys %}<th class="rw-qh{% if forloop.first %} rw-qfirst{% endif %}">{{ q }} шт<div class="spf-muted">{{ cmp.home }} / шт · разом</div></th>{% empty %}<th class="rw-qfirst">Ціна</th>{% endfor %}
-        <th class="rw-qafter">Разово</th><th>Строк</th><th>Доставка</th><th></th></tr>
+      <tr class="rw-head"><th class="rw-n" data-col="n">{% if can_change and rows %}<label title="Вибрати всіх — переслати колезі"><input type="checkbox" id="rw-all"> №</label>{% else %}№{% endif %}</th><th data-col="sup">Постачальник</th><th data-col="state">Стан</th>
+        {% for q in qtys %}<th class="rw-qh{% if forloop.first %} rw-qfirst{% endif %}" data-col="q{{ forloop.counter }}">{{ q }} шт<div class="spf-muted">{{ cmp.home }} / шт · разом</div></th>{% empty %}<th class="rw-qfirst" data-col="q1">Ціна</th>{% endfor %}
+        <th class="rw-qafter" data-col="once">Разово</th><th data-col="lead">Строк</th><th data-col="ship">Доставка</th><th data-col="act"></th></tr>
       {% for row in rows %}{% with r=row.recipient %}
       <tr class="rw-row{% cycle '' ' rw-even' as zebra silent %}{{ zebra }}{% if r.chosen %} rw-chosen{% endif %}{% if row.priced and row.gaps %} rw-partial{% endif %}{% if not row.priced %} rw-noprice{% endif %}" data-rw-row="{{ r.pk }}" title="Клік — усе про цю пропозицію праворуч: ціни, вкладення, листи">
-        <td class="rw-n">{% if can_change %}<label title="Вибрати — «↪ Переслати колезі»"><input type="checkbox" class="rw-pick" value="{{ r.pk }}"> {{ forloop.counter }}</label>{% else %}{{ forloop.counter }}{% endif %}</td>
+        <td class="rw-n{% if row.label.color %} rw-lab{% endif %}"{% if row.label.color %} style="--rwl:{{ row.label.hex }}"{% endif %} data-color="{{ row.label.color }}" data-stickers="{% for s in row.label.stickers %}{{ s.key }}{% if not forloop.last %},{% endif %}{% endfor %}" data-text="{{ row.label.text }}"{% if row.label.by %} title="🏷 {% if row.label.color_name %}{{ row.label.color_name }} · {% endif %}{% for s in row.label.stickers %}{{ s.name }} · {% endfor %}{{ row.label.by }} · {{ row.label.at }}{% endif %}">{% if can_change %}<label title="Вибрати — «↪ Переслати колезі»"><input type="checkbox" class="rw-pick" value="{{ r.pk }}"> {{ forloop.counter }}</label>{% else %}{{ forloop.counter }}{% endif %}
+          <div class="rw-labs">{% for s in row.label.stickers %}<span title="{{ s.name }}">{{ s.icon }}</span>{% endfor %}{% if row.label.text %}<span class="rw-lab-t" translate="no">{{ row.label.text }}</span>{% endif %}</div></td>
         <td><a href="{% url 'admin:inventory_supplier_change' r.supplier.pk %}" translate="no"><b>{{ r.supplier.name }}</b></a>{% if r.chosen %} 🏆{% endif %}
           {% if r.award %}<div class="spf-muted">✅ <span translate="no">{{ r.award }}</span></div>{% endif %}
           {% if r.reject_reason %}<div class="spf-muted">✖ не взяли{% if r.reject_reason != "—" %}: <span translate="no">{{ r.reject_reason }}</span>{% endif %}</div>{% endif %}

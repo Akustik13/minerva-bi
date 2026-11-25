@@ -4871,6 +4871,7 @@
 {"uk": "Без клієнта", "en": "No customer", "de": "Ohne Kunden"}
 {"uk": "Без клієнта CRM", "en": "Without CRM customer", "de": "Ohne CRM-Kunde"}
 {"uk": "Без клієнта, але з проєктом — візьметься клієнт проєкту.", "en": "No customer but a project — the project’s customer is used.", "de": "Kein Kunde, aber ein Projekt — der Kunde des Projekts wird übernommen."}
+{"uk": "Без кольору", "en": "No colour", "de": "Ohne Farbe"}
 {"uk": "Без копій: у листі одноразове посилання — його бачить лише покупець.", "en": "No copies: the e-mail has a one-time link — only the buyer sees it.", "de": "Ohne Kopien: die E-Mail enthält einen Einmal-Link – nur der Käufer sieht ihn."}
 {"uk": "Без країни", "en": "No country", "de": "Kein Land"}
 {"uk": "Без курсу — не переведено ({0})", "en": "No exchange rate — not converted ({0})", "de": "Kein Wechselkurs — nicht umgerechnet ({0})"}
@@ -7039,6 +7040,7 @@
 {"uk": "Для вас AI вимкнено — адміністратор вмикає «AI увімкнено» у вашому профілі.", "en": "AI is turned off for you — an administrator enables “AI enabled” in your profile.", "de": "KI ist für Sie deaktiviert — ein Administrator aktiviert „KI aktiviert“ in Ihrem Profil."}
 {"uk": "Для вибору ПДВ: своя країна — з ПДВ, ЄС з USt-IdNr — Reverse Charge, поза ЄС — експорт.", "en": "For choosing VAT: own country — with VAT, EU with VAT ID — reverse charge, outside the EU — export.", "de": "Für die MwSt.-Wahl: eigenes Land — mit MwSt., EU mit USt-IdNr. — Reverse Charge, außerhalb der EU — Ausfuhr."}
 {"uk": "Для всіх", "en": "For everyone", "de": "Für alle"}
+{"uk": "Для всіх вибраних", "en": "For all selected", "de": "Für alle ausgewählten"}
 {"uk": "Для відкату", "en": "For undo", "de": "Für Rückgängig"}
 {"uk": "Для відповідей, листів клієнту замовлення й пересилань — як галочки в «Написати». Чернетка відкривається з ними вже вибраними; «Надсилати самому» — запланований лист з ними. Немає реакції — лист і Telegram вам: потрібне ручне втручання.", "en": "For replies, emails to the order's customer and forwards — like the checkboxes in «Compose». The draft opens with them already ticked; «Send by itself» — the scheduled email goes with them. No reaction — an email and Telegram to you: manual action needed.", "de": "Für Antworten, E-Mails an den Kunden des Auftrags und Weiterleitungen — wie die Häkchen in «Verfassen». Der Entwurf öffnet sich mit ihnen bereits angehakt; «Selbst senden» — die geplante E-Mail geht mit ihnen. Keine Reaktion — E-Mail und Telegram an Sie: manuelles Eingreifen nötig."}
 {"uk": "Для відповідей, перекладу, історії, граматики й нових листів. Фонове визначення дедлайнів у кожному листі завжди «Автоматично» (дешево).", "en": "For replies, translation, history, grammar and new emails. Background deadline detection in every email is always “Automatic” (cheap).", "de": "Für Antworten, Übersetzung, Verlauf, Grammatik und neue E-Mails. Die Hintergrunderkennung von Fristen in jeder E-Mail ist immer „Automatisch“ (günstig)."}
@@ -7675,6 +7677,7 @@
 {"uk": "Життєвий цикл: {0}", "en": "Lifecycle: {0}", "de": "Lebenszyklus: {0}"}
 {"uk": "Жов", "en": "Oct", "de": "Okt"}
 {"uk": "Жовт", "en": "Oct", "de": "Okt"}
+{"uk": "Жовта", "en": "Yellow", "de": "Gelb"}
 {"uk": "Жовта рамка", "en": "Yellow border", "de": "Gelber Rahmen"}
 {"uk": "Жовтень", "en": "October", "de": "Oktober"}
 {"uk": "Жоден канал не налаштований", "en": "No channel is configured", "de": "Kein Kanal ist konfiguriert"}
@@ -9119,6 +9122,7 @@
 {"uk": "Згорнути/Розгорнути", "en": "Collapse/Expand", "de": "Einklappen/Ausklappen"}
 {"uk": "Згорнуто / розгорнуто — localStorage prw-open; графіки малюються при першому розгортанні.", "en": "Collapsed / expanded — localStorage prw-open; charts are drawn on first expansion.", "de": "Eingeklappt / ausgeklappt — localStorage prw-open; Diagramme werden beim ersten Aufklappen gezeichnet."}
 {"uk": "Згорнуто / розгорнуто — запам'ятовується для виду картки (localStorage ehw-open", "en": "Collapsed / expanded — remembered per card type (localStorage ehw-open", "de": "Zugeklappt / aufgeklappt – wird je Kartenart gespeichert (localStorage ehw-open"}
+{"uk": "Зелена", "en": "Green", "de": "Grün"}
 {"uk": "Зелена рамка", "en": "Green border", "de": "Grüner Rahmen"}
 {"uk": "Зелений запис", "en": "Green record", "de": "Grüner Datensatz"}
 {"uk": "Зливати дублікатів можна лише з правами змінювати й видаляти клієнтів — дублікат видаляється назавжди.", "en": "Duplicates can only be merged with permission to edit and delete customers — the duplicate is deleted permanently.", "de": "Duplikate können nur mit den Rechten zum Bearbeiten und Löschen von Kunden zusammengeführt werden – das Duplikat wird endgültig gelöscht."}
@@ -9228,6 +9232,7 @@
 {"uk": "Змінити правило", "en": "Change the rule", "de": "Regel ändern"}
 {"uk": "Змінити після копіювання", "en": "Change after copying", "de": "Nach dem Kopieren ändern"}
 {"uk": "Змінити рекомендовану заміну", "en": "Change recommended replacement", "de": "Empfohlenen Ersatz ändern"}
+{"uk": "Змінити свою наліпку…", "en": "Change your own sticker…", "de": "Eigenen Aufkleber ändern…"}
 {"uk": "Змінити стандартні", "en": "Change the defaults", "de": "Standards ändern"}
 {"uk": "Змінити статус", "en": "Change status", "de": "Status ändern"}
 {"uk": "Змінити текст і записати, що вирішили", "en": "Edit the text and note what was decided", "de": "Text ändern und festhalten, was beschlossen wurde"}
@@ -9395,6 +9400,7 @@
 {"uk": "Зняти акцію", "en": "Remove promotion", "de": "Aktion entfernen"}
 {"uk": "Зняти блокування входу", "en": "Remove login lock", "de": "Anmeldesperre aufheben"}
 {"uk": "Зняти вибір", "en": "Clear selection", "de": "Auswahl aufheben"}
+{"uk": "Зняти все", "en": "Remove all", "de": "Alles entfernen"}
 {"uk": "Зняти всю підсвітку — усе перевірено, так і лишити", "en": "Remove all highlighting — everything checked, keep as is", "de": "Alle Hervorhebungen entfernen — alles geprüft, so lassen"}
 {"uk": "Зняти всі", "en": "Deselect all", "de": "Alle abwählen"}
 {"uk": "Зняти обраність", "en": "Remove from favorites", "de": "Favorit entfernen"}
@@ -9440,6 +9446,7 @@
 {"uk": "Зони доставки — куди доставляємо, за скільки і як швидко (нетто)", "en": "Shipping zones — where we deliver, at what price and how fast (net)", "de": "Versandzonen — wohin wir liefern, zu welchem Preis und wie schnell (netto)"}
 {"uk": "Зони доставки: {0} (країни, ціни, терміни, винятки)", "en": "Shipping zones: {0} (countries, prices, lead times, exceptions)", "de": "Versandzonen: {0} (Länder, Preise, Lieferzeiten, Ausnahmen)"}
 {"uk": "Зони з DigiKey", "en": "Zones from DigiKey", "de": "Zonen von DigiKey"}
+{"uk": "Зразки", "en": "Samples", "de": "Muster"}
 {"uk": "Зразки клієнту", "en": "Samples to the customer", "de": "Muster an den Kunden"}
 {"uk": "Зразок", "en": "Sample", "de": "Beispiel"}
 {"uk": "Зразок погоджено", "en": "Sample approved", "de": "Muster freigegeben"}
@@ -10012,6 +10019,7 @@
 {"uk": "Колонка будується на полі", "en": "The column is based on the field", "de": "Die Spalte basiert auf dem Feld"}
 {"uk": "Колонка у файлі", "en": "Column in file", "de": "Spalte in der Datei"}
 {"uk": "Колонка — поточна фаза проєкту (однакові назви фаз — разом). Червона риска — фаза мала вже закінчитись.", "en": "A column is the project's current phase (phases with the same name are together). A red bar — the phase should have ended already.", "de": "Eine Spalte ist die aktuelle Projektphase (gleichnamige Phasen zusammen). Roter Strich — die Phase hätte schon enden sollen."}
+{"uk": "Колонки", "en": "Columns", "de": "Spalten"}
 {"uk": "Колонки з позначкою", "en": "Columns marked with", "de": "Spalten mit der Markierung"}
 {"uk": "Колонки з форматом «Name (код)» парсяться автоматично.", "en": "Columns in the “Name (code)” format are parsed automatically.", "de": "Spalten im Format „Name (Code)“ werden automatisch ausgewertet."}
 {"uk": "Колонки з числовим кодом в дужках", "en": "Columns with a numeric code in parentheses", "de": "Spalten mit einem numerischen Code in Klammern"}
@@ -12145,6 +12153,7 @@
 {"uk": "Не запускається: {0}", "en": "Does not run: {0}", "de": "Läuft nicht: {0}"}
 {"uk": "Не застосовувати", "en": "Do not apply", "de": "Nicht übernehmen"}
 {"uk": "Не збережено — не схоже на email чи Chat ID", "en": "Not saved — does not look like an email or Chat ID", "de": "Nicht gespeichert — sieht nicht wie E-Mail oder Chat-ID aus"}
+{"uk": "Не збережено — немає зв’язку", "en": "Not saved — no connection", "de": "Nicht gespeichert — keine Verbindung"}
 {"uk": "Не збережено.", "en": "Not saved.", "de": "Nicht gespeichert."}
 {"uk": "Не зберігати", "en": "Do not save", "de": "Nicht speichern"}
 {"uk": "Не зберігати (опублікувати без збереження)", "en": "Do not save (publish without saving)", "de": "Nicht speichern (ohne Speichern veröffentlichen)"}
@@ -12933,6 +12942,7 @@
 {"uk": "Обговорили", "en": "Discussed", "de": "Besprochen"}
 {"uk": "Обговорили на зустрічі", "en": "Discussed at a meeting", "de": "In einer Besprechung besprochen"}
 {"uk": "Обговорили — разом з підпунктами", "en": "Discussed — together with the sub-items", "de": "Besprochen — samt Unterpunkten"}
+{"uk": "Обговорити", "en": "Discuss", "de": "Besprechen"}
 {"uk": "Оберіть .docx файл", "en": "Select a .docx file", "de": "Wählen Sie eine .docx-Datei aus"}
 {"uk": "Оберіть аркуш. Система", "en": "Select a sheet. The system", "de": "Wählen Sie ein Blatt. Das System"}
 {"uk": "Оберіть дату...", "en": "Select a date...", "de": "Datum wählen..."}
@@ -14350,6 +14360,7 @@
 {"uk": "Подвійний клік — виділити фазу й тягнути її разом з кроками", "en": "Double-click — select the phase and drag it together with its steps", "de": "Doppelklick — Phase markieren und mit ihren Schritten verschieben"}
 {"uk": "Подзвонити", "en": "Call", "de": "Anrufen"}
 {"uk": "Подзвонити, запитати про досвід роботи, дізнатися про нові потреби.", "en": "Call, ask about their experience working with us, find out about new needs.", "de": "Anrufen, nach den Erfahrungen mit der Zusammenarbeit fragen, neue Bedürfnisse erfahren."}
+{"uk": "Подобається", "en": "Like it", "de": "Gefällt"}
 {"uk": "Подовжувачі", "en": "Extensions", "de": "Verlängerungen"}
 {"uk": "Подробиці", "en": "Details", "de": "Details"}
 {"uk": "Подробиці запису", "en": "Record details", "de": "Details des Datensatzes"}
@@ -14654,6 +14665,7 @@
 {"uk": "Поля, для яких локальні попередження вимкнено вручну", "en": "Fields for which local warnings were turned off manually", "de": "Felder, für die lokale Warnungen manuell deaktiviert wurden"}
 {"uk": "Поляризація", "en": "Polarization", "de": "Polarisation"}
 {"uk": "Полів для показу немає.", "en": "No fields to show.", "de": "Keine Felder zum Anzeigen."}
+{"uk": "Помаранчева", "en": "Orange", "de": "Orange"}
 {"uk": "Помилка", "en": "Error", "de": "Fehler"}
 {"uk": "Помилка (без деталей)", "en": "Error (no details)", "de": "Fehler (ohne Details)"}
 {"uk": "Помилка (спроба {0}/{1}): {2}", "en": "Error (attempt {0}/{1}): {2}", "de": "Fehler (Versuch {0}/{1}): {2}"}
@@ -16711,6 +16723,8 @@
 {"uk": "Своя категорія листа", "en": "E-mail's own category", "de": "Eigene Kategorie der E-Mail"}
 {"uk": "Своя категорія листів", "en": "Own email category", "de": "Eigene E-Mail-Kategorie"}
 {"uk": "Своя надбавка / знижка, %", "en": "Custom markup / discount, %", "de": "Eigener Aufschlag / Rabatt, %"}
+{"uk": "Своя наліпка (до 60 символів; порожньо — прибрати)", "en": "Your own sticker (up to 60 characters; empty — remove)", "de": "Eigener Aufkleber (bis 60 Zeichen; leer — entfernen)"}
+{"uk": "Своя наліпка…", "en": "Own sticker…", "de": "Eigener Aufkleber…"}
 {"uk": "Своя фіксована добавка за 1 шт.", "en": "Own fixed surcharge per 1 pc.", "de": "Eigener fester Aufschlag pro Stück"}
 {"uk": "Своя фіксована добавка за 1 шт., {0}", "en": "Custom fixed surcharge per pc, {0}", "de": "Eigener fester Zuschlag pro Stk., {0}"}
 {"uk": "Своя ціна / термін для окремих країн зони: {\"CH\": {\"price\": \"25.00\", \"days_min\": 4, \"days_max\": 7}}.", "en": "Own price / lead time for individual countries of the zone: {\"CH\": {\"price\": \"25.00\", \"days_min\": 4, \"days_max\": 7}}.", "de": "Eigener Preis / eigene Lieferzeit für einzelne Länder der Zone: {\"CH\": {\"price\": \"25.00\", \"days_min\": 4, \"days_max\": 7}}."}
@@ -16887,6 +16901,7 @@
 {"uk": "Синхронізую Вхідні та Надіслані…", "en": "Syncing Inbox and Sent…", "de": "Posteingang und Gesendet werden synchronisiert…"}
 {"uk": "Синхронізує замовлення з CRM (створює/оновлює Customer)", "en": "Syncs orders with CRM (creates/updates Customer)", "de": "Synchronisiert Aufträge mit dem CRM (legt Customer an/aktualisiert ihn)"}
 {"uk": "Синхронізує замовлення з DigiKey Marketplace API", "en": "Syncs orders from the DigiKey Marketplace API", "de": "Synchronisiert Aufträge aus der DigiKey-Marketplace-API"}
+{"uk": "Синя", "en": "Blue", "de": "Blau"}
 {"uk": "Синя рамка", "en": "Blue border", "de": "Blauer Rahmen"}
 {"uk": "Сирий текст з імпорту", "en": "Raw text from import", "de": "Rohtext aus dem Import"}
 {"uk": "Сировина", "en": "Raw materials", "de": "Rohstoffe"}
@@ -18475,10 +18490,12 @@
 {"uk": "Тут нічого немає — виберіть іншу плитку.", "en": "There is nothing here — choose another tile.", "de": "Hier ist nichts — wählen Sie eine andere Kachel."}
 {"uk": "Тут цього змінити не можна — відкрийте картку.", "en": "This cannot be changed here — open the card.", "de": "Das lässt sich hier nicht ändern — öffnen Sie die Karte."}
 {"uk": "Тут — постачальники", "en": "Here — suppliers", "de": "Hier — Lieferanten"}
+{"uk": "Тягніть правий край заголовка — ширина колонки; двічі клацніть — як була.", "en": "Drag the right edge of a header — column width; double-click — as it was.", "de": "Rechten Rand der Überschrift ziehen — Spaltenbreite; Doppelklick — wie vorher."}
 {"uk": "Тягніть рамку — інший період · краї рамки — довший чи коротший · подвійний клік — увесь проєкт", "en": "Drag the frame — another period · its edges — longer or shorter · double-click — the whole project", "de": "Rahmen ziehen — anderer Zeitraum · Ränder — länger oder kürzer · Doppelklick — ganzes Projekt"}
 {"uk": "Тягніть смугу чи ◆ — нові дати, край смуги — тривалість · клік — вікно кроку · правий клік — меню", "en": "Drag a bar or ◆ — new dates, the bar edge — duration · click — step window · right-click — menu", "de": "Balken oder ◆ ziehen — neue Daten, Balkenrand — Dauer · Klick — Schrittfenster · Rechtsklick — Menü"}
 {"uk": "Тягніть — нові дати · подвійний клік — тягнути початок і кінець · правий клік — меню", "en": "Drag — new dates · double-click — drag start and end · right-click — menu", "de": "Ziehen — neue Termine · Doppelklick — Anfang und Ende ziehen · Rechtsklick — Menü"}
 {"uk": "Тягніть — нові дати · правий клік — меню", "en": "Drag — new dates · right-click — menu", "de": "Ziehen — neue Daten · Rechtsklick — Menü"}
+{"uk": "Тягніть — ширина колонки · двічі клацніть — як було", "en": "Drag — column width · double-click — as it was", "de": "Ziehen — Spaltenbreite · Doppelklick — wie vorher"}
 {"uk": "Тягніть — ширша колонка «КРОК» · подвійний клік — під найдовшу назву", "en": "Drag to widen the «STEP» column · double-click to fit the longest name", "de": "Ziehen — Spalte «SCHRITT» breiter · Doppelklick — passend zum längsten Namen"}
 {"uk": "Тягніть — ширша колонка «Крок» · подвійний клік — під найдовшу назву", "en": "Drag to widen the «Step» column · double-click to fit the longest name", "de": "Ziehen — Spalte «Schritt» breiter · Doppelklick — passend zum längsten Namen"}
 {"uk": "Ті самі посилання, що для магазинів, або свої правила саме для DigiKey.", "en": "The same links as for the web shops, or own rules specifically for DigiKey.", "de": "Dieselben Links wie für die Webshops oder eigene Regeln speziell für DigiKey."}
@@ -18814,6 +18831,7 @@
 {"uk": "Усе на екрані", "en": "Fit to screen", "de": "Alles anzeigen"}
 {"uk": "Усе перевірено", "en": "All checked", "de": "Alles geprüft"}
 {"uk": "Усе перекладено. Нові написи з'являються після оновлення Minerva — «🔄 Зібрати написи з коду».", "en": "Everything is translated. New labels appear after a Minerva update — “🔄 Collect labels from code”.", "de": "Alles ist übersetzt. Neue Beschriftungen erscheinen nach einem Minerva-Update — „🔄 Beschriftungen aus dem Code sammeln“."}
+{"uk": "Усе про пропозицію праворуч", "en": "Everything about the offer on the right", "de": "Alles zum Angebot rechts"}
 {"uk": "Усе проіндексовано й підтверджено — пошук готовий.", "en": "Everything is indexed and confirmed — search is ready.", "de": "Alles ist indexiert und bestätigt – die Suche ist bereit."}
 {"uk": "Усе підряд", "en": "All in sequence", "de": "Alles nacheinander"}
 {"uk": "Усе інше, що просить UPS або митниця.", "en": "Anything else UPS or customs ask for.", "de": "Alles andere, was UPS oder der Zoll verlangt."}
@@ -19190,6 +19208,7 @@
 {"uk": "Фінансовий огляд: прострочені замовлення, дедлайни.", "en": "Financial overview: overdue orders, deadlines.", "de": "Finanzübersicht: überfällige Aufträge, Fristen."}
 {"uk": "Фінансовий підсумок", "en": "Financial summary", "de": "Finanzübersicht"}
 {"uk": "Фінляндія", "en": "Finland", "de": "Finnland"}
+{"uk": "Фіолетова", "en": "Purple", "de": "Lila"}
 {"uk": "Фірм", "en": "Companies", "de": "Firmen"}
 {"uk": "Фірма", "en": "Company", "de": "Firma"}
 {"uk": "Фірма, людина, що роблять, виставка, примітка…", "en": "Company, person, what they do, trade fair, note…", "de": "Firma, Person, was sie machen, Messe, Notiz…"}
@@ -19642,6 +19661,7 @@
 {"uk": "Чер", "en": "Jun", "de": "Jun"}
 {"uk": "Черв", "en": "Jun", "de": "Jun"}
 {"uk": "Червень", "en": "June", "de": "Juni"}
+{"uk": "Червона", "en": "Red", "de": "Rot"}
 {"uk": "Червона рамка", "en": "Red border", "de": "Roter Rahmen"}
 {"uk": "Через «;», напр. «10; 100; 500» — ціна на кожну.", "en": "Separated by «;», e.g. «10; 100; 500» — a price for each.", "de": "Getrennt mit «;», z. B. «10; 100; 500» — ein Preis je Menge."}
 {"uk": "Через кому, напр. archiv@… Копія листів «Ласкаво просимо», «Оплату отримано» тощо; листи з одноразовими посиланнями (підтвердження, новий пароль, запрошення) не копіюються.", "en": "Comma-separated, e.g. archiv@… A copy of the “Welcome”, “Payment received” e-mails etc.; e-mails with one-time links (confirmation, new password, invitation) are not copied.", "de": "Durch Komma getrennt, z. B. archiv@… Kopie der E-Mails „Willkommen“, „Zahlung eingegangen“ usw.; E-Mails mit einmaligen Links (Bestätigung, neues Passwort, Einladung) werden nicht kopiert."}
@@ -19816,6 +19836,7 @@
 {"uk": "Ширина", "en": "Width", "de": "Breite"}
 {"uk": "Ширина (см)", "en": "Width (cm)", "de": "Breite (cm)"}
 {"uk": "Ширина картинки", "en": "Image width", "de": "Bildbreite"}
+{"uk": "Ширина колонок як була", "en": "Column widths as they were", "de": "Spaltenbreiten wie vorher"}
 {"uk": "Ширина панелі", "en": "Panel width", "de": "Panel-Breite"}
 {"uk": "Ширина смуги на рівні -3 дБ від максимуму", "en": "Bandwidth at the -3 dB level from the maximum", "de": "Bandbreite bei -3 dB unter dem Maximum"}
 {"uk": "Ширина смуги пропускання на рівні -3 дБ", "en": "Passband width at the -3 dB level", "de": "Breite des Durchlassbereichs bei -3 dB"}

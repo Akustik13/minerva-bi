@@ -571,3 +571,49 @@ class ChatFilesTests(TalkBase):
                             thread=EmailThread.objects.create(account=self.other_account, subject="o"))
         self.assertEqual(self.client.get(reverse("admin:suppliers_supplierrequest_chat_file",
                                                  args=[self.req.pk, self.r.pk, foreign.pk, 0])).status_code, 404)
+
+
+class RowMarksTests(TalkBase):
+    """🏷 Позначки рядків (правий клік): колір «№», наліпки, свій текст — одному або всім вибраним; ↔ ширина колонок."""
+
+    def test_apply_and_view(self):
+        from suppliers.services import rfq_marks
+        out = rfq_marks.apply(self.req, [self.r.pk, self.r2.pk], self.user, {"color": "green"})
+        self.assertEqual(set(out), {self.r.pk, self.r2.pk})
+        self.assertEqual((out[self.r.pk]["color"], out[self.r.pk]["hex"]), ("green", "#43a047"))
+        rfq_marks.apply(self.req, [self.r.pk], self.user, {"sticker": "ask", "on": True})
+        rfq_marks.apply(self.req, [self.r.pk], self.user, {"sticker": "star", "on": True})
+        v = rfq_marks.apply(self.req, [self.r.pk], self.user, {"text": "  ENIG   ціна  " + "x" * 80})[self.r.pk]
+        self.assertEqual([s["key"] for s in v["stickers"]], ["star", "ask"])           # порядок — як у довіднику
+        self.assertTrue(v["text"].startswith("ENIG ціна x") and len(v["text"]) == rfq_marks.TEXT_MAX)
+        self.assertTrue(v["by"] and v["at"])
+        v = rfq_marks.apply(self.req, [self.r.pk], self.user, {"sticker": "ask", "on": False})[self.r.pk]
+        self.assertEqual([s["key"] for s in v["stickers"]], ["star"])
+        rfq_marks.apply(self.req, [self.r.pk], self.user, {"color": "nonsense"})
+        self.r.refresh_from_db()
+        self.assertEqual(self.r.label["color"], "")
+        rfq_marks.apply(self.req, [self.r.pk], self.user, {"clear": True})
+        self.r.refresh_from_db()
+        self.assertEqual(self.r.label, {})                                               # порожньо — без «хто / коли»
+        other = SupplierRequest.objects.create(title="інший", owner=self.user, account=self.account)
+        self.assertEqual(rfq_marks.apply(other, [self.r.pk], self.user, {"color": "red"}), {})   # рядок іншого запиту
+
+    def test_action_and_page(self):
+        j = self.client.post(self.act, {"do": "mark", "rids": f"{self.r.pk},{self.r2.pk}", "color": "red"}).json()
+        self.assertEqual(j["labels"][str(self.r2.pk)]["color"], "red")
+        j = self.client.post(self.act, {"do": "mark", "rids": str(self.r.pk), "sticker": "talk", "on": "1"}).json()
+        self.assertEqual(j["labels"][str(self.r.pk)]["stickers"][0]["icon"], "💬")
+        self.client.post(self.act, {"do": "mark", "rids": str(self.r.pk), "text": "<b>x</b>"})
+        page = self.client.get(reverse("admin:suppliers_supplierrequest_work", args=[self.req.pk])).content.decode()
+        self.assertIn('class="rw-n rw-lab" style="--rwl:#e53935" data-color="red" data-stickers="talk"', page)
+        self.assertIn('<span class="rw-lab-t" translate="no">&lt;b&gt;x&lt;/b&gt;</span>', page)
+        self.assertIn('data-col="sup"', page)
+        self.assertIn("rw-colw", page)                                                    # ↔ ширина колонок
+        self.assertIn('"key": "sample"', page)                                            # довідник наліпок для меню
+        self.other.profile.role = "readonly"
+        self.other.profile.save()
+        self.client.force_login(self.other)
+        self.assertNotEqual(self.client.post(self.act, {"do": "mark", "rids": str(self.r.pk), "clear": "1"})
+                            .status_code, 200)
+        self.r.refresh_from_db()
+        self.assertEqual(self.r.label["color"], "red")
