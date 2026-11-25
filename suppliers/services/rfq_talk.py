@@ -58,7 +58,8 @@ def letters(r, user) -> list:
     from suppliers.services import rfq_replies
     own = rfq_replies._own()
     # 📎 файли постачальника, уже збережені в запиті, — їх бачать усі, хто бачить запит; решта — лише зі своїх листів
-    saved = {(f.message_id, f.index): f.file.url for f in r.reply_files.all() if f.file}
+    saved = {(f.message_id, f.index): reverse("admin:suppliers_supplierrequest_file", args=[r.request_id, "reply", f.pk])
+             for f in r.reply_files.all() if f.file}
     out = []
     for m in rfq_replies.mail(r):
         readable = rfq_replies.can_read(m, user)

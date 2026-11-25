@@ -153,7 +153,7 @@
 
   <div class="spf-card" id="rq-files-card">
     <div class="spf-h">📎 Файли (ZIP, Gerber, креслення, BOM) — підуть вкладенням кожному</div>
-    {% for f in files %}<div><a href="{{ f.file.url }}" target="_blank" translate="no">📎 {{ f.name }}</a> <span class="spf-muted">{{ f.size|filesizeformat }}</span> <label class="spf-muted"><input type="checkbox" name="del_file" value="{{ f.pk }}"> {% if src %}не брати{% else %}прибрати{% endif %}</label></div>{% endfor %}
+    {% for f in files %}<div><a href="{% url 'admin:suppliers_supplierrequest_file' f.request_id 'req' f.pk %}" target="_blank" translate="no">📎 {{ f.name }}</a> <span class="spf-muted">{{ f.size|filesizeformat }}</span> <label class="spf-muted"><input type="checkbox" name="del_file" value="{{ f.pk }}"> {% if src %}не брати{% else %}прибрати{% endif %}</label></div>{% endfor %}
     <div class="rq-drop" id="rq-drop">
       <input type="file" name="files" id="rq-files" multiple>
       <span class="spf-muted">або перетягніть файли сюди; ще раз «вибрати» — додає до списку</span>

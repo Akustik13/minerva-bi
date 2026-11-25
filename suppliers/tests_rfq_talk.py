@@ -563,7 +563,8 @@ class ChatFilesTests(TalkBase):
         page = self.chat().content.decode()
         url = reverse("admin:suppliers_supplierrequest_chat_file", args=[self.req.pk, self.r.pk, self.ans.pk, 1])
         self.assertIn(f'href="{url}"', page)
-        resp = self.client.get(url)
+        self.assertContains(self.client.get(url), 'class="fp-frame"')                 # 👁 сторінка перегляду
+        resp = self.client.get(url + "?raw=1")
         self.assertEqual((resp.status_code, resp["Content-Type"]), (200, "application/pdf"))
         self.assertTrue(b"".join(resp.streaming_content if resp.streaming else [resp.content]).startswith(b"%PDF"))
         # чужий лист / лист не цього рядка — ні
@@ -617,3 +618,53 @@ class RowMarksTests(TalkBase):
                             .status_code, 200)
         self.r.refresh_from_db()
         self.assertEqual(self.r.label["color"], "red")
+
+
+class FilePreviewTests(TalkBase):
+    """👁 Файли запиту відкриваються в Minerva: Excel таблицею, архів — списком і файлом усередині; чужий запит — ні."""
+
+    def _xlsx(self):
+        from core.tests_file_preview import _xlsx
+        return _xlsx()
+
+    def test_reply_file_views(self):
+        from core.tests_file_preview import _zip
+        from suppliers.models import SupplierReplyFile
+        f = SupplierReplyFile.objects.create(recipient=self.r, message=self.ans, index=0, name="BOM_TM.xlsx",
+                                             file=ContentFile(self._xlsx(), name="BOM_TM.xlsx"), sha256="a" * 64)
+        url = reverse("admin:suppliers_supplierrequest_file", args=[self.req.pk, "reply", f.pk])
+        page = self.client.get(url).content.decode()
+        self.assertIn("<td title=\"STM32G0\">STM32G0</td>", page)
+        self.assertIn('<td title="&lt;b&gt;bold&lt;/b&gt;">&lt;b&gt;bold&lt;/b&gt;</td>', page)   # екрановано
+        self.assertIn(self.req.code, page)                                                 # назад до запиту
+        dl = self.client.get(url + "?download=1")
+        self.assertTrue(dl["Content-Disposition"].startswith("attachment"))
+        z = SupplierReplyFile.objects.create(recipient=self.r, name="Gerber.zip", sha256="b" * 64,
+                                             file=ContentFile(_zip({"pcb/top.gtl": b"G04 TOP*", "BOM.xlsx": self._xlsx()}),
+                                                              name="Gerber.zip"))
+        zurl = reverse("admin:suppliers_supplierrequest_file", args=[self.req.pk, "reply", z.pk])
+        page = self.client.get(zurl).content.decode()
+        self.assertIn("?e=pcb%2Ftop.gtl", page)
+        self.assertIn("G04 TOP*", self.client.get(zurl + "?e=pcb/top.gtl").content.decode())
+        self.assertIn("STM32G0", self.client.get(zurl + "?e=BOM.xlsx").content.decode())
+        self.assertIn("немає", self.client.get(zurl + "?e=nope.txt").content.decode())
+        # панель праворуч і 💬 ведуть на перегляд
+        panel = self.client.get(reverse("admin:suppliers_supplierrequest_panel", args=[self.req.pk, self.r.pk]))
+        self.assertContains(panel, f'href="{url}"')
+        EmailMessage.objects.filter(pk=self.ans.pk).update(attachments=[{"name": "BOM_TM.xlsx", "size": 900}])
+        self.assertIn(f'href="{url}"', self.chat().content.decode())
+
+    def test_request_file_and_rights(self):
+        from suppliers.models import SupplierRequestFile
+        f = SupplierRequestFile.objects.create(request=self.req, name="spec.txt", file=ContentFile(b"4 layers", name="spec.txt"))
+        url = reverse("admin:suppliers_supplierrequest_file", args=[self.req.pk, "req", f.pk])
+        self.assertContains(self.client.get(url), "4 layers")
+        other = SupplierRequest.objects.create(title="інший", owner=self.user, account=self.account)
+        self.assertEqual(self.client.get(reverse("admin:suppliers_supplierrequest_file",
+                                                 args=[other.pk, "req", f.pk])).status_code, 404)
+        self.assertEqual(self.client.get(reverse("admin:suppliers_supplierrequest_file",
+                                                 args=[self.req.pk, "bogus", f.pk])).status_code, 404)
+        self.other.profile.role = "readonly"
+        self.other.profile.save()
+        self.client.force_login(self.other)
+        self.assertNotEqual(self.client.get(url).status_code, 200)

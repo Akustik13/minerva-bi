@@ -120,7 +120,7 @@
       {% if can_change %}<a class="button" href="{% url 'admin:suppliers_supplierrequest_edit' req.pk %}">✏️ Перевірити й змінити</a>
       <form method="post" action="{{ act }}" style="display:inline">{% csrf_token %}<input type="hidden" name="do" value="review_done"><button type="submit" class="button" title="Значення правильні — більше не підсвічувати">✓ Усе перевірено</button></form>{% endif %}</div>{% endif %}
     {% if overdue %}<div class="spf-warn" style="margin-top:6px">⏰ Строк відповіді минув, мовчать: {% for r in overdue %}<span translate="no">{{ r.supplier.name }}</span>{% if not forloop.last %}, {% endif %}{% endfor %} — нагадайте (⏰ у рядку) або позначте «🔕 Не відповів».</div>{% endif %}
-    {% if files %}<div class="spf-row">{% for f in files %}<a class="spf-tag" href="{{ f.file.url }}" target="_blank" translate="no">📎 {{ f.name }}</a>{% endfor %}</div>{% endif %}
+    {% if files %}<div class="spf-row">{% for f in files %}<a class="spf-tag" href="{% url 'admin:suppliers_supplierrequest_file' req.pk 'req' f.pk %}" target="_blank" translate="no">📎 {{ f.name }}</a>{% endfor %}</div>{% endif %}
     <details style="margin-top:6px"><summary class="spf-muted">Текст листа</summary><div class="spf-mail" translate="no"><b>{{ req.subject }}</b>
 
 {{ req.body }}</div></details>

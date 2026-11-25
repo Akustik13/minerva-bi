@@ -206,6 +206,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             path("<int:pk>/missed/", view(self.missed_view), name="suppliers_supplierrequest_missed"),
             path("<int:pk>/recipient/<int:rid>/panel/", view(self.panel_view), name="suppliers_supplierrequest_panel"),
             path("<int:pk>/recipient/<int:rid>/chat/", view(self.chat_view), name="suppliers_supplierrequest_chat"),
+            path("<int:pk>/file/<str:src>/<int:fid>/", view(self.file_view), name="suppliers_supplierrequest_file"),
             path("<int:pk>/recipient/<int:rid>/file/<int:msg>/<int:idx>/", view(self.chat_file_view),
                  name="suppliers_supplierrequest_chat_file"),
             path("preview/", view(self.preview_view), name="suppliers_supplierrequest_preview"),
@@ -840,11 +841,10 @@ class SupplierRequestAdmin(admin.ModelAdmin):
 
     def chat_file_view(self, request, pk, rid, msg, idx):
         """📎 Вкладення листа з листування рядка: лише лист цього рядка й лише з власної скриньки людини (файл
-        постачальника, уже збережений у запиті, — посилання на нього дає сам рядок). PDF / картинки — перегляд,
-        решта — завантаження (email_assistant.views._attachment_response: безпечний тип, nosniff, sandbox)."""
+        постачальника, уже збережений у запиті, — посилання на нього дає сам рядок). Сторінка «👁 Перегляд»
+        (core/file_preview.py): PDF, картинки, Word, Excel, текст, архіви; ?raw=1 — сам файл, ?download=1 — завантажити."""
         from email_assistant.attachments import attachment_bytes
         from email_assistant.models import EmailMessage
-        from email_assistant.views import _attachment_response
         from suppliers.services import rfq_replies
         req = self._request(request, pk)
         r = req.recipients.filter(pk=rid).first()
@@ -860,9 +860,30 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             data = None
         if not data:
             return HttpResponse("Файл не знайдено — пошта не віддала вкладення. Відкрийте лист у пошті.", status=404)
-        return _attachment_response(data, atts[idx].get("name") or "attachment",
-                                    atts[idx].get("content_type") or "application/octet-stream",
-                                    force_download=request.GET.get("download") == "1")
+        return self._file_page(request, req, atts[idx].get("name") or "attachment", data)
+
+    def file_view(self, request, pk, src, fid):
+        """👁 Файл запиту в Minerva (core/file_preview.py): src reply — вкладення постачальника, збережене в рядку цього
+        запиту (SupplierReplyFile), req — файл нашого запиту (SupplierRequestFile). Право — перегляд запиту."""
+        from suppliers.models import SupplierReplyFile
+        req = self._request(request, pk)
+        f = (SupplierReplyFile.objects.filter(pk=fid, recipient__request=req).first() if src == "reply" else
+             req.files.filter(pk=fid).first() if src == "req" else None)
+        if f is None or not f.file:
+            raise Http404
+        try:
+            with f.file.open("rb") as fh:
+                data = fh.read()
+        except OSError:
+            return self._file_page(request, req, f.name, b"",
+                                   error="Файлу немає на сервері — можливо, його видалили. Відкрийте лист у пошті.")
+        return self._file_page(request, req, f.name, data)
+
+    def _file_page(self, request, req, name, data, error=""):
+        from core import file_preview
+        return file_preview.respond(request, name, data, context=self.admin_site.each_context(request),
+                                    back=reverse("admin:suppliers_supplierrequest_work", args=[req.pk]),
+                                    back_label=req.code, error=error)
 
     def action_view(self, request, pk):
         if request.method != "POST":
