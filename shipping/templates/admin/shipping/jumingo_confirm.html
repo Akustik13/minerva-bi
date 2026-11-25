@@ -87,9 +87,15 @@
     <div class="weight-warn-title">⚖️ Увага: розбіжність у вазі</div>
     <div class="weight-warn-detail">
       Вага посилки: <b>{{ weight_warn.shipment_kg }} кг</b> ·
-      Сума ваг митних артикулів: <b>{{ weight_warn.articles_kg }} кг</b> ·
+      Сума ваг митних артикулів: <b>{{ weight_warn.customs_kg }} кг</b> ·
+      {% if weight_warn.boxes %}
+      📦 Коробка (<span translate="no">{% for b in weight_warn.boxes %}{{ b.name }}{% if b.qty > 1 %} × {{ b.qty }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</span>): <b>{{ weight_warn.tare_kg }} кг</b> ·
+      Разом: <b>{{ weight_warn.expected_kg }} кг</b> ·
+      {% endif %}
       Різниця: <b>{{ weight_warn.diff_kg }} кг ({{ weight_warn.diff_pct }}%)</b><br>
       Перевірте правильність вказаної ваги перед відправкою.
+      {% if weight_warn.unknown %}<br><small>Вагу порожньої коробки не вказано — не враховано:
+        {% for u in weight_warn.unknown %}<a href="{% url 'admin:shipping_packagingmaterial_change' u.pk %}" target="_blank" translate="no">{{ u.name }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</small>{% endif %}
     </div>
   </div>
   {% endif %}

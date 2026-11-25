@@ -295,6 +295,50 @@ def shipment_boxes(shipment, pool=None):
     return out
 
 
+WEIGHT_DIFF_KG = Decimal("0.5")     # «⚖️ Розбіжність у вазі» — від такої різниці …
+WEIGHT_DIFF_PCT = 20                # … або від такої частки ваги посилки
+
+
+def box_tare(shipment, pool=None) -> dict:
+    """Вага порожніх коробок відправлення (`shipment_boxes` → «Вага порожньої» коробки): {kg, boxes [{name, qty,
+    kg}], unknown [{name, pk}]}. Коробку без «Вага порожньої» не враховано — вона в unknown; не впізнану за
+    розмірами — пропускаємо."""
+    kg, boxes, unknown = Decimal(0), [], []
+    for b in shipment_boxes(shipment, pool):
+        m = b.packaging
+        if m is None:
+            continue
+        tare = Decimal(m.tare_weight_kg or 0)
+        if tare > 0:
+            kg += tare * b.qty
+            boxes.append({"name": str(m), "qty": b.qty, "kg": tare})
+        elif all(u["pk"] != m.pk for u in unknown):
+            unknown.append({"name": str(m), "pk": m.pk})
+    return {"kg": kg, "boxes": boxes, "unknown": unknown}
+
+
+def weight_check(shipment, content_kg, pool=None) -> dict | None:
+    """«⚖️ Розбіжність у вазі» на сторінках перевірки UPS / Jumingo: вага посилки проти митних позицій + вага
+    порожніх коробок (якщо відома, інакше без неї). None — збігається або порівнювати нічим."""
+    ship = Decimal(shipment.weight_kg or 0)
+    content = Decimal(str(content_kg or 0))
+    if ship <= 0 or content <= 0:
+        return None
+    tare = box_tare(shipment, pool)
+    expected = content + tare["kg"]
+    diff = abs(ship - expected)
+    pct = diff / ship * 100
+    if diff < WEIGHT_DIFF_KG and pct < WEIGHT_DIFF_PCT:
+        return None
+
+    def r3(d):
+        return float(Decimal(d).quantize(Decimal("0.001")))
+
+    return {"shipment_kg": r3(ship), "customs_kg": r3(content), "tare_kg": r3(tare["kg"]),
+            "boxes": [dict(b, kg=r3(b["kg"])) for b in tare["boxes"]], "unknown": tare["unknown"],
+            "expected_kg": r3(expected), "diff_kg": r3(diff), "diff_pct": float(round(pct, 1))}
+
+
 def _capacity(recs, rec):
     """Скільки одиниць товару вміщує коробка rec — найбільше з його записів з нею."""
     return max([r.qty_per_box for r in recs if r.packaging_id == rec.packaging_id] + [1])

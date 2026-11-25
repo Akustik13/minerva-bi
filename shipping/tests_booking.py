@@ -204,6 +204,27 @@ class UPSBookingTests(BookingBase):
         self.assertContains(r, 'method="post"')
         self.assertContains(r, 'id="ups-confirm-form"')
 
+    def test_weight_warning_counts_the_empty_box_when_its_weight_is_known(self):
+        from shipping.models import PackagingMaterial
+        Shipment.objects.filter(pk=self.shipment.pk).update(
+            recipient_country="US", weight_kg=Decimal("0.31"), length_cm=25, width_cm=18, height_cm=6,
+            customs_articles={"customs_line_items": [
+                {"description": "Cable", "quantity": 2, "weight": "0.1", "weight_auto": False, "value": "10"}]})
+        m = PackagingMaterial.objects.create(name="Box S", length_cm=25, width_cm=18, height_cm=6)
+        r = self.client.get(self.urls["ups"][0] + "?service_code=65")
+        self.assertContains(r, "Розбіжність у вазі")                  # 0.2 кг проти 0.31 — коробку не враховано
+        self.assertContains(r, "Вагу порожньої коробки не вказано")
+        self.assertContains(r, f"/admin/shipping/packagingmaterial/{m.pk}/change/")
+        PackagingMaterial.objects.filter(pk=m.pk).update(tare_weight_kg=Decimal("0.1"))
+        r = self.client.get(self.urls["ups"][0] + "?service_code=65")
+        self.assertNotContains(r, "Розбіжність у вазі")               # 0.2 + 0.1 коробка ≈ 0.31
+        PackagingMaterial.objects.filter(pk=m.pk).update(tare_weight_kg=Decimal("0.05"))
+        Shipment.objects.filter(pk=self.shipment.pk).update(weight_kg=Decimal("0.9"))
+        r = self.client.get(self.urls["ups"][0] + "?service_code=65")
+        self.assertContains(r, "Розбіжність у вазі")
+        self.assertContains(r, "Box S")
+        self.assertContains(r, "Разом")
+
 
 class DHLBookingTests(BookingBase):
     carrier_type = "dhl"

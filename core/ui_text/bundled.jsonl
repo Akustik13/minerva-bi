@@ -5154,6 +5154,7 @@
 {"uk": "Вагу й коробки перевірте: підказка", "en": "Check the weight and boxes: the", "de": "Gewicht und Kartons prüfen: der"}
 {"uk": "Вагу й коробки перевірте: підказка пакування рахує все замовлення, а в посилці лише частина.", "en": "Check the weight and boxes: the packaging suggestion counts the whole order, but the parcel holds only part of it.", "de": "Gewicht und Kartons prüfen: der Verpackungsvorschlag rechnet mit dem ganzen Auftrag, im Paket ist aber nur ein Teil."}
 {"uk": "Вагу нетто записано в картки товарів", "en": "Net weight has been written to the product cards", "de": "Das Nettogewicht wurde in die Artikelkarten geschrieben"}
+{"uk": "Вагу порожньої коробки не вказано — не враховано", "en": "The empty box weight is not set — not counted", "de": "Leergewicht des Kartons nicht angegeben — nicht berücksichtigt"}
 {"uk": "Вагу та розміри не вдалося визначити автоматично.", "en": "Weight and dimensions could not be determined automatically.", "de": "Gewicht und Maße konnten nicht automatisch ermittelt werden."}
 {"uk": "Вагу та розміри не вдалося визначити автоматично. Заповни вручну або", "en": "Weight and dimensions could not be determined automatically. Fill them in manually or", "de": "Gewicht und Maße konnten nicht automatisch ermittelt werden. Füllen Sie sie manuell aus oder"}
 {"uk": "Важливе", "en": "Important", "de": "Wichtig"}
@@ -10232,6 +10233,7 @@
 {"uk": "Користувачі, групи", "en": "Users, groups", "de": "Benutzer, Gruppen"}
 {"uk": "Користувачі: e2e_anna (id {0}, {1}), e2e_boris (id {2}, {3}); e2e_admin без пароля.", "en": "Users: e2e_anna (id {0}, {1}), e2e_boris (id {2}, {3}); e2e_admin has no password.", "de": "Benutzer: e2e_anna (id {0}, {1}), e2e_boris (id {2}, {3}); e2e_admin ohne Passwort."}
 {"uk": "Коробка", "en": "Box", "de": "Karton"}
+{"uk": "Коробка (", "en": "Box (", "de": "Karton ("}
 {"uk": "Коробка {0} ({1} кг, {2}×{3}×{4} см)", "en": "Box {0} ({1} kg, {2}×{3}×{4} cm)", "de": "Karton {0} ({1} kg, {2}×{3}×{4} cm)"}
 {"uk": "Коробка «{0}» без обліку на складі — увімкніть «Вести облік на складі» (PATCH track_stock=true).", "en": "Box «{0}» has no stock tracking — turn on «Track stock» (PATCH track_stock=true).", "de": "Karton «{0}» ohne Bestandsführung — aktivieren Sie «Bestand führen» (PATCH track_stock=true)."}
 {"uk": "Коробка з насічками, яку можна зробити нижчою: висоти через кому, напр. «22, 16». Довжина й ширина ті самі; це та сама коробка — один запас на складі, посилка 30×30×16 її теж списує, а рекомендація складає коробку до найменшої висоти, у яку вміщується товар.", "en": "A scored box that can be made lower: heights separated by commas, e.g. «22, 16». Length and width stay the same; it is the same box — one stock, a 30×30×16 parcel also uses it, and the recommendation folds the box down to the lowest height the goods fit into.", "de": "Gerillter Karton, der sich niedriger falten lässt: Höhen durch Kommas getrennt, z. B. «22, 16». Länge und Breite bleiben; es ist derselbe Karton — ein Bestand, ein Paket 30×30×16 bucht ihn ebenfalls ab, und die Empfehlung faltet den Karton auf die niedrigste Höhe, in die die Ware passt."}

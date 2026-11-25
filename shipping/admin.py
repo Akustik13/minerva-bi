@@ -5211,21 +5211,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         payload = service._build_payload(shipment)
         customs = payload.get("customs_invoice")
 
-        # ── Перевірка відповідності ваги ─────────────────────────────────────
-        weight_warn = None
+        # ── Перевірка відповідності ваги (митні артикули + вага порожніх коробок, якщо відома) ──
+        from .services.packaging import weight_check as _weight_check
         articles = (shipment.customs_articles or {}).get("customs_line_items") or []
         articles_weight = sum(float(a.get("weight") or 0) for a in articles)
-        ship_kg = float(shipment.weight_kg or 0)
-        if articles_weight > 0 and ship_kg > 0:
-            diff_abs = abs(ship_kg - articles_weight)
-            diff_pct = diff_abs / ship_kg * 100
-            if diff_abs >= 0.5 or diff_pct >= 20:
-                weight_warn = {
-                    "shipment_kg":  ship_kg,
-                    "articles_kg":  round(articles_weight, 3),
-                    "diff_kg":      round(diff_abs, 3),
-                    "diff_pct":     round(diff_pct, 1),
-                }
+        weight_warn = _weight_check(shipment, articles_weight)
 
         # ── Тип тарифу: shop (везеш сам) vs pickup (кур'єр забирає) ─────────────
         is_shop_tariff = str(shipment.selected_tariff_id or "").startswith("s-")
@@ -5480,21 +5470,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             messages.error(request, f'❌ UPS налаштування: {e}')
             return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
 
-        # Перевірка розбіжності ваги (митниця vs посилка)
+        # Перевірка розбіжності ваги: посилка проти митних позицій + вага порожніх коробок (якщо відома)
         weight_warn = None
         if customs and customs.get('items'):
+            from .services.packaging import weight_check as _weight_check
             customs_kg = sum(float(i.get('weight_kg', 0)) * int(i.get('quantity', 1)) for i in customs['items'])
-            ship_kg    = float(shipment.weight_kg or 0)
-            if customs_kg > 0 and ship_kg > 0:
-                diff = abs(ship_kg - customs_kg)
-                pct  = diff / ship_kg * 100
-                if diff >= 0.5 or pct >= 20:
-                    weight_warn = {
-                        'shipment_kg': ship_kg,
-                        'customs_kg':  round(customs_kg, 3),
-                        'diff_kg':     round(diff, 3),
-                        'diff_pct':    round(pct, 1),
-                    }
+            weight_warn = _weight_check(shipment, customs_kg)
 
         back_url = (
             reverse('admin:shipping_shipment_edit_draft', args=[shipment.pk])

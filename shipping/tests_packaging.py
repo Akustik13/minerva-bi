@@ -340,3 +340,41 @@ class ViewTests(Base):
         html = SalesOrderAdmin(SalesOrder, admin.site).packaging_panel(o)
         self.assertIn("(2 позиції разом)", html)
         self.assertIn("&quot;qty_boxes&quot;: 1", html)
+
+
+class WeightCheckTests(Base):
+    """«⚖️ Розбіжність у вазі» (UPS / Jumingo): митні позиції + вага порожніх коробок, якщо відома."""
+
+    def test_box_tare_is_added_and_closes_the_gap(self):
+        box(25, 18, 6, tare="0.1")
+        s = self.ship(self.order((self.a, 1)), kg="0.31")
+        self.assertEqual(packaging.box_tare(s)["kg"], Decimal("0.1"))
+        self.assertIsNone(packaging.weight_check(s, 0.2))             # 0.2 + 0.1 ≈ 0.31
+
+    def test_box_without_tare_is_skipped_and_named(self):
+        m = box(25, 18, 6)
+        s = self.ship(self.order((self.a, 1)), kg="0.31")
+        w = packaging.weight_check(s, 0.2)
+        self.assertEqual((w["tare_kg"], w["expected_kg"], w["diff_kg"]), (0.0, 0.2, 0.11))
+        self.assertEqual(w["boxes"], [])
+        self.assertEqual(w["unknown"], [{"name": str(m), "pk": m.pk}])
+
+    def test_unknown_box_size_is_skipped_silently(self):
+        s = self.ship(self.order((self.a, 1)), dims=(40, 40, 40), kg="0.31")
+        w = packaging.weight_check(s, 0.2)
+        self.assertEqual((w["tare_kg"], w["unknown"], w["boxes"]), (0.0, [], []))
+
+    def test_rows_count_every_box_and_still_warn_when_far_off(self):
+        m = box(30, 20, 10, tare="0.25")
+        s = self.ship(self.order((self.a, 4)), kg="3.0",
+                      rows=[{"length_cm": 30, "width_cm": 20, "height_cm": 10, "quantity": 2, "weight_kg": 1.5}])
+        w = packaging.weight_check(s, 1.0)
+        self.assertEqual(w["boxes"], [{"name": str(m), "qty": 2, "kg": 0.25}])
+        self.assertEqual((w["tare_kg"], w["expected_kg"], w["diff_kg"]), (0.5, 1.5, 1.5))
+        self.assertIsNone(packaging.weight_check(s, 2.5))
+
+    def test_nothing_to_compare(self):
+        s = self.ship(self.order((self.a, 1)), kg="0")
+        self.assertIsNone(packaging.weight_check(s, 0.2))
+        s = self.ship(self.order((self.a, 1)), kg="0.3")
+        self.assertIsNone(packaging.weight_check(s, 0))

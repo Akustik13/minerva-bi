@@ -93,8 +93,14 @@
     <b>⚖️ {% trans "Розбіжність у вазі" %}:</b>
     {% trans "Посилка" %}: <b>{{ weight_warn.shipment_kg }} {% trans "кг" %}</b> ·
     {% trans "Митні артикули" %}: <b>{{ weight_warn.customs_kg }} {% trans "кг" %}</b> ·
+    {% if weight_warn.boxes %}
+    📦 {% trans "Коробка" %} (<span translate="no">{% for b in weight_warn.boxes %}{{ b.name }}{% if b.qty > 1 %} × {{ b.qty }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</span>): <b>{{ weight_warn.tare_kg }} {% trans "кг" %}</b> ·
+    {% trans "Разом" %}: <b>{{ weight_warn.expected_kg }} {% trans "кг" %}</b> ·
+    {% endif %}
     {% trans "Різниця" %}: <b>{{ weight_warn.diff_kg }} {% trans "кг" %} ({{ weight_warn.diff_pct }}%)</b><br>
     {% trans "Перевірте правильність вказаної ваги перед відправкою." %}
+    {% if weight_warn.unknown %}<br><small>{% trans "Вагу порожньої коробки не вказано — не враховано" %}:
+      {% for u in weight_warn.unknown %}<a href="{% url 'admin:shipping_packagingmaterial_change' u.pk %}" target="_blank" translate="no">{{ u.name }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</small>{% endif %}
   </div>
   {% endif %}
 
