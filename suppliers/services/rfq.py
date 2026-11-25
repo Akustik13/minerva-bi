@@ -704,6 +704,8 @@ def apply_ai(recipient, data: dict, overwrite=False):
         recipient.state = R.DECLINED
     elif tiers or recipient.price is not None:
         recipient.state = R.QUOTED
+    from suppliers.services import rfq_columns
+    rfq_columns.apply_ai(recipient, data.get("extra") or {})     # ➕ свої колонки — лише не вписане людиною
     recipient.save()
     _touch_answered(recipient.request)
 

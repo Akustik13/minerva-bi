@@ -646,8 +646,14 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                 pass
         cmp = rfq_compare.table(req)
         rows = cmp["rows"]
-        from suppliers.services import rfq_bank
+        from suppliers.services import rfq_bank, rfq_columns
         bank = rfq_bank.bank(req, [row["recipient"] for row in rows])      # 📂 усі файли — вікно «📂 Файли»
+        xcols = rfq_columns.cells(cmp, req)                                   # ➕ свої колонки («Сума з ENIG»…)
+        # 💱 у якій валюті пишуть постачальники (одна — її назва в заголовках, різні — «як у постачальника»)
+        curs = {(row["recipient"].currency or cmp["home"]).upper() for row in rows if row["priced"]}
+        sup_cur = next(iter(curs)) if len(curs) == 1 else ""
+        for row in rows:
+            row["xcols"] = xcols.get(row["recipient"].pk, [])
         n_files = dict(SupplierReplyFile.objects.filter(recipient__request=req).values_list("recipient")
                        .annotate(n=Count("pk")).values_list("recipient", "n"))
         for row in rows:
@@ -692,10 +698,17 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             copies=list(req.copies.order_by("-created_at").values("pk", "code", "status")[:10]),
             states=[s for s in SupplierRequestRecipient.STATES if s[0] != SupplierRequestRecipient.PLANNED],
             more=more, more_mail=sum(1 for s in more if s.f_email), events=events, quantities=rfq.parse_quantities(req.quantities),
-            cmp=cmp, qtys=cmp["qtys"], ncols=9 if cmp["qtys"] else 7, stale=rfq_compare.stale(req),
+            cmp=cmp, qtys=cmp["qtys"], ncols=(9 if cmp["qtys"] else 7) + len(rfq_columns.columns(req)), stale=rfq_compare.stale(req),
             st=rfq_stats.stats(req, cmp), ai_sum=rfq_usage.summary(req, rows),
-            compare_json=_js({"rows": rfq_compare.breakdown(cmp), "qtys": cmp["qtys"], "home": cmp["home"]}),
+            compare_json=_js({"rows": rfq_compare.breakdown(cmp), "qtys": cmp["qtys"], "home": cmp["home"],
+                              "columns": rfq_columns.columns(req)}),
             bank_json=_js(bank), bank_count=bank["count"],
+            sup_cur=sup_cur, cur_toggle=bool(curs - {cmp["home"].upper()}),
+            xcolumns=rfq_columns.columns(req), replied_n=len(self._to_parse(req, False, refill=True)),
+            cols_json=_js({"columns": rfq_columns.columns(req), "kinds": rfq_columns.KINDS,
+                           "std": [{"key": k, "name": n} for k, n in (("unit", "Ціна / шт."), ("total", "Сума"),
+                                   ("incl", "Враховано в сумі"), ("lead1", "Строк, дн."), ("terms", "Умови"),
+                                   ("valid", "Діє до"))]}),
             marks_json=_js({"colors": [{"key": k, "icon": i, "name": n, "hex": h} for k, i, n, h in rfq_marks.COLORS],
                             "stickers": [{"key": k, "icon": i, "name": n} for k, i, n in rfq_marks.STICKERS],
                             "text_max": rfq_marks.TEXT_MAX}),
@@ -789,14 +802,14 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             return JsonResponse({"error": str(e)}, status=400)
 
     @staticmethod
-    def _to_parse(req, overwrite) -> list:
+    def _to_parse(req, overwrite, refill=False) -> list:
         """🧠 Кого розібрати разом: є відповідь, ще не розібрано (або розібрано до разових витрат і «що входить»);
-        overwrite — усіх, хто відповів."""
+        overwrite — усіх, хто відповів; refill — теж усіх (➕ «🧠 Заповнити з листів» свою колонку), без перезапису."""
         from suppliers.services import ai
         R = SupplierRequestRecipient
         out = []
         for r in req.recipients.exclude(thread=None, reply_message=None).filter(state__in=[R.REPLIED, R.QUOTED]):
-            if overwrite or not (r.ai or {}).get("summary") or (r.ai or {}).get("v") != ai.QUOTE_VERSION or _new_mail(r):
+            if overwrite or refill or not (r.ai or {}).get("summary") or (r.ai or {}).get("v") != ai.QUOTE_VERSION or _new_mail(r):
                 out.append(r.pk)
         return out
 
@@ -930,7 +943,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                 from suppliers.services import ai as ai_mod
                 model, user = ai.model_of(request.POST.get("model")), request.user
                 over = bool(request.POST.get("overwrite"))
-                ids = self._to_parse(req, over)
+                ids = self._to_parse(req, over, refill=bool(request.POST.get("refill")))
                 if not ids:
                     return JsonResponse({"error": "Нема що розбирати — усі відповіді вже прочитано."}, status=400)
 
@@ -957,6 +970,26 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                         msg += " · не вдалося: " + "; ".join(failed)
                     return {"url": back, "message": msg}
                 return JsonResponse({"job": jobs.start(user, f"quotes {req.pk}", run, progress=True)})
+            elif do in ("col_add", "col_edit", "col_del", "col_set"):     # ➕ свої колонки таблиці
+                from suppliers.services import rfq_columns
+                P = request.POST
+                try:
+                    if do == "col_add":
+                        col = rfq_columns.add(req, P.get("name"), P.get("kind"), P.get("hint", ""))
+                        return JsonResponse({"ok": True, "column": col})
+                    if do == "col_edit":
+                        return JsonResponse({"ok": True, "column": rfq_columns.edit(
+                            req, P.get("key"), P.get("name") if "name" in P else None,
+                            P.get("hint") if "hint" in P else None)})
+                    if do == "col_del":
+                        rfq_columns.delete(req, P.get("key"))
+                        return JsonResponse({"ok": True})
+                    if r is None:
+                        return JsonResponse({"error": "Немає рядка."}, status=400)
+                    return JsonResponse({"ok": True, "value": rfq_columns.set_value(
+                        r, P.get("key"), P.get("qty"), P.get("value", ""), request.user)})
+                except rfq_columns.ColumnError as e:
+                    return JsonResponse({"error": str(e)}, status=400)
             elif do == "mark":                    # 🏷 позначка рядків: колір «№», наліпки, свій текст
                 from suppliers.services import rfq_marks
                 op = {}

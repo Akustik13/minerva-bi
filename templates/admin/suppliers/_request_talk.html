@@ -31,6 +31,22 @@
   </div>
 </dialog>
 
+{% if can_change %}<dialog id="rw-colnew" class="rw-pv rw-colnew" aria-labelledby="rw-colnew-h">
+  <div class="rw-pv-head"><b id="rw-colnew-h">➕ Своя колонка</b><button type="button" class="button" data-colnew-close aria-label="Закрити">✕</button></div>
+  <form id="rw-colnew-form" class="rw-pv-mail" autocomplete="off">
+    <label class="rwc-subjf">Назва <input name="name" maxlength="40" required placeholder="Напр.: Сума з ENIG"></label>
+    <div class="rw-colnew-kinds">
+      <label><input type="radio" name="kind" value="price" checked> 💶 <b>Число на кожну кількість</b> — напр. «Сума з ENIG», «Ціна hard gold / шт.»: у валюті постачальника, у таблиці — у валюті Minerva, найнижче позначено</label>
+      <label><input type="radio" name="kind" value="text"> 📝 <b>Текст</b> — напр. «Покриття», «Зразки до», «Упаковка»</label>
+    </div>
+    <label class="rwc-subjf">Що шукати AI в листах <span class="spf-muted">(необов’язково — інакше за назвою)</span><input name="hint" maxlength="200" placeholder="Напр.: сума за кількість з покриттям ENIG 1u&quot; замість HASL"></label>
+    {% if replied_n %}<label class="rw-colnew-fill"><input type="checkbox" name="fill" checked> 🧠 Одразу заповнити з листів — AI ще раз прочитає відповіді ({{ replied_n }}); вписане вручну не змінює</label>{% endif %}
+  </form>
+  <div class="rw-pv-foot"><span class="spf-muted" id="rw-colnew-note"></span>
+    <button type="button" class="button" data-colnew-close>Скасувати</button>
+    <button type="button" class="button default" id="rw-colnew-save">＋ Додати колонку</button></div>
+</dialog>{% endif %}
+
 <dialog id="rw-cmpd" class="rw-pv rw-cmpd" aria-labelledby="rw-cmpd-h">
   <div class="rw-pv-head"><b id="rw-cmpd-h">⚖ Порівняння вибраних</b>
     <span class="rw-seg" id="rw-cmpd-q" role="group" aria-label="Кількість"></span>
@@ -210,19 +226,30 @@
   .rw-bank-none { padding: 14px 12px; color: var(--text-muted, #888); font-size: 13px; }
   @media (max-width: 760px) { .rw-bank-body { grid-template-columns: 1fr; grid-template-rows: 38% 1fr; }
     .rw-bank-list { border-right: 0; border-bottom: 1px solid var(--border-strong, #ddd); } }
+  /* ➕ своя колонка */
+  .rw-colnew { width: min(620px, 96vw); }
+  .rw-colnew-kinds { display: grid; gap: 4px; margin: 4px 0 10px; font-size: 13px; }
+  .rw-colnew .rw-pv-mail label { width: auto !important; float: none !important; }
+  .rw-colnew label.rwc-subjf { display: flex !important; flex-direction: column; align-items: stretch; text-align: left; gap: 3px; margin-bottom: 8px; }
+  .rw-colnew label.rwc-subjf input { width: 100%; box-sizing: border-box; }
+  .rw-colnew-kinds label, .rw-colnew label.rw-colnew-fill { display: block !important; padding: 3px 0 !important; line-height: 1.45; }
   /* ⚖ порівняння вибраних */
   .rw-cmpd { width: min(1280px, 97vw); }
   .rw-cmpd .rw-pv-head { flex-wrap: wrap; }
   .rw-cmpd-body { overflow: auto; max-height: calc(90vh - 130px); padding: 10px 14px; }
   .rw-cmpd-foot { justify-content: flex-start; }
   .rw-cmpt { border-collapse: collapse; width: 100%; font-size: 13px; }
-  .rw-cmpt th, .rw-cmpt td { padding: 6px 10px; border-bottom: 1px solid var(--hairline-color, rgba(127, 127, 127, .3));
+  .rw-cmpt th, .rw-cmpt td { padding: 8px 12px; border-bottom: 1px solid var(--border-strong, rgba(127, 127, 127, .45));
     text-align: right; vertical-align: top; }
+  .rw-cmpt th + th, .rw-cmpt td + td { border-left: 1px solid var(--border-strong, rgba(127, 127, 127, .45)); }
+  .rw-cmpt tbody tr:nth-child(even) > td { background: rgba(127, 127, 127, .07); }
+  .rw-cmpt tbody tr:hover > td { background: rgba(91, 141, 239, .08); }
   .rw-cmpt thead th { position: sticky; top: 0; background: var(--body-bg, #fff); z-index: 1; font-weight: 700;
     border-bottom: 2px solid var(--border-strong, #bbb); min-width: 130px; }
-  .rw-cmpt th.rw-cmpt-k, .rw-cmpt td.rw-cmpt-k { text-align: left; position: sticky; left: 0; background: var(--body-bg, #fff);
-    font-weight: 600; white-space: nowrap; min-width: 0; }
-  .rw-cmpt td.low { background: rgba(76, 175, 80, .16); }
+  .rw-cmpt th.rw-cmpt-k, .rw-cmpt td.rw-cmpt-k { text-align: left; position: sticky; left: 0; background: var(--darkened-bg, #f3f3f3) !important;
+    font-weight: 600; white-space: nowrap; min-width: 0; border-right: 2px solid var(--border-strong, #bbb); }
+  .rw-cmpt thead th { background: var(--darkened-bg, #f3f3f3); }
+  .rw-cmpt td.low { background: rgba(76, 175, 80, .22) !important; }
   .rw-cmpt td.low .rw-cmpt-v::after { content: " ✓"; color: var(--success-fg, #2e7d32); }
   .rw-cmpt tr.sum > td { font-weight: 700; border-top: 2px solid var(--border-strong, #bbb); }
   .rw-cmpt .rw-cmpt-v { font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -718,6 +745,100 @@
     }, true);
   })();
 
+  /* ── ⚙ колонки: показати / сховати (цей браузер); ➕ свої колонки — додати, перейменувати, заповнити з листів, прибрати ── */
+  (function(){
+    var btn = document.getElementById('rw-cols-btn');
+    if (!btn) return;
+    var C = {{ cols_json|safe }}, canEdit = {% if can_change %}true{% else %}false{% endif %}, repliedN = {{ replied_n|default:0 }};
+    var jobEl = document.getElementById('rw-cols-job'), nd = document.getElementById('rw-colnew');
+    function shown(k) { return !window.rwCols || window.rwCols.hidden().indexOf(k) < 0; }
+    function check(k, name, data) {
+      return {type: 'check', label: name, data: !!data, checked: function(){ return shown(k); },
+              onToggle: function(next, ctx){ window.rwCols.set(k, next); if (ctx && ctx.refresh) ctx.refresh(); }};
+    }
+    function model() { var m = document.getElementById('rw-model'); return m ? m.value : ''; }
+    function fill() {
+      if (!repliedN) { alert('Відповідей з листами ще немає — нема з чого заповнювати.'); return; }
+      if (!confirm('🧠 AI ще раз прочитає відповіді постачальників і впише свої колонки. Вписане вручну не змінює. Продовжити?')) return;
+      spJob(act, {do: 'ai_quote_all', refill: '1', model: model()}, jobEl, function(){ location.reload(); });
+    }
+    function col(c) {
+      var sub = [check(c.key, 'Показувати', false)];
+      if (canEdit) {
+        sub.push({type: 'separator'});
+        sub.push({label: 'Перейменувати…', icon: '✏️', onSelect: function(){
+          var n = prompt('Нова назва колонки:', c.name);
+          if (n === null || !n.trim()) return;
+          post({do: 'col_edit', key: c.key, name: n}).then(function(j){ if (j.error) alert(j.error); else location.reload(); });
+        }});
+        sub.push({label: 'Що шукати AI…', icon: '🔎', onSelect: function(){
+          var h = prompt('Що шукати AI в листах для цієї колонки (порожньо — за назвою):', c.hint || '');
+          if (h === null) return;
+          post({do: 'col_edit', key: c.key, hint: h}).then(function(j){ if (j.error) alert(j.error); else location.reload(); });
+        }});
+        sub.push({label: 'Заповнити з листів', icon: '🧠', onSelect: fill});
+        sub.push({type: 'separator'});
+        sub.push({label: 'Прибрати колонку', icon: '🗑', danger: true, onSelect: function(){
+          if (!confirm('Прибрати цю колонку й усі її значення в усіх постачальників?')) return;
+          post({do: 'col_del', key: c.key}).then(function(j){ if (j.error) alert(j.error); else location.reload(); });
+        }});
+      }
+      return {type: 'submenu', label: c.name, data: true, icon: c.kind === 'price' ? '💶' : '📝', items: sub};
+    }
+    btn.setAttribute('aria-haspopup', 'menu');
+    btn.addEventListener('click', function(){
+      if (!window.MVMenu) return;
+      var items = [{type: 'title', label: 'Показати колонки'}];
+      C.std.forEach(function(c){ items.push(check(c.key, c.name)); });
+      if (C.columns.length || canEdit) items.push({type: 'separator'}, {type: 'title', label: 'Свої колонки'});
+      C.columns.forEach(function(c){ items.push(col(c)); });
+      if (canEdit) items.push({label: 'Своя колонка…', icon: '＋', hint: 'напр. «Сума з ENIG»', onSelect: function(){ if (nd) nd.showModal(); }});
+      if (canEdit && C.columns.length) items.push({label: 'Заповнити свої колонки з листів', icon: '🧠', onSelect: fill});
+      items.push({type: 'separator'}, {label: 'Показати всі колонки', icon: '↺', onSelect: function(){ window.rwCols.reset(); }});
+      MVMenu.open(btn, items, {title: 'Колонки', side: 'bottom-end'});
+    });
+    // ➕ нова колонка
+    if (nd) {
+      var form = document.getElementById('rw-colnew-form'), note = document.getElementById('rw-colnew-note');
+      nd.querySelectorAll('[data-colnew-close]').forEach(function(b){ b.addEventListener('click', function(){ nd.close(); }); });
+      document.getElementById('rw-colnew-save').addEventListener('click', function(){
+        var name = form.elements.name.value.trim();
+        if (!name) { note.textContent = 'Назвіть колонку — напр. «Сума з ENIG».'; form.elements.name.focus(); return; }
+        var kind = form.querySelector('input[name="kind"]:checked').value, doFill = form.elements.fill && form.elements.fill.checked;
+        note.textContent = '⏳';
+        post({do: 'col_add', name: name, kind: kind, hint: form.elements.hint.value}).then(function(j){
+          if (j.error) { note.textContent = '⚠️ ' + j.error; return; }
+          if (doFill) { note.textContent = '🧠 Заповнюю з листів…'; spJob(act, {do: 'ai_quote_all', refill: '1', model: model()}, note, function(){ location.reload(); }); }
+          else location.reload();
+        }).catch(function(){ note.textContent = '⚠️ Не збережено — немає зв’язку'; });
+      });
+    }
+    // ✏️ клітинка своєї колонки: клік — вписати (ціна — для кількості, яку зараз видно)
+    if (canEdit) document.querySelectorAll('td.rw-xedit').forEach(function(td){
+      td.addEventListener('click', function(e){
+        if (e.target.closest('a, button')) return;
+        e.stopPropagation();
+        var name = td.getAttribute('data-xname'), kind = td.getAttribute('data-xkind'), data = {do: 'col_set', rid: td.getAttribute('data-rid'), key: td.getAttribute('data-xkey')};
+        if (kind === 'text') {
+          var cur = (td.querySelector('.rw-xtext') || {}).textContent || '';
+          var v = prompt(name + ':', cur.trim());
+          if (v === null) return;
+          data.value = v;
+        } else {
+          var tb = document.getElementById('rw-cmp'), qi = tb ? tb.getAttribute('data-qi') || '1' : '1';
+          var qv = td.querySelector('.rw-qv.rw-qi' + qi) || td.querySelector('.rw-qv');
+          if (!qv) return;
+          var cur2 = td.getAttribute('data-xcur') || '';
+          var v2 = prompt(name + ' — ' + qv.getAttribute('data-qty') + ' шт' + (cur2 ? ' (' + cur2 + ')' : '') + ':', qv.getAttribute('data-raw') || '');
+          if (v2 === null) return;
+          data.qty = qv.getAttribute('data-qty'); data.value = v2;
+        }
+        post(data).then(function(j){ if (j.error) alert(j.error); else location.reload(); })
+          .catch(function(){ alert('Не збережено — немає зв’язку'); });
+      });
+    });
+  })();
+
   /* ── ⚖ порівняння вибраних: що скільки коштує в кожного — плата, монтаж, компоненти, разові, доставка, разом ── */
   (function(){
     var dlg = document.getElementById('rw-cmpd'), btn = document.getElementById('rw-cmp-btn');
@@ -729,9 +850,10 @@
     var PARTS = [['pcb', '🟩 Плата'], ['assembly', '🔧 Монтаж'], ['components', '🔩 Компоненти']];
     var MARK = {y: '✓ у ціні', n: '✗ не входить', u: '? не уточнили'};
     var TIP = {y: 'Входить у ціну, але окремо не назвали', n: 'У ціні немає — буде зверху або окремо', u: 'Постачальник не сказав'};
-    function amt(td, a, extra) {               // сума: у валюті Minerva, під нею — як у постачальника
-      var v = el('span', 'rw-cmpt-v', a.h || a.t); td.appendChild(v);
-      if (a.h) td.appendChild(el('span', 'rw-cmpt-s', a.t));
+    function amt(td, a, extra) {   // сума: як пише постачальник; 💱 «+ EUR» — у валюті Minerva, під нею — як у постачальника
+      var home = document.documentElement.classList.contains('rw-cur-home');
+      var v = el('span', 'rw-cmpt-v', home ? (a.h || a.t) : a.t); td.appendChild(v);
+      if (home && a.h) td.appendChild(el('span', 'rw-cmpt-s', a.t));
       if (extra) td.appendChild(typeof extra === 'string' ? el('span', 'rw-cmpt-s', extra) : extra);
       return a.v;
     }
@@ -803,6 +925,16 @@
         if (c.lead === null || c.lead === undefined) { td.appendChild(el('span', 'spf-muted', '—')); return null; }
         td.appendChild(el('span', 'rw-cmpt-v', String(c.lead))); return c.lead;
       }, {okOnly: true});
+      (D.columns || []).forEach(function(col, ci){         // ➕ свої колонки («Сума з ENIG»…)
+        line(tb, (col.kind === 'price' ? '💶 ' : '📝 ') + col.name, function(td, c, r){
+          var x = (r.x || [])[ci];
+          if (!x) { td.appendChild(el('span', 'spf-muted', '—')); return null; }
+          if (col.kind === 'text') { td.appendChild(document.createTextNode(x.text || '—')); return null; }
+          var q = x.qs[qi];
+          if (!q || !q.text) { td.appendChild(el('span', 'spf-muted', '—')); return null; }
+          return amt(td, {v: q.v, t: q.text, h: q.home_text});
+        }, {row: true, text: col.kind === 'text', low: col.kind === 'price'});
+      });
       if (rows.some(function(r){ var c = r.cells[qi]; return c && !c.missing && c.lacks.length; })) {
         line(tb, '⚠️ Чого бракує', function(td, c){
           td.appendChild(el('span', c.lacks.length ? 'n' : 'y', c.lacks.length ? c.lacks.join(', ') : '✓ усе, що просили'));
@@ -834,7 +966,9 @@
       var tbl = document.getElementById('rw-cmp');
       qi = tbl && tbl.getAttribute('data-mode') === 'one' ? Math.max(0, Number(tbl.getAttribute('data-qi') || 1) - 1) : 0;
       note.textContent = '';
-      ['Суми — у валюті Minerva за курсом (під ними — як у постачальника); найменше в рядку — зелене ✓.',
+      [document.documentElement.classList.contains('rw-cur-home') ?
+         'Суми — у валюті Minerva за курсом (під ними — як у постачальника); найменше в рядку — зелене ✓.' :
+         'Суми — як пише постачальник; найменше в рядку — зелене ✓ (порівняно за курсом у валюті Minerva).',
        'Плата, монтаж, компоненти — ціна за шт. × кількість, як назвав постачальник; «✓ у ціні» — входить, але окремо не назвали.',
        'Разом, за 1 шт. і строк — найменше серед повних пропозицій (є все, що просили).'].forEach(function(x){
         note.appendChild(el('span', null, x)); note.appendChild(document.createTextNode(' '));

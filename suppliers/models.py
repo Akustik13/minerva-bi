@@ -337,6 +337,8 @@ class SupplierRequest(models.Model):
     ai_usage = models.JSONField("Витрати AI", default=dict, blank=True)
     # 🔎 «Не відповідь на запит» — листи, які людина відкинула в «Знайти пропущені відповіді» (suppliers/services/rfq_match.py)
     missed_skip = models.JSONField("Не відповіді", default=list, blank=True)
+    # ➕ свої колонки таблиці пропозицій (services/rfq_columns.py): [{key, name, kind price | text, hint}]
+    columns = models.JSONField("Свої колонки", default=list, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
     sent_at = models.DateTimeField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)
@@ -443,6 +445,8 @@ class SupplierRequestRecipient(models.Model):
     reject_reason = models.CharField("Чому не взяли", max_length=255, blank=True, default="")
     # 🏷 позначка рядка в таблиці пропозицій: {color, stickers, text, by, at} — suppliers/services/rfq_marks.py
     label = models.JSONField("Позначка", default=dict, blank=True)
+    # ➕ значення своїх колонок запиту: {key: {v: {кількість: сума} | текст, src: ai | user, at}}
+    extra = models.JSONField("Свої колонки", default=dict, blank=True)
 
     class Meta:
         ordering = ["pk"]

@@ -211,6 +211,7 @@ def _one_time_sum(items, q) -> Decimal:
 
 # 🧾 «Враховано в сумі» (вигляд «одна кількість»): ✓ y — у сумі, ✗ n — не в сумі, буде зверху, ? u — не уточнили
 PART_NAMES = {"pcb": "Плата", "assembly": "Монтаж", "components": "Компоненти"}
+SHORT = {"pcb": "Плата", "assembly": "Монтаж", "components": "Компон.", "one_time": "NRE", "shipping": "Дост."}   # чипи вузько
 
 
 def flags(tin, items, q, shipping, currency) -> tuple:
@@ -218,16 +219,16 @@ def flags(tin, items, q, shipping, currency) -> tuple:
     out = []
     for k, _i, _n in SCOPE:
         state = ("y" if k in tin else "n") if tin else "u"
-        out.append({"key": k, "label": PART_NAMES[k], "state": state,
+        out.append({"key": k, "label": PART_NAMES[k], "short": SHORT[k], "state": state,
                     "title": {"y": "У ціні", "n": "У ціні немає — буде зверху або окремо",
                               "u": "Постачальник не сказав, чи входить"}[state]})
     its = [it for it in items if not it.get("qty") or it["qty"] == q]
     cur = (currency or "").upper()
     ot = "; ".join(f"{it['name']} {money(dec(it['amount']))}" for it in its)
-    out.append({"key": "one_time", "label": "Оснащення / NRE", "state": "y" if its else "u",
+    out.append({"key": "one_time", "label": "Оснащення / NRE", "short": SHORT["one_time"], "state": "y" if its else "u",
                 "title": f"У сумі: {ot} {cur}".strip() if its else "Разових витрат постачальник не назвав"})
     ship = money(shipping) if shipping is not None else ""
-    out.append({"key": "shipping", "label": "Доставка", "state": "n" if ship else "u",
+    out.append({"key": "shipping", "label": "Доставка", "short": SHORT["shipping"], "state": "n" if ship else "u",
                 "title": f"Доставка {ship} {cur} — окремо, у суму не входить" if ship else
                 "Вартість доставки не назвали"})
     detail = [f"{it['name']} {money(dec(it['amount']))}" for it in its]
@@ -494,6 +495,10 @@ def breakdown(cmp) -> list:
                 "lacks": c.get("lacks", []),
             })
         out.append({"rid": r.pk, "name": r.supplier.name, "cur": cur, "rate": price(rate) if rate is not None else "",
+                    "x": [{"key": x["key"], "kind": x["kind"], "text": x.get("text", ""),
+                           "qs": [{"v": q.get("v"), "main": q.get("main", ""), "text": q.get("text", ""),
+                                   "home_text": q.get("home_text", "")} for q in x.get("qs", [])]}
+                          for x in row.get("xcols", [])],
                     "terms": row.get("terms", ""), "valid": r.valid_until.strftime("%d.%m.%Y") if r.valid_until else "",
                     "valid_state": row.get("valid_state", ""), "cells": cells})
     return out

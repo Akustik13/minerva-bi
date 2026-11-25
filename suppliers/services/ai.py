@@ -786,8 +786,11 @@ def quote(recipient, user=None, model=DEFAULT_MODEL) -> dict:
         parts.append("Файли від постачальника:\n" + "\n".join(files_part))
     asked = (f"Ми запитували: {req.title}\nКількості: {req.quantities or '—'}\nФорма запиту: "
              f"{_template_label(req.template)}\n{req.body[:2000]}")
+    from suppliers.services import rfq_columns
+    cols_note, cols_json = rfq_columns.ai_prompt(req)       # ➕ свої колонки («Сума з ENIG»…) — що ще шукати
     system = ("Ти розбираєш відповідь постачальника на наш запит пропозиції (RFQ). " + DATA_NOTE + QUOTE_RULES +
-              " Відповідай лише JSON: " + QUOTE_JSON)
+              (" " + cols_note if cols_note else "") + " Відповідай лише JSON: " +
+              (QUOTE_JSON[:-1] + cols_json + "}" if cols_json else QUOTE_JSON))
     text, price = call(system, f"{asked}\n<<<ДАНІ\n" + "\n\n".join(parts)[:60000] + "\nДАНІ>>>",
                        model=model_of(model), user=user, effort="low", max_tokens=6000)
     data = parse_json(text)
@@ -808,7 +811,8 @@ def quote(recipient, user=None, model=DEFAULT_MODEL) -> dict:
            else None, "conditions": _s(data.get("conditions"), 800),
            "questions": [_s(q, 200) for q in (data.get("questions") or []) if _s(q)][:6]
            if isinstance(data.get("questions"), list) else [],
-           "summary": _s(data.get("summary"), 400), "cost_usd": float(price), "model": model_of(model)}
+           "summary": _s(data.get("summary"), 400), "cost_usd": float(price), "model": model_of(model),
+           "extra": rfq_columns.clean_ai(req, data)}
     return out
 
 

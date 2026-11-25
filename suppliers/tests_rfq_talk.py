@@ -721,7 +721,7 @@ class CompareViewTests(TalkBase):
         page = self.client.get(reverse("admin:suppliers_supplierrequest_work", args=[self.req.pk])).content.decode()
         self.assertIn('data-rw-qi="all"', page)                                              # ⇔ Усі кількості
         self.assertIn('data-rw-qi="2"', page)
-        self.assertIn('class="rw-chip n" title="У ціні немає', page)
+        self.assertIn('class="rw-chip n" title="Плата: У ціні немає', page)
         self.assertIn('class="rw-note"', page)                                                # коментар під рядком
         self.assertIn('data-rw-sort="total"', page)
         self.assertIn("rw-qv rw-qi2", page)
@@ -785,3 +785,85 @@ class FileBankTests(TalkBase):
         self.assertIn(f'href="{url}"', full)                                             # ← Назад — до архіву
         self.assertIn(reverse("admin:suppliers_supplierrequest_work", args=[self.req.pk]),
                       self.client.get(url).content.decode())                             # з архіву — до запиту
+
+
+class CustomColumnsTests(TalkBase):
+    """➕ Свої колонки («Сума з ENIG», «Покриття»): додати / змінити / прибрати, вписати вручну, AI — лише не вписане людиною."""
+
+    def test_columns_values_and_ai(self):
+        from suppliers.services import rfq_columns
+        enig = rfq_columns.add(self.req, "Сума з ENIG", "price", "ENIG 1u замість HASL")
+        cov = rfq_columns.add(self.req, "Покриття", "text")
+        self.assertEqual((enig["key"], cov["key"]), ("c1", "c2"))
+        with self.assertRaises(rfq_columns.ColumnError):
+            rfq_columns.add(self.req, "сума з enig", "price")                      # така вже є
+        rfq_columns.set_value(self.r, "c1", 5, "1.291,69", self.user)
+        rfq_columns.set_value(self.r2, "c1", 5, "800", self.user)
+        rfq_columns.set_value(self.r, "c2", None, "  ENIG   1u ", self.user)
+        with self.assertRaises(rfq_columns.ColumnError):
+            rfq_columns.set_value(self.r, "c1", 5, "abc", self.user)
+        self.r.refresh_from_db()
+        self.assertEqual(self.r.extra["c1"]["v"], {"5": "1291.69"})
+        self.assertEqual((self.r.extra["c2"]["v"], self.r.extra["c2"]["src"]), ("ENIG 1u", "user"))
+        cmp = rfq_compare.table(self.req)
+        cells = rfq_columns.cells(cmp, self.req)
+        self.assertEqual(cells[self.r.pk][0]["qs"][0]["main"], "1 291,69")
+        self.assertTrue(cells[self.r2.pk][0]["qs"][0]["best"])                       # 800 < 1291,69
+        # 🧠 AI: у промпті — колонки; вписане людиною лишається, порожнє — заповнюється
+        note, js = rfq_columns.ai_prompt(self.req)
+        self.assertIn("«Сума з ENIG» (ENIG 1u замість HASL)", note)
+        self.assertIn('"extra": {"c1"', js)
+        x = rfq_columns.clean_ai(self.req, {"extra": {"c1": {"5": 999, "2500": "26672.70", "x": 1}, "c2": "HASL",
+                                                     "c9": "чужа"}})
+        self.assertEqual(x, {"c1": {"5": "999", "2500": "26672.7"}, "c2": "HASL"})
+        rfq_columns.apply_ai(self.r, x)
+        rfq_columns.apply_ai(self.r3, x)
+        self.r.refresh_from_db()
+        self.r3.refresh_from_db()
+        self.assertEqual(self.r.extra["c1"]["v"], {"5": "1291.69"})                  # вручну — не змінено
+        self.assertEqual((self.r3.extra["c1"]["src"], self.r3.extra["c2"]["v"]), ("ai", "HASL"))
+        rfq_columns.edit(self.req, "c1", name="ENIG total")
+        rfq_columns.delete(self.req, "c2")
+        self.req.refresh_from_db()
+        self.r.refresh_from_db()
+        self.assertEqual([c["name"] for c in rfq_columns.columns(self.req)], ["ENIG total"])
+        self.assertNotIn("c2", self.r.extra)
+
+    def test_quote_prompt_and_page(self):
+        from suppliers.services import rfq_columns
+        rfq_columns.add(self.req, "Сума з ENIG", "price")
+        answer = json.dumps({"currency": "EUR", "tiers": [{"qty": 5, "unit_price": 120}], "includes": ["assembly"],
+                             "summary": "PCBA", "extra": {"c1": {"5": 711.46}}})
+        with mock.patch.object(ai, "call", return_value=(answer, Decimal("0.01"))) as call:
+            self.client.post(self.act, {"do": "ai_quote", "rid": self.r.pk})
+        self.assertIn("«Сума з ENIG»", call.call_args[0][0])
+        self.r.refresh_from_db()
+        self.assertEqual(self.r.extra["c1"]["v"], {"5": "711.46"})
+        j = self.client.post(self.act, {"do": "col_add", "name": "Покриття", "kind": "text"}).json()
+        self.assertEqual(j["column"]["key"], "c2")
+        j = self.client.post(self.act, {"do": "col_set", "rid": self.r2.pk, "key": "c1", "qty": "5", "value": "x"})
+        self.assertEqual(j.status_code, 400)
+        page = self.client.get(reverse("admin:suppliers_supplierrequest_work", args=[self.req.pk])).content.decode()
+        self.assertIn('data-rw-sort="x:c1"', page)
+        self.assertIn('<span translate="no">Сума з ENIG</span>', page)
+        self.assertIn('id="rw-cols-btn"', page)
+        self.assertIn('id="rw-colnew"', page)
+        self.assertIn('data-x-c1-1="', page)
+        self.other.profile.role = "readonly"
+        self.other.profile.save()
+        self.client.force_login(self.other)
+        self.assertNotEqual(self.client.post(self.act, {"do": "col_del", "key": "c1"}).status_code, 200)
+
+
+class CurrencyToggleTests(TalkBase):
+    """💱 Ціни як пише постачальник (за замовчуванням) або ще й у валюті Minerva — перемикач, коли валюта інша."""
+
+    def test_toggle(self):
+        url = reverse("admin:suppliers_supplierrequest_work", args=[self.req.pk])
+        self.assertNotIn('data-rw-cur="home"', self.client.get(url).content.decode())     # усі в EUR — без перемикача
+        R.objects.filter(pk__in=[self.r.pk, self.r2.pk]).update(currency="USD")
+        page = self.client.get(url).content.decode()
+        self.assertIn('data-rw-cur="home"', page)
+        self.assertIn('💱 USD</button>', page)
+        self.assertIn('<span class="rw-cur-s">USD, </span>без разових', page)
+        self.assertRegex(page, r'<span class="rw-cur-s">130,00 <span class="spf-muted">USD</span></span>')
