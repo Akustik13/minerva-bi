@@ -58,6 +58,8 @@ class FakeStripe:
             s = self.sessions[path.split("/")[3]]
             s["status"] = "expired"
             resp.status_code, resp.json.return_value = 200, s
+        elif method == "GET" and path == "v1/checkout/sessions":
+            resp.status_code, resp.json.return_value = 200, {"object": "list", "data": []}
         elif method == "GET" and path.startswith("v1/checkout/sessions/"):
             resp.status_code, resp.json.return_value = 200, self.sessions[path.split("/")[3]]
         elif method == "GET" and path == "v1/account":
@@ -354,6 +356,13 @@ class StripeAdminTests(StripeTestCase):
 
     def test_check_key(self):
         self.assertIn("Sevskiy", payments.check_key(self.shop))
+
+    def test_check_key_restricted_skips_account(self):
+        """Обмежений ключ rk_… — одразу список сесій Checkout, без /v1/account (у журналі Stripe — без 403)."""
+        self.shop.stripe_secret_key = "rk_test_restricted"
+        self.shop.save()
+        self.assertIn("обмежений ключ", payments.check_key(self.shop))
+        self.assertEqual([c[1] for c in self.fake.calls], ["/v1/checkout/sessions"])
 
 
 class PollingTests(StripeTestCase):

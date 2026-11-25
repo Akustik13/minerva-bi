@@ -181,16 +181,22 @@ def _request(shop: Shop, method: str, path: str, data: dict | None = None, idemp
 
 
 def check_key(shop: Shop) -> str:
-    """Для адмінки: перевірити ключ (назва акаунта Stripe і режим)."""
-    try:
-        acc = _request(shop, "GET", "/v1/account")
-        name = ((acc.get("settings") or {}).get("dashboard") or {}).get("display_name") \
-            or (acc.get("business_profile") or {}).get("name") or acc.get("id", "")
-    except PaymentError as e:
-        if "permission" not in e.message.lower():  # обмежений ключ без права читати акаунт — перевіримо Checkout
-            raise
+    """Для адмінки: перевірити ключ (назва акаунта Stripe і режим). Обмежений ключ (rk_…) права читати акаунт не
+    потребує — його перевіряємо одразу списком сесій Checkout (інакше в журналі Stripe — 403
+    «more_permissions_required» на /v1/account)."""
+    if (shop.stripe_secret_key or "").strip().startswith("rk_"):
         _request(shop, "GET", "/v1/checkout/sessions", {"limit": 1})
         name = "обмежений ключ"
+    else:
+        try:
+            acc = _request(shop, "GET", "/v1/account")
+            name = ((acc.get("settings") or {}).get("dashboard") or {}).get("display_name") \
+                or (acc.get("business_profile") or {}).get("name") or acc.get("id", "")
+        except PaymentError as e:
+            if "permission" not in e.message.lower():  # ключ без права читати акаунт — перевіримо Checkout
+                raise
+            _request(shop, "GET", "/v1/checkout/sessions", {"limit": 1})
+            name = "обмежений ключ"
     mode = {"test": "тестовий режим", "live": "бойовий режим"}.get(key_mode(shop.stripe_secret_key), "?")
     return f"✅ Stripe: {name} · {mode}"
 
