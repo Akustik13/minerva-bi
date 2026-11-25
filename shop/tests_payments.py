@@ -171,6 +171,23 @@ class CheckoutTests(StripeTestCase):
         Shop.objects.update(stripe_secret_key="")
         self.assertEqual(self.checkout().json()["code"], "stripe_disabled")
 
+    def test_admin_list_shows_customer(self):
+        """«💳 Онлайн-оплати»: колонка «Клієнт» — компанія й email покупця, клієнт CRM — посиланням на картку."""
+        from config.models import SystemSettings
+        from crm.models import Customer
+        SystemSettings.objects.update_or_create(pk=1, defaults={"is_onboarding_complete": True})
+        o = self.order()
+        self.checkout()
+        crm = Customer.objects.filter(email="einkauf@firma.de").first() or Customer.objects.create(
+            name="Firma", company="Firma", email="einkauf@firma.de")
+        self.client.force_login(User.objects.create_superuser("boss", "b@x.y", "p"))
+        page = self.client.get("/admin/shop/shoppayment/")
+        self.assertContains(page, "einkauf@firma.de")
+        self.assertContains(page, f"/admin/crm/customer/{crm.pk}/change/")
+        self.assertContains(self.client.get("/admin/shop/shoppayment/", {"q": "Firma"}), o.order_number)
+        card = self.client.get(f"/admin/shop/shoppayment/{ShopPayment.objects.get().pk}/change/")
+        self.assertContains(card, "einkauf@firma.de")
+
     def test_vat_unknown(self):
         o = self.order()
         o.shop_info.vat_rate = None

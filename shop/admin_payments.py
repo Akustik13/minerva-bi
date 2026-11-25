@@ -230,16 +230,37 @@ def shop_orders_overview(request) -> dict | None:
             "orders_url": f"{base}?from_shop=1", "open_url": f"{base}?from_shop=1&pay=open"}
 
 
+def _attach_customers(payments_, user):
+    """payment._crm — клієнт CRM замовлення (ключ CRM, потім email; два запити на всю сторінку), _crm_open — чи
+    відкриє людина його картку."""
+    from crm.models import Customer
+    orders = [p.order for p in payments_]
+    keys = {o.customer_key for o in orders if o.customer_key}
+    emails = {o.email.lower() for o in orders if o.email}
+    by_key = {c.external_key: c for c in Customer.objects.filter(external_key__in=keys)} if keys else {}
+    by_email = {}
+    if emails:
+        for c in Customer.objects.filter(email__in=list(emails)).order_by("pk"):
+            by_email.setdefault((c.email or "").lower(), c)
+    can_open = bool(user is not None and user.has_perm("crm.view_customer"))
+    for p in payments_:
+        o = p.order
+        p._crm = by_key.get(o.customer_key) or by_email.get((o.email or "").lower())
+        p._crm_open = can_open
+
+
 @admin.register(ShopPayment)
 class ShopPaymentAdmin(admin.ModelAdmin):
-    list_display = ["created_at", "order_link", "shop", "amount_col", "status_col", "livemode", "paid_at", "stripe_link"]
+    list_display = ["created_at", "order_link", "customer_col", "shop", "amount_col", "status_col", "livemode", "paid_at",
+                    "stripe_link"]
     list_filter = ["status", "shop", "livemode"]
-    search_fields = ["order__order_number", "session_id", "payment_intent", "order__email", "order__client"]
+    search_fields = ["order__order_number", "session_id", "payment_intent", "order__email", "order__client",
+                     "order__contact_name"]
     list_select_related = ["order", "shop"]
     actions = ["action_sync"]
-    readonly_fields = ["order_link", "shop", "provider", "session_id", "payment_intent", "url", "amount", "currency",
-                       "status", "livemode", "last_event", "expires_at", "paid_at", "created_at", "updated_at",
-                       "stripe_link"]
+    readonly_fields = ["order_link", "customer_col", "shop", "provider", "session_id", "payment_intent", "url", "amount",
+                       "currency", "status", "livemode", "last_event", "expires_at", "paid_at", "created_at",
+                       "updated_at", "stripe_link"]
     fields = readonly_fields
 
     def has_add_permission(self, request):
@@ -252,6 +273,30 @@ class ShopPaymentAdmin(admin.ModelAdmin):
     def order_link(self, obj):
         return format_html('<a href="{}">{}</a>', reverse("admin:sales_salesorder_change", args=[obj.order_id]),
                            obj.order.order_number)
+
+    def get_changelist_instance(self, request):
+        """Клієнти CRM рядків — одним запитом на сторінку (як `SalesOrder.crm_customer`: ключ CRM, потім email)."""
+        cl = super().get_changelist_instance(request)
+        _attach_customers(cl.result_list, request.user)
+        return cl
+
+    def get_object(self, request, object_id, from_field=None):
+        obj = super().get_object(request, object_id, from_field)
+        if obj is not None:
+            _attach_customers([obj], request.user)
+        return obj
+
+    @admin.display(description="Клієнт", ordering="order__client")
+    def customer_col(self, obj):
+        o = obj.order
+        who = o.client or o.contact_name or o.email or "—"
+        sub = [x for x in (o.contact_name if o.client and o.contact_name != o.client else "", o.email) if x]
+        customer, can_open = getattr(obj, "_crm", None), getattr(obj, "_crm_open", False)
+        head = (format_html('<a href="{}" translate="no">{}</a>', reverse("admin:crm_customer_change", args=[customer.pk]),
+                            who) if customer is not None and can_open else format_html('<span translate="no">{}</span>', who))
+        if not sub:
+            return head
+        return format_html('{}<div style="font-size:12px;opacity:.75" translate="no">{}</div>', head, " · ".join(sub))
 
     @admin.display(description="Сума", ordering="amount")
     def amount_col(self, obj):
