@@ -668,3 +668,83 @@ class FilePreviewTests(TalkBase):
         self.other.profile.save()
         self.client.force_login(self.other)
         self.assertNotEqual(self.client.get(url).status_code, 200)
+
+
+class PinnedPlaceTests(TalkBase):
+    """📌 Закріплене місце: 1, 2, 3… поспіль, вставка зсуває інших, «відкріпити» стискає; «Зняти все» місця не чіпає."""
+
+    def test_set_rank(self):
+        from suppliers.services import rfq_marks
+        rfq_marks.set_rank(self.req, self.r.pk, 1, self.user)
+        out = rfq_marks.set_rank(self.req, self.r2.pk, 1, self.user)              # r2 — перше, r — друге
+        self.assertEqual((out[self.r2.pk]["rank"], out[self.r.pk]["rank"]), (1, 2))
+        rfq_marks.set_rank(self.req, self.r3.pk, 9, self.user)                     # місце 9 → у кінець закріплених: 3
+        for x in (self.r, self.r2, self.r3):
+            x.refresh_from_db()
+        self.assertEqual([x.label.get("rank") for x in (self.r2, self.r, self.r3)], [1, 2, 3])
+        out = rfq_marks.set_rank(self.req, self.r2.pk, 0, self.user)               # відкріпити — решта стискаються
+        self.assertEqual((out[self.r2.pk]["rank"], out[self.r.pk]["rank"], out[self.r3.pk]["rank"]), (0, 1, 2))
+        rfq_marks.apply(self.req, [self.r.pk], self.user, {"color": "red"})
+        rfq_marks.apply(self.req, [self.r.pk], self.user, {"clear": True})
+        self.r.refresh_from_db()
+        self.assertEqual((self.r.label.get("rank"), self.r.label.get("color")), (1, None))
+        self.r2.refresh_from_db()
+        self.assertEqual(self.r2.label.get("rank"), None)
+        self.assertEqual(rfq_marks.set_rank(self.req, 999999, 1, self.user), {})
+
+    def test_action_and_page(self):
+        j = self.client.post(self.act, {"do": "mark", "rids": str(self.r3.pk), "rank": "1"}).json()
+        self.assertEqual(j["labels"][str(self.r3.pk)]["rank"], 1)
+        page = self.client.get(reverse("admin:suppliers_supplierrequest_work", args=[self.req.pk])).content.decode()
+        self.assertIn('data-rank="1"', page)
+        self.assertIn("📌 1</div>", page)
+
+
+class CompareViewTests(TalkBase):
+    """💶 Таблиця: одна кількість (ціна за шт., сума, «враховано в сумі», строк, умови, діє до) і «⇔ Усі кількості»."""
+
+    def test_cells_and_page(self):
+        cmp = rfq_compare.table(self.req)
+        row = next(x for x in cmp["rows"] if x["recipient"].pk == self.r.pk)
+        c5 = row["cells"][0]
+        self.assertEqual([f["state"] for f in c5["flags"]], ["n", "y", "n", "y", "u"])   # лише монтаж; stencil; доставки немає
+        self.assertIn("Stencil", c5["detail"])
+        self.assertTrue(c5["unit_best"] and c5["bar"] == 65)                                 # 130 проти 200 за шт.
+        R.objects.filter(pk=self.r2.pk).update(lead_days=12)
+        R.objects.filter(pk=self.r.pk).update(lead_days=20)
+        fast = {x["recipient"].pk: x["cells"][0].get("fast") for x in rfq_compare.table(self.req)["rows"]}
+        self.assertTrue(fast[self.r2.pk])                                                   # 12 дн. — найшвидше
+        self.assertFalse(fast[self.r.pk])
+        self.assertEqual(rfq_compare.valid_state(datetime.date(2026, 1, 1), datetime.date(2026, 1, 2)), "expired")
+        self.assertEqual(rfq_compare.valid_state(datetime.date(2026, 1, 3), datetime.date(2026, 1, 2)), "soon")
+        self.assertEqual(rfq_compare.valid_state(datetime.date(2026, 1, 9), datetime.date(2026, 1, 2)), "")
+        page = self.client.get(reverse("admin:suppliers_supplierrequest_work", args=[self.req.pk])).content.decode()
+        self.assertIn('data-rw-qi="all"', page)                                              # ⇔ Усі кількості
+        self.assertIn('data-rw-qi="2"', page)
+        self.assertIn('class="rw-chip n" title="У ціні немає', page)
+        self.assertIn('class="rw-note"', page)                                                # коментар під рядком
+        self.assertIn('data-rw-sort="total"', page)
+        self.assertIn("rw-qv rw-qi2", page)
+
+
+class CompareSelectedTests(TalkBase):
+    """⚖ Порівняння вибраних: складові × кількість, разові, доставка, разом — у валюті Minerva й постачальника."""
+
+    def test_breakdown(self):
+        R.objects.filter(pk=self.r.pk).update(
+            shipping=Decimal("35"), includes=["pcb", "assembly", "components"],
+            tiers=[{"qty": 5, "unit_price": "130", "parts": {"pcb": "22.528", "assembly": "40.746", "components": "67.326"}},
+                   {"qty": 2500, "unit_price": "10"}])
+        rows = rfq_compare.breakdown(rfq_compare.table(self.req))
+        jy = next(x for x in rows if x["rid"] == self.r.pk)
+        c5 = jy["cells"][0]
+        self.assertEqual(c5["parts"]["pcb"]["t"], "112,64 EUR")                  # 22,528 × 5
+        self.assertEqual(c5["parts"]["components"]["v"], 336.63)
+        self.assertEqual(c5["one_time"][0]["name"], "Stencil")
+        self.assertEqual((c5["ship"]["v"], c5["total"]["v"], c5["total_ship"]["v"]), (35.0, 680.0, 715.0))
+        self.assertEqual(jy["cells"][1]["parts"]["pcb"], {"state": "y"})        # без розбивки — лише «у ціні»
+        self.assertNotIn(self.r3.pk, [x["rid"] for x in rows])                   # без цін — немає
+        page = self.client.get(reverse("admin:suppliers_supplierrequest_work", args=[self.req.pk])).content.decode()
+        self.assertIn('id="rw-cmp-btn"', page)
+        self.assertIn('id="rw-cmpd"', page)
+        self.assertIn('"rid": %d' % self.r.pk, page)

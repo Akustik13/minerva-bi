@@ -75,7 +75,6 @@
   .rw-cmp tr > td.rw-cell-best { background: rgba(76, 175, 80, .18); }
   .rw-cmp tr > td.rw-cell-part { background: rgba(224, 168, 0, .10); }
   .rw-gapc { font-size: 11px; color: var(--message-warning-fg, #b26a00); font-weight: 600; }
-  .rw-cmp tr.rw-row > td:first-child { min-width: 230px; max-width: 320px; }
   .rw-cell-none { text-align: center; }
   .rw-over { font-size: 11px; font-weight: normal; color: var(--text-muted, #888); }
   .rw-medal { font-size: 13px; }
@@ -101,6 +100,60 @@
   .rw-cmp tr.rw-sub > td, .rw-cmp tr.rw-q > td { border-bottom: 0; border-left: 0; }
   .rw-cmp tr.rw-even > td { background: rgba(127, 127, 127, .05); }
   .rw-cmp tr.rw-row:hover > td { background: rgba(127, 127, 127, .10); }
+  table.rw-cmp > tbody.rw-grp:nth-of-type(even) > tr > td { background: rgba(127, 127, 127, .05); }
+  /* 💶 вигляд: одна кількість (data-mode one, data-qi — яка) або «⇔ Усі кількості» (all) */
+  table.rw-cmp[data-mode="one"] .rw-ma, table.rw-cmp[data-mode="all"] .rw-m1 { display: none; }
+  {% for q in qtys %}table.rw-cmp[data-qi="{{ forloop.counter }}"] .rw-qv:not(.rw-qi{{ forloop.counter }}) { display: none; }
+  {% endfor %}.rw-viewbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 10px 0 8px; }
+  .rw-seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--border-strong, #ccc); border-radius: 8px; overflow: hidden; }
+  .rw-seg button { font: inherit; border: 0; background: transparent; color: var(--body-fg); padding: 6px 14px; cursor: pointer;
+    font-variant-numeric: tabular-nums; }
+  .rw-seg button + button { border-left: 1px solid var(--border-strong, #ccc); }
+  .rw-seg button[aria-pressed="true"] { background: var(--primary, #417690); color: var(--primary-fg, #fff); }
+  .rw-seg button:focus-visible { outline: 2px solid var(--primary, #5b8def); outline-offset: -2px; }
+  .rw-leg1 { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; }
+  .rw-leg1[hidden] { display: none; }
+  .rw-notes-btn { margin-left: auto; }
+  .rw-chips { display: flex; flex-wrap: wrap; gap: 3px; min-width: 200px; }
+  .rw-chip { display: inline-flex; gap: 3px; align-items: center; padding: 0 6px; border-radius: 5px; font-size: 11.5px;
+    font-weight: 500; white-space: nowrap; border: 1px solid transparent; line-height: 1.7; }
+  .rw-chip.y { background: rgba(76, 175, 80, .16); color: var(--success-fg, #2e7d32); }
+  .rw-chip.n { background: rgba(229, 57, 53, .10); color: var(--error-fg, #c62828); border-color: currentColor; }
+  .rw-chip.u { background: rgba(245, 165, 36, .12); color: var(--warning-fg, #b06d00); border: 1px dashed currentColor; }
+  .rw-pill { display: inline-block; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap;
+    margin-top: 3px; }
+  .rw-pill.best { background: rgba(76, 175, 80, .18); color: var(--success-fg, #2e7d32); }
+  .rw-pill.warn { background: rgba(245, 165, 36, .18); color: var(--warning-fg, #b06d00); }
+  .rw-pill.bad { background: rgba(229, 57, 53, .15); color: var(--error-fg, #c62828); }
+  .rw-big { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rw-barl { height: 4px; border-radius: 2px; background: var(--primary, #5b8def); margin: 4px 0 2px auto; }
+  .rw-cmp .rw-r { text-align: right; }
+  .rw-th-sub { font-weight: normal; font-size: 10px; text-transform: none; color: var(--text-muted, #888); }
+  .rw-detail { font-size: 11.5px; margin-top: 3px; }
+  .rw-clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px;
+    min-width: 150px; max-width: 280px; }
+  .rw-nowrap { white-space: nowrap; }
+  .rw-cmp td.rw-supc { min-width: 200px; max-width: 320px; }
+  .rw-state { font-size: 11.5px; margin-top: 2px; }
+  .rw-act { white-space: nowrap; }
+  .rw-cmp th[data-rw-sort], .rw-sorter { cursor: pointer; }
+  .rw-cmp th[data-rw-sort]:hover { color: var(--primary, #5b8def); }
+  .rw-cmp th[data-sorted="asc"]::after { content: " ▲"; font-size: 9px; }
+  .rw-cmp th[data-sorted="desc"]::after { content: " ▼"; font-size: 9px; }
+  /* 💬 коментар під рядком — один рядок, клік розгортає */
+  .rw-note { display: flex; gap: 6px; align-items: baseline; cursor: pointer; font-size: 12px; color: var(--text-muted, #888);
+    border-radius: 6px; padding: 2px 4px; }
+  .rw-note:hover { background: rgba(127, 127, 127, .08); }
+  .rw-note:focus-visible { outline: 2px solid var(--primary, #5b8def); }
+  .rw-note-tg { display: inline-block; transition: transform .15s; }
+  .rw-note.open .rw-note-tg { transform: rotate(90deg); }
+  .rw-note-body { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rw-note.open .rw-note-body { white-space: normal; overflow: visible; color: var(--body-fg); }
+  .rw-gap-i { color: var(--warning-fg, #b06d00); }
+  .rw-rank { display: inline-block; margin-top: 3px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 700;
+    background: rgba(91, 141, 239, .18); color: var(--body-fg); white-space: nowrap; }
+  .rw-rank[hidden] { display: none; }
+  table.rw-cmp > tbody.rw-grp[data-rank]:not([data-rank=""]) > tr.rw-row > td { box-shadow: inset 0 2px 0 rgba(91, 141, 239, .35); }
 </style>
 {% url 'admin:suppliers_supplierrequest_action' req.pk as act %}
 <div class="spp">
@@ -157,35 +210,77 @@
     {% endif %}
     {% if letters_pending and can_change %}<div class="spf-warn rw-saved-line">📝 Збережені листи «Написати кожному» — не надіслано: <b>{{ letters_pending }}</b> <button type="button" class="button" id="rw-saved-open" title="Відкрити складені раніше листи — надіслати без нового складання AI">📝 Відкрити й дослати</button></div>{% endif %}
     {% include "admin/suppliers/_request_stats.html" %}
+    {% if qtys %}<div class="rw-viewbar">
+      <div class="rw-seg" role="group" aria-label="Кількість">{% for q in qtys %}<button type="button" data-rw-qi="{{ forloop.counter }}" aria-pressed="{% if forloop.first %}true{% else %}false{% endif %}" title="Пропозиції на {{ q }} шт: ціна за шт., сума, що в неї входить, строк, умови">{{ q }} шт.</button>{% endfor %}{% if qtys|length > 1 %}<button type="button" data-rw-qi="all" aria-pressed="false" title="Ціни на всі кількості поруч, колонками — наочно порівняти 5 … 20000 шт">⇔ Усі кількості</button>{% endif %}</div>
+      <div class="rw-leg1 rw-m1"><span class="spf-muted">Позначки — що вже є в сумі постачальника:</span> <span class="rw-chip y">✓ враховано</span> <span class="rw-chip n">✗ не враховано, буде зверху</span> <span class="rw-chip u">? постачальник не уточнив</span></div>
+      <button type="button" class="button rw-notes-btn" id="rw-notes-all" title="Коментарі під рядками: що прочитав AI, питання постачальника, умови, чого бракує">▾ Розгорнути коментарі</button>
+    </div>{% endif %}
     <div class="rw-scroll">
-    <table class="spf-table rw-cmp">
-      <tr class="rw-head"><th class="rw-n" data-col="n">{% if can_change and rows %}<label title="Вибрати всіх — переслати колезі"><input type="checkbox" id="rw-all"> №</label>{% else %}№{% endif %}</th><th data-col="sup">Постачальник</th><th data-col="state">Стан</th>
-        {% for q in qtys %}<th class="rw-qh{% if forloop.first %} rw-qfirst{% endif %}" data-col="q{{ forloop.counter }}">{{ q }} шт<div class="spf-muted">{{ cmp.home }} / шт · разом</div></th>{% empty %}<th class="rw-qfirst" data-col="q1">Ціна</th>{% endfor %}
-        <th class="rw-qafter" data-col="once">Разово</th><th data-col="lead">Строк</th><th data-col="ship">Доставка</th><th data-col="act"></th></tr>
+    <table class="spf-table rw-cmp" id="rw-cmp" data-mode="{% if qtys %}one{% else %}all{% endif %}" data-qi="1">
+      <thead><tr class="rw-head"><th class="rw-n" data-col="n">{% if can_change and rows %}<label title="Вибрати всіх — переслати колезі"><input type="checkbox" id="rw-all"></label> {% endif %}<span class="rw-sorter" data-rw-sort="pos" title="Порядок як був (за ціною)">№</span></th>
+        <th data-col="sup" data-rw-sort="name">Постачальник</th>
+        {% if qtys %}<th class="rw-m1 rw-r" data-col="unit" data-rw-sort="unit" title="Ціна за 1 шт. без разових і без доставки — плата, монтаж, компоненти, як назвав постачальник">Ціна / шт.<div class="rw-th-sub">{{ cmp.home }}, без разових</div></th>
+        <th class="rw-m1 rw-r" data-col="total" data-rw-sort="total" title="Сума за кількість: ціна × кількість + разові витрати (оснастка, NRE), без доставки">Сума<div class="rw-th-sub">{{ cmp.home }}, з разовими</div></th>
+        <th class="rw-m1" data-col="incl">Враховано в сумі</th>
+        <th class="rw-m1 rw-r" data-col="lead1" data-rw-sort="lead">Строк, дн.</th>
+        <th class="rw-m1" data-col="terms">Умови</th>
+        <th class="rw-m1" data-col="valid" data-rw-sort="valid">Діє до</th>{% endif %}
+        {% for q in qtys %}<th class="rw-ma rw-qh{% if forloop.first %} rw-qfirst{% endif %}" data-col="q{{ forloop.counter }}" data-rw-sort="q{{ forloop.counter }}">{{ q }} шт<div class="spf-muted">{{ cmp.home }} / шт · разом</div></th>{% empty %}<th class="rw-ma rw-qfirst" data-col="q1">Ціна</th>{% endfor %}
+        <th class="rw-ma rw-qafter" data-col="once">Разово</th><th class="rw-ma" data-col="lead" data-rw-sort="leadall">Строк</th><th class="rw-ma" data-col="ship">Доставка</th><th data-col="act"></th></tr></thead>
       {% for row in rows %}{% with r=row.recipient %}
-      <tr class="rw-row{% cycle '' ' rw-even' as zebra silent %}{{ zebra }}{% if r.chosen %} rw-chosen{% endif %}{% if row.priced and row.gaps %} rw-partial{% endif %}{% if not row.priced %} rw-noprice{% endif %}" data-rw-row="{{ r.pk }}" title="Клік — усе про цю пропозицію праворуч: ціни, вкладення, листи">
-        <td class="rw-n{% if row.label.color %} rw-lab{% endif %}"{% if row.label.color %} style="--rwl:{{ row.label.hex }}"{% endif %} data-color="{{ row.label.color }}" data-stickers="{% for s in row.label.stickers %}{{ s.key }}{% if not forloop.last %},{% endif %}{% endfor %}" data-text="{{ row.label.text }}"{% if row.label.by %} title="🏷 {% if row.label.color_name %}{{ row.label.color_name }} · {% endif %}{% for s in row.label.stickers %}{{ s.name }} · {% endfor %}{{ row.label.by }} · {{ row.label.at }}{% endif %}">{% if can_change %}<label title="Вибрати — «↪ Переслати колезі»"><input type="checkbox" class="rw-pick" value="{{ r.pk }}"> {{ forloop.counter }}</label>{% else %}{{ forloop.counter }}{% endif %}
+      <tbody class="rw-grp" data-pos="{{ forloop.counter }}" data-rank="{{ row.label.rank|default:'' }}" data-name="{{ r.supplier.name|lower }}" data-valid="{{ row.sort_valid }}" data-lead="{{ row.sort_lead }}"{% for c in row.cells %} data-u{{ forloop.counter }}="{{ c.sort_unit }}" data-t{{ forloop.counter }}="{{ c.sort_total }}" data-l{{ forloop.counter }}="{{ c.sort_lead }}"{% endfor %}>
+      <tr class="rw-row{% if r.chosen %} rw-chosen{% endif %}{% if row.priced and row.gaps %} rw-partial{% endif %}{% if not row.priced %} rw-noprice{% endif %}" data-rw-row="{{ r.pk }}" title="Клік — усе про цю пропозицію праворуч: ціни, вкладення, листи">
+        <td class="rw-n{% if row.label.color %} rw-lab{% endif %}"{% if row.label.color %} style="--rwl:{{ row.label.hex }}"{% endif %} data-color="{{ row.label.color }}" data-stickers="{% for s in row.label.stickers %}{{ s.key }}{% if not forloop.last %},{% endif %}{% endfor %}" data-text="{{ row.label.text }}" data-rank="{{ row.label.rank|default:'' }}"{% if row.label.by %} title="🏷 {% if row.label.rank %}📌 {{ row.label.rank }} місце · {% endif %}{% if row.label.color_name %}{{ row.label.color_name }} · {% endif %}{% for s in row.label.stickers %}{{ s.name }} · {% endfor %}{{ row.label.by }} · {{ row.label.at }}{% endif %}">{% if can_change %}<label title="Вибрати — «↪ Переслати колезі»"><input type="checkbox" class="rw-pick" value="{{ r.pk }}"> {{ forloop.counter }}</label>{% else %}{{ forloop.counter }}{% endif %}
+          {% if row.label.rank %}<div class="rw-rank" title="📌 Закріплено на {{ row.label.rank }} місці — завжди вгорі таблиці; правий клік — змінити">📌 {{ row.label.rank }}</div>{% else %}<div class="rw-rank" hidden></div>{% endif %}
           <div class="rw-labs">{% for s in row.label.stickers %}<span title="{{ s.name }}">{{ s.icon }}</span>{% endfor %}{% if row.label.text %}<span class="rw-lab-t" translate="no">{{ row.label.text }}</span>{% endif %}</div></td>
-        <td><a href="{% url 'admin:inventory_supplier_change' r.supplier.pk %}" translate="no"><b>{{ r.supplier.name }}</b></a>{% if r.chosen %} 🏆{% endif %}
+        <td class="rw-supc"><a href="{% url 'admin:inventory_supplier_change' r.supplier.pk %}" translate="no"><b>{{ r.supplier.name }}</b></a>{% if r.chosen %} 🏆{% endif %}
           {% if r.award %}<div class="spf-muted">✅ <span translate="no">{{ r.award }}</span></div>{% endif %}
           {% if r.reject_reason %}<div class="spf-muted">✖ не взяли{% if r.reject_reason != "—" %}: <span translate="no">{{ r.reject_reason }}</span>{% endif %}</div>{% endif %}
           <div class="spf-muted" translate="no">{% if r.contact %}{{ r.contact.name }} · {% endif %}{{ r.email }}</div>
-          {% if row.priced %}<div class="rw-scope">{% if row.includes_text %}У ціні: {{ row.includes_text }}{% endif %}</div>{% endif %}
-          {% if row.gaps %}<div class="rw-gap">⚠️ <b>неповна:</b> {{ row.gaps|join:"; " }}</div>{% endif %}
-          {% if row.notes %}<div class="spf-muted rw-notes">не вказано / приблизно: {{ row.notes|join:", " }}</div>{% endif %}</td>
-        <td>{{ r.get_state_display }}
-          <div class="spf-muted">{% if r.sent_at %}↑ {{ r.sent_at|date:"d.m H:i" }}{% if row.sent_link %} <a href="/email/?msg={{ row.sent_link }}" target="_blank">✉️</a>{% endif %}{% endif %}
+          <div class="spf-muted rw-state">{{ r.get_state_display }}{% if r.sent_at %} · ↑ {{ r.sent_at|date:"d.m H:i" }}{% if row.sent_link %} <a href="/email/?msg={{ row.sent_link }}" target="_blank">✉️</a>{% endif %}{% endif %}
             {% if r.replied_at %}<br>↓ {{ r.replied_at|date:"d.m H:i" }}{% if row.timing.after_text %} <span class="rw-after" title="Від надсилання запиту до першої відповіді">· за {{ row.timing.after_text }}</span>{% endif %}{% if row.reply_link %} <span class="rw-peek-w"><a href="/email/?msg={{ row.reply_link }}" target="_blank" data-rw-reply="{{ r.pk }}" data-msg="{{ row.reply_link }}">✉️ відповідь</a>{% if row.peek %}<span class="rw-peek"><b translate="no">{{ row.peek.from }}</b> <span class="spf-muted" translate="no">&lt;{{ row.peek.email }}&gt; · {{ row.peek.at|date:"d.m.Y H:i" }}</span>
               {% if row.peek.subject %}<div translate="no">{{ row.peek.subject }}</div>{% endif %}<div class="rw-peek-t" translate="no">{{ row.peek.text|default:"(без тексту)" }}</div>
               {% if row.peek.files %}<div class="spf-muted" translate="no">📎 {{ row.peek.files|join:" · " }}</div>{% endif %}
               <div class="spf-muted">Клік — увесь лист праворуч · Ctrl + клік — у пошті</div></span>{% endif %}</span>{% endif %}{% endif %}
             {% if row.timing.newer %}<br><span title="Найновіший лист постачальника">↓ останній {{ row.timing.last_in|date:"d.m H:i" }}</span>{% endif %}
-            {% if row.files_n %}<br><span class="rw-files" title="Вкладення з листів постачальника — у запиті">📎 {{ row.files_n }}</span>{% endif %}
-            {% if r.reminded_at %}<br>⏰ {{ r.reminded_at|date:"d.m" }}{% endif %}</div>
+            {% if row.files_n %} · <span class="rw-files" title="Вкладення з листів постачальника — у запиті">📎 {{ row.files_n }}</span>{% endif %}
+            {% if r.reminded_at %} · ⏰ {{ r.reminded_at|date:"d.m" }}{% endif %}</div>
+          {% if row.priced and row.gaps %}<span class="rw-pill warn" title="{{ row.gaps|join:'; ' }}">⚠️ неповна</span>{% endif %}
           {% if r.error %}<div class="spf-bad">{{ r.error|truncatechars:160 }}</div>{% endif %}</td>
+        {% if qtys %}{% if row.priced %}
+        <td class="rw-m1 rw-r rw-unit">{% for c in row.cells %}<div class="rw-qv rw-qi{{ forloop.counter }}">{% if c.missing %}<span class="spf-warn" title="Постачальник не назвав ціну на {{ c.qty }} шт">— немає ціни</span>{% else %}
+            <div class="rw-big">{% if c.unit_home_text %}{{ c.unit_home_text }}{% else %}{{ c.unit_text }} <span class="spf-muted">{{ r.currency }}</span>{% endif %}</div>
+            {% if c.bar %}<div class="rw-barl" style="width:{{ c.bar }}%"></div>{% endif %}
+            {% if c.unit_best %}<span class="rw-pill best" title="Найнижча ціна за шт. для {{ c.qty }} шт серед повних пропозицій">найнижча</span>{% endif %}
+            {% if c.unit_home_text and r.currency and r.currency|upper != cmp.home %}<div class="spf-muted rw-src" translate="no" title="Як у постачальника">{{ c.unit_text }} {{ r.currency }}</div>{% endif %}
+            {% if not c.exact %}<div class="spf-muted rw-src">≈ ціна на {{ c.tier_qty }} шт</div>{% endif %}
+            {% if c.parts_text %}<div class="spf-muted rw-src" translate="no" title="Складові ціни за шт., як назвав постачальник (🟩 плата · 🔧 монтаж · 🔩 компоненти)">{{ c.parts_text }}</div>{% endif %}
+            {% if c.suspect %}<div class="rw-gapc" title="Ціна дуже далеко від медіани інших — часто це не та сама річ (лише плати замість PCBA). Перевірте лист і що входить; 🧠 — перечитати відповідь">⚠️ {{ c.suspect }}</div>{% endif %}
+          {% endif %}</div>{% endfor %}</td>
+        <td class="rw-m1 rw-r rw-total">{% for c in row.cells %}<div class="rw-qv rw-qi{{ forloop.counter }}">{% if c.missing %}—{% else %}
+            <div class="rw-big">{% if c.total_home_text %}{{ c.total_home_text }}{% else %}{{ c.total_text }} <span class="spf-muted">{{ r.currency }}</span>{% endif %}</div>
+            {% if c.best %}<span class="rw-pill best" title="Найдешевше для {{ c.qty }} шт серед повних пропозицій">🥇 найнижча</span>{% elif c.over_text %}<span class="rw-over" title="Дорожче за найдешевше для {{ c.qty }} шт">{{ c.over_text }}</span>{% endif %}
+            {% if c.sup_total_text %}<div class="rw-sup{% if c.sum_mismatch %} bad{% else %} spf-muted{% endif %}" title="{% if c.sum_mismatch %}Наше «разом» (ціна за шт. × кількість + разові) не сходиться з сумою, яку написав постачальник — перевірте лист і ✏️ виправте{% else %}Сума постачальника сходиться з нашим «разом»{% endif %}{% if c.fixed %} · ціну за шт. Minerva перерахувала з цієї суми{% endif %}">у постачальника {{ c.sup_total_text }} {{ r.currency }}{% if c.sum_mismatch %} ⚠️ не сходиться{% else %} ✓{% endif %}</div>{% endif %}
+          {% endif %}</div>{% endfor %}</td>
+        <td class="rw-m1 rw-incl1">{% for c in row.cells %}<div class="rw-qv rw-qi{{ forloop.counter }}">{% if not c.missing %}
+            <div class="rw-chips">{% for f in c.flags %}<span class="rw-chip {{ f.state }}" title="{{ f.title }}">{% if f.state == "y" %}✓{% elif f.state == "n" %}✗{% else %}?{% endif %} {{ f.label }}</span>{% endfor %}</div>
+            {% if c.detail %}<div class="spf-muted rw-detail" translate="no">{{ c.detail }}</div>{% endif %}
+            {% if c.lacks %}<div class="rw-gapc" title="Для цієї кількості в ціні немає того, що просили — у 🥇 і статистиці не бере участі">⚠️ немає: {{ c.lacks|join:", " }} — у 🥇 не бере участі</div>{% elif c.unknown %}<div class="rw-gapc" title="Не сказано, що входить у цю ціну — у 🥇 не бере участі">⚠️ не сказано, що в ціні</div>{% endif %}
+          {% endif %}</div>{% endfor %}</td>
+        {% else %}
+        <td colspan="3" class="rw-m1 spf-muted rw-noprice-cell">
+            {% if r.state == "declined" %}🙅 відмовився
+            {% elif row.unparsed %}📥 відповів — ціни ще не розібрано{% if can_change %}: 🧠 у рядку{% if reparse %} або «🧠 Розібрати відповіді» вгорі{% endif %}{% endif %}
+            {% elif row.no_price_read %}💬 цін у відповіді немає{% if r.ai.questions %} — питають{% endif %}
+            {% elif r.state == "sent" or r.state == "silent" %}⏳ чекаємо відповідь{% else %}—{% endif %}</td>
+        {% endif %}
+        <td class="rw-m1 rw-r">{% if row.priced %}{% for c in row.cells %}<div class="rw-qv rw-qi{{ forloop.counter }}">{% if c.missing or c.lead is None %}<span class="spf-muted">—</span>{% else %}<span class="rw-big">{{ c.lead }}</span>{% if c.fast %}<br><span class="rw-pill best">найшвидше</span>{% endif %}{% endif %}</div>{% endfor %}{% else %}—{% endif %}</td>
+        <td class="rw-m1 rw-terms">{% if row.terms %}<div class="rw-clamp" translate="no" title="{{ row.terms }}">{{ row.terms }}</div>{% else %}<span class="spf-muted">—</span>{% endif %}</td>
+        <td class="rw-m1">{% if r.valid_until %}<span class="rw-nowrap">{{ r.valid_until|date:"d.m.Y" }}</span>{% if row.valid_state == "expired" %}<br><span class="rw-pill bad">минув</span>{% elif row.valid_state == "today" %}<br><span class="rw-pill warn">сьогодні</span>{% elif row.valid_state == "soon" %}<br><span class="rw-pill warn">до 2 днів</span>{% endif %}{% elif row.priced %}<span class="spf-muted">не вказано</span>{% else %}—{% endif %}</td>
+        {% endif %}
         {% if row.priced %}
           {% for c in row.cells %}
-          <td class="rw-cell{% if forloop.first %} rw-qfirst{% endif %}{% if c.best %} rw-cell-best{% endif %}{% if c.missing %} rw-cell-none{% endif %}{% if c.lacks or c.unknown %} rw-cell-part{% endif %}">
+          <td class="rw-ma rw-cell{% if forloop.first %} rw-qfirst{% endif %}{% if c.best %} rw-cell-best{% endif %}{% if c.missing %} rw-cell-none{% endif %}{% if c.lacks or c.unknown %} rw-cell-part{% endif %}">
             {% if c.missing %}<span class="spf-warn" title="Постачальник не назвав ціну на {{ c.qty }} шт">— немає ціни</span>
             {% else %}
               <div class="rw-eff">{% if c.eff_home_text %}{{ c.eff_home_text }} {{ row.home }}{% else %}{{ c.eff_text }} {{ r.currency }}{% endif %}{% if c.best %} <span class="rw-medal" title="Найдешевше для {{ c.qty }} шт серед повних пропозицій">🥇</span>{% elif c.over_text %} <span class="rw-over" title="Дорожче за найдешевше для {{ c.qty }} шт">{{ c.over_text }}</span>{% endif %}</div>
@@ -196,18 +291,18 @@
               {% if c.lacks %}<div class="rw-gapc" title="Для цієї кількості в ціні немає того, що просили — у 🥇 і статистиці не бере участі">⚠️ немає: {{ c.lacks|join:", " }}{% if c.scope_text %} · лише {{ c.scope_text }}{% endif %}</div>{% elif c.unknown %}<div class="rw-gapc" title="Не сказано, що входить у цю ціну — у 🥇 не бере участі">⚠️ не сказано, що в ціні</div>{% elif c.scope_text %}<div class="spf-muted rw-src">у ціні: {{ c.scope_text }}</div>{% endif %}
               {% if c.sup_total_text %}<div class="rw-sup{% if c.sum_mismatch %} bad{% else %} spf-muted{% endif %}" title="{% if c.sum_mismatch %}Наше «разом» (ціна за шт. × кількість + разові) не сходиться з сумою, яку написав постачальник — перевірте лист і ✏️ виправте{% else %}Сума постачальника сходиться з нашим «разом»{% endif %}{% if c.fixed %} · ціну за шт. Minerva перерахувала з цієї суми{% endif %}">у постачальника {{ c.sup_total_text }} {{ r.currency }} {% if c.sup_total_ot %}з разовими{% else %}без разових{% endif %}{% if c.sum_mismatch %} ⚠️ не сходиться{% else %} ✓{% endif %}</div>{% endif %}
             {% endif %}</td>
-          {% empty %}<td class="rw-qfirst">—</td>{% endfor %}
+          {% empty %}<td class="rw-ma rw-qfirst">—</td>{% endfor %}
         {% else %}
-          <td colspan="{{ qtys|length|default:1 }}" class="spf-muted rw-noprice-cell rw-qfirst">
+          <td colspan="{{ qtys|length|default:1 }}" class="rw-ma spf-muted rw-noprice-cell rw-qfirst">
             {% if r.state == "declined" %}🙅 відмовився
             {% elif row.unparsed %}📥 відповів — ціни ще не розібрано{% if can_change %}: 🧠 у рядку{% if reparse %} або «🧠 Розібрати відповіді» вгорі{% endif %}{% endif %}
             {% elif row.no_price_read %}💬 цін у відповіді немає{% if r.ai.questions %} — питають{% endif %}
             {% elif r.state == "sent" or r.state == "silent" %}⏳ чекаємо відповідь{% else %}—{% endif %}</td>
         {% endif %}
-        <td class="rw-one rw-qafter">{% if row.one_time %}{% for it in row.one_time %}<div translate="no">{{ it.name }}: {{ it.amount }} {{ r.currency }}{% if it.qty %} <span class="spf-muted">(лише {{ it.qty }} шт)</span>{% endif %}</div>{% endfor %}{% elif row.priced %}<span class="spf-muted">не названо</span>{% else %}—{% endif %}</td>
-        <td>{% if r.lead_days is not None %}{{ r.lead_days }} дн.{% if row.fastest %}<span class="rw-best spf-ok">найшвидше</span>{% endif %}{% elif row.priced %}<span class="spf-muted">не вказано</span>{% else %}—{% endif %}</td>
-        <td>{% if row.shipping_text %}{{ row.shipping_text }} {{ r.currency }}{% elif row.priced %}<span class="spf-muted">не вказано</span>{% else %}—{% endif %}</td>
-        <td style="white-space:nowrap">{% if r.state != "planned" and r.state != "failed" %}<button type="button" class="button rw-chat-btn" data-rw-chat="{{ r.pk }}" data-name="{{ r.supplier.name }}" title="Листування лише з цим постачальником: діалог, коротко — про що питають, що обіцяли, що відповісти; відповідь у ту саму гілку">💬{% if row.timing.letters_n %} {{ row.timing.letters_n }}{% endif %}</button>{% endif %}{% if can_change %}
+        <td class="rw-ma rw-one rw-qafter">{% if row.one_time %}{% for it in row.one_time %}<div translate="no">{{ it.name }}: {{ it.amount }} {{ r.currency }}{% if it.qty %} <span class="spf-muted">(лише {{ it.qty }} шт)</span>{% endif %}</div>{% endfor %}{% elif row.priced %}<span class="spf-muted">не названо</span>{% else %}—{% endif %}</td>
+        <td class="rw-ma">{% if r.lead_days is not None %}{{ r.lead_days }} дн.{% if row.fastest %}<span class="rw-best spf-ok">найшвидше</span>{% endif %}{% elif row.priced %}<span class="spf-muted">не вказано</span>{% else %}—{% endif %}</td>
+        <td class="rw-ma">{% if row.shipping_text %}{{ row.shipping_text }} {{ r.currency }}{% elif row.priced %}<span class="spf-muted">не вказано</span>{% else %}—{% endif %}</td>
+        <td class="rw-act">{% if r.state != "planned" and r.state != "failed" %}<button type="button" class="button rw-chat-btn" data-rw-chat="{{ r.pk }}" data-name="{{ r.supplier.name }}" title="Листування лише з цим постачальником: діалог, коротко — про що питають, що обіцяли, що відповісти; відповідь у ту саму гілку">💬{% if row.timing.letters_n %} {{ row.timing.letters_n }}{% endif %}</button>{% endif %}{% if can_change %}
           {% if r.state == "planned" or r.state == "failed" %}
             <form method="post" action="{{ act }}" style="display:inline">{% csrf_token %}<input type="hidden" name="rid" value="{{ r.pk }}"><button type="submit" name="do" value="send_one" class="button rw-send-one" data-rid="{{ r.pk }}" title="Показати лист і надіслати лише йому">📤</button><button type="submit" name="do" value="remove" class="button" title="Прибрати з запиту">✕</button></form>
           {% else %}
@@ -219,8 +314,12 @@
           <span class="spf-job" id="rw-job-{{ r.pk }}"></span>
         {% endif %}</td>
       </tr>
-      {% if r.ai.summary or r.quote_note %}<tr class="rw-sub{{ zebra }}"><td colspan="2"></td><td colspan="{{ ncols|add:'-2' }}" class="spf-muted">{% if r.ai.summary %}🧠 {{ r.ai.summary }}{% if r.ai.questions %} · <b>питають:</b> {{ r.ai.questions|join:"; " }}{% endif %}{% if r.ai.moq %} · MOQ {{ r.ai.moq }}{% endif %} {% endif %}{% if r.quote_note %}📝 {{ r.quote_note|truncatechars:240 }}{% endif %}{% if r.valid_until %} · діє до {{ r.valid_until|date:"d.m.Y" }}{% endif %}{% if row.ai_info %} · <span class="rw-aiinfo" title="Яка модель розібрала відповідь, скільки коштувало, коли">🧠 <span translate="no">{{ row.ai_info.model }}</span> · {{ row.ai_info.usd }}{% if row.ai_info.at %} · {{ row.ai_info.at|date:"d.m H:i" }}{% endif %}</span>{% endif %}</td></tr>{% endif %}
-      {% if can_change %}<tr class="rw-q{{ zebra }}" id="rq-{{ r.pk }}"><td colspan="{{ ncols }}">
+      {% if r.ai.summary or r.quote_note or row.gaps or row.notes or row.ai_info %}<tr class="rw-sub"><td></td><td colspan="{{ ncols|add:'-1' }}" data-rw-span="rest">
+        <div class="rw-note" role="button" tabindex="0" aria-expanded="false" title="Клік — розгорнути / згорнути коментар">
+          <span class="rw-note-tg" aria-hidden="true">▸</span>
+          <div class="rw-note-body">{% if row.priced and row.gaps %}<span class="rw-gap-i">⚠️ <b>неповна:</b> {{ row.gaps|join:"; " }}</span> {% endif %}{% if r.ai.summary %}<span>🧠 <span translate="no">{{ r.ai.summary }}</span></span> {% endif %}{% if r.ai.questions %}<span>· <b>питають:</b> <span translate="no">{{ r.ai.questions|join:"; " }}</span></span> {% endif %}{% if r.ai.moq %}<span>· MOQ {{ r.ai.moq }}</span> {% endif %}{% if r.quote_note %}<span class="rw-note-q">📝 <span translate="no">{{ r.quote_note }}</span></span> {% endif %}{% if row.priced and row.includes_text %}<span>· у ціні: {{ row.includes_text }}</span> {% endif %}{% if row.notes %}<span class="spf-muted">· не вказано / приблизно: {{ row.notes|join:", " }}</span> {% endif %}{% if row.ai_info %}<span class="rw-aiinfo" title="Яка модель розібрала відповідь, скільки коштувало, коли">· 🧠 <span translate="no">{{ row.ai_info.model }}</span> · {{ row.ai_info.usd }}{% if row.ai_info.at %} · {{ row.ai_info.at|date:"d.m H:i" }}{% endif %}</span>{% endif %}</div>
+        </div></td></tr>{% endif %}
+      {% if can_change %}<tr class="rw-q" id="rq-{{ r.pk }}"><td colspan="{{ ncols }}" data-rw-span="all">
         <form method="post" action="{{ act }}">{% csrf_token %}<input type="hidden" name="do" value="quote"><input type="hidden" name="rid" value="{{ r.pk }}">
           <input type="hidden" name="includes_set" value="1">
           <div class="spf-grid">
@@ -238,9 +337,101 @@
           <label class="spf-wide">Умови / примітки<textarea name="quote_note" rows="2">{{ r.quote_note }}</textarea></label>
           <div class="spf-row"><button type="submit" class="button">💾 Зберегти</button></div>
         </form></td></tr>{% endif %}
-      {% endwith %}{% empty %}<tr><td colspan="{{ ncols }}" class="spf-muted">Отримувачів ще немає — «✏️ Змінити запит» або «➕ Додати» нижче.</td></tr>{% endfor %}
+      </tbody>
+      {% endwith %}{% empty %}<tbody><tr><td colspan="{{ ncols }}" data-rw-span="all" class="spf-muted">Отримувачів ще немає — «✏️ Змінити запит» або «➕ Додати» нижче.</td></tr></tbody>{% endfor %}
     </table>
     </div>
+    <script>
+    /* 💶 вигляд таблиці: одна кількість (ціна за шт., сума, що в ній, строк, умови) або «⇔ Усі кількості» поруч;
+       сортування за заголовком; коментарі під рядком розгортаються. Вибір — у цьому браузері (localStorage). */
+    (function(){
+      var t = document.getElementById('rw-cmp');
+      if (!t) return;
+      var KEY = 'rw-qview-{{ req.pk }}', NOTES = 'rw-notes-open', SORT = 'rw-sort-{{ req.pk }}';
+      var segBtns = document.querySelectorAll('[data-rw-qi]');
+      function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+      function save(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+      function spans() {      // colspan рядків «на всю ширину» — під видимі колонки
+        var vis = Array.prototype.filter.call(t.querySelectorAll('tr.rw-head > th'), function(th){ return th.getClientRects().length; }).length;
+        t.querySelectorAll('[data-rw-span="all"]').forEach(function(td){ td.colSpan = vis; });
+        t.querySelectorAll('[data-rw-span="rest"]').forEach(function(td){ td.colSpan = Math.max(1, vis - 1); });
+      }
+      function view(v, keep) {
+        if (!segBtns.length) { spans(); return; }
+        if (!document.querySelector('[data-rw-qi="' + v + '"]')) v = '1';
+        t.setAttribute('data-mode', v === 'all' ? 'all' : 'one');
+        document.querySelectorAll('.rw-leg1').forEach(function(x){ x.hidden = v === 'all'; });
+        if (v !== 'all') t.setAttribute('data-qi', v);
+        segBtns.forEach(function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-rw-qi') === v ? 'true' : 'false'); });
+        spans();
+        if (keep) save(KEY, v);
+        if (sortKey) sort(sortKey, sortDir);
+        document.dispatchEvent(new CustomEvent('rw:layout'));
+      }
+      segBtns.forEach(function(b){ b.addEventListener('click', function(){ view(b.getAttribute('data-rw-qi'), true); }); });
+      // ↕ сортування: клік по назві колонки (не по краю ширини); вдруге — навпаки; «№» — як було
+      var sortKey = '', sortDir = 1;
+      function attrOf(k) {
+        var qi = t.getAttribute('data-qi') || '1';
+        return {name: 'data-name', valid: 'data-valid', leadall: 'data-lead', unit: 'data-u' + qi, total: 'data-t' + qi,
+                lead: 'data-l' + qi, pos: 'data-pos'}[k] || (/^q\d+$/.test(k) ? 'data-t' + k.slice(1) : 'data-pos');
+      }
+      function sort(k, dir) {
+        var a = attrOf(k), num = k !== 'name' && k !== 'valid';
+        var groups = Array.prototype.slice.call(t.querySelectorAll('tbody.rw-grp'));
+        groups.sort(function(x, y){
+          var ra = Number(x.getAttribute('data-rank')) || 0, rb = Number(y.getAttribute('data-rank')) || 0;
+          if (ra || rb) return (ra || 1e6) - (rb || 1e6);      // 📌 закріплені — угорі, у своєму порядку
+          var u = x.getAttribute(a) || '', v = y.getAttribute(a) || '';
+          if (!u || !v) return (u ? 0 : 1) - (v ? 0 : 1) || (Number(x.getAttribute('data-pos')) - Number(y.getAttribute('data-pos')));
+          var c = num ? Number(u) - Number(v) : u.localeCompare(v);
+          return (c || Number(x.getAttribute('data-pos')) - Number(y.getAttribute('data-pos'))) * (k === 'pos' ? 1 : dir);
+        });
+        groups.forEach(function(g){ t.appendChild(g); });
+        t.querySelectorAll('[data-rw-sort]').forEach(function(th){
+          th.setAttribute('data-sorted', th.getAttribute('data-rw-sort') === k && k !== 'pos' ? (dir > 0 ? 'asc' : 'desc') : '');
+        });
+      }
+      t.querySelectorAll('tr.rw-head [data-rw-sort]').forEach(function(th){
+        th.addEventListener('click', function(e){
+          if (e.target.closest('.rw-grip, input, label')) return;
+          var k = th.getAttribute('data-rw-sort');
+          if (k === 'pos') { sortKey = ''; sortDir = 1; sort('pos', 1); save(SORT, ''); return; }
+          sortDir = sortKey === k ? -sortDir : 1; sortKey = k;
+          sort(k, sortDir); save(SORT, k + ':' + sortDir);
+        });
+      });
+      // 💬 коментарі під рядком: клік — розгорнути / згорнути; кнопка вгорі — усі (запам’ятовується)
+      function toggle(note, on) {
+        note.classList.toggle('open', on);
+        note.setAttribute('aria-expanded', on ? 'true' : 'false');
+      }
+      t.querySelectorAll('.rw-note').forEach(function(note){
+        note.addEventListener('click', function(e){
+          if (e.target.closest('a, button') || (window.getSelection && String(window.getSelection()).length)) return;
+          toggle(note, !note.classList.contains('open'));
+        });
+        note.addEventListener('keydown', function(e){
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(note, !note.classList.contains('open')); }
+        });
+      });
+      var allBtn = document.getElementById('rw-notes-all');
+      function allNotes(on) {
+        t.querySelectorAll('.rw-note').forEach(function(x){ toggle(x, on); });
+        if (allBtn) allBtn.textContent = on ? '▴ Згорнути коментарі' : '▾ Розгорнути коментарі';
+      }
+      if (allBtn) allBtn.addEventListener('click', function(){
+        var on = allBtn.textContent.indexOf('▾') === 0;
+        allNotes(on); save(NOTES, on ? '1' : '');
+      });
+      if (load(NOTES) === '1') allNotes(true);
+      var was = (load(SORT) || '').split(':');
+      if (was[0] && t.querySelector('[data-rw-sort="' + was[0] + '"]')) { sortKey = was[0]; sortDir = Number(was[1]) || 1; }
+      window.rwResort = function(){ sort(sortKey || 'pos', sortKey ? sortDir : 1); };   // після 📌 — новий порядок
+      view(load(KEY) || '1', false);
+      if (!sortKey) sort('pos', 1);
+    })();
+    </script>
     {% if can_change %}
     <div class="spf-row">
       <span class="spf-muted" title="Модель — у смузі «🧠 AI» над таблицею">🧠 модель — угорі ·</span>

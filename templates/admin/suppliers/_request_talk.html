@@ -11,10 +11,19 @@
 
 <div class="rw-selbar" id="rw-selbar" hidden>
   <b id="rw-sel-n"></b>
+  <button type="button" class="button default" id="rw-cmp-btn" title="Що скільки коштує в кожного з вибраних: плата, монтаж, компоненти, разові, доставка, разом — поруч, для кожної кількості">⚖ Порівняти</button>
   <button type="button" class="button default" id="rw-each-btn" title="Кожному вибраному — свій лист, відповіддю в його гілці листування, з вашої скриньки; інші постачальники його не бачать">✉️ Написати кожному</button>
   <button type="button" class="button default" id="rw-fwd-btn" title="Таблиця пропозицій, листування й файли вибраних постачальників — одним листом колезі">↪ Переслати колезі</button>
   <button type="button" class="button" id="rw-sel-none">✕ Зняти вибір</button>
 </div>
+
+<dialog id="rw-cmpd" class="rw-pv rw-cmpd" aria-labelledby="rw-cmpd-h">
+  <div class="rw-pv-head"><b id="rw-cmpd-h">⚖ Порівняння вибраних</b>
+    <span class="rw-seg" id="rw-cmpd-q" role="group" aria-label="Кількість"></span>
+    <button type="button" class="button" data-cmpd-close aria-label="Закрити">✕</button></div>
+  <div class="rw-cmpd-body" id="rw-cmpd-body"></div>
+  <div class="rw-pv-foot rw-cmpd-foot"><span class="spf-muted" id="rw-cmpd-note"></span></div>
+</dialog>
 
 {% if can_change %}
 <dialog id="rw-fwd" class="rw-pv" aria-labelledby="rw-fwd-h">
@@ -161,6 +170,26 @@
     .rwc-side { flex: none; border-top: 1px solid var(--border-strong, #ddd); }
     .rwc-msg { max-width: 94%; }
   }
+  /* ⚖ порівняння вибраних */
+  .rw-cmpd { width: min(1280px, 97vw); }
+  .rw-cmpd .rw-pv-head { flex-wrap: wrap; }
+  .rw-cmpd-body { overflow: auto; max-height: calc(90vh - 130px); padding: 10px 14px; }
+  .rw-cmpd-foot { justify-content: flex-start; }
+  .rw-cmpt { border-collapse: collapse; width: 100%; font-size: 13px; }
+  .rw-cmpt th, .rw-cmpt td { padding: 6px 10px; border-bottom: 1px solid var(--hairline-color, rgba(127, 127, 127, .3));
+    text-align: right; vertical-align: top; }
+  .rw-cmpt thead th { position: sticky; top: 0; background: var(--body-bg, #fff); z-index: 1; font-weight: 700;
+    border-bottom: 2px solid var(--border-strong, #bbb); min-width: 130px; }
+  .rw-cmpt th.rw-cmpt-k, .rw-cmpt td.rw-cmpt-k { text-align: left; position: sticky; left: 0; background: var(--body-bg, #fff);
+    font-weight: 600; white-space: nowrap; min-width: 0; }
+  .rw-cmpt td.low { background: rgba(76, 175, 80, .16); }
+  .rw-cmpt td.low .rw-cmpt-v::after { content: " ✓"; color: var(--success-fg, #2e7d32); }
+  .rw-cmpt tr.sum > td { font-weight: 700; border-top: 2px solid var(--border-strong, #bbb); }
+  .rw-cmpt .rw-cmpt-v { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rw-cmpt .rw-cmpt-s { display: block; font-size: 11px; font-weight: normal; color: var(--text-muted, #888); }
+  .rw-cmpt .rw-cmpt-text { text-align: left; font-size: 12px; min-width: 160px; }
+  .rw-cmpt .y { color: var(--success-fg, #2e7d32); } .rw-cmpt .n { color: var(--error-fg, #c62828); }
+  .rw-cmpt .u { color: var(--warning-fg, #b06d00); }
 </style>
 <script>
 (function(){
@@ -424,20 +453,25 @@
     function load() { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { return {}; } }
     function store(o) { try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {} }
     function key(th, i) { return th.getAttribute('data-col') || ('c' + i); }
-    function sizeTable() { var sum = 0; ths.forEach(function(th){ sum += parseFloat(th.style.width) || th.getBoundingClientRect().width; }); table.style.width = Math.round(sum) + 'px'; }
+    function shown(th) { return th.getClientRects().length > 0; }     // колонка іншого вигляду — прихована
+    function sizeTable() { var sum = 0; ths.forEach(function(th){ if (shown(th)) sum += parseFloat(th.style.width) || th.getBoundingClientRect().width; }); table.style.width = Math.round(sum) + 'px'; }
     function fix() {          // зафіксувати теперішні ширини — далі кожна колонка міняється окремо
       if (table.classList.contains('rw-fixed')) return;
       var ws = ths.map(function(th){ return th.getBoundingClientRect().width; });
-      ths.forEach(function(th, i){ th.style.width = Math.round(ws[i]) + 'px'; });
+      ths.forEach(function(th, i){ if (shown(th)) th.style.width = Math.round(ws[i]) + 'px'; });
       table.classList.add('rw-fixed'); sizeTable();
     }
     function unfix() { table.classList.remove('rw-fixed'); table.style.width = ''; ths.forEach(function(th){ th.style.width = ''; }); }
-    var saved = load();
-    if (ths.some(function(th, i){ return saved[key(th, i)]; })) {
+    function apply() {        // збережені ширини колонок, які зараз видно
+      var saved = load();
+      unfix();
+      if (!ths.some(function(th, i){ return shown(th) && saved[key(th, i)]; })) return;
       fix();
-      ths.forEach(function(th, i){ var w = saved[key(th, i)]; if (w) th.style.width = w + 'px'; });
+      ths.forEach(function(th, i){ var w = saved[key(th, i)]; if (w && shown(th)) th.style.width = w + 'px'; });
       sizeTable();
     }
+    apply();
+    document.addEventListener('rw:layout', apply);      // «5 шт.» ↔ «⇔ Усі кількості»: інші колонки
     ths.forEach(function(th, i){
       var g = document.createElement('span'); g.className = 'rw-grip';
       g.title = 'Тягніть — ширина колонки · двічі клацніть — як було'; th.appendChild(g);
@@ -456,9 +490,7 @@
         document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
       });
       g.addEventListener('dblclick', function(e){
-        e.stopPropagation(); var s = load(); delete s[key(th, i)]; store(s);
-        if (!Object.keys(s).length) { unfix(); return; }
-        unfix(); fix(); ths.forEach(function(t, j){ var w = s[key(t, j)]; if (w) t.style.width = w + 'px'; }); sizeTable();
+        e.stopPropagation(); var s = load(); delete s[key(th, i)]; store(s); apply();
       });
     });
     head.addEventListener('contextmenu', function(e){
@@ -477,18 +509,23 @@
     function cellOf(rid) { return document.querySelector('tr.rw-row[data-rw-row="' + rid + '"] > td.rw-n'); }
     function state(td) {
       return {color: td.getAttribute('data-color') || '', text: td.getAttribute('data-text') || '',
+              rank: Number(td.getAttribute('data-rank')) || 0,
               stickers: (td.getAttribute('data-stickers') || '').split(',').filter(Boolean)};
     }
     function paint(rid, v) {
       var td = cellOf(rid); if (!td) return;
       td.setAttribute('data-color', v.color || ''); td.setAttribute('data-text', v.text || '');
+      td.setAttribute('data-rank', v.rank || '');
+      var grp = td.closest('tbody'); if (grp) grp.setAttribute('data-rank', v.rank || '');
+      var rk = td.querySelector('.rw-rank');
+      if (rk) { rk.hidden = !v.rank; rk.textContent = v.rank ? '📌 ' + v.rank : ''; }
       td.setAttribute('data-stickers', (v.stickers || []).map(function(s){ return s.key; }).join(','));
       td.classList.toggle('rw-lab', !!v.color);
       if (v.color) td.style.setProperty('--rwl', v.hex); else td.style.removeProperty('--rwl');
       var box = td.querySelector('.rw-labs'); box.innerHTML = '';
       (v.stickers || []).forEach(function(s){ var sp = el('span', null, s.icon); sp.title = s.name; box.appendChild(sp); });
       if (v.text) { var t = el('span', 'rw-lab-t', v.text); t.setAttribute('translate', 'no'); box.appendChild(t); }
-      td.title = v.by ? '🏷 ' + [v.color_name].concat((v.stickers || []).map(function(s){ return s.name; })).filter(Boolean).concat([v.by, v.at]).join(' · ') : '';
+      td.title = v.by ? '🏷 ' + [v.rank ? '📌 ' + v.rank : ''].concat([v.color_name]).concat((v.stickers || []).map(function(s){ return s.name; })).filter(Boolean).concat([v.by, v.at]).join(' · ') : '';
     }
     function targets(rid) {
       var p = picked().map(function(c){ return c.value; });
@@ -498,6 +535,7 @@
     function send(rids, op, ctx) {
       queue = queue.then(function(){ return post(Object.assign({do: 'mark', rids: rids.join(',')}, op)); }).then(function(j){
         Object.keys(j.labels || {}).forEach(function(k){ paint(k, j.labels[k]); });
+        if ('rank' in op && window.rwResort) window.rwResort();
         if (ctx && ctx.refresh) ctx.refresh();
       }).catch(function(){ if (window.MVMenu) MVMenu.toast('⚠️ Не збережено — немає зв’язку'); });
       return queue;
@@ -526,6 +564,16 @@
                       }});
         });
         items.push({type: 'separator'});
+        [1, 2, 3].forEach(function(n){
+          items.push({type: 'radio', group: 'rk', label: n + ' місце', icon: '📌', checked: function(){ return st.rank === n; },
+                      onSelect: function(){ st.rank = n; send([rid], {rank: n}); }});
+        });
+        items.push({label: 'Інше місце…', icon: '🔢', onSelect: function(){
+          var v = prompt('На яке місце закріпити (1, 2, 3…)? Закріплені завжди вгорі таблиці.', st.rank || '');
+          if (v !== null && /^\s*\d+\s*$/.test(v) && Number(v) > 0) send([rid], {rank: Number(v)});
+        }});
+        if (st.rank) items.push({label: 'Відкріпити', icon: '📍', onSelect: function(){ send([rid], {rank: 0}); }});
+        items.push({type: 'separator'});
         items.push({label: st.text ? 'Змінити свою наліпку…' : 'Своя наліпка…', icon: '✏️', onSelect: function(){
           var t = prompt('Своя наліпка (до 60 символів; порожньо — прибрати):', st.text);
           if (t !== null) send(rids, {text: t});
@@ -539,6 +587,135 @@
         MVMenu.open(e, items, {title: name, titleData: true});
       });
     });
+  })();
+
+  /* ── ⚖ порівняння вибраних: що скільки коштує в кожного — плата, монтаж, компоненти, разові, доставка, разом ── */
+  (function(){
+    var dlg = document.getElementById('rw-cmpd'), btn = document.getElementById('rw-cmp-btn');
+    if (!dlg || !btn || typeof dlg.showModal !== 'function') { if (btn) btn.hidden = true; return; }
+    var D = {{ compare_json|safe }}, byId = {};
+    D.rows.forEach(function(r){ byId[String(r.rid)] = r; });
+    var body = document.getElementById('rw-cmpd-body'), seg = document.getElementById('rw-cmpd-q'),
+        note = document.getElementById('rw-cmpd-note'), qi = 0, rows = [];
+    var PARTS = [['pcb', '🟩 Плата'], ['assembly', '🔧 Монтаж'], ['components', '🔩 Компоненти']];
+    var MARK = {y: '✓ у ціні', n: '✗ не входить', u: '? не уточнили'};
+    var TIP = {y: 'Входить у ціну, але окремо не назвали', n: 'У ціні немає — буде зверху або окремо', u: 'Постачальник не сказав'};
+    function amt(td, a, extra) {               // сума: у валюті Minerva, під нею — як у постачальника
+      var v = el('span', 'rw-cmpt-v', a.h || a.t); td.appendChild(v);
+      if (a.h) td.appendChild(el('span', 'rw-cmpt-s', a.t));
+      if (extra) td.appendChild(typeof extra === 'string' ? el('span', 'rw-cmpt-s', extra) : extra);
+      return a.v;
+    }
+    function supTotal(c) {                     // «у постачальника 683,31 USD ✓ / ⚠️ не сходиться» — напис окремо від суми
+      var s = el('span', 'rw-cmpt-s');
+      s.appendChild(el('span', null, 'у постачальника')); s.appendChild(document.createTextNode(' '));
+      var n = el('span', null, c.sup_total); n.setAttribute('translate', 'no'); s.appendChild(n);
+      s.appendChild(document.createTextNode(' '));
+      s.appendChild(c.mismatch ? el('span', 'n', '⚠️ не сходиться') : el('span', 'y', '✓'));
+      return s;
+    }
+    function line(t, label, fill, opt) {
+      opt = opt || {};
+      var tr = el('tr', opt.sum ? 'sum' : ''), vals = [];
+      tr.appendChild(el('td', 'rw-cmpt-k', label));
+      rows.forEach(function(r){
+        var td = el('td', opt.text ? 'rw-cmpt-text' : ''), c = r.cells[qi];
+        if (opt.text) td.setAttribute('translate', 'no');
+        var v = (!c || c.missing) && !opt.row ? (td.appendChild(el('span', 'spf-muted', '— немає ціни')), null) : fill(td, c, r);
+        var ok = !opt.okOnly || (c && !c.missing && c.ok);     // разом / за шт. / строк — лише серед повних, як 🥇
+        if (opt.okOnly && c && !c.missing && !c.ok && opt.sum) td.appendChild(el('span', 'rw-cmpt-s u', '⚠️ неповна — не порівнюється'));
+        vals.push([td, typeof v === 'number' && ok ? v : null]);
+        tr.appendChild(td);
+      });
+      var nums = vals.filter(function(x){ return x[1] !== null; });
+      if (opt.low !== false && nums.length > 1) {
+        var low = Math.min.apply(null, nums.map(function(x){ return x[1]; }));
+        nums.forEach(function(x){
+          if (x[1] === low) x[0].classList.add('low');
+          else if (opt.sum && low > 0) x[0].appendChild(el('span', 'rw-cmpt-s', '+' + Math.round((x[1] / low - 1) * 100) + ' %'));
+        });
+      }
+      t.appendChild(tr);
+    }
+    function render() {
+      body.textContent = '';
+      seg.querySelectorAll('button').forEach(function(b){ b.setAttribute('aria-pressed', Number(b.getAttribute('data-i')) === qi ? 'true' : 'false'); });
+      var t = el('table', 'rw-cmpt'), head = el('tr'), thead = el('thead'), tb = el('tbody');
+      head.appendChild(el('th', 'rw-cmpt-k', D.qtys[qi] + ' шт.'));
+      rows.forEach(function(r){ var th = el('th', null, r.name); th.setAttribute('translate', 'no'); head.appendChild(th); });
+      thead.appendChild(head); t.appendChild(thead); t.appendChild(tb);
+      PARTS.forEach(function(p){
+        line(tb, p[1], function(td, c){
+          var x = c.parts[p[0]] || {state: 'u'};
+          if (x.t) return amt(td, x, x.state === 'n' ? 'окремо' : '');
+          var s = el('span', x.state, MARK[x.state]); s.title = TIP[x.state]; td.appendChild(s); return null;
+        });
+      });
+      line(tb, '🧰 Разові: оснащення, NRE', function(td, c){
+        if (!c.one_time.length) { td.appendChild(el('span', 'spf-muted', 'не назвали')); return null; }
+        var v = amt(td, c.one_time_sum);
+        c.one_time.forEach(function(it){ var s = el('span', 'rw-cmpt-s', it.name + ': ' + it.t); s.setAttribute('translate', 'no'); td.appendChild(s); });
+        return v;
+      });
+      line(tb, '🚚 Доставка', function(td, c){
+        if (!c.ship) { td.appendChild(el('span', 'spf-muted', 'не назвали')); return null; }
+        return amt(td, c.ship, 'окремо, у «Разом» не входить');
+      });
+      line(tb, 'Σ Разом, без доставки', function(td, c){
+        return amt(td, c.total, c.sup_total ? supTotal(c) : '');
+      }, {sum: true, okOnly: true});
+      line(tb, 'Σ Разом з доставкою', function(td, c){
+        if (!c.total_ship) { td.appendChild(el('span', 'spf-muted', '—')); return null; }
+        return amt(td, c.total_ship);
+      }, {sum: true, okOnly: true});
+      line(tb, 'За 1 шт., з разовими', function(td, c){ return amt(td, c.unit, c.exact ? '' : '≈ ціна на ' + c.tier_qty + ' шт'); },
+           {okOnly: true});
+      line(tb, '⏱ Строк, дн.', function(td, c){
+        if (c.lead === null || c.lead === undefined) { td.appendChild(el('span', 'spf-muted', '—')); return null; }
+        td.appendChild(el('span', 'rw-cmpt-v', String(c.lead))); return c.lead;
+      }, {okOnly: true});
+      if (rows.some(function(r){ var c = r.cells[qi]; return c && !c.missing && c.lacks.length; })) {
+        line(tb, '⚠️ Чого бракує', function(td, c){
+          td.appendChild(el('span', c.lacks.length ? 'n' : 'y', c.lacks.length ? c.lacks.join(', ') : '✓ усе, що просили'));
+          return null;
+        }, {low: false});
+      }
+      line(tb, 'Умови', function(td, c, r){ td.appendChild(document.createTextNode(r.terms || '—')); return null; },
+           {text: true, row: true, low: false});
+      line(tb, 'Діє до', function(td, c, r){
+        td.appendChild(el('span', null, r.valid || '—'));
+        var st = {expired: 'минув', today: 'сьогодні', soon: 'до 2 днів'}[r.valid_state];
+        if (st) td.appendChild(el('span', 'rw-cmpt-s ' + (r.valid_state === 'expired' ? 'n' : 'u'), st));
+        return null;
+      }, {row: true, low: false});
+      body.appendChild(t);
+    }
+    D.qtys.forEach(function(q, i){
+      var b = el('button', null, q + ' шт.'); b.type = 'button'; b.setAttribute('data-i', String(i));
+      b.addEventListener('click', function(){ qi = i; render(); }); seg.appendChild(b);
+    });
+    btn.addEventListener('click', function(){
+      var picks = picked().map(function(c){ return c.value; });     // у порядку таблиці (з сортуванням)
+      rows = picks.map(function(id){ return byId[id]; }).filter(Boolean);
+      var skip = picks.length - rows.length;
+      if (rows.length < 2 || !D.qtys.length) {
+        alert('Виберіть галочками щонайменше двох постачальників з цінами.');
+        return;
+      }
+      var tbl = document.getElementById('rw-cmp');
+      qi = tbl && tbl.getAttribute('data-mode') === 'one' ? Math.max(0, Number(tbl.getAttribute('data-qi') || 1) - 1) : 0;
+      note.textContent = '';
+      ['Суми — у валюті Minerva за курсом (під ними — як у постачальника); найменше в рядку — зелене ✓.',
+       'Плата, монтаж, компоненти — ціна за шт. × кількість, як назвав постачальник; «✓ у ціні» — входить, але окремо не назвали.',
+       'Разом, за 1 шт. і строк — найменше серед повних пропозицій (є все, що просили).'].forEach(function(x){
+        note.appendChild(el('span', null, x)); note.appendChild(document.createTextNode(' '));
+      });
+      if (skip) note.appendChild(el('span', 'u', 'Без цін, не показано: ' + skip));
+      render();
+      dlg.showModal();
+    });
+    dlg.querySelectorAll('[data-cmpd-close]').forEach(function(b){ b.addEventListener('click', function(){ dlg.close(); }); });
+    dlg.addEventListener('click', function(e){ if (e.target === dlg) dlg.close(); });
   })();
 
   /* ── ☑ вибір рядків і ↪ переслати колезі ── */

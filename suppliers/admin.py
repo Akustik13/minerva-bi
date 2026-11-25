@@ -690,8 +690,9 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             copies=list(req.copies.order_by("-created_at").values("pk", "code", "status")[:10]),
             states=[s for s in SupplierRequestRecipient.STATES if s[0] != SupplierRequestRecipient.PLANNED],
             more=more, more_mail=sum(1 for s in more if s.f_email), events=events, quantities=rfq.parse_quantities(req.quantities),
-            cmp=cmp, qtys=cmp["qtys"], ncols=max(len(cmp["qtys"]), 1) + 7, stale=rfq_compare.stale(req),
+            cmp=cmp, qtys=cmp["qtys"], ncols=9 if cmp["qtys"] else 7, stale=rfq_compare.stale(req),
             st=rfq_stats.stats(req, cmp), ai_sum=rfq_usage.summary(req, rows),
+            compare_json=_js({"rows": rfq_compare.breakdown(cmp), "qtys": cmp["qtys"], "home": cmp["home"]}),
             marks_json=_js({"colors": [{"key": k, "icon": i, "name": n, "hex": h} for k, i, n, h in rfq_marks.COLORS],
                             "stickers": [{"key": k, "icon": i, "name": n} for k, i, n in rfq_marks.STICKERS],
                             "text_max": rfq_marks.TEXT_MAX}),
@@ -965,8 +966,11 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                 if request.POST.get("clear"):
                     op["clear"] = True
                 rids = request.POST.getlist("rid") or str(request.POST.get("rids") or "").split(",")
-                return JsonResponse({"labels": {str(k): v for k, v in
-                                                rfq_marks.apply(req, rids, request.user, op).items()}})
+                if "rank" in request.POST:            # 📌 місце — одному рядку; змінюються й місця інших
+                    done = rfq_marks.set_rank(req, rids[0] if rids else "", request.POST.get("rank"), request.user)
+                else:
+                    done = rfq_marks.apply(req, rids, request.user, op)
+                return JsonResponse({"labels": {str(k): v for k, v in done.items()}})
             elif do in ("chat_brief", "chat_send", "chat_ai", "forward_plan", "forward_send", "each_compose",
                         "each_send", "each_save", "each_load"):
                 return self._talk(request, req, r, do)

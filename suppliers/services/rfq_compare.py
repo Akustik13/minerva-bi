@@ -209,6 +209,52 @@ def _one_time_sum(items, q) -> Decimal:
     return sum((Decimal(it["amount"]) for it in items if not it.get("qty") or it["qty"] == q), Decimal(0))
 
 
+# 🧾 «Враховано в сумі» (вигляд «одна кількість»): ✓ y — у сумі, ✗ n — не в сумі, буде зверху, ? u — не уточнили
+PART_NAMES = {"pcb": "Плата", "assembly": "Монтаж", "components": "Компоненти"}
+
+
+def flags(tin, items, q, shipping, currency) -> tuple:
+    """([{key, label, state, title}], деталь) для кількості q: складові ціни, разові витрати, доставка."""
+    out = []
+    for k, _i, _n in SCOPE:
+        state = ("y" if k in tin else "n") if tin else "u"
+        out.append({"key": k, "label": PART_NAMES[k], "state": state,
+                    "title": {"y": "У ціні", "n": "У ціні немає — буде зверху або окремо",
+                              "u": "Постачальник не сказав, чи входить"}[state]})
+    its = [it for it in items if not it.get("qty") or it["qty"] == q]
+    cur = (currency or "").upper()
+    ot = "; ".join(f"{it['name']} {money(dec(it['amount']))}" for it in its)
+    out.append({"key": "one_time", "label": "Оснащення / NRE", "state": "y" if its else "u",
+                "title": f"У сумі: {ot} {cur}".strip() if its else "Разових витрат постачальник не назвав"})
+    ship = money(shipping) if shipping is not None else ""
+    out.append({"key": "shipping", "label": "Доставка", "state": "n" if ship else "u",
+                "title": f"Доставка {ship} {cur} — окремо, у суму не входить" if ship else
+                "Вартість доставки не назвали"})
+    detail = [f"{it['name']} {money(dec(it['amount']))}" for it in its]
+    if ship:
+        detail.append(f"доставка {ship} окремо")
+    return out, ("; ".join(detail) + (f" {cur}" if detail and cur else ""))
+
+
+def valid_state(day, today=None) -> str:
+    """«діє до»: expired — минув, today — сьогодні, soon — ще ≤ 2 дні, '' — далі або не вказано."""
+    if not day:
+        return ""
+    if today is None:
+        from django.utils import timezone
+        today = timezone.localdate()
+    if day < today:
+        return "expired"
+    if day == today:
+        return "today"
+    return "soon" if (day - today).days <= 2 else ""
+
+
+def _key(d) -> str:
+    """Ключ сортування для data-атрибута (без локалізації): порожньо — у кінець."""
+    return "" if d is None else f"{float(d):.6f}"
+
+
 def table(req) -> dict:
     from sales.revenue import home_currency
     from suppliers.models import SupplierRequestRecipient as R
@@ -248,6 +294,8 @@ def table(req) -> dict:
                 cell["total_home"] = (total * rate).quantize(CENT, ROUND_HALF_UP)
                 cell["eff_home_text"] = price(cell["eff_home"])
                 cell["total_home_text"] = money(cell["total_home"])
+                cell["unit_home"] = t["unit"] * rate
+                cell["unit_home_text"] = price(cell["unit_home"])
             if t.get("total") is not None and cell["exact"]:
                 # у постачальника «разом» — з разовими чи без; наше «разом» — завжди з ними
                 theirs = t["total"] if t["total_ot"] else t["total"] + ot
@@ -268,6 +316,12 @@ def table(req) -> dict:
                 cell["parts_text"] = " + ".join(f"{i} {price(t['parts'][k])}" for k, i, _n in SCOPE if k in t["parts"])
             if not cell["exact"]:
                 approx.append(f"ціна на {t['qty']} шт замість {q}")
+            cell["flags"], cell["detail"] = flags(tin or [], items, q, r.shipping, r.currency)
+            cell["parts"] = dict(t.get("parts") or {})          # ⚖ складові за 1 шт., як назвав постачальник
+            cell["items"] = [it for it in items if not it.get("qty") or it["qty"] == q]
+            cell["sort_unit"] = _key(cell.get("unit_home"))
+            cell["sort_total"] = _key(cell.get("total_home"))
+            cell["sort_lead"] = "" if cell["lead"] is None else str(cell["lead"])
             cells.append(cell)
         priced_cells = [c for c in cells if not c.get("missing")]
         lacks = [n for k, _i, n in SCOPE if priced_cells and all(n in c["lacks"] for c in priced_cells)]
@@ -304,8 +358,12 @@ def table(req) -> dict:
         except Exception:  # noqa: BLE001
             sc = None
         ai = r.ai or {}
+        terms = " ".join(str(ai.get("conditions") or r.quote_note or "").split())
         rows.append({
             "recipient": r, "home": home, "cells": cells,
+            "terms": terms, "valid_state": valid_state(r.valid_until),
+            "sort_valid": r.valid_until.isoformat() if r.valid_until else "",
+            "sort_lead": "" if r.lead_days is None else str(r.lead_days),
             "one_time": [{**it, "amount": money(dec(it["amount"]))} for it in items],
             "one_time_note": "; ".join(f"{it['name']} {money(dec(it['amount']))}" + (f" (лише {it['qty']} шт)"
                                                                                      if it.get("qty") else "")
@@ -338,6 +396,23 @@ def table(req) -> dict:
             c["over"] = None if c["best"] or not best else int(((c["total_home"] / best - 1) * 100)
                                                               .quantize(Decimal(1), ROUND_HALF_UP))
             c["over_text"] = over_text(c["over"])
+        # ціна за шт. без разових: «найнижча» і смужка (частка від найвищої) — серед повних пропозицій
+        units = [row["cells"][i]["unit_home"] for row in ok if row["cells"][i].get("unit_home") is not None]
+        if units and max(units) > 0:
+            low, high = min(units), max(units)
+            for row in ok:
+                c = row["cells"][i]
+                if c.get("unit_home") is not None:
+                    c["unit_best"] = c["unit_home"] == low
+                    c["bar"] = max(2, int((c["unit_home"] / high * 100).quantize(Decimal(1), ROUND_HALF_UP)))
+    # ⚡ найшвидше для кожної кількості — серед тих, у кого є все, що просили
+    for i, q in enumerate(qtys):
+        leads = [row["cells"][i] for row in rows if row["priced"] and not row["cells"][i].get("missing")
+                 and row["cells"][i].get("lead") is not None and not row["cells"][i].get("lacks")]
+        if leads:
+            fast = min(c["lead"] for c in leads)
+            for c in leads:
+                c["fast"] = c["lead"] == fast
     if qtys:
         for row in rows:
             if row["cells"] and row["cells"][0].get("best"):
@@ -366,6 +441,62 @@ def table(req) -> dict:
     return {"rows": rows, "qtys": qtys, "home": home, "fx": fx.notes(), "missing_fx": fx.missing(),
             "needed": scope_text(need), "counts": counts,
             "unparsed": [x["recipient"].pk for x in rows if x["unparsed"]]}
+
+
+def _amount(d, rate, cur, home) -> dict:
+    """Сума для ⚖: v — число для порівняння (у валюті Minerva; без курсу — None), t — як у постачальника, h — у Minerva."""
+    if d is None:
+        return None
+    d = Decimal(d).quantize(CENT, ROUND_HALF_UP)
+    home_d = (d * rate).quantize(CENT, ROUND_HALF_UP) if rate is not None else None
+    same = (cur or home).upper() == home.upper()
+    return {"v": float(home_d) if home_d is not None else None, "t": f"{money(d)} {(cur or home).upper()}",
+            "h": f"{money(home_d)} {home}" if home_d is not None and not same else ""}
+
+
+def breakdown(cmp) -> list:
+    """⚖ Порівняння вибраних постачальників (сторінка запиту, JSON для вікна): на кожну кількість — складові
+    (плата, монтаж, компоненти: ціна за шт. × кількість, якщо постачальник назвав їх окремо; інакше — y / n / u, як у
+    «Враховано в сумі»), разові витрати, доставка, разом без / з доставкою, за 1 шт., строк; і умови, «діє до»."""
+    home = cmp["home"]
+    out = []
+    for row in cmp["rows"]:
+        if not row["priced"]:
+            continue
+        r, rate = row["recipient"], row["rate"]
+        cur = (r.currency or home).upper()
+        cells = []
+        for c in row["cells"]:
+            if c.get("missing"):
+                cells.append({"qty": c["qty"], "missing": True})
+                continue
+            q = c["qty"]
+            state = {f["key"]: f["state"] for f in c.get("flags", [])}
+            parts = {}
+            for k in SCOPE_KEYS:
+                v = c.get("parts", {}).get(k)
+                parts[k] = {"state": state.get(k, "u"), **(_amount(v * q, rate, cur, home) or {})} if v is not None \
+                    else {"state": state.get(k, "u")}
+            ship = _amount(r.shipping, rate, cur, home)
+            total = _amount(c["total"], rate, cur, home)
+            cells.append({
+                "qty": q, "missing": False, "exact": c["exact"], "tier_qty": c["tier_qty"], "parts": parts,
+                "one_time": [{"name": it["name"], **_amount(dec(it["amount"]), rate, cur, home)} for it in c.get("items", [])],
+                "one_time_sum": _amount(c["one_time"], rate, cur, home) if c["one_time"] else None,
+                "ship": ship, "total": total,
+                "total_ship": _amount(c["total"] + r.shipping, rate, cur, home) if r.shipping is not None else None,
+                # за 1 шт. з разовими — 4 знаки (як у таблиці), не до центів
+                "unit": {"v": float(c["eff_home"]) if c.get("eff_home") is not None else None,
+                         "t": f"{c['eff_text']} {cur}",
+                         "h": f"{c['eff_home_text']} {home}" if c.get("eff_home_text") and cur != home.upper() else ""},
+                "sup_total": f"{c['sup_total_text']} {cur}" if c.get("sup_total_text") else "",
+                "mismatch": bool(c.get("sum_mismatch")), "lead": c.get("lead"), "ok": bool(c.get("ok")),
+                "lacks": c.get("lacks", []),
+            })
+        out.append({"rid": r.pk, "name": r.supplier.name, "cur": cur, "rate": price(rate) if rate is not None else "",
+                    "terms": row.get("terms", ""), "valid": r.valid_until.strftime("%d.%m.%Y") if r.valid_until else "",
+                    "valid_state": row.get("valid_state", ""), "cells": cells})
+    return out
 
 
 def over_text(over) -> str:
