@@ -96,7 +96,7 @@ class PartiesTests(PartiesBase):
 class ExportTests(PartiesBase):
     def setUp(self):
         super().setUp()
-        self.step("Зразки", days=5, start=self.today)
+        self.step("Зразки антени 5G", days=5, start=self.today)   # не слово словника інтерфейсу — не перекладається
 
     def send(self, **data):
         from django.core.files.uploadedfile import SimpleUploadedFile
@@ -128,7 +128,7 @@ class ExportTests(PartiesBase):
         self.assertTrue(r.content.startswith(b"PK"))                                # xlsx = zip
         from openpyxl import load_workbook
         ws = load_workbook(io.BytesIO(r.content)).active
-        self.assertIn("Зразки", [ws.cell(row=i, column=2).value for i in range(1, 12)])
+        self.assertIn("Зразки антени 5G", [ws.cell(row=i, column=2).value for i in range(1, 12)])
 
     def test_send_makes_a_draft_with_files(self):
         r = self.send(formats="pdf,xlsx,png" if HAS_PDF else "xlsx,png", send="1")
