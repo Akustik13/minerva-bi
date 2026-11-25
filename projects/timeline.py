@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 LANES = [
     ("moments", "📌 Важливі моменти"),
-    ("plan", "📋 Фази й віхи"),
+    ("plan", "📋 Фази: план і факт"),
     ("mail", "✉️ Листування"),
     ("docs", "📝 Angebote й документи"),
     ("files", "📎 Файли з листів"),
@@ -109,7 +109,8 @@ def events(project, facts, viewer, today=None, meetings=None) -> list:
         ev("moments", "flag", h.date, h.title, tip, url, cls, hid=h.pk)
 
     _plan_events(ev, facts, today)
-    _mail_events(ev, facts, uid)
+    _planned_events(ev, facts, today)
+    _mail_events(ev, facts, uid, today)
     _doc_events(ev, project, facts, viewer)
     _file_events(ev, project, facts, uid)
     _order_events(ev, facts, today)
@@ -334,7 +335,9 @@ def meeting_ref(obj, refs, uid):
 
 
 def _plan_events(ev, facts, today):
-    """📋 Фази плану — смуги (прогноз), віхи — ромби; зсув від базового плану — жовтим, прострочена віха — червоним."""
+    """📋 Фази: план і факт — фаза одною смугою: виконана — суцільна (факт), поточна — факт до сьогодні й штрихований
+    прогноз далі, майбутня — пунктир (план); під ними — базовий план (тонка лінія, порожні ромби воріт). Віхи — ромби
+    на тому самому рядку; зсув від базового плану — жовтим, прострочена віха — червоним (pj_timeline.js drawPlan)."""
     from .models import ProjectPhase, ProjectStep
     plan = facts.get("plan")
     if plan is None or not plan.has_plan:
@@ -343,12 +346,21 @@ def _plan_events(ev, facts, today):
         if pc.phase is None or not pc.start or not pc.end:
             continue
         late = pc.status != ProjectPhase.DONE and bool(pc.slip and pc.slip > 0)
-        cls = "warn" if late else {ProjectPhase.DONE: "ok", ProjectPhase.ACTIVE: "open"}.get(pc.status, "plan")
+        if pc.status == ProjectPhase.DONE:
+            state = "done"
+        elif pc.start <= today or pc.status == ProjectPhase.ACTIVE:
+            state = "active"
+        else:
+            state = "future"
+        cls = "warn" if late else {"done": "ok", "active": "open"}.get(state, "plan")
         name = f"{pc.phase.icon} {pc.phase.name}".strip()
         ev("plan", "bar", pc.start, name,
            f"📋 {name} · кроків {pc.done} з {len(pc.steps)} · {_fmt(pc.start)} → {_fmt(pc.end)}"
-           + (f" · зсув +{pc.slip} дн." if late else "") + (f"\nУмова переходу: {pc.phase.gate}" if pc.phase.gate else ""),
-           "", cls, end=pc.end)
+           + (f" · зсув +{pc.slip} дн." if late else "")
+           + (f" · базовий план {_fmt(pc.base_start)} → {_fmt(pc.base_end)}" if pc.base_start and pc.base_end else "")
+           + (f"\nУмова переходу: {pc.phase.gate}" if pc.phase.gate else ""),
+           "", cls, end=pc.end, kind="phase", state=state, prog=f"{pc.done}/{len(pc.steps)}" if pc.steps else "",
+           bs=pc.base_start.isoformat() if pc.base_start else "", be=pc.base_end.isoformat() if pc.base_end else "")
     for c in plan.steps:
         s = c.step
         if s.kind != ProjectStep.MILESTONE or not c.end:
@@ -366,10 +378,37 @@ def _plan_events(ev, facts, today):
         ev("plan", "diamond", c.end, f"◆ {s.title}",
            f"◆ {s.title} · {dict(ProjectStep.STATUS_CHOICES).get(c.status, c.status)} · {_fmt(c.end)}"
            + (f" · план {_fmt(s.baseline_end)}" if s.baseline_end and s.baseline_end != c.end else "")
-           + (f"\n{c.note}" if c.note else ""), "", cls)
+           + (f"\n{c.note}" if c.note else ""), "", cls, kind="ms", short=_cut(s.title, 18),
+           bd=s.baseline_end.isoformat() if s.baseline_end else "")
 
 
-def _mail_events(ev, facts, uid):
+# Крок плану з умовою «виконано, коли …» — на якій доріжці його об'єкт (Angebot, замовлення, закупівля…)
+TRIGGER_LANES = {"offer_sent": "docs", "offer_accepted": "docs", "order_received": "orders", "order_shipped": "orders",
+                 "order_delivered": "orders", "shipment_sent": "orders", "shipment_delivered": "orders",
+                 "po_ordered": "supply", "po_received": "supply", "jlc_ordered": "supply", "jlc_delivered": "supply"}
+
+
+def _planned_events(ev, facts, today):
+    """Що план ще тільки обіцяє: крок з умовою «виконано, коли …», для якого ще немає жодного об'єкта (Angebot,
+    замовлення, закупівлі, JLC, відправлення), — пунктиром «(план)» на доріжці свого об'єкта, у дати прогнозу кроку.
+    З'явився об'єкт — замість пунктиру сам об'єкт (факт і прогноз)."""
+    from .models import ProjectStep
+    plan = facts.get("plan")
+    if plan is None or not plan.has_plan:
+        return
+    for c in plan.steps:
+        s = c.step
+        lane = TRIGGER_LANES.get(s.trigger or "")
+        if not lane or not c.end or c.status in (ProjectStep.DONE, ProjectStep.SKIPPED) or c.note:
+            continue
+        ms = s.kind == ProjectStep.MILESTONE
+        ev(lane, "diamond" if ms else "bar", c.end if ms else (c.start or c.end), f"{s.title} (план)",
+           f"📋 За планом: {s.title} · {_fmt(c.end) if ms else f'{_fmt(c.start)} → {_fmt(c.end)}'}"
+           f"\n{dict(ProjectStep._meta.get_field('trigger').choices).get(s.trigger, '')} — ще немає прив'язаного об'єкта",
+           "", "plan", end=None if ms else c.end, planned=1)
+
+
+def _mail_events(ev, facts, uid, today=None):
     days = defaultdict(lambda: {"in": [], "out": []})
     for x in facts.get("messages", []):
         if x["dir"] == "internal":
@@ -394,9 +433,11 @@ def _mail_events(ev, facts, uid):
             if other:
                 lines.append(f"ще {other} з інших скриньок")
             mails = [{"pk": m.pk, "s": _cut(m.subject or "(без теми)", 70), "d": d.isoformat()} for m in own[:MAIL_LIST]]
+            ring = any(m.pk in waiting for m in msgs)
             ev("mail", "dot", d, "", "\n".join(lines),
                f"/email/message/{own[0].pk}/" if len(msgs) == 1 and own else "", direction,
-               count=len(msgs), mails=mails, ring=any(m.pk in waiting for m in msgs))
+               count=len(msgs), mails=mails, ring=ring,
+               wait=max((today - d).days, 0) if ring and today else None)   # «чекає нашої відповіді N дн.»
 
 
 def _doc_events(ev, project, facts, viewer):

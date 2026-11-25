@@ -1930,15 +1930,18 @@
     de: {plan: 'Projektplan', timeline: 'Projektverlauf', chain: 'Projektbeteiligte und Lieferkette', asof: 'Stand',
          customer: 'Kunde', done: 'erledigt', doing: 'in Arbeit', waiting: 'wartet', todo: 'geplant',
          crit: 'kritischer Pfad', mile: 'Meilenstein', base: 'Basisplan', today: 'heute', due: 'Kundentermin',
-         late: 'überfällig', ok: 'fertig', slip: 'Tage Verzug ggü. Basisplan'},
+         late: 'überfällig', ok: 'fertig', slip: 'Tage Verzug ggü. Basisplan', fact: 'Ist',
+         forecast: 'Prognose', planned: 'Plan'},
     en: {plan: 'Project plan', timeline: 'Project timeline', chain: 'Project parties and supply chain', asof: 'as of',
          customer: 'Customer', done: 'done', doing: 'in progress', waiting: 'waiting', todo: 'planned',
          crit: 'critical path', mile: 'milestone', base: 'baseline', today: 'today', due: 'customer deadline',
-         late: 'overdue', ok: 'done', slip: 'days behind the baseline'},
+         late: 'overdue', ok: 'done', slip: 'days behind the baseline', fact: 'actual', forecast: 'forecast',
+         planned: 'planned'},
     uk: {plan: 'План проєкту', timeline: 'Шкала проєкту', chain: 'Сторони проєкту й ланцюжок постачання',
          asof: 'станом на', customer: 'Клієнт', done: 'виконано', doing: 'в роботі', waiting: 'чекаємо',
          todo: 'заплановано', crit: 'критичний шлях', mile: 'віха', base: 'базовий план', today: 'сьогодні',
-         due: 'строк клієнту', late: 'прострочено', ok: 'готово', slip: 'дн. зсуву від базового плану'}
+         due: 'строк клієнту', late: 'прострочено', ok: 'готово', slip: 'дн. зсуву від базового плану',
+         fact: 'факт', forecast: 'прогноз', planned: 'план'}
   };
   // 📅 Наради звірки, пропозиції яких зараз на діаграмі: [{m, tag, day}] (gantt.classic_data → props)
   function expMeetings() {
@@ -1969,6 +1972,10 @@
       legend.push(['text', '#cf222e', w.slip]);
     } else if (expKind === 'chain') {
       legend = [['outline', '#cf222e', w.late], ['outline', '#9a6700', w.waiting], ['outline', '#1a7f37', w.ok]];
+    } else if (expKind === 'timeline') {                               // 🗓 шкала: факт, прогноз, план, базовий план
+      legend = [['bar', '#0860c9', w.fact], ['hatch', '#0860c9', w.forecast], ['dashbox', '#57606a', w.planned],
+                ['base', '#4b5563', w.base], ['diamond', '#1c2128', w.mile], ['line', '#1c2128', w.today]];
+      if (b.dataset.due) legend.push(['dash', '#cf222e', w.due]);
     }
     if (expKind === 'plan' && props) {                                  // 📅 пунктир кольором наради
       expMeetings().forEach(function (m) {

@@ -79,6 +79,11 @@
       return 22;
     } else if (kind === 'base') {
       ctx.globalAlpha = .7; ctx.fillRect(x, y - 2, 22, 4);
+    } else if (kind === 'hatch') {                 // прогноз — штриховано
+      ctx.lineWidth = 1; ctx.strokeRect(x + .5, y - 5.5, 21, 11);
+      ctx.beginPath(); ctx.rect(x, y - 6, 22, 12); ctx.clip();
+      ctx.lineWidth = 2;
+      for (var i = -12; i < 24; i += 5) { ctx.beginPath(); ctx.moveTo(x + i, y + 6); ctx.lineTo(x + i + 12, y - 6); ctx.stroke(); }
     } else {
       ctx.globalAlpha = kind === 'soft' ? .45 : .85; ctx.fillRect(x, y - 6, 22, 12);
     }

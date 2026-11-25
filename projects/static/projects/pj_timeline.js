@@ -20,6 +20,14 @@
   var EMPTY_TEXT = 'На шкалі поки порожньо: додайте листування, Angebot, замовлення чи закупівлю до проєкту — вони з’являться тут самі.';
   var NONE_TEXT = 'У цьому періоді на вибраних доріжках подій немає — віддаліть масштаб чи ввімкніть доріжки.';
   var CLUSTER_TEXT = '{n} подій тут — клік, щоб наблизити:';
+  var WAIT_TEXT = '← чекає нашої відповіді {n} дн.';
+  var HATCH = ['open', 'warn', 'bad', 'ok', 'def'];
+  var PLAN_ROW = 22;                                  // рядок фаз «📋 Фази: план і факт»
+  function rect(x1, y, w, h, cls, fill) {
+    return '<rect x="' + n1(x1) + '" y="' + n1(y) + '" width="' + n1(Math.max(w, 1)) + '" height="' + n1(h) +
+      '" rx="3" class="' + cls + '"' + (fill ? ' fill="' + fill + '"' : '') + '/>';
+  }
+  function hatch(cls) { return 'url(#pjtH-' + (HATCH.indexOf(cls) >= 0 ? cls : 'def') + ')'; }
 
   function dnum(iso) { return iso ? Math.round(Date.parse(String(iso).slice(0, 10) + 'T00:00:00Z') / DAY) : null; }
   function diso(n) { return new Date(Math.round(n) * DAY).toISOString().slice(0, 10); }
@@ -99,6 +107,9 @@
       html += '<button type="button" class="pjc-b pjt-chip" data-tl-lane="' + l[0] + '" title="' + esc(l[1]) + '">' +
         esc(SHORT[l[0]] || l[1]) + '</button>';
     });
+    if (this.events.some(function (e) { return e.bs || e.bd; })) {
+      html += '<button type="button" class="pjc-b pjt-chip" data-tl-base title="Базовий план під фазами: тонка лінія й порожні ромби воріт — як планували, коли зафіксували">📏 Базовий план</button>';
+    }
     html += '</span>';
     bar.innerHTML = html;
     var wrap = document.createElement('div');
@@ -122,6 +133,11 @@
       else if (t.dataset.tlZoom === 'out') self.zoomAt(2, null);
       else if (t.dataset.tlZoom === 'today') self.centerOn(self.today);
       else if (t.dataset.tlLanes) self.setLanes(t.dataset.tlLanes);
+      else if (t.hasAttribute('data-tl-base')) {
+        if (self.off.base) delete self.off.base; else self.off.base = 1;
+        self.save();
+        self.render();
+      }
       else if (t.dataset.tlLane) {
         if (self.off[t.dataset.tlLane]) delete self.off[t.dataset.tlLane];
         else self.off[t.dataset.tlLane] = 1;
@@ -265,8 +281,9 @@
       }).sort(function (a, b) { return a.s - b.s || ((a.e || a.s) - (b.e || b.s)); });
       if (!items.length) return;
       shown += items.length;
-      var r = l[0] === 'mail' ? self.drawMail(items, y, xc)
-        : (l[0] === 'hours' ? self.drawHours(items, y, x, W) : self.drawLane(items, y, x, xc, clip, W));
+      var r = l[0] === 'mail' ? self.drawMail(items, y, xc, W)
+        : (l[0] === 'hours' ? self.drawHours(items, y, x, W)
+          : (l[0] === 'plan' ? self.drawPlan(items, y, x, xc, clip, W) : self.drawLane(items, y, x, xc, clip, W)));
       if (idx % 2) body.push('<rect x="0" y="' + n1(y) + '" width="' + W + '" height="' + n1(r[0]) + '" class="pjt-alt"/>');
       body.push('<text x="8" y="' + n1(y + Math.min(r[0], 30) / 2 + 4) + '" class="pjt-lab">' + esc(l[1]) + '</text>');
       body.push(r[1]);
@@ -278,8 +295,8 @@
       b.classList.toggle('on', on);
       b.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
-    this.bar.querySelectorAll('[data-tl-lane]').forEach(function (b) {
-      var on = !self.off[b.dataset.tlLane];
+    this.bar.querySelectorAll('[data-tl-lane], [data-tl-base]').forEach(function (b) {
+      var on = !self.off[b.dataset.tlLane || 'base'];
       b.classList.toggle('on', on);
       b.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
@@ -287,6 +304,10 @@
     var out = ['<svg class="pjt pjt-live" width="' + W + '" height="' + (total + 32) + '" viewBox="0 0 ' + W + ' ' +
                (total + 32) + '" role="img" aria-label="' + esc('Шкала проєкту ' + dshort(v.from) + ' – ' +
                dshort(v.to - 1) + ': подій ' + shown) + '">'];
+    out.push('<defs>' + HATCH.map(function (k) {     // штрихування прогнозу — кольором стану
+      return '<pattern id="pjtH-' + k + '" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">' +
+        '<rect width="6" height="6" class="pjt-hb pjt-hb-' + k + '"/><line x1="0" y1="0" x2="0" y2="6" class="pjt-hl pjt-hl-' + k + '"/></pattern>';
+    }).join('') + '</defs>');
     out.push(this.grid(x, ppd, total, W));
     if (!body.length) {
       out.push('<text x="' + (LEFT + 8) + '" y="' + (HEAD + 24) + '" class="pjt-lab">' + esc(NONE_TEXT) + '</text>');
@@ -376,13 +397,18 @@
     return e.url ? '<a href="' + esc(e.url) + '" target="_blank" rel="noopener">' + g + '</a>' : g;
   }
 
+  function forecasts(e, today) {                     // смуга в роботі, що ще триває, — прогноз після сьогодні
+    return e.shape === 'bar' && !e.planned && e.e !== null && e.e > today &&
+      (e.cls === 'open' || e.cls === 'warn' || e.cls === 'bad');
+  }
   Timeline.prototype.drawLane = function (items, top, x, xc, clip, W) {
-    var rows = [], placed = [], clusters = [];
+    var rows = [], placed = [], clusters = [], today = this.today;
     items.forEach(function (e) {
       var point = e.shape !== 'bar';
       var x1 = point ? clip(xc(e.s)) : clip(x(e.s));
       var x2 = point ? x1 : Math.max(clip(x((e.e !== null ? e.e : e.s) + 1)), x1 + 3);
-      var label = e.label || '', lw = label.length * CHAR_W, anchor = 'start', lx = x2 + (point ? 9 : 5);
+      var label = (e.label || '') + (forecasts(e, today) ? ' → ' + dshort(e.e) : '');
+      var lw = label.length * CHAR_W, anchor = 'start', lx = x2 + (point ? 9 : 5);
       var lo = x1 - 7, hi = lx + lw;
       if (label && hi > W - RIGHT) {
         anchor = 'end';
@@ -412,7 +438,11 @@
     var height = PAD * 2 + nrows * ROW_H, parts = [];
     placed.forEach(function (p) {
       var e = p[0], cy = top + PAD + p[1] * ROW_H + ROW_H / 2, x1 = p[2], x2 = p[3], inner;
-      if (e.shape === 'bar') {
+      if (e.shape === 'bar' && forecasts(e, today)) {
+        var xt = Math.min(Math.max(clip(x(today + 1)), x1), x2);
+        inner = (xt > x1 ? rect(x1, cy - 5, xt - x1, 10, 'pjt-bar') : '') +
+          (x2 > xt ? rect(xt, cy - 5, x2 - xt, 10, 'pjt-fc pjt-fc-' + e.cls, hatch(e.cls)) : '');
+      } else if (e.shape === 'bar') {
         inner = '<rect x="' + n1(x1) + '" y="' + n1(cy - 5) + '" width="' + n1(x2 - x1) + '" height="10" rx="3" class="pjt-bar"/>';
       } else if (e.shape === 'diamond') {
         inner = '<polygon points="' + n1(x1) + ',' + n1(cy - 6) + ' ' + n1(x1 + 6) + ',' + n1(cy) + ' ' + n1(x1) + ',' +
@@ -433,7 +463,7 @@
           (e.lane === 'plan' ? ' data-mv-tr="exact" data-mv-full="' + esc(p[4]) + '">' : ' translate="no">') +
           esc(p[4]) + '</text>';
       }
-      parts.push(wrapEv(e, inner));
+      parts.push(wrapEv(e, inner, e.planned ? ' pjt-planned' : ''));
     });
     var cy = top + PAD + (nrows - 1) * ROW_H + ROW_H / 2;
     clusters.forEach(function (c) {
@@ -452,7 +482,83 @@
     return [height, parts.join('')];
   };
 
-  Timeline.prototype.drawMail = function (items, top, xc) {
+  Timeline.prototype.drawPlan = function (items, top, x, xc, clip, W) {
+    var today = this.today, rows = [], placed = [], parts = [], PW = 6.4;
+    var phases = items.filter(function (e) { return e.shape === 'bar'; });
+    var gates = items.filter(function (e) { return e.shape !== 'bar'; });
+    phases.forEach(function (e) {                      // фази — по можливості в один рядок
+      var x1 = clip(x(e.s)), x2 = Math.max(clip(x(e.e + 1)), x1 + 3);
+      var name = e.label || '', full = name + (e.prog ? ' · ' + e.prog : '');
+      var inside = (x2 - x1 - 10) >= full.length * PW;                 // назва в смузі — якщо влазить уся
+      var out = !inside && x2 + 6 + full.length * PW <= W - RIGHT;      // інакше праворуч від смуги
+      var hi = out ? x2 + 6 + full.length * PW : x2;
+      var row = place(rows, x1 - 1, hi + 1, 4);
+      if (row === null) { row = rows.length - 1; out = false; }
+      placed.push([e, row, x1, x2, inside ? 'in' : (out ? 'out' : 'cut'), full]);
+    });
+    var nrows = Math.max(rows.length, 1);
+    function rowY(r) { return top + PAD + r * PLAN_ROW + PLAN_ROW / 2; }
+    placed.forEach(function (p) {
+      var e = p[0], cy = rowY(p[1]), x1 = p[2], x2 = p[3], h = 16, y0 = cy - h / 2, inner = '';
+      if (e.state === 'future') {
+        inner += rect(x1, y0, x2 - x1, h, 'pjt-pl');                      // план — пунктир
+      } else if (e.state === 'active' && e.e > today) {
+        var xt = Math.min(Math.max(clip(x(today + 1)), x1), x2);          // факт до сьогодні, далі прогноз
+        if (xt > x1) inner += rect(x1, y0, xt - x1, h, 'pjt-bar');
+        if (x2 > xt) inner += rect(xt, y0, x2 - xt, h, 'pjt-fc pjt-fc-' + (e.cls || 'open'), hatch(e.cls || 'open'));
+      } else {
+        inner += rect(x1, y0, x2 - x1, h, 'pjt-bar');                      // факт
+      }
+      var name = e.label || '', mode = p[4], tx = mode === 'out' ? x2 + 6 : x1 + 5, shown = name, prog = '';
+      if (mode === 'cut') {
+        var room = Math.floor((x2 - x1 - 10) / PW);
+        shown = room >= 4 ? (name.length > room ? name.slice(0, room - 1) + '…' : name) : '';
+      } else if (e.prog) {
+        prog = ' · ' + e.prog;
+      }
+      if (shown) {
+        inner += '<text x="' + n1(tx) + '" y="' + n1(cy + 4) + '" class="' + (mode === 'out' ? 'pjt-t' : 'pjt-pin') +
+          '"><tspan data-mv-tr="exact" data-mv-full="' + esc(name) + '"' +
+          (shown !== name ? ' data-mv-cut="' + shown.length + '"' : '') + '>' + esc(shown) + '</tspan>' + esc(prog) + '</text>';
+      }
+      parts.push(wrapEv(e, inner));
+    });
+    // Ворота: прогноз віх (ромби кольором стану) і 📏 базовий план (тонка лінія, порожні ромби) — окремою лінією під
+    // фазами, назва й дата віхи — під нею
+    var base = !this.off.base, hasBase = base && (phases.some(function (e) { return e.bs && e.be; }) ||
+                                                   gates.some(function (e) { return e.bd; }));
+    if (!gates.length && !hasBase) return [PAD * 2 + nrows * PLAN_ROW, parts.join('')];
+    var ly = top + PAD + nrows * PLAN_ROW + 8, labels = [];
+    if (hasBase) {
+      phases.forEach(function (e) {
+        if (!e.bs || !e.be) return;
+        var a2 = clip(x(dnum(e.bs))), b2 = clip(x(dnum(e.be) + 1));
+        if (b2 > a2) parts.push('<line x1="' + n1(a2) + '" y1="' + n1(ly) + '" x2="' + n1(b2) + '" y2="' + n1(ly) + '" class="pjt-base"/>');
+      });
+      gates.forEach(function (e) {
+        if (!e.bd) return;
+        var bx = clip(xc(dnum(e.bd)));
+        parts.push('<polygon points="' + n1(bx) + ',' + n1(ly - 4) + ' ' + n1(bx + 4) + ',' + n1(ly) + ' ' + n1(bx) + ',' +
+                   n1(ly + 4) + ' ' + n1(bx - 4) + ',' + n1(ly) + '" class="pjt-bdia"><title>' +
+                   esc('📏 ' + (e.short || '') + ' — базовий план ' + dshort(dnum(e.bd))) + '</title></polygon>');
+      });
+    }
+    gates.forEach(function (e) {
+      var gx = clip(xc(e.s));
+      var inner = '<polygon points="' + n1(gx) + ',' + n1(ly - 7) + ' ' + n1(gx + 7) + ',' + n1(ly) + ' ' + n1(gx) + ',' +
+        n1(ly + 7) + ' ' + n1(gx - 7) + ',' + n1(ly) + '" class="pjt-dia pjt-gate"/>';
+      var lab = (e.short || (e.label || '').replace(/^◆\s*/, '')) + ' ' + dshort(e.s), lw = lab.length * 5.6;
+      var l = Math.min(Math.max(gx - lw / 2, LEFT), W - RIGHT - lw), r = place(labels, l, l + lw, 2);
+      if (r !== null) {
+        inner += '<text x="' + n1(l) + '" y="' + n1(ly + 19 + r * 12) + '" class="pjt-gt" translate="no">' + esc(lab) + '</text>';
+      }
+      parts.push(wrapEv(e, inner));
+    });
+    var height = PAD * 2 + nrows * PLAN_ROW + 16 + (labels.length ? labels.length * 12 + 2 : 0);
+    return [height, parts.join('')];
+  };
+
+  Timeline.prototype.drawMail = function (items, top, xc, W) {
     var buckets = {}, order = [];
     items.forEach(function (e) {                       // точки, що злилися б, — одна (сума листів)
       var k = e.cls + ':' + Math.round(xc(e.s) / 5);
@@ -460,6 +566,7 @@
       var b = buckets[k];
       b.n += e.count || 1;
       b.ring = b.ring || !!e.ring;
+      if (e.ring && e.wait !== undefined && e.wait !== null) b.wait = Math.max(b.wait || 0, e.wait);
       b.mails = b.mails.concat(e.mails || []).slice(0, 12);
       b.last = Math.max(b.last, e.s);
       b.tips.push(e.tip);
@@ -476,6 +583,15 @@
                    : e.tip};
       return wrapEv(one, inner);
     });
+    var lastRing = null;
+    order.forEach(function (k) { var b = buckets[k]; if (b.ring && (!lastRing || b.s > lastRing.s)) lastRing = b; });
+    if (lastRing && lastRing.wait) {
+      var txt = WAIT_TEXT.replace('{n}', lastRing.wait), rx = xc(lastRing.s) + 12;
+      var ry = top + (lastRing.e.cls === 'in' ? 12 : 25) + 4;
+      if (rx + txt.length * CHAR_W <= (W || 1e9) - RIGHT) {
+        parts.push('<text x="' + n1(rx) + '" y="' + n1(ry) + '" class="pjt-wait">' + esc(txt) + '</text>');
+      }
+    }
     return [MAIL_H, parts.join('')];
   };
 

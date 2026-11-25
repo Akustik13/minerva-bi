@@ -275,7 +275,7 @@ class DrawingTests(PlanBase):
         self.assertNotIn("tabindex", gantt.render(self.project, facts["plan"], self.today))
         tl = timeline.render(self.project, facts, self.user)
         ET.fromstring(tl)
-        self.assertIn("📋 Фази й віхи", tl)
+        self.assertIn("📋 Фази: план і факт", tl)
         self.assertIn("◆ Muster OK", tl)
         self.assertIn("Muster &lt;OK&gt;", tl)
 
@@ -324,3 +324,44 @@ class TemplateAdminTests(PlanBase):
         self.assertFalse(form([{"name": "A", "steps": [{"title": "t", "side": "boss"}]}]).is_valid())
         self.assertFalse(form([{"name": "A", "steps": []}]).is_valid())
         self.assertTrue(form([{"name": "A", "steps": [{"title": "t", "days": 2, "trigger": "po_received"}]}]).is_valid())
+
+
+class TimelinePlanFactTests(PlanBase):
+    """🗓 Шкала: «📋 Фази: план і факт» (стан фази, прогрес, базовий план, віхи), кроки плану без об'єкта — пунктиром
+    «(план)» на доріжці свого об'єкта, «чекає нашої відповіді N дн.»."""
+
+    def evs(self):
+        return timeline.events(self.project, overview.collect(self.project), self.user, self.today)
+
+    def test_phases_plan_and_fact_with_baseline(self):
+        done = ProjectPhase.objects.create(project=self.project, name="Spec", order=10)
+        now = ProjectPhase.objects.create(project=self.project, name="Proto", order=20)
+        later = ProjectPhase.objects.create(project=self.project, name="Serie", order=30)
+        a = self.step("Lastenheft", 3, start=self.d(-10), phase=done, status=ProjectStep.DONE, done_on=self.d(-8))
+        b = self.step("Muster", 6, start=self.d(-2), phase=now, after=[a])
+        self.step("Freigabe", 0, kind=M, phase=now, after=[b])
+        self.step("Serienstart", 5, start=self.d(20), phase=later)
+        plan.baseline(self.project)
+        phases = {e["label"]: e for e in self.evs() if e["lane"] == "plan" and e.get("kind") == "phase"}
+        self.assertEqual({k: v["state"] for k, v in phases.items()}, {"Spec": "done", "Proto": "active", "Serie": "future"})
+        self.assertEqual(phases["Proto"]["prog"], "0/2")
+        self.assertTrue(phases["Proto"]["bs"] and phases["Proto"]["be"])
+        ms = next(e for e in self.evs() if e["lane"] == "plan" and e.get("kind") == "ms")
+        self.assertEqual((ms["short"], ms["bd"]), ("Freigabe", ms["start"].isoformat()))
+        self.assertIn("📋 Фази: план і факт", timeline.render(self.project, overview.collect(self.project), self.user))
+
+    def test_planned_steps_without_objects_show_dashed_on_their_lane(self):
+        s = self.step("Muster an den Kunden senden", 3, start=self.d(5), trigger="order_shipped")
+        self.step("Bauteile bestellen", 2, start=self.d(1), trigger="po_ordered")
+        self.step("Ohne Bedingung", 2, start=self.d(1))
+        planned = {e["lane"]: e for e in self.evs() if e.get("planned")}
+        self.assertEqual(set(planned), {"orders", "supply"})
+        self.assertEqual((planned["orders"]["label"], planned["orders"]["cls"]), ("Muster an den Kunden senden (план)", "plan"))
+        self.assertEqual(planned["orders"]["start"], self.d(5))
+        ProjectStep.objects.filter(pk=s.pk).update(status=ProjectStep.DONE, done_on=self.d(0))
+        self.assertNotIn("orders", {e["lane"] for e in self.evs() if e.get("planned")})     # виконано — пунктиру немає
+
+    def test_waiting_mail_has_days(self):
+        rings = [e for e in self.evs() if e["lane"] == "mail" and e.get("ring")]
+        self.assertTrue(rings)                                                 # запит клієнта ще без відповіді
+        self.assertEqual(rings[0]["wait"], (self.today - rings[0]["start"]).days)

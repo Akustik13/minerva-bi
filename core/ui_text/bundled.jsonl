@@ -3100,6 +3100,7 @@
 {"uk": "{0} (немає email)", "en": "{0} (no email)", "de": "{0} (keine E-Mail)"}
 {"uk": "{0} (немає в Minerva)", "en": "{0} (not in Minerva)", "de": "{0} (nicht in Minerva)"}
 {"uk": "{0} (немає в довіднику)", "en": "{0} (not in the reference list)", "de": "{0} (nicht in der Referenzliste)"}
+{"uk": "{0} (план)", "en": "{0} (planned)", "de": "{0} (Plan)"}
 {"uk": "{0} (продовження)", "en": "{0} (continued)", "de": "{0} (Fortsetzung)"}
 {"uk": "{0} (рік тому {1})", "en": "{0} (a year ago {1})", "de": "{0} (vor einem Jahr {1})"}
 {"uk": "{0} (сьогодні вже {1}); уже переглянуті — без обмежень, решта у списках приховується.", "en": "{0} (already {1} today); records already viewed are not limited, the rest are hidden in lists.", "de": "{0} (heute bereits {1}); bereits angesehene Datensätze unterliegen keiner Beschränkung, der Rest wird in Listen ausgeblendet."}
@@ -3505,6 +3506,7 @@
 {"uk": "{0} — число", "en": "{0} — a number", "de": "{0} – eine Zahl"}
 {"uk": "{0} — ще на перевірці DigiKey. Спробуйте пізніше.", "en": "{0} — still under review by DigiKey. Try again later.", "de": "{0} — wird von DigiKey noch geprüft. Versuchen Sie es später erneut."}
 {"uk": "{0} — ще не збережена в магазині.", "en": "{0} — not saved in the shop yet.", "de": "{0} – noch nicht im Shop gespeichert."}
+{"uk": "{0} — ще немає прив'язаного об'єкта", "en": "{0} — no linked item yet", "de": "{0} — noch kein verknüpftes Objekt"}
 {"uk": "{0} — ще очікує DigiKey", "en": "{0} — still waiting for DigiKey", "de": "{0} — wartet noch auf DigiKey"}
 {"uk": "{0} — що бачить і що може змінити", "en": "{0} — what it can see and change", "de": "{0} — was er sehen und ändern kann"}
 {"uk": "{0} — як в оригіналі", "en": "{0} — as in the original", "de": "{0} – wie im Original"}
@@ -4783,8 +4785,10 @@
 {"uk": "Базовий URL без слеша на кінці. Приклад: https://akustik.synology.me:81 — використовується для OAuth Callback та Webhook URL.", "en": "Base URL without a trailing slash. Example: https://akustik.synology.me:81 — used for the OAuth Callback and Webhook URL.", "de": "Basis-URL ohne abschließenden Schrägstrich. Beispiel: https://akustik.synology.me:81 — wird für OAuth Callback und Webhook-URL verwendet."}
 {"uk": "Базовий URL сайту (напр. https://jlcpcb.com). Буде підставлятися в гіперпосилання на рахунок.", "en": "Base URL of the site (e.g. https://jlcpcb.com). Used in the hyperlink to the invoice.", "de": "Basis-URL der Website (z. B. https://jlcpcb.com). Wird im Hyperlink zur Rechnung verwendet."}
 {"uk": "Базовий кінець", "en": "Baseline end", "de": "Basis-Ende"}
+{"uk": "Базовий план", "en": "Baseline", "de": "Basisplan"}
 {"uk": "Базовий план зафіксовано", "en": "Baseline saved", "de": "Basisplan festgelegt"}
 {"uk": "Базовий план зафіксовано: кроків {0}", "en": "Baseline saved: {0} steps", "de": "Basisplan festgelegt: {0} Schritte"}
+{"uk": "Базовий план під фазами: тонка лінія й порожні ромби воріт — як планували, коли зафіксували", "en": "Baseline under the phases: thin line and hollow gate diamonds — as planned when it was fixed", "de": "Basisplan unter den Phasen: dünne Linie und leere Meilenstein-Rauten — wie beim Festlegen geplant"}
 {"uk": "Базовий початок", "en": "Baseline start", "de": "Basis-Beginn"}
 {"uk": "Базовий промпт персонажа", "en": "Base persona prompt", "de": "Basis-Prompt der Persona"}
 {"uk": "Базових цін немає — показано «Ціну продажу» (історії змін вона не має).", "en": "No base prices — the “Sale price” is shown (it has no change history).", "de": "Keine Basispreise — angezeigt wird der „Verkaufspreis“ (er hat keinen Änderungsverlauf)."}
@@ -7832,6 +7836,8 @@
 {"uk": "За назвою", "en": "By name", "de": "Nach Name"}
 {"uk": "За період", "en": "In the period", "de": "Im Zeitraum"}
 {"uk": "За планом", "en": "On track", "de": "Im Plan"}
+{"uk": "За планом: {0} · {1}", "en": "As planned: {0} · {1}", "de": "Laut Plan: {0} · {1}"}
+{"uk": "За планом: {0} · {1} {2} — ще немає прив'язаного об'єкта", "en": "As planned: {0} · {1} {2} — no linked item yet", "de": "Laut Plan: {0} · {1} {2} — noch kein verknüpftes Objekt"}
 {"uk": "За правилом", "en": "By rule", "de": "Nach Regel"}
 {"uk": "За правилом з налаштувань (", "en": "By the rule from the settings (", "de": "Nach der Regel aus den Einstellungen ("}
 {"uk": "За пріоритетом", "en": "By priority", "de": "Nach Priorität"}
@@ -19012,6 +19018,7 @@
 {"uk": "Фази й кроки таблицею — як у Excel", "en": "Phases and steps as a table — like in Excel", "de": "Phasen und Schritte als Tabelle — wie in Excel"}
 {"uk": "Фази плану", "en": "Plan phases", "de": "Planphasen"}
 {"uk": "Фази проєкту", "en": "Project phases", "de": "Projektphasen"}
+{"uk": "Фази: план і факт", "en": "Phases: plan and actual", "de": "Phasen: Plan und Ist"}
 {"uk": "Фазовий шум", "en": "Phase noise", "de": "Phasenrauschen"}
 {"uk": "Фазу «{0}» уже прибрано — закрийте редактор і відкрийте знову", "en": "Phase «{0}» has already been removed — close the editor and open it again", "de": "Die Phase «{0}» wurde bereits entfernt — schließen Sie den Editor und öffnen Sie ihn erneut"}
 {"uk": "Фазу вже прибрано", "en": "The phase was already removed", "de": "Die Phase wurde bereits entfernt"}
@@ -20621,6 +20628,7 @@
 {"uk": "бази даних", "en": "of the database", "de": "der Datenbank"}
 {"uk": "базова ціна × курс", "en": "base price × rate", "de": "Basispreis × Kurs"}
 {"uk": "базовий план", "en": "baseline", "de": "Basisplan"}
+{"uk": "базовий план {0} → {1}", "en": "baseline {0} → {1}", "de": "Basisplan {0} → {1}"}
 {"uk": "базовий план від {0}", "en": "baseline of {0}", "de": "Basisplan vom {0}"}
 {"uk": "базовий план не зафіксовано", "en": "no baseline saved", "de": "kein Basisplan festgelegt"}
 {"uk": "базові", "en": "base", "de": "Basis-"}
@@ -20774,6 +20782,7 @@
 {"uk": "в процесі, є поточний крок", "en": "in progress, there is a current step", "de": "in Bearbeitung, es gibt einen aktuellen Schritt"}
 {"uk": "в рахунку → завантаження A4-документу з реквізитами компанії, адресами, таблицею позицій, VAT та банківськими деталями (IBAN/SWIFT).", "en": "in the invoice → download of an A4 document with company details, addresses, a table of line items, VAT and bank details (IBAN/SWIFT).", "de": "in der Rechnung → Herunterladen eines A4-Dokuments mit Firmendaten, Adressen, Positionstabelle, MwSt. und Bankdaten (IBAN/SWIFT)."}
 {"uk": "в роботі", "en": "in progress", "de": "in Arbeit"}
+{"uk": "в роботі (факт)", "en": "in progress (actual)", "de": "in Arbeit (Ist)"}
 {"uk": "в середньому", "en": "on average", "de": "im Durchschnitt"}
 {"uk": "в сутінках", "en": "at dusk", "de": "in der Dämmerung"}
 {"uk": "в інвойсі «все оплачено», а UPS прийде до клієнта з рахунком за мито.", "en": "the invoice says “all paid”, but UPS will come to the customer with a bill for duties.", "de": "auf der Rechnung steht „alles bezahlt“, aber UPS kommt zum Kunden mit einer Rechnung für den Zoll."}
@@ -21196,6 +21205,7 @@
 {"uk": "віха", "en": "milestone", "de": "Meilenstein"}
 {"uk": "віха · +N — зсув від базового · 🔗 стан з прив'язаних об'єктів", "en": "milestone · +N — slip from the baseline · 🔗 state from linked objects", "de": "Meilenstein · +N — Verschiebung gegenüber dem Basisplan · 🔗 Zustand aus verknüpften Objekten"}
 {"uk": "віха плану", "en": "plan milestone", "de": "Meilenstein des Plans"}
+{"uk": "віха, ворота", "en": "milestone, gate", "de": "Meilenstein, Gate"}
 {"uk": "г (грам)", "en": "g (gram)", "de": "g (Gramm)"}
 {"uk": "галочка «{0}» на «🧠 База знань» вимкнена", "en": "the “{0}” checkbox on “🧠 Knowledge base” is off", "de": "das Kontrollkästchen „{0}“ auf „🧠 Wissensdatenbank“ ist deaktiviert"}
 {"uk": "галочка «Оплата на сторінці сайту»", "en": "checkbox «Оплата на сторінці сайту»", "de": "Häkchen «Оплата на сторінці сайту»"}
@@ -23649,6 +23659,8 @@
 {"uk": "пишіть як колезі — або продиктуйте", "en": "write as to a colleague — or dictate", "de": "schreiben Sie wie einem Kollegen — oder diktieren Sie"}
 {"uk": "плавно — як на DigiKey", "en": "smoothly — like on DigiKey", "de": "gleitend — wie bei DigiKey"}
 {"uk": "плавно — як на DigiKey (на малих кількостях швидше)", "en": "smoothly — like on DigiKey (faster on small quantities)", "de": "gleitend — wie bei DigiKey (bei kleinen Mengen schneller)"}
+{"uk": "план", "en": "plan", "de": "Plan"}
+{"uk": "план / чернетка", "en": "planned / draft", "de": "Plan / Entwurf"}
 {"uk": "план {0}", "en": "plan {0}", "de": "Plan {0}"}
 {"uk": "план {0}–{1}", "en": "plan {0}–{1}", "de": "Plan {0}–{1}"}
 {"uk": "план написано іншою мовою — Claude перекладе назви кроків і фаз мовою документа (назви фірм, людей і артикули лишаються); переклад запам’ятовується — повторний експорт без оплати", "en": "the plan is written in another language — Claude translates the step and phase names into the document language (company and people names and part numbers stay); the translation is remembered — exporting again costs nothing", "de": "der Plan ist in einer anderen Sprache geschrieben — Claude übersetzt die Namen der Schritte und Phasen in die Dokumentsprache (Firmen-, Personennamen und Artikelnummern bleiben); die Übersetzung wird gespeichert — erneuter Export kostet nichts"}
@@ -25213,6 +25225,7 @@
 {"uk": "файлів тут", "en": "files here", "de": "Dateien hier"}
 {"uk": "файлів: {0}", "en": "files: {0}", "de": "Dateien: {0}"}
 {"uk": "файлів: {0} — дивіться в DigiKey", "en": "files: {0} — see DigiKey", "de": "Dateien: {0} — siehe DigiKey"}
+{"uk": "факт", "en": "actual", "de": "Ist"}
 {"uk": "форма «Kontakt»; «Відповісти» — пише тому, хто заповнив", "en": "the «Kontakt» form; «Reply» writes to whoever filled it in", "de": "Formular „Kontakt“; „Antworten“ schreibt dem, der es ausgefüllt hat"}
 {"uk": "форма з даними замовлення → DOCX/PDF у документи замовлення", "en": "a form with the order data → DOCX/PDF into the order documents", "de": "Formular mit den Auftragsdaten → DOCX/PDF in die Auftragsdokumente"}
 {"uk": "форма: {0} [{1}]", "en": "form: {0} [{1}]", "de": "Formular: {0} [{1}]"}
@@ -25378,6 +25391,7 @@
 {"uk": "чекає затвердження DigiKey", "en": "awaiting DigiKey approval", "de": "wartet auf Genehmigung durch DigiKey"}
 {"uk": "чекає звірки стрічки", "en": "waiting for feed reconciliation", "de": "wartet auf den Feed-Abgleich"}
 {"uk": "чекає нашої відповіді", "en": "waiting for our reply", "de": "wartet auf unsere Antwort"}
+{"uk": "чекає нашої відповіді {0} дн.", "en": "waiting for our reply {0} d.", "de": "wartet auf unsere Antwort {0} T."}
 {"uk": "чекає перевірки", "en": "awaiting check", "de": "wartet auf Prüfung"}
 {"uk": "чекає передачі", "en": "awaiting delivery", "de": "wartet auf Übermittlung"}
 {"uk": "чекає підтвердження", "en": "awaiting confirmation", "de": "wartet auf Bestätigung"}
