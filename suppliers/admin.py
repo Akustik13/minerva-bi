@@ -646,6 +646,8 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                 pass
         cmp = rfq_compare.table(req)
         rows = cmp["rows"]
+        from suppliers.services import rfq_bank
+        bank = rfq_bank.bank(req, [row["recipient"] for row in rows])      # 📂 усі файли — вікно «📂 Файли»
         n_files = dict(SupplierReplyFile.objects.filter(recipient__request=req).values_list("recipient")
                        .annotate(n=Count("pk")).values_list("recipient", "n"))
         for row in rows:
@@ -693,6 +695,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             cmp=cmp, qtys=cmp["qtys"], ncols=9 if cmp["qtys"] else 7, stale=rfq_compare.stale(req),
             st=rfq_stats.stats(req, cmp), ai_sum=rfq_usage.summary(req, rows),
             compare_json=_js({"rows": rfq_compare.breakdown(cmp), "qtys": cmp["qtys"], "home": cmp["home"]}),
+            bank_json=_js(bank), bank_count=bank["count"],
             marks_json=_js({"colors": [{"key": k, "icon": i, "name": n, "hex": h} for k, i, n, h in rfq_marks.COLORS],
                             "stickers": [{"key": k, "icon": i, "name": n} for k, i, n in rfq_marks.STICKERS],
                             "text_max": rfq_marks.TEXT_MAX}),

@@ -153,6 +153,10 @@
   .rw-rank { display: inline-block; margin-top: 3px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 700;
     background: rgba(91, 141, 239, .18); color: var(--body-fg); white-space: nowrap; }
   .rw-rank[hidden] { display: none; }
+  .rw-files-btn { border: 1px solid var(--border-strong, #ccc); background: transparent; color: inherit; border-radius: 10px;
+    padding: 0 7px; font: inherit; font-size: 11.5px; cursor: pointer; }
+  .rw-files-btn:hover { background: rgba(91, 141, 239, .15); }
+  .rw-bank-btn { white-space: nowrap; }
   table.rw-cmp > tbody.rw-grp[data-rank]:not([data-rank=""]) > tr.rw-row > td { box-shadow: inset 0 2px 0 rgba(91, 141, 239, .35); }
 </style>
 {% url 'admin:suppliers_supplierrequest_action' req.pk as act %}
@@ -173,7 +177,7 @@
       {% if can_change %}<a class="button" href="{% url 'admin:suppliers_supplierrequest_edit' req.pk %}">✏️ Перевірити й змінити</a>
       <form method="post" action="{{ act }}" style="display:inline">{% csrf_token %}<input type="hidden" name="do" value="review_done"><button type="submit" class="button" title="Значення правильні — більше не підсвічувати">✓ Усе перевірено</button></form>{% endif %}</div>{% endif %}
     {% if overdue %}<div class="spf-warn" style="margin-top:6px">⏰ Строк відповіді минув, мовчать: {% for r in overdue %}<span translate="no">{{ r.supplier.name }}</span>{% if not forloop.last %}, {% endif %}{% endfor %} — нагадайте (⏰ у рядку) або позначте «🔕 Не відповів».</div>{% endif %}
-    {% if files %}<div class="spf-row">{% for f in files %}<a class="spf-tag" href="{% url 'admin:suppliers_supplierrequest_file' req.pk 'req' f.pk %}" target="_blank" translate="no">📎 {{ f.name }}</a>{% endfor %}</div>{% endif %}
+    {% if files %}<div class="spf-row">{% for f in files %}<a class="spf-tag" href="{% url 'admin:suppliers_supplierrequest_file' req.pk 'req' f.pk %}" target="_blank" data-rw-file="req:{{ f.pk }}" translate="no">📎 {{ f.name }}</a>{% endfor %}</div>{% endif %}
     <details style="margin-top:6px"><summary class="spf-muted">Текст листа</summary><div class="spf-mail" translate="no"><b>{{ req.subject }}</b>
 
 {{ req.body }}</div></details>
@@ -210,9 +214,10 @@
     {% endif %}
     {% if letters_pending and can_change %}<div class="spf-warn rw-saved-line">📝 Збережені листи «Написати кожному» — не надіслано: <b>{{ letters_pending }}</b> <button type="button" class="button" id="rw-saved-open" title="Відкрити складені раніше листи — надіслати без нового складання AI">📝 Відкрити й дослати</button></div>{% endif %}
     {% include "admin/suppliers/_request_stats.html" %}
-    {% if qtys %}<div class="rw-viewbar">
-      <div class="rw-seg" role="group" aria-label="Кількість">{% for q in qtys %}<button type="button" data-rw-qi="{{ forloop.counter }}" aria-pressed="{% if forloop.first %}true{% else %}false{% endif %}" title="Пропозиції на {{ q }} шт: ціна за шт., сума, що в неї входить, строк, умови">{{ q }} шт.</button>{% endfor %}{% if qtys|length > 1 %}<button type="button" data-rw-qi="all" aria-pressed="false" title="Ціни на всі кількості поруч, колонками — наочно порівняти 5 … 20000 шт">⇔ Усі кількості</button>{% endif %}</div>
-      <div class="rw-leg1 rw-m1"><span class="spf-muted">Позначки — що вже є в сумі постачальника:</span> <span class="rw-chip y">✓ враховано</span> <span class="rw-chip n">✗ не враховано, буде зверху</span> <span class="rw-chip u">? постачальник не уточнив</span></div>
+    {% if qtys or bank_count %}<div class="rw-viewbar">
+      {% if bank_count %}<button type="button" class="button rw-bank-btn" data-rw-files="" title="Усі файли, які надіслали постачальники, і файли нашого запиту — список по постачальниках і перегляд поруч (PDF, Excel, Word, картинки, архіви)">📂 Файли ({{ bank_count }})</button>{% endif %}
+      {% if qtys %}<div class="rw-seg" role="group" aria-label="Кількість">{% for q in qtys %}<button type="button" data-rw-qi="{{ forloop.counter }}" aria-pressed="{% if forloop.first %}true{% else %}false{% endif %}" title="Пропозиції на {{ q }} шт: ціна за шт., сума, що в неї входить, строк, умови">{{ q }} шт.</button>{% endfor %}{% if qtys|length > 1 %}<button type="button" data-rw-qi="all" aria-pressed="false" title="Ціни на всі кількості поруч, колонками — наочно порівняти 5 … 20000 шт">⇔ Усі кількості</button>{% endif %}</div>
+      <div class="rw-leg1 rw-m1"><span class="spf-muted">Позначки — що вже є в сумі постачальника:</span> <span class="rw-chip y">✓ враховано</span> <span class="rw-chip n">✗ не враховано, буде зверху</span> <span class="rw-chip u">? постачальник не уточнив</span></div>{% endif %}
       <button type="button" class="button rw-notes-btn" id="rw-notes-all" title="Коментарі під рядками: що прочитав AI, питання постачальника, умови, чого бракує">▾ Розгорнути коментарі</button>
     </div>{% endif %}
     <div class="rw-scroll">
@@ -243,7 +248,7 @@
               {% if row.peek.files %}<div class="spf-muted" translate="no">📎 {{ row.peek.files|join:" · " }}</div>{% endif %}
               <div class="spf-muted">Клік — увесь лист праворуч · Ctrl + клік — у пошті</div></span>{% endif %}</span>{% endif %}{% endif %}
             {% if row.timing.newer %}<br><span title="Найновіший лист постачальника">↓ останній {{ row.timing.last_in|date:"d.m H:i" }}</span>{% endif %}
-            {% if row.files_n %} · <span class="rw-files" title="Вкладення з листів постачальника — у запиті">📎 {{ row.files_n }}</span>{% endif %}
+            {% if row.files_n %} · <button type="button" class="rw-files-btn" data-rw-files="{{ r.pk }}" title="Усі файли від постачальника — переглянути тут, поруч зі списком">📎 {{ row.files_n }}</button>{% endif %}
             {% if r.reminded_at %} · ⏰ {{ r.reminded_at|date:"d.m" }}{% endif %}</div>
           {% if row.priced and row.gaps %}<span class="rw-pill warn" title="{{ row.gaps|join:'; ' }}">⚠️ неповна</span>{% endif %}
           {% if r.error %}<div class="spf-bad">{{ r.error|truncatechars:160 }}</div>{% endif %}</td>

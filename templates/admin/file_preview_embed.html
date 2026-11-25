@@ -1,0 +1,24 @@
+<!doctype html>
+{# 👁 Перегляд файлу всередині вікна «📂 Файли» (iframe, ?embed=1) — без меню Minerva; уміст — admin/_file_preview_body.html #}
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+<style>
+  :root { --text-muted: #6b6b6b; --hairline-color: #d9d9d9; --primary: #417690; --primary-fg: #fff; --error-fg: #c62828; --fp-top: 96px; }
+  html, body { margin: 0; background: #f4f5f7; color: #1d1d1d; font: 14px/1.45 "Segoe UI", system-ui, -apple-system, Arial, sans-serif; }
+  body { padding: 12px 14px; }
+  a { color: #1a5fb4; }
+  .button { display: inline-block; padding: 5px 11px; border: 1px solid #c9c9c9; border-radius: 6px; background: #fff; color: #1d1d1d;
+            text-decoration: none; font-size: 13px; cursor: pointer; }
+  .button:hover { background: #f0f0f0; }
+  .button.default { background: #417690; border-color: #417690; color: #fff; }
+  .button.default:hover { background: #2f5a70; }
+  h3 { font-size: 15px; }
+</style>
+</head>
+<body>
+{% include "admin/_file_preview_body.html" %}
+</body>
+</html>

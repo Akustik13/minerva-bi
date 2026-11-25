@@ -1,0 +1,122 @@
+{# 👁 Перегляд файлу — спільна частина сторінки (file_preview.html) і вбудованої версії для вікна «📂 Файли» (file_preview_embed.html); core/file_preview.py respond(). Вміст файлу — лише текстом (шаблон екранує) #}
+<style>
+  .fp-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 10px; }
+  .fp-name { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+  .fp-muted { color: var(--text-muted, #777); font-size: 12px; }
+  .fp-crumbs { font-size: 12px; margin-top: 2px; }
+  .fp-crumbs a { text-decoration: none; }
+  .fp-acts { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .fp-msg { padding: 14px 16px; border: 1px solid var(--hairline-color, #ccc); border-radius: 8px; margin: 8px 0; }
+  .fp-msg.err { border-color: var(--error-fg, #c62828); }
+  .fp-frame { width: 100%; height: calc(100vh - var(--fp-top, 190px)); min-height: 420px; border: 1px solid var(--hairline-color, #ccc); border-radius: 6px; background: #fff; }
+  .fp-img { max-width: 100%; max-height: calc(100vh - var(--fp-top, 190px)); display: block; margin: 0 auto; background: #fff;
+            background-image: linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%), linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%);
+            background-size: 16px 16px; background-position: 0 0, 8px 8px; }
+  .fp-text { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.45 Consolas, "Courier New", monospace; background: #fff; color: #111;
+             border: 1px solid var(--hairline-color, #ccc); padding: 12px; border-radius: 6px; max-height: calc(100vh - var(--fp-top, 190px)); overflow: auto; margin: 0; }
+  /* 📄 Word і 📗 Excel — «папір»: білий аркуш, чорний текст, як у Word / Excel */
+  .fp-doc { max-width: 900px; background: #fff; color: #111; border: 1px solid var(--hairline-color, #ccc); border-radius: 6px; padding: 22px 28px; line-height: 1.5;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, .12); }
+  .fp-doc h1 { font-size: 22px; margin: 14px 0 8px; color: #111; } .fp-doc h2 { font-size: 18px; margin: 14px 0 6px; color: #111; }
+  .fp-doc h3, .fp-doc h4 { font-size: 15px; margin: 12px 0 6px; color: #111; }
+  .fp-doc p { margin: 0 0 8px; } .fp-doc li { margin: 0 0 4px 18px; }
+  .fp-doc table { border-collapse: collapse; margin: 8px 0 12px; font-size: 13px; }
+  .fp-doc td { border: 1px solid #bbb; padding: 4px 7px; vertical-align: top; }
+  .fp-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 6px; }
+  .fp-tab { border: 1px solid var(--hairline-color, #ccc); background: none; color: inherit; border-radius: 6px 6px 0 0; padding: 4px 10px; cursor: pointer; font-size: 13px; }
+  .fp-tab.on { background: var(--primary, #417690); color: var(--primary-fg, #fff); border-color: transparent; }
+  .fp-sheet { overflow: auto; max-height: calc(100vh - var(--fp-top, 190px) - 40px); border: 1px solid #c8c8c8; border-radius: 4px; background: #fff; }
+  .fp-sheet table { border-collapse: collapse; margin: 0; font: 13px/1.35 Calibri, Carlito, "Segoe UI", Arial, sans-serif; background: #fff; color: #111; }
+  .fp-sheet table.fp-xl { table-layout: fixed; }
+  .fp-sheet td, .fp-sheet th { border: 1px solid #e1e1e1; padding: 2px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+  .fp-sheet table:not(.fp-xl) td, .fp-sheet table:not(.fp-xl) th { max-width: 420px; }
+  .fp-sheet thead th { position: sticky; top: 0; background: #f3f3f3; z-index: 1; font-weight: 400; font-size: 11px; color: #666; text-align: center; border-color: #d6d6d6; }
+  .fp-sheet th.fp-rn { position: sticky; left: 0; background: #f3f3f3; font-size: 11px; color: #666; text-align: right; font-weight: 400; border-color: #d6d6d6; }
+  .fp-sheet thead th.fp-rn { z-index: 2; }
+  .fp-sheet col.fp-rnc { width: 42px; }
+  .fp-arch { width: 100%; border-collapse: collapse; }
+  .fp-arch td, .fp-arch th { padding: 6px 8px; border-bottom: 1px solid var(--hairline-color, #ddd); text-align: left; font-size: 13px; }
+  .fp-arch tr:hover td { background: rgba(127, 127, 127, .08); }
+  .fp-arch td.fp-num { text-align: right; white-space: nowrap; }
+  .fp-arch .fp-path { color: var(--text-muted, #888); }
+  .fp-gal { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+  .fp-gal a { display: block; border: 1px solid var(--hairline-color, #ccc); border-radius: 6px; padding: 4px; background: #fff; }
+  .fp-gal img { max-width: 220px; max-height: 160px; display: block; }
+</style>
+
+<div class="fp-head">
+  {% if back_url %}<a class="button" id="fp-back" href="{{ back_url }}" title="Назад — {{ back_label }}">← Назад</a>{% endif %}
+  <span style="font-size:22px">{{ p.icon }}</span>
+  <div><div class="fp-name" translate="no">{{ p.basename }}</div>
+    <div class="fp-muted">{{ p.kind_name }}{% if p.size %} · {{ p.size_text }}{% endif %}{% if p.kind == "archive" and p.entries %} · файлів: {{ p.entries|length }}{% if p.more %}+{% endif %}{% endif %}</div>
+    {% if embed and crumbs|length > 1 %}<div class="fp-crumbs">{% for c in crumbs %}{% if not forloop.first %} › {% endif %}{% if c.url %}<a href="{{ c.url }}" translate="no">{% if forloop.first %}📦 {% endif %}{{ c.label }}</a>{% else %}<span translate="no">{{ c.label }}</span>{% endif %}{% endfor %}</div>{% endif %}</div>
+  <div class="fp-acts">
+    {% if not p.error %}{% if p.kind == "pdf" or p.kind == "image" %}<a class="button" href="{{ raw_url }}" target="_blank" rel="noopener" title="Відкрити на всю вкладку браузера">↗ Відкрити окремо</a>{% elif embed %}<a class="button" href="{{ page_url }}" target="_blank" rel="noopener" title="Відкрити на окремій вкладці">↗ Відкрити окремо</a>{% endif %}{% endif %}
+    {% if not p.error or p.size %}<a class="button default" href="{{ download_url }}">⬇ Завантажити</a>{% endif %}
+  </div>
+</div>
+
+{% if p.error %}<div class="fp-msg err">⚠️ {{ p.error }}</div>
+{% elif p.kind == "pdf" %}<iframe class="fp-frame" src="{{ raw_url }}" title="PDF"></iframe>
+{% elif p.kind == "image" %}<a href="{{ raw_url }}" target="_blank" rel="noopener"><img class="fp-img" src="{{ raw_url }}" alt=""></a>
+{% elif p.kind == "office" %}{% if office_ok %}<iframe class="fp-frame" src="{{ pdf_url }}" title="PDF"></iframe>
+  <div class="fp-muted">Показано як PDF — так документ перетворила Minerva; вигляд може трохи відрізнятися від Word.</div>
+  {% else %}<div class="fp-msg">📘 {{ p.note }}</div>{% endif %}
+{% elif p.kind == "text" %}<pre class="fp-text" translate="no">{{ p.text }}</pre>
+  {% if p.more %}<div class="fp-muted">Показано початок файлу — увесь текст у ⬇ файлі.</div>{% endif %}
+{% elif p.kind == "docx" %}
+  <div class="fp-doc" translate="no">
+    {% for b in p.blocks %}{% if b.t == "table" %}<table>{% for row in b.rows %}<tr>{% for c in row %}<td>{{ c|linebreaksbr }}</td>{% endfor %}</tr>{% endfor %}</table>
+    {% elif b.t == "h1" %}<h1>{{ b.text }}</h1>{% elif b.t == "h2" %}<h2>{{ b.text }}</h2>{% elif b.t == "h3" %}<h3>{{ b.text }}</h3>{% elif b.t == "h4" %}<h4>{{ b.text }}</h4>
+    {% elif b.t == "li" %}<li>{{ b.text }}</li>{% else %}<p>{% if b.bold %}<b>{{ b.text|linebreaksbr }}</b>{% else %}{{ b.text|linebreaksbr }}{% endif %}</p>{% endif %}
+    {% empty %}<p class="fp-muted">У документі немає тексту.</p>{% endfor %}
+  </div>
+  <div class="fp-muted">Показано текст і таблиці документа; вигляд (шрифти, колонтитули) — у ⬇ файлі.{% if p.more %} Документ довгий — показано початок.{% endif %}</div>
+{% elif p.kind == "sheet" %}
+  {% if p.sheets|length > 1 %}<div class="fp-tabs" role="tablist">{% for s in p.sheets %}<button type="button" class="fp-tab{% if forloop.first %} on{% endif %}" data-fp-tab="{{ forloop.counter0 }}" translate="no">{{ s.name }}{% if s.hidden %} 🙈{% endif %}</button>{% endfor %}</div>{% endif %}
+  {% for s in p.sheets %}
+  <div class="fp-sheet-wrap" data-fp-sheet="{{ forloop.counter0 }}"{% if not forloop.first %} hidden{% endif %}>
+    {% if s.rows %}{% if s.rich %}<div class="fp-sheet"><table translate="no" class="fp-xl" style="width:{{ s.width }}px">
+      <colgroup><col class="fp-rnc">{% for c in s.colw %}<col style="width:{{ c.w }}px">{% endfor %}</colgroup>
+      <thead><tr><th class="fp-rn"></th>{% for c in s.colw %}<th>{{ c.letter }}</th>{% endfor %}</tr></thead>
+      <tbody>{% for row in s.rows %}<tr><th class="fp-rn">{{ row.n }}</th>{% for c in row.cells %}<td{% if c.rs > 1 %} rowspan="{{ c.rs }}"{% endif %}{% if c.cs > 1 %} colspan="{{ c.cs }}"{% endif %}{% if c.s %} style="{{ c.s }}"{% endif %}{% if c.v %} title="{{ c.v }}"{% endif %}>{{ c.v }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}<div class="fp-sheet"><table translate="no">
+      <thead><tr><th class="fp-rn"></th>{% for l in s.letters %}<th>{{ l }}</th>{% endfor %}</tr></thead>
+      <tbody>{% for row in s.rows %}<tr><th class="fp-rn">{{ forloop.counter }}</th>{% for c in row %}<td title="{{ c }}">{{ c }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+    </table></div>{% endif %}
+    {% else %}<div class="fp-msg">Аркуш порожній.</div>{% endif %}
+    {% if s.more_rows or s.more_cols %}<div class="fp-muted">Показано {% if s.more_rows %}перші рядки{% endif %}{% if s.more_rows and s.more_cols %} і {% endif %}{% if s.more_cols %}перші колонки{% endif %} — уся таблиця у ⬇ файлі.</div>{% endif %}
+  </div>
+  {% endfor %}
+{% elif p.kind == "archive" %}
+  {% if p.entries %}
+  <table class="fp-arch"><thead><tr><th>Файл</th><th class="fp-num">Розмір</th><th class="fp-num">Дата</th><th></th></tr></thead><tbody>
+  {% for e in p.entries %}<tr><td><span>{{ e.icon }}</span> {% if e.viewable %}<a href="{{ e.view_url }}" translate="no">{{ e.label }}</a>{% else %}<span translate="no">{{ e.label }}</span>{% endif %}{% if e.note %} <span class="fp-muted">{{ e.note }}</span>{% endif %}</td>
+    <td class="fp-num">{{ e.size_text }}</td><td class="fp-num fp-muted">{{ e.when }}</td>
+    <td class="fp-num">{% if not e.note %}<a href="{{ e.download_url }}" title="Завантажити цей файл">⬇</a>{% endif %}</td></tr>{% endfor %}
+  </tbody></table>
+  {% if p.more %}<div class="fp-muted">Показано перші {{ p.entries|length }} файлів — увесь архів у ⬇ файлі.</div>{% endif %}
+  {% else %}<div class="fp-msg">Архів порожній.</div>{% endif %}
+{% else %}<div class="fp-msg">📎 {{ p.note }}</div>{% endif %}
+
+{% if media %}<h3 style="margin-top:16px">🖼 Картинки з файлу ({{ media|length }})</h3>
+<div class="fp-gal">{% for m in media %}<a href="{{ m.view }}" title="{{ m.name }}"><img src="{{ m.raw }}" alt="" loading="lazy"></a>{% endfor %}</div>{% endif %}
+
+<script>
+  document.querySelectorAll('[data-fp-tab]').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('[data-fp-tab]').forEach(function(x){ x.classList.toggle('on', x === b); });
+      document.querySelectorAll('[data-fp-sheet]').forEach(function(s){ s.hidden = s.getAttribute('data-fp-sheet') !== b.getAttribute('data-fp-tab'); });
+    });
+  });
+  // ← Назад: прийшли з Minerva — туди ж (історія браузера), інакше — на сторінку, з якої файл (запит / архів)
+  (function(){
+    var b = document.getElementById('fp-back');
+    if (!b) return;
+    b.addEventListener('click', function(e){
+      var same = document.referrer && document.referrer.indexOf(location.origin + '/') === 0;
+      if (same && history.length > 1) { e.preventDefault(); history.back(); }
+    });
+  })();
+</script>

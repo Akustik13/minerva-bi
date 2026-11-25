@@ -17,6 +17,20 @@
   <button type="button" class="button" id="rw-sel-none">✕ Зняти вибір</button>
 </div>
 
+<dialog id="rw-bank" class="rw-pv rw-bankd" aria-labelledby="rw-bank-h">
+  <div class="rw-pv-head"><b id="rw-bank-h">📂 Файли запиту</b>
+    <input type="search" id="rw-bank-q" class="rw-bank-q" placeholder="Пошук: назва файлу або постачальник" autocomplete="off">
+    <span class="rw-bank-kinds" id="rw-bank-kinds" role="group" aria-label="Тип файлу">
+      <button type="button" data-k="" aria-pressed="true">Усі</button><button type="button" data-k="pdf" aria-pressed="false">📕 PDF</button><button type="button" data-k="sheet" aria-pressed="false">📗 Excel</button><button type="button" data-k="doc" aria-pressed="false">📘 Word</button><button type="button" data-k="image" aria-pressed="false">🖼 Картинки</button><button type="button" data-k="archive" aria-pressed="false">📦 Архіви</button><button type="button" data-k="other" aria-pressed="false">📄 Інше</button></span>
+    <span id="rw-bank-only" class="rw-bank-only" hidden></span>
+    <button type="button" class="button" data-bank-close aria-label="Закрити">✕</button></div>
+  <div class="rw-bank-body">
+    <div class="rw-bank-list" id="rw-bank-list"></div>
+    <div class="rw-bank-view"><iframe id="rw-bank-frame" title="Перегляд файлу" hidden></iframe>
+      <div class="rw-bank-empty" id="rw-bank-empty">Виберіть файл ліворуч — він відкриється тут. ↑ ↓ — наступний файл.</div></div>
+  </div>
+</dialog>
+
 <dialog id="rw-cmpd" class="rw-pv rw-cmpd" aria-labelledby="rw-cmpd-h">
   <div class="rw-pv-head"><b id="rw-cmpd-h">⚖ Порівняння вибраних</b>
     <span class="rw-seg" id="rw-cmpd-q" role="group" aria-label="Кількість"></span>
@@ -170,6 +184,32 @@
     .rwc-side { flex: none; border-top: 1px solid var(--border-strong, #ddd); }
     .rwc-msg { max-width: 94%; }
   }
+  /* 📂 банк файлів запиту */
+  .rw-bankd { width: 97vw; max-width: 1700px; height: 93vh; max-height: 93vh; }
+  .rw-bankd[open] { display: flex; flex-direction: column; }
+  .rw-bankd .rw-pv-head { flex-wrap: wrap; gap: 8px; }
+  .rw-bank-q { flex: 1; min-width: 180px; max-width: 360px; padding: 5px 8px; }
+  .rw-bank-kinds { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--border-strong, #ccc); border-radius: 8px; overflow: hidden; }
+  .rw-bank-kinds button { font: inherit; font-size: 12px; border: 0; background: transparent; color: var(--body-fg); padding: 4px 9px; cursor: pointer; }
+  .rw-bank-kinds button + button { border-left: 1px solid var(--border-strong, #ccc); }
+  .rw-bank-kinds button[aria-pressed="true"] { background: var(--primary, #417690); color: var(--primary-fg, #fff); }
+  .rw-bank-only { font-size: 12px; border: 1px solid var(--primary, #5b8def); border-radius: 12px; padding: 1px 8px; cursor: pointer; }
+  .rw-bank-only[hidden] { display: none; }
+  .rw-bank-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(260px, 340px) 1fr; }
+  .rw-bank-list { overflow: auto; border-right: 1px solid var(--border-strong, #ddd); padding: 6px 0; }
+  .rw-bank-g { font-size: 12px; font-weight: 700; padding: 8px 12px 4px; color: var(--text-muted, #888); position: sticky; top: -6px;
+    background: var(--body-bg, #fff); z-index: 1; }
+  .rw-bank-i { display: flex; gap: 8px; width: 100%; text-align: left; border: 0; background: transparent; color: var(--body-fg);
+    padding: 6px 12px; cursor: pointer; font: inherit; font-size: 13px; align-items: flex-start; }
+  .rw-bank-i:hover { background: rgba(127, 127, 127, .10); }
+  .rw-bank-i.on { background: rgba(91, 141, 239, .20); box-shadow: inset 3px 0 0 var(--primary, #5b8def); }
+  .rw-bank-i .nm { overflow-wrap: anywhere; } .rw-bank-i .mt { display: block; font-size: 11px; color: var(--text-muted, #888); }
+  .rw-bank-view { position: relative; min-width: 0; }
+  .rw-bank-view iframe { border: 0; width: 100%; height: 100%; display: block; background: #f4f5f7; }
+  .rw-bank-empty { padding: 30px; color: var(--text-muted, #888); }
+  .rw-bank-none { padding: 14px 12px; color: var(--text-muted, #888); font-size: 13px; }
+  @media (max-width: 760px) { .rw-bank-body { grid-template-columns: 1fr; grid-template-rows: 38% 1fr; }
+    .rw-bank-list { border-right: 0; border-bottom: 1px solid var(--border-strong, #ddd); } }
   /* ⚖ порівняння вибраних */
   .rw-cmpd { width: min(1280px, 97vw); }
   .rw-cmpd .rw-pv-head { flex-wrap: wrap; }
@@ -587,6 +627,95 @@
         MVMenu.open(e, items, {title: name, titleData: true});
       });
     });
+  })();
+
+  /* ── 📂 банк файлів запиту: усе, що надіслали постачальники, — список по постачальниках і перегляд поруч ── */
+  (function(){
+    var dlg = document.getElementById('rw-bank');
+    if (!dlg || typeof dlg.showModal !== 'function') return;
+    var B = {{ bank_json|safe }}, list = document.getElementById('rw-bank-list'), frame = document.getElementById('rw-bank-frame'),
+        empty = document.getElementById('rw-bank-empty'), q = document.getElementById('rw-bank-q'),
+        only = document.getElementById('rw-bank-only'), kinds = document.getElementById('rw-bank-kinds');
+    var st = {kind: '', rid: '', q: '', cur: ''};
+    function visible() {
+      var out = [], s = st.q.trim().toLowerCase();
+      B.groups.forEach(function(g){
+        if (st.rid !== '' && String(g.rid) !== String(st.rid)) return;
+        var fs = g.files.filter(function(f){
+          return (!st.kind || f.kind === st.kind) && (!s || f.name.toLowerCase().indexOf(s) >= 0 || g.name.toLowerCase().indexOf(s) >= 0);
+        });
+        if (fs.length) out.push({g: g, files: fs});
+      });
+      return out;
+    }
+    function show(f) {
+      st.cur = f ? f.id : '';
+      list.querySelectorAll('.rw-bank-i').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-id') === st.cur); });
+      if (!f) { frame.hidden = true; frame.removeAttribute('src'); empty.hidden = false; return; }
+      empty.hidden = true; frame.hidden = false;
+      if (frame.getAttribute('src') !== f.embed) frame.setAttribute('src', f.embed);
+      var b = list.querySelector('.rw-bank-i.on'); if (b) b.scrollIntoView({block: 'nearest'});
+    }
+    function render(keep) {
+      list.textContent = '';
+      var vis = visible(), flat = [];
+      vis.forEach(function(x){
+        var h = el('div', 'rw-bank-g', (x.g.n ? '№ ' + x.g.n + ' · ' : '') + x.g.name + ' · ' + x.files.length);
+        h.setAttribute('translate', 'no'); list.appendChild(h);
+        x.files.forEach(function(f){
+          var b = el('button', 'rw-bank-i'); b.type = 'button'; b.setAttribute('data-id', f.id);
+          b.appendChild(el('span', null, f.icon));
+          var t = el('span'), nm = el('span', 'nm', f.name); nm.setAttribute('translate', 'no'); t.appendChild(nm);
+          t.appendChild(el('span', 'mt', f.size + (f.at ? ' · ' + f.at : ''))); b.appendChild(t);
+          b.addEventListener('click', function(){ show(f); });
+          list.appendChild(b); flat.push(f);
+        });
+      });
+      if (!flat.length) list.appendChild(el('div', 'rw-bank-none', 'Нічого не знайдено — змініть пошук або тип файлу.'));
+      var cur = flat.filter(function(f){ return f.id === st.cur; })[0];
+      show(cur || (keep ? null : flat[0]) || null);
+      return flat;
+    }
+    function flat() { var a = []; visible().forEach(function(x){ a = a.concat(x.files); }); return a; }
+    function open(opt) {
+      opt = opt || {};
+      st.rid = opt.rid !== undefined && opt.rid !== '' ? String(opt.rid) : '';
+      st.cur = opt.file || ''; st.kind = ''; st.q = ''; q.value = '';
+      kinds.querySelectorAll('button').forEach(function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-k') === '' ? 'true' : 'false'); });
+      var g = B.groups.filter(function(x){ return String(x.rid) === st.rid; })[0];
+      only.hidden = !g; only.textContent = g ? '👤 ' + g.name + ' ✕' : '';
+      if (g) { only.setAttribute('translate', 'no'); only.title = 'Показати файли всіх постачальників'; }
+      render(false);
+      if (!dlg.open) dlg.showModal();
+    }
+    kinds.querySelectorAll('button').forEach(function(b){ b.addEventListener('click', function(){
+      st.kind = b.getAttribute('data-k');
+      kinds.querySelectorAll('button').forEach(function(x){ x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      render(false);
+    }); });
+    q.addEventListener('input', function(){ st.q = q.value; render(false); });
+    only.addEventListener('click', function(){ st.rid = ''; only.hidden = true; render(true); });
+    dlg.addEventListener('keydown', function(e){
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      var a = flat(), i = a.map(function(f){ return f.id; }).indexOf(st.cur);
+      if (!a.length) return;
+      e.preventDefault();
+      show(a[Math.max(0, Math.min(a.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))]);
+    });
+    dlg.querySelectorAll('[data-bank-close]').forEach(function(b){ b.addEventListener('click', function(){ dlg.close(); }); });
+    dlg.addEventListener('close', function(){ frame.removeAttribute('src'); frame.hidden = true; });
+    // 📂 / 📎 N у таблиці — усі файли (або одного постачальника); файл у панелі, листуванні, файлах запиту — він у вікні.
+    // Ctrl / Shift / середня кнопка — як посилання (окрема вкладка).
+    document.addEventListener('click', function(e){
+      var a = e.target.closest('[data-rw-files], [data-rw-file]');
+      if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+      if (a.hasAttribute('data-rw-file')) {
+        var id = a.getAttribute('data-rw-file'), has = B.groups.some(function(g){ return g.files.some(function(f){ return f.id === id; }); });
+        if (!has) return;                     // файлу ще немає в банку (щойно прийшов) — звичайне посилання
+        e.preventDefault(); e.stopPropagation();
+        open({file: id});
+      } else { e.preventDefault(); e.stopPropagation(); open({rid: a.getAttribute('data-rw-files')}); }
+    }, true);
   })();
 
   /* ── ⚖ порівняння вибраних: що скільки коштує в кожного — плата, монтаж, компоненти, разові, доставка, разом ── */

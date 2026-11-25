@@ -4725,6 +4725,7 @@
 {"uk": "Архів документів", "en": "Document archive", "de": "Dokumentenarchiv"}
 {"uk": "Архів порожній.", "en": "The archive is empty.", "de": "Das Archiv ist leer."}
 {"uk": "Архів пошкоджений — завантажте його.", "en": "The archive is damaged — download it.", "de": "Das Archiv ist beschädigt — laden Sie es herunter."}
+{"uk": "Архіви", "en": "Archives", "de": "Archive"}
 {"uk": "Архівна коробка не може бути ціллю", "en": "An archived box cannot be the target", "de": "Ein archivierter Karton kann nicht das Ziel sein"}
 {"uk": "Архівовано товарів", "en": "Products archived", "de": "Archivierte Artikel"}
 {"uk": "Архівувати вибрані (вимкнути «Активний»)", "en": "Archive selected (turn off “Active”)", "de": "Ausgewählte archivieren („Aktiv“ ausschalten)"}
@@ -5405,6 +5406,7 @@
 {"uk": "Виберіть файл", "en": "Choose a file", "de": "Wählen Sie eine Datei"}
 {"uk": "Виберіть файл ABD з листа або з ПК.", "en": "Choose the ABD file from the e-mail or from your PC.", "de": "Wählen Sie die ABD-Datei aus der E-Mail oder vom PC."}
 {"uk": "Виберіть файл або вставте посилання", "en": "Choose a file or paste a link", "de": "Wählen Sie eine Datei oder fügen Sie einen Link ein"}
+{"uk": "Виберіть файл ліворуч — він відкриється тут. ↑ ↓ — наступний файл.", "en": "Choose a file on the left — it opens here. ↑ ↓ — next file.", "de": "Wählen Sie links eine Datei — sie öffnet sich hier. ↑ ↓ — nächste Datei."}
 {"uk": "Виберіть файл тут — Minerva завантажить його на DigiKey, передасть разом із трек-номером і перевірить, чи", "en": "Choose a file here — Minerva uploads it to DigiKey, sends it with the tracking number and checks whether", "de": "Wählen Sie hier eine Datei — Minerva lädt sie zu DigiKey hoch, sendet sie mit der Sendungsnummer und prüft, ob"}
 {"uk": "Виберіть файли або папку — назва джерела підставиться сама (назва папки). Поле «Папка» лишіть", "en": "Choose files or a folder — the source name will be filled in automatically (the folder name). Leave the “Folder” field", "de": "Wählen Sie Dateien oder einen Ordner – der Name der Quelle wird automatisch eingesetzt (Ordnername). Lassen Sie das Feld „Ordner“"}
 {"uk": "Виберіть файли або папку — назва джерела підставиться сама (назва папки). Поле «Папка» лишіть порожнім: Minerva створить свою. Після «Зберегти» Minerva створить джерело й завантажить вибране. Типи: {0} · до {1} МБ на файл.", "en": "Choose files or a folder — the source name will be filled in automatically (the folder name). Leave the “Folder” field empty: Minerva will create its own. After “Save” Minerva will create the source and upload the selection. Types: {0} · up to {1} MB per file.", "de": "Wählen Sie Dateien oder einen Ordner – der Name der Quelle wird automatisch eingesetzt (Ordnername). Lassen Sie das Feld „Ordner“ leer: Minerva erstellt einen eigenen. Nach „Speichern“ erstellt Minerva die Quelle und lädt die Auswahl hoch. Typen: {0} · bis zu {1} MB pro Datei."}
@@ -6223,6 +6225,8 @@
 {"uk": "Відкрити лист", "en": "Open e-mail", "de": "E-Mail öffnen"}
 {"uk": "Відкрити лог трекінгу ({0} записів)", "en": "Open the tracking log ({0} entries)", "de": "Tracking-Protokoll öffnen ({0} Einträge)"}
 {"uk": "Відкрити магазин", "en": "Open shop", "de": "Shop öffnen"}
+{"uk": "Відкрити на всю вкладку браузера", "en": "Open in a full browser tab", "de": "Im ganzen Browser-Tab öffnen"}
+{"uk": "Відкрити на окремій вкладці", "en": "Open in a separate tab", "de": "In einem eigenen Tab öffnen"}
 {"uk": "Відкрити налаштування", "en": "Open settings", "de": "Einstellungen öffnen"}
 {"uk": "Відкрити налаштування Google Calendar", "en": "Open Google Calendar settings", "de": "Google-Kalender-Einstellungen öffnen"}
 {"uk": "Відкрити нараду", "en": "Open meeting", "de": "Besprechung öffnen"}
@@ -9628,6 +9632,7 @@
 {"uk": "Картинка завелика — зменште масштаб діаграми", "en": "The image is too large — zoom the chart out", "de": "Das Bild ist zu groß — Diagramm verkleinern"}
 {"uk": "Картинка понад {0} МБ.", "en": "Picture over {0} MB.", "de": "Bild über {0} MB."}
 {"uk": "Картинка — PNG, JPG, GIF або WEBP.", "en": "Picture — PNG, JPG, GIF or WEBP.", "de": "Bild — PNG, JPG, GIF oder WEBP."}
+{"uk": "Картинки", "en": "Pictures", "de": "Bilder"}
 {"uk": "Картинки з файлу ({0})", "en": "Pictures from the file ({0})", "de": "Bilder aus der Datei ({0})"}
 {"uk": "Картка", "en": "Card", "de": "Karte"}
 {"uk": "Картка Angebot", "en": "Angebot card", "de": "Angebot-Karte"}
@@ -11640,6 +11645,7 @@
 {"uk": "Назад до лістингів", "en": "Back to listings", "de": "Zurück zu den Listings"}
 {"uk": "Назад до списку", "en": "Back to list", "de": "Zurück zur Liste"}
 {"uk": "Назад до тарифів", "en": "Back to rates", "de": "Zurück zu den Tarifen"}
+{"uk": "Назад — {0}", "en": "Back — {0}", "de": "Zurück — {0}"}
 {"uk": "Назад — додайте email користувачу", "en": "Back — add an email to the user", "de": "Zurück — E-Mail-Adresse für den Benutzer hinzufügen"}
 {"uk": "Назва", "en": "Name", "de": "Name"}
 {"uk": "Назва (DK Title) не заповнена", "en": "Name (DK Title) is not filled in", "de": "Name (DK Title) ist nicht ausgefüllt"}
@@ -12961,6 +12967,7 @@
 {"uk": "Нічого не знайдено", "en": "Nothing found", "de": "Nichts gefunden"}
 {"uk": "Нічого не знайдено для бекапу (БД порожня або недоступна).", "en": "Nothing found to back up (the DB is empty or unavailable).", "de": "Nichts zu sichern gefunden (die DB ist leer oder nicht erreichbar)."}
 {"uk": "Нічого не знайдено за запитом «{0}»", "en": "Nothing found for “{0}”", "de": "Keine Treffer für „{0}“"}
+{"uk": "Нічого не знайдено — змініть пошук або тип файлу.", "en": "Nothing found — change the search or the file type.", "de": "Nichts gefunden — ändern Sie die Suche oder den Dateityp."}
 {"uk": "Нічого не знайдено — ні в її меню, ні серед розділів, яких вона ще не має.", "en": "Nothing found — neither in their menu nor among the sections they do not have yet.", "de": "Nichts gefunden — weder im Menü dieser Person noch unter den Bereichen, die sie noch nicht hat."}
 {"uk": "Нічого не знайдено — спробуйте інші слова або перегляньте розділи нижче.", "en": "Nothing found — try other words or browse the sections below.", "de": "Nichts gefunden — versuchen Sie andere Begriffe oder sehen Sie sich die Bereiche unten an."}
 {"uk": "Нічого не знайдено.", "en": "Nothing found.", "de": "Nichts gefunden."}
@@ -14022,6 +14029,7 @@
 {"uk": "Перегляд недоступний", "en": "Preview unavailable", "de": "Vorschau nicht verfügbar"}
 {"uk": "Перегляд перед друком: копії, правки…", "en": "Preview before printing: copies, edits…", "de": "Vorschau vor dem Drucken: Kopien, Änderungen…"}
 {"uk": "Перегляд тирів", "en": "View price breaks", "de": "Staffelpreise anzeigen"}
+{"uk": "Перегляд файлу", "en": "File preview", "de": "Dateivorschau"}
 {"uk": "Перегляд чи одразу на принтер, позначка в куті", "en": "Preview or straight to the printer, mark in the corner", "de": "Vorschau oder direkt zum Drucker, Markierung in der Ecke"}
 {"uk": "Перегляд — лише бачить налаштування", "en": "View — can only see the settings", "de": "Ansicht – sieht nur die Einstellungen"}
 {"uk": "Переглянути", "en": "View", "de": "Ansehen"}
@@ -14621,6 +14629,7 @@
 {"uk": "Показати рядок у списку", "en": "Show the row in the list", "de": "Zeile in der Liste anzeigen"}
 {"uk": "Показати список IMAP папок для кожного юзера і вийти (діагностика)", "en": "Show the list of IMAP folders for each user and exit (diagnostics)", "de": "Liste der IMAP-Ordner für jeden Benutzer anzeigen und beenden (Diagnose)"}
 {"uk": "Показати у звіті", "en": "Show in report", "de": "Im Bericht anzeigen"}
+{"uk": "Показати файли всіх постачальників", "en": "Show files of all suppliers", "de": "Dateien aller Lieferanten anzeigen"}
 {"uk": "Показати цю сторінку", "en": "Show this page", "de": "Diese Seite anzeigen"}
 {"uk": "Показати що буде зроблено без збереження", "en": "Show what would be done without saving", "de": "Anzeigen, was getan würde, ohne zu speichern"}
 {"uk": "Показати що буде зроблено без збереження в БД", "en": "Show what would be done without saving to the database", "de": "Anzeigen, was getan würde, ohne in der Datenbank zu speichern"}
@@ -15314,6 +15323,7 @@
 {"uk": "Пошук усюди", "en": "Search everywhere", "de": "Überall suchen"}
 {"uk": "Пошук ще не запускали", "en": "The search has not been started yet", "de": "Die Suche wurde noch nicht gestartet"}
 {"uk": "Пошук: назва або код — напр. Schweiz, Швейцарія, CH", "en": "Search: name or code — e.g. Schweiz, Switzerland, CH", "de": "Suche: Name oder Code – z. B. Schweiz, Switzerland, CH"}
+{"uk": "Пошук: назва файлу або постачальник", "en": "Search: file name or supplier", "de": "Suche: Dateiname oder Lieferant"}
 {"uk": "Пошук: назва, людина, email, країна…", "en": "Search: name, person, email, country…", "de": "Suche: Name, Person, E-Mail, Land…"}
 {"uk": "Пошук: ім'я, логін, роль", "en": "Search: name, login, role", "de": "Suche: Name, Login, Rolle"}
 {"uk": "Пошуки в RAG", "en": "RAG searches", "de": "RAG-Suchen"}
@@ -18331,6 +18341,7 @@
 {"uk": "Тип складу", "en": "Warehouse type", "de": "Lagertyp"}
 {"uk": "Тип страхування посилки у Jumingo. 'Ohne' = тільки базова відповідальність.", "en": "Parcel insurance type at Jumingo. 'Ohne' = basic liability only.", "de": "Versicherungsart des Pakets bei Jumingo. 'Ohne' = nur Basishaftung."}
 {"uk": "Тип товару", "en": "Product type", "de": "Artikeltyp"}
+{"uk": "Тип файлу", "en": "File type", "de": "Dateityp"}
 {"uk": "Тип фільтра", "en": "Filter type", "de": "Filtertyp"}
 {"uk": "Тип чату", "en": "Chat type", "de": "Chat-Typ"}
 {"uk": "Тип імпорту", "en": "Import type", "de": "Importtyp"}
@@ -18991,6 +19002,8 @@
 {"uk": "Усі фази завершено", "en": "All phases completed", "de": "Alle Phasen abgeschlossen"}
 {"uk": "Усі фази й кроки однією таблицею: назви, дати, тривалості, хто робить, «після №», стан, порядок", "en": "All phases and steps in one table: names, dates, durations, who does it, «after No.», status, order", "de": "Alle Phasen und Schritte in einer Tabelle: Namen, Daten, Dauern, wer es macht, «nach Nr.», Status, Reihenfolge"}
 {"uk": "Усі фази й кроки однією таблицею: назви, дати, тривалості, хто робить, «після №», стан, порядок — і 🧠 «Що змінити в плані»: AI пропонує виправлення", "en": "All phases and steps in one table: names, dates, durations, who does it, «after #», status, order — and 🧠 «What to change in the plan»: AI proposes corrections", "de": "Alle Phasen und Schritte in einer Tabelle: Namen, Daten, Dauer, wer es macht, «nach Nr.», Status, Reihenfolge — und 🧠 «Was im Plan ändern»: AI schlägt Korrekturen vor"}
+{"uk": "Усі файли від постачальника — переглянути тут, поруч зі списком", "en": "All files from the supplier — view them here, next to the list", "de": "Alle Dateien des Lieferanten — hier neben der Liste ansehen"}
+{"uk": "Усі файли, які надіслали постачальники, і файли нашого запиту — список по постачальниках і перегляд поруч (PDF, Excel, Word, картинки, архіви)", "en": "All files the suppliers sent and the files of our request — a list by supplier with a preview next to it (PDF, Excel, Word, pictures, archives)", "de": "Alle Dateien, die die Lieferanten geschickt haben, und die Dateien unserer Anfrage — Liste nach Lieferanten mit Vorschau daneben (PDF, Excel, Word, Bilder, Archive)"}
 {"uk": "Усі ціни", "en": "All prices", "de": "Alle Preise"}
 {"uk": "Усі інші країни", "en": "All other countries", "de": "Alle übrigen Länder"}
 {"uk": "Усі інші країни (*)", "en": "All other countries (*)", "de": "Alle übrigen Länder (*)"}
@@ -19137,6 +19150,7 @@
 {"uk": "Файл: {0}", "en": "File: {0}", "de": "Datei: {0}"}
 {"uk": "Файли", "en": "Files", "de": "Dateien"}
 {"uk": "Файли (ZIP, Gerber, креслення, BOM) — підуть вкладенням кожному", "en": "Files (ZIP, Gerber, drawings, BOM) — attached for everyone", "de": "Dateien (ZIP, Gerber, Zeichnungen, Stückliste) — gehen als Anhang an alle"}
+{"uk": "Файли ({0})", "en": "Files ({0})", "de": "Dateien ({0})"}
 {"uk": "Файли .{0} у це джерело не беруться (типи: {1})", "en": "Files .{0} are not accepted in this source (types: {1})", "de": "Dateien .{0} werden in dieser Quelle nicht übernommen (Typen: {1})"}
 {"uk": "Файли / Товари", "en": "Files / Products", "de": "Dateien / Artikel"}
 {"uk": "Файли агенд нарад", "en": "Meeting agenda files", "de": "Dateien der Tagesordnungen"}
@@ -19149,10 +19163,12 @@
 {"uk": "Файли завантажують у браузері; видалити файл можна там же", "en": "Files are uploaded in the browser; a file can be deleted there too", "de": "Dateien werden im Browser hochgeladen; dort kann eine Datei auch gelöscht werden"}
 {"uk": "Файли завантажуються лише в джерело-папку", "en": "Files can only be uploaded to a folder source", "de": "Dateien können nur in eine Ordnerquelle hochgeladen werden"}
 {"uk": "Файли замовлення", "en": "Order files", "de": "Bestelldateien"}
+{"uk": "Файли запиту", "en": "Request files", "de": "Dateien der Anfrage"}
 {"uk": "Файли зі старого запиту — ті самі версії? Непотрібні — «не брати», нові — додайте.", "en": "Files from the old request — the same versions? Unneeded — «don't take», new ones — add.", "de": "Dateien aus der alten Anfrage — dieselben Versionen? Unnötige — «nicht übernehmen», neue — hinzufügen."}
 {"uk": "Файли й скріншоти до агенди: перетягніть сюди, вставте скріншот (Ctrl+V) або", "en": "Files and screenshots for the agenda: drag them here, paste a screenshot (Ctrl+V) or", "de": "Dateien und Screenshots zur Tagesordnung: hierher ziehen, Screenshot einfügen (Strg+V) oder"}
 {"uk": "Файли клієнта ({0} шт.)", "en": "Customer files ({0} pcs.)", "de": "Kundendateien ({0} Stk.)"}
 {"uk": "Файли клієнта: договори, рахунки, листування. Зберігаються у", "en": "Customer files: contracts, invoices, correspondence. Stored in", "de": "Kundendateien: Verträge, Rechnungen, Korrespondenz. Gespeichert in"}
+{"uk": "Файли нашого запиту", "en": "Files of our request", "de": "Dateien unserer Anfrage"}
 {"uk": "Файли нашого запиту ({0})", "en": "Files of our request ({0})", "de": "Dateien unserer Anfrage ({0})"}
 {"uk": "Файли не вибрані", "en": "No files selected", "de": "Keine Dateien ausgewählt"}
 {"uk": "Файли не знайдено. Відкрийте DevTools (F12) → Console і скопіюйте вивід «Order files debug»", "en": "No files found. Open DevTools (F12) → Console and copy the output of “Order files debug”", "de": "Keine Dateien gefunden. Öffnen Sie DevTools (F12) → Console und kopieren Sie die Ausgabe von „Order files debug“"}

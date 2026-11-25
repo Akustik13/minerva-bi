@@ -10,7 +10,7 @@
         {% if l.readable %}
         {% if l.subject %}<div class="rwc-subj" translate="no">{{ l.subject }}</div>{% endif %}
         <div class="rwc-text" translate="no">{{ l.text|default:"(без тексту)" }}</div>
-        {% if l.files %}<div class="rwc-files">{% for f in l.files %}{% if f.url %}<a class="spf-tag rwc-file" href="{{ f.url }}" target="_blank" rel="noopener" title="👁 Відкрити в Minerva — PDF, Word, Excel, картинки, архіви" translate="no">{{ f.icon }} {{ f.name }} · {{ f.size }}</a>{% else %}<span class="spf-tag" translate="no" title="Лист у скриньці колеги — файл відкриє власник скриньки">{{ f.icon }} {{ f.name }} · {{ f.size }}</span>{% endif %}{% endfor %}</div>{% endif %}
+        {% if l.files %}<div class="rwc-files">{% for f in l.files %}{% if f.url %}<a class="spf-tag rwc-file" href="{{ f.url }}" target="_blank" rel="noopener"{% if f.bank_id %} data-rw-file="{{ f.bank_id }}"{% endif %} title="👁 Відкрити в Minerva — PDF, Word, Excel, картинки, архіви" translate="no">{{ f.icon }} {{ f.name }} · {{ f.size }}</a>{% else %}<span class="spf-tag" translate="no" title="Лист у скриньці колеги — файл відкриє власник скриньки">{{ f.icon }} {{ f.name }} · {{ f.size }}</span>{% endif %}{% endfor %}</div>{% endif %}
         {% else %}<div class="spf-muted">🔒 Лист у скриньці колеги — тему й текст бачить лише власник скриньки.</div>{% endif %}
       </div>
       {% empty %}<div class="spf-muted" style="padding:12px">{% if r.state == "planned" %}Запит ще не надіслано.{% else %}Листів ще немає.{% endif %}</div>{% endfor %}

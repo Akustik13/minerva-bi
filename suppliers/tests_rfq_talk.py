@@ -748,3 +748,40 @@ class CompareSelectedTests(TalkBase):
         self.assertIn('id="rw-cmp-btn"', page)
         self.assertIn('id="rw-cmpd"', page)
         self.assertIn('"rid": %d' % self.r.pk, page)
+
+
+class FileBankTests(TalkBase):
+    """📂 Банк файлів запиту: по постачальниках, тип для фільтра, перегляд у вікні (?embed=1), «← Назад» на сторінці."""
+
+    def test_bank_and_embed(self):
+        from core.tests_file_preview import _xlsx, _zip
+        from suppliers.models import SupplierReplyFile, SupplierRequestFile
+        from suppliers.services import rfq_bank
+        f1 = SupplierReplyFile.objects.create(recipient=self.r, name="BOM.xlsx", sha256="a" * 64, size=900,
+                                              received_at=timezone.now(), file=ContentFile(_xlsx(), name="BOM.xlsx"))
+        z = SupplierReplyFile.objects.create(recipient=self.r2, name="Gerber.zip", sha256="b" * 64,
+                                             file=ContentFile(_zip({"top.gtl": b"G04*"}), name="Gerber.zip"))
+        ours = SupplierRequestFile.objects.create(request=self.req, name="spec.pdf", file=ContentFile(b"%PDF-1.4", name="spec.pdf"))
+        b = rfq_bank.bank(self.req, [self.r, self.r2, self.r3])
+        self.assertEqual(b["count"], 3)
+        self.assertEqual([g["name"] for g in b["groups"]], ["JY Electronics", "HITECH CIRCUITS", "📤 Файли нашого запиту"])
+        self.assertEqual((b["groups"][0]["n"], b["groups"][0]["files"][0]["id"], b["groups"][0]["files"][0]["kind"]),
+                         (1, f"reply:{f1.pk}", "sheet"))
+        self.assertEqual(b["groups"][1]["files"][0]["kind"], "archive")
+        self.assertTrue(b["groups"][2]["files"][0]["embed"].endswith("?embed=1"))
+        page = self.client.get(reverse("admin:suppliers_supplierrequest_work", args=[self.req.pk])).content.decode()
+        self.assertIn("📂 Файли (3)", page)
+        self.assertIn(f'data-rw-files="{self.r.pk}"', page)                            # 📎 N у таблиці
+        self.assertIn(f'data-rw-file="req:{ours.pk}"', page)
+        self.assertIn('id="rw-bank"', page)
+        url = reverse("admin:suppliers_supplierrequest_file", args=[self.req.pk, "reply", z.pk])
+        emb = self.client.get(url + "?embed=1")
+        self.assertEqual(emb["X-Frame-Options"], "SAMEORIGIN")
+        html = emb.content.decode()
+        self.assertNotIn('id="nav-sidebar"', html)                                      # без меню Minerva
+        self.assertIn("?e=top.gtl&amp;embed=1", html)                                    # файл в архіві — у вікні ж
+        full = self.client.get(url + "?e=top.gtl").content.decode()
+        self.assertIn('id="fp-back"', full)
+        self.assertIn(f'href="{url}"', full)                                             # ← Назад — до архіву
+        self.assertIn(reverse("admin:suppliers_supplierrequest_work", args=[self.req.pk]),
+                      self.client.get(url).content.decode())                             # з архіву — до запиту

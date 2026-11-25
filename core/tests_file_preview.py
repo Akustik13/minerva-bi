@@ -74,9 +74,48 @@ class BuildTests(SimpleTestCase):
         self.assertEqual(p.kind, "sheet")
         self.assertEqual([s.name for s in p.sheets], ["BOM", "Notes"])
         bom = p.sheets[0]
-        self.assertEqual(bom.rows, [["Ref", "Part", "Qty"], ["U1", "STM32G0", "2"], ["R1", "10k", "1.5"]])
-        self.assertEqual(bom.letters, ["A", "B", "C"])
-        self.assertEqual(p.sheets[1].rows, [["<b>bold</b>"]])           # як текст — шаблон екранує
+        self.assertTrue(bom.rich)
+        self.assertEqual([[c["v"] for c in r["cells"]] for r in bom.rows],
+                         [["Ref", "Part", "Qty"], ["U1", "STM32G0", "2"], ["R1", "10k", "1.5"]])
+        self.assertEqual([c["letter"] for c in bom.colw], ["A", "B", "C"])
+        self.assertEqual(p.sheets[1].rows[0]["cells"][0]["v"], "<b>bold</b>")      # як текст — шаблон екранує
+
+    def test_xlsx_like_excel(self):
+        """Об'єднані клітинки, жирний, заливка, формат грошей, приховані рядки — як в Excel."""
+        from openpyxl import Workbook
+        from openpyxl.styles import Alignment, Font, PatternFill
+        wb = Workbook()
+        ws = wb.active
+        ws["A1"] = "QUOTATION"
+        ws.merge_cells("A1:C1")
+        ws["A1"].font = Font(b=True, sz=16, color="FFC00000")
+        ws["A1"].alignment = Alignment(horizontal="center")
+        ws.append(["Qty", "PCB ($)", "Amount ($)"])
+        ws["A2"].fill = PatternFill("solid", fgColor="FFD9D9D9")
+        ws.append([2500, 1291.69, 26362.08])
+        ws["B3"].number_format = '"$"#,##0.00'
+        ws["C3"].number_format = '[$$-409]#,##0.00'
+        ws.append(["hidden", 1, 2])
+        ws.row_dimensions[4].hidden = True
+        ws.append(["x", 0.25])
+        ws["B5"].number_format = "0%"
+        ws.column_dimensions["B"].width = 20
+        buf = io.BytesIO()
+        wb.save(buf)
+        sh = fp.build("q.xlsx", buf.getvalue()).sheets[0]
+        head = sh.rows[0]["cells"][0]
+        self.assertEqual((head["v"], head["cs"], head["rs"]), ("QUOTATION", 3, 1))
+        self.assertIn("font-weight:700", head["s"])
+        self.assertIn("color:#c00000", head["s"])
+        self.assertIn("text-align:center", head["s"])
+        self.assertIn("background:#d9d9d9", sh.rows[1]["cells"][0]["s"])
+        vals = [c["v"] for c in sh.rows[2]["cells"]]
+        self.assertEqual(vals[0], "2500")
+        self.assertTrue(vals[1].startswith("$1") and vals[1].endswith("291,69"))              # $1 291,69
+        self.assertTrue(vals[2].startswith("$") and vals[2].endswith("362,08"))
+        self.assertEqual([r["n"] for r in sh.rows], [1, 2, 3, 5])                              # 4 — приховано
+        self.assertEqual(sh.rows[3]["cells"][1]["v"], "25 %")
+        self.assertEqual(sh.colw[1]["w"], 150)                                                 # 20 знаків
 
     def test_csv(self):
         p = fp.build("bom.csv", "Ref;Part;Qty\nU1;STM32;2\n".encode("utf-8-sig"))

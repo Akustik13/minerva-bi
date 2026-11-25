@@ -32,6 +32,7 @@ RATIO_MAX = 200                       # стиснення понад 200 : 1 у
 LIST_MAX = 2000                       # файлів у списку архіву
 CHAIN_MAX = 4                         # вкладених архівів
 SHEETS_MAX, ROWS_MAX, COLS_MAX = 20, 500, 40
+RICH_MAX = 8 * 1024 * 1024            # xlsx до 8 МБ — з оформленням (об'єднані клітинки, кольори); більший — лише значення
 TEXT_MAX = 300_000
 BLOCKS_MAX = 3000
 MEDIA_MAX = 40                        # картинок з docx / xlsx
@@ -220,10 +221,16 @@ class Sheet:
     more_rows: bool = False
     more_cols: bool = False
     hidden: bool = False
+    rich: bool = False         # rows — [{n, cells: [{v, s, rs, cs}]}], colw — [{letter, w}] (лише видимі)
+    colw: list = field(default_factory=list)
 
     @property
     def letters(self):
         return [_col_letter(i) for i in range(self.cols)]
+
+    @property
+    def width(self):            # px: колонка номерів рядків + ширини колонок, як у файлі
+        return 42 + sum(c["w"] for c in self.colw)
 
 
 @dataclass
@@ -295,8 +302,185 @@ def _trim(rows) -> tuple:
     return [r[:cols] + [""] * (cols - len(r[:cols])) for r in rows], cols
 
 
+_RGB = re.compile(r"^[0-9A-Fa-f]{8}$")
+_CURRENCY = re.compile(r'"([^"]*)"|\[\$([^\]-]*)[^\]]*\]|([$€£¥₴₽])')
+
+
+def _rgb(color):
+    """#rrggbb з кольору openpyxl (лише явний ARGB; тема / індекс — ні)."""
+    try:
+        if color is not None and getattr(color, "type", "") == "rgb" and _RGB.match(str(color.rgb or "")):
+            return "#" + str(color.rgb)[2:].lower()
+    except Exception:  # noqa: BLE001 — дивний колір
+        pass
+    return ""
+
+
+def _num(v, fmt) -> str:
+    """Число за форматом Excel: знаки після коми, групування, %, валюта (символ як у форматі, до / після)."""
+    from django.utils.formats import number_format
+    f = (fmt or "").split(";")[0]
+    if not f or f == "General" or "@" in f:
+        return _cell(v)
+    plain = re.sub(r'"[^"]*"|\[[^\]]*\]', "", f)
+    m = re.search(r"0[.,](0+)", plain)
+    dec = len(m.group(1)) if m else 0
+    pct = "%" in plain
+    x = v * 100 if pct else v
+    text = number_format(round(x, dec), decimal_pos=dec, use_l10n=True, force_grouping="," in plain or "#" in plain)
+    cur = ""
+    pos = 0
+    for mm in _CURRENCY.finditer(f):
+        sym = next((g for g in mm.groups() if g), "")
+        if sym and not sym.isspace():
+            cur, pos = sym.strip(), mm.start()
+            break
+    if pct:
+        text += " %"
+    if cur:
+        first0 = min([i for i in (f.find("0"), f.find("#")) if i >= 0] or [0])
+        text = f"{cur}{text}" if pos < first0 else f"{text} {cur}"
+    return text
+
+
+def _rich_value(c) -> str:
+    v = c.value
+    if v is None:
+        return ""
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        try:
+            return _num(v, c.number_format)
+        except Exception:  # noqa: BLE001
+            return _cell(v)
+    return _cell(v)
+
+
+def _rich_style(c) -> str:
+    out = []
+    try:
+        f = c.font
+        if f is not None:
+            if f.b:
+                out.append("font-weight:700")
+            if f.i:
+                out.append("font-style:italic")
+            if f.u:
+                out.append("text-decoration:underline")
+            col = _rgb(f.color)
+            if col and col != "#000000":
+                out.append(f"color:{col}")
+            if f.sz and float(f.sz) >= 12.5:
+                out.append(f"font-size:{min(float(f.sz), 22):.0f}pt")
+        fill = c.fill
+        if fill is not None and getattr(fill, "fill_type", None) == "solid":
+            bg = _rgb(fill.fgColor)
+            if bg and bg != "#ffffff":
+                out.append(f"background:{bg}")
+        a = c.alignment
+        h = getattr(a, "horizontal", None) if a is not None else None
+        if h in ("center", "centerContinuous"):
+            out.append("text-align:center")
+        elif h in ("right", "left"):
+            out.append(f"text-align:{h}")
+        elif isinstance(c.value, (int, float)) and not isinstance(c.value, bool):
+            out.append("text-align:right")
+        if a is not None and getattr(a, "vertical", None) in ("center", "top", "bottom"):
+            out.append("vertical-align:" + {"center": "middle"}.get(a.vertical, a.vertical))
+        if a is not None and a.wrap_text:
+            out.append("white-space:pre-wrap")
+    except Exception:  # noqa: BLE001 — дивне оформлення — без нього
+        pass
+    return ";".join(out)
+
+
+def _px(width) -> int:
+    """Ширина колонки Excel (у знаках, за замовчуванням 8,43) → px."""
+    return int(min(max(width or 8.43, 2), 80) * 7 + 10)
+
+
+def _overflow(cells, px) -> list:
+    """Як в Excel: довгий текст заходить на порожні клітинки праворуч (без заливки й об'єднання) — colspan."""
+    out, i = [], 0
+    while i < len(cells):
+        c = cells[i]
+        out.append(c)
+        i += 1
+        if not (c["text"] and c["v"] and c["cs"] == 1 and c["rs"] == 1 and "pre-wrap" not in c["s"]):
+            continue
+        need, have = len(c["v"]) * 7 + 10, px.get(c["c"], 70)
+        while need > have and i < len(cells):
+            n = cells[i]
+            if n["v"] or n["cs"] != 1 or n["rs"] != 1 or "background" in n["s"] or n["c"] != c["c"] + c["cs"]:
+                break
+            c["cs"] += 1
+            have += px.get(n["c"], 70)
+            i += 1
+    return out
+
+
+def _sheet_rich(ws) -> Sheet:
+    """Аркуш з оформленням: видимі рядки / колонки до ROWS_MAX × COLS_MAX, об'єднані клітинки — rowspan / colspan."""
+    from openpyxl.utils import get_column_letter
+    max_r, max_c = min(ws.max_row or 0, ROWS_MAX), min(ws.max_column or 0, COLS_MAX)
+    # останні рядок / колонка з даними (порожнє форматування в кінці — не показуємо)
+    last_r = last_c = 0
+    for row in ws.iter_rows(min_row=1, max_row=max_r, max_col=max_c):
+        for c in row:
+            if c.value is not None and str(c.value).strip() != "":
+                last_r, last_c = max(last_r, c.row), max(last_c, c.column)
+    widths, hidden_c = {}, set()
+    for dim in ws.column_dimensions.values():
+        lo, hi = (dim.min or 0), (dim.max or 0)
+        for i in range(max(lo, 1), min(hi, COLS_MAX) + 1):
+            if dim.hidden:
+                hidden_c.add(i)
+            if dim.width:
+                widths[i] = dim.width
+    rows_vis = [r for r in range(1, last_r + 1) if not ws.row_dimensions[r].hidden] if last_r else []
+    cols_vis = [c for c in range(1, last_c + 1) if c not in hidden_c] if last_c else []
+    rv, cv = set(rows_vis), set(cols_vis)
+    span, covered = {}, set()
+    for rng in ws.merged_cells.ranges:
+        r1, c1, r2, c2 = rng.min_row, rng.min_col, min(rng.max_row, last_r), min(rng.max_col, last_c)
+        if r1 > last_r or c1 > last_c:
+            continue
+        rs = sum(1 for r in range(r1, r2 + 1) if r in rv)
+        cs = sum(1 for c in range(c1, c2 + 1) if c in cv)
+        span[(r1, c1)] = (rs, cs)
+        for r in range(r1, r2 + 1):
+            for c in range(c1, c2 + 1):
+                if (r, c) != (r1, c1):
+                    covered.add((r, c))
+    out = []
+    for r in rows_vis:
+        cells = []
+        for c in cols_vis:
+            if (r, c) in covered:
+                continue
+            cell = ws.cell(row=r, column=c)
+            rs, cs = span.get((r, c), (1, 1))
+            if rs < 1 or cs < 1:        # об'єднана клітинка починається в прихованому рядку / колонці
+                continue
+            cells.append({"v": _rich_value(cell), "s": _rich_style(cell), "rs": rs, "cs": cs, "c": c,
+                          "text": isinstance(cell.value, str)})
+        out.append({"n": r, "cells": _overflow(cells, {c: _px(widths.get(c)) for c in cols_vis})})
+    colw = [{"letter": get_column_letter(c), "w": _px(widths.get(c))} for c in cols_vis]
+    return Sheet(ws.title, out, len(cols_vis), more_rows=(ws.max_row or 0) > ROWS_MAX,
+                 more_cols=(ws.max_column or 0) > COLS_MAX, hidden=getattr(ws, "sheet_state", "") != "visible",
+                 rich=True, colw=colw)
+
+
 def _xlsx(data) -> list:
     from openpyxl import load_workbook
+    if len(data) <= RICH_MAX:
+        try:
+            wb = load_workbook(io.BytesIO(data), read_only=False, data_only=True)
+            try:
+                return [_sheet_rich(ws) for ws in wb.worksheets[:SHEETS_MAX]]
+            finally:
+                wb.close()
+        except Exception:  # noqa: BLE001 — не вийшло з оформленням — значення, як раніше
+            logger.info("rich xlsx failed", exc_info=True)
     wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
     out = []
     try:
@@ -531,16 +715,19 @@ def office_pdf(name, data: bytes):
 def respond(request, name, data: bytes, *, context=None, back="", back_label="", error=""):
     """Сторінка «👁 Перегляд» (шаблон admin/file_preview.html) для файлу, який виклик уже перевірив за правами.
     ?e=…&e=… — файл в архіві; ?raw=1 — сам файл для <img> / <iframe> (BMP / TIFF — PNG); ?pdf=1 — doc / rtf / odt
-    у PDF; ?download=1 — завантажити. error — файлу немає / не прочитався: сторінка з поясненням і «назад»."""
+    у PDF; ?download=1 — завантажити; ?embed=1 — без меню Minerva (у вікні «📂 Файли», admin/file_preview_embed.html).
+    error — файлу немає / не прочитався: сторінка з поясненням і «назад»."""
     from django.http import HttpResponse
     from django.shortcuts import render
     from django.utils.http import urlencode
     from email_assistant.views import _attachment_response
 
     chain = [c for c in request.GET.getlist("e") if c][:CHAIN_MAX + 1]
+    embed = request.GET.get("embed") == "1"
 
-    def url(ch, **extra):
-        q = [("e", c) for c in ch] + list(extra.items())
+    def url(ch, page=False, **extra):
+        """Адреса цього ж перегляду: файл у архіві ch; перегляд у вікні лишається у вікні (embed), page — окрема сторінка."""
+        q = [("e", c) for c in ch] + list(extra.items()) + ([("embed", "1")] if embed and not page and not extra else [])
         return request.path + ("?" + urlencode(q) if q else "")
 
     try:
@@ -583,8 +770,13 @@ def respond(request, name, data: bytes, *, context=None, back="", back_label="",
         e.download_url = url(chain + [e.path], download="1")
     media = [{"name": os.path.basename(m), "raw": url(chain + [m], raw="1"), "view": url(chain + [m])}
              for m in p.media]
-    return render(request, "admin/file_preview.html", {
-        **(context or {}), "title": f"👁 {base}", "p": p, "crumbs": crumbs, "media": media,
+    resp = render(request, "admin/file_preview_embed.html" if embed else "admin/file_preview.html", {
+        **({} if embed else (context or {})), "title": f"👁 {base}", "p": p, "crumbs": crumbs, "media": media,
         "raw_url": url(chain, raw="1"), "pdf_url": url(chain, pdf="1"), "download_url": url(chain, download="1"),
-        "office_ok": office_ok, "back": back, "back_label": back_label,
+        "page_url": url(chain, page=True), "office_ok": office_ok, "back": back, "back_label": back_label, "embed": embed,
+        # ← Назад: з файлу в архіві — до архіву, інакше — до сторінки, звідки файл (запит)
+        "back_url": "" if embed else (url(chain[:-1]) if chain else back),
     })
+    if embed:
+        resp["X-Frame-Options"] = "SAMEORIGIN"
+    return resp

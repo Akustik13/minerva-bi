@@ -60,6 +60,7 @@ def letters(r, user) -> list:
     # 📎 файли постачальника, уже збережені в запиті, — їх бачать усі, хто бачить запит; решта — лише зі своїх листів
     saved = {(f.message_id, f.index): reverse("admin:suppliers_supplierrequest_file", args=[r.request_id, "reply", f.pk])
              for f in r.reply_files.all() if f.file}
+    bank_ids = {(f.message_id, f.index): f"reply:{f.pk}" for f in r.reply_files.all() if f.file}   # 📂 вікно файлів
     out = []
     for m in rfq_replies.mail(r):
         readable = rfq_replies.can_read(m, user)
@@ -74,6 +75,7 @@ def letters(r, user) -> list:
             "text": rfq_replies.snippet(m, LETTER_CHARS) if readable else "",
             "files": [{"name": a.get("name"), "icon": rfq_replies.icon(a.get("name")),
                        "size": rfq_replies.size_text(a.get("size")),
+                       "bank_id": bank_ids.get((m.pk, i), ""),
                        "url": saved.get((m.pk, i)) or (reverse("admin:suppliers_supplierrequest_chat_file",
                                                                args=[r.request_id, r.pk, m.pk, i]) if readable else "")}
                       for i, a in enumerate(m.attachments or []) if rfq_replies.wanted(a)],

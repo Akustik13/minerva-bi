@@ -57,7 +57,7 @@
   <section class="rwp-sec">
     <div class="spf-h">📎 Вкладення від постачальника{% if files %} ({{ files|length }}){% endif %}</div>
     {% for f in files %}
-    <a class="rwp-file" href="{% url 'admin:suppliers_supplierrequest_file' req.pk 'reply' f.obj.pk %}" target="_blank" title="👁 Відкрити в Minerva — PDF, Word, Excel, картинки, архіви">
+    <a class="rwp-file" href="{% url 'admin:suppliers_supplierrequest_file' req.pk 'reply' f.obj.pk %}" target="_blank" data-rw-file="reply:{{ f.obj.pk }}" title="👁 Відкрити в Minerva — PDF, Word, Excel, картинки, архіви">
       <span class="rwp-ic">{{ f.icon }}</span><span class="rwp-fn" translate="no">{{ f.obj.name }}</span>
       <span class="spf-muted">{{ f.size }}{% if f.obj.received_at %} · {{ f.obj.received_at|date:"d.m H:i" }}{% endif %}</span></a>
     {% empty %}
@@ -67,7 +67,7 @@
     {% elif out.waiting %}<div class="spf-muted rwp-wait">⏳ Ще {{ out.waiting }} у пошті — забираю…</div>
     {% elif out.error %}<div class="spf-warn">⚠️ Пошта: {{ out.error }}</div>{% endif %}
     {% if request_files %}<details class="rwp-our"><summary class="spf-muted">Файли нашого запиту ({{ request_files|length }})</summary>
-      {% for f in request_files %}<a class="rwp-file" href="{% url 'admin:suppliers_supplierrequest_file' req.pk 'req' f.pk %}" target="_blank"><span class="rwp-ic">📤</span><span class="rwp-fn" translate="no">{{ f.name }}</span></a>{% endfor %}</details>{% endif %}
+      {% for f in request_files %}<a class="rwp-file" href="{% url 'admin:suppliers_supplierrequest_file' req.pk 'req' f.pk %}" target="_blank" data-rw-file="req:{{ f.pk }}"><span class="rwp-ic">📤</span><span class="rwp-fn" translate="no">{{ f.name }}</span></a>{% endfor %}</details>{% endif %}
   </section>
 
   <section class="rwp-sec">
