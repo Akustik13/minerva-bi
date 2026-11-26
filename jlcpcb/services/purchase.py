@@ -182,6 +182,15 @@ def has_open_stock_lines(order) -> bool:
     return any(ln.product_id and ln.qty_received < ln.qty_ordered for ln in po.lines.all())
 
 
+def _locked_lines(po):
+    """Позиції закупівлі під блокуванням (у transaction.atomic). of=("self",): товар позиції необов'язковий
+    (LEFT JOIN), а PostgreSQL не блокує «nullable side of an outer join» — без of прийом падав з 500 (SQLite
+    блокувань не робить, тож звичайні тести цього не бачили; перевірка — tests_purchase.PostgresLockTests)."""
+    from inventory.models import PurchaseOrderLine
+    return (PurchaseOrderLine.objects.select_for_update(of=("self",)).filter(purchase_order=po)
+            .select_related("product"))
+
+
 def receive(order, user=None, line=None) -> list:
     """Оприбуткувати доставлене — залишок позицій закупівлі (усіх або однієї позиції JLC line).
     Повертає [(артикул, к-сть)] того, що додано на склад."""
@@ -195,7 +204,7 @@ def receive(order, user=None, line=None) -> list:
     direct = not InventorySettings.get().add_on_po_receive
     out = []
     with transaction.atomic():
-        qs = PurchaseOrderLine.objects.select_for_update().filter(purchase_order=po).select_related("product")
+        qs = _locked_lines(po)
         if line is not None:
             qs = qs.filter(external_line_id=f"jlc:{line.pk}")
         for pl in qs:

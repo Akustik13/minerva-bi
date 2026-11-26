@@ -118,6 +118,21 @@ class AdminTests(Base):
         self.assertEqual(other.ordered_skus, 'TR240402-01')
         self.assertEqual(list(self.client.get(url, {'q': 'TR240402'}).context['cl'].result_list), [other])
 
+    def test_list_marks_received_articles(self):
+        """«Що замовляли»: ✓ — артикул отримано повністю, «10/30» — частково, без позначки — ще ні."""
+        from inventory.models import PurchaseOrderLine
+        full, part, none = (Product.objects.create(sku=s, name=s) for s in ('AN120202-01H', 'AN220206-001',
+                                                                            'AN220214-01A'))
+        PurchaseOrderLine.objects.create(purchase_order=self.po, product=full, qty_ordered=30, qty_received=30)
+        PurchaseOrderLine.objects.create(purchase_order=self.po, product=part, qty_ordered=30, qty_received=10)
+        PurchaseOrderLine.objects.create(purchase_order=self.po, product=none, qty_ordered=10)
+        html = self.client.get(reverse('admin:inventory_purchaseorder_changelist'), {'view': 'all'}).content.decode()
+        self.assertIn('title="Отримано 30 з 30 шт." aria-label="Отримано повністю">✓</span> <a href="'
+                      + reverse('admin:inventory_product_change', args=[full.pk]), html)
+        self.assertIn('title="Отримано 10 з 30 шт.">10/30</span> <a href="'
+                      + reverse('admin:inventory_product_change', args=[part.pk]), html)
+        self.assertIn(', <a href="' + reverse('admin:inventory_product_change', args=[none.pk]), html)
+
     def test_detect_button_post_only(self):
         D.objects.create(purchase_order=self.po, category=D.ORDER, title='TR240408-01.zip')
         page = self.client.get(reverse('admin:inventory_purchaseorder_change', args=[self.po.pk]))

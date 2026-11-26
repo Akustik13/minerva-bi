@@ -4479,6 +4479,20 @@ class SupplierAdmin(SupplierCardMixin, ProjectsBlockMixin, admin.ModelAdmin):
     )
 
 
+def _received_mark(ordered, received):
+    """Позначка біля артикула в «Що замовляли»: ✓ — усе отримано, «10/30» — частково, нічого — ще не отримано."""
+    def n(d):
+        return f"{Decimal(d).normalize():f}"
+    if not received or received <= 0:
+        return ""
+    if ordered and received >= ordered:
+        return format_html('<span class="po-got po-got-all" title="{}" aria-label="{}">✓</span> ',
+                           _("Отримано {0} з {1} шт.").format(n(received), n(ordered)),
+                           _("Отримано повністю"))
+    return format_html('<span class="po-got po-got-part" title="{}">{}/{}</span> ',
+                       _("Отримано {0} з {1} шт.").format(n(received), n(ordered)), n(received), n(ordered))
+
+
 @admin.register(PurchaseOrder)
 class PurchaseOrderAdmin(ProjectsBlockMixin, admin.ModelAdmin):
     projects_block_kind = "purchase"           # «📁 Проєкти» (projects/panels.py)
@@ -4589,8 +4603,11 @@ class PurchaseOrderAdmin(ProjectsBlockMixin, admin.ModelAdmin):
         """Що замовляли: артикули з поля (з документів чи вписані) + товари позицій; товар каталогу — посилання."""
         from inventory.services.po_documents import ordered_codes
         links = getattr(self, "_ordered_products", {})
-        items, seen = [], set()
+        items, seen, got = [], set(), {}
         for line in obj.lines.all():
+            if line.product_id:
+                o, r = got.get(line.product_id, (Decimal("0"), Decimal("0")))
+                got[line.product_id] = (o + (line.qty_ordered or 0), r + (line.qty_received or 0))
             if line.product_id and line.product.sku.upper() not in seen:
                 seen.add(line.product.sku.upper())
                 items.append((line.product.sku, line.product_id))
@@ -4600,10 +4617,12 @@ class PurchaseOrderAdmin(ProjectsBlockMixin, admin.ModelAdmin):
                 items.append((code, links.get(code.upper())))
         if not items:
             return "—"
-        shown = format_html_join(", ", "{}", ((
+        shown = format_html_join(", ", "{}{}", ((
+            _received_mark(*got[pk]) if pk in got else "",
             format_html('<a href="{}" translate="no">{}</a>', reverse("admin:inventory_product_change", args=[pk]),
                         code) if pk else format_html('<span translate="no">{}</span>', code),) for code, pk in items[:4]))
-        more = format_html(' <span style="opacity:.65" title="{}">+{}</span>', ", ".join(c for c, _p in items[4:]),
+        more = format_html(' <span style="opacity:.65" title="{}">+{}</span>', ", ".join(
+            ("✓ " if p in got and got[p][1] >= got[p][0] > 0 else "") + c for c, p in items[4:]),
                            len(items) - 4) if len(items) > 4 else ""
         return format_html("{}{}", shown, more)
     ordered_col.short_description = _("Що замовляли")

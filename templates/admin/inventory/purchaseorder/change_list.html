@@ -36,6 +36,10 @@
     .po-chips .po-chip { padding: 7px 8px 7px 12px; font-size: 13px; }
   }
   @media (prefers-reduced-motion: reduce) { .po-chips .po-chip { transition: none; } }
+  /* «Що замовляли»: ✓ — артикул отримано повністю, «10/30» — частково (inventory/admin._received_mark) */
+  .po-got { font-weight: 700; font-size: 11px; white-space: nowrap; cursor: help; }
+  .po-got-all { color: #2e7d32; }
+  .po-got-part { color: #ef6c00; }
 </style>
 {% endblock %}
 

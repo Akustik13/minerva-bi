@@ -210,3 +210,20 @@ class TrackingTests(TestCase):
         self.assertEqual((order.tracking_number, order.local_status, order.tracking_carrier),
                          ('1ZF1F5420410259015', 'shipped', 'UPS'))
         self.assertEqual(order.purchase_order.tracking_number, '1ZF1F5420410259015')
+
+
+class PostgresLockTests(TestCase):
+    """Прийом блокує позиції закупівлі з LEFT JOIN товару — на PostgreSQL лише «FOR UPDATE OF <позиції>»
+    (інакше «FOR UPDATE cannot be applied to the nullable side of an outer join» → 500 на NAS; SQLite не блокує)."""
+
+    def test_receive_lock_is_valid_on_postgresql(self):
+        from django.db.backends.postgresql.base import DatabaseWrapper
+        pg = DatabaseWrapper({'ENGINE': 'django.db.backends.postgresql', 'NAME': 'x', 'USER': 'x', 'PASSWORD': 'x',
+                              'HOST': '', 'PORT': '', 'OPTIONS': {}, 'TIME_ZONE': None, 'CONN_MAX_AGE': 0,
+                              'CONN_HEALTH_CHECKS': False, 'AUTOCOMMIT': True, 'ATOMIC_REQUESTS': False,
+                              'TEST': {}}, alias='pg-sql-only')
+        pg.__dict__['pg_version'] = 160000                 # без з'єднання з базою
+        pg.get_autocommit = lambda: False                  # як усередині transaction.atomic()
+        sql, _ = purchase._locked_lines(PurchaseOrder(pk=1)).query.get_compiler(connection=pg).as_sql()
+        self.assertIn('LEFT OUTER JOIN', sql)
+        self.assertTrue(sql.endswith('FOR UPDATE OF "inventory_purchaseorderline"'), sql[-80:])

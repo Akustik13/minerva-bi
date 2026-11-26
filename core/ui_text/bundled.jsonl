@@ -13589,12 +13589,14 @@
 {"uk": "Отримано", "en": "Received", "de": "Eingegangen"}
 {"uk": "Отримано (нове)", "en": "Received (new)", "de": "Empfangen (neu)"}
 {"uk": "Отримано (шт)", "en": "Received (pcs)", "de": "Erhalten (Stk.)"}
+{"uk": "Отримано {0} з {1} шт.", "en": "Received {0} of {1} pcs", "de": "Erhalten {0} von {1} Stk."}
 {"uk": "Отримано · ⚙️ В обробці · 🚀 Відправлено · ❌ Скасовано", "en": "Received · ⚙️ Processing · 🚀 Shipped · ❌ Cancelled", "de": "Eingegangen · ⚙️ In Bearbeitung · 🚀 Versendet · ❌ Storniert"}
 {"uk": "Отримано більше, ніж замовлено — схоже на ту саму доставку під іншим delivery_id. Якщо це справді так, надішліть allow_over: true.", "en": "More was received than ordered — this looks like the same delivery under a different delivery_id. If it really is, send allow_over: true.", "de": "Es wurde mehr erhalten als bestellt — das sieht nach derselben Lieferung unter einer anderen delivery_id aus. Wenn das tatsächlich so ist, senden Sie allow_over: true."}
 {"uk": "Отримано замовлення клієнта", "en": "Customer order received", "de": "Kundenauftrag eingegangen"}
 {"uk": "Отримано лист", "en": "Email received", "de": "E-Mail empfangen"}
 {"uk": "Отримано на склад (шт)", "en": "Received into stock (pcs)", "de": "Ins Lager übernommen (Stk.)"}
 {"uk": "Отримано не все — частину ще чекаємо", "en": "Not everything received — still waiting for part of it", "de": "Nicht alles eingegangen — ein Teil steht noch aus"}
+{"uk": "Отримано повністю", "en": "Fully received", "de": "Vollständig erhalten"}
 {"uk": "Отримано трекінг-номер та PDF-етикетку", "en": "Tracking number and PDF label received", "de": "Sendungsnummer und PDF-Etikett erhalten"}
 {"uk": "Отримати дані з DigiKey API", "en": "Get data from DigiKey API", "de": "Daten von der DigiKey API abrufen"}
 {"uk": "Отримати дані клієнта для формування стратегії комунікації.", "en": "Get customer data for building a communication strategy.", "de": "Kundendaten für die Erstellung einer Kommunikationsstrategie abrufen."}
