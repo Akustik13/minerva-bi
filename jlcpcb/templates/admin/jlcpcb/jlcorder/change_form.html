@@ -441,7 +441,7 @@
             <td style="white-space:nowrap;font-size:12px;min-width:120px">
               {% if sub.product %}
                 <a href="/admin/inventory/product/{{ sub.product.pk }}/change/" style="color:var(--link-fg);font-weight:600">{{ sub.product.sku }}</a>
-                {% if sub.is_received %}<span style="color:var(--ok);font-size:10px;display:block">📦 Прийнято {{ sub.received_qty }} шт.</span>{% endif %}
+                {% if sub.is_received %}<span style="color:var(--ok);font-size:10px;display:block">📦 Прийнято {{ sub.received_qty|floatformat:"-3" }} шт.</span>{% endif %}
               {% else %}
                 <span style="color:var(--text-dim);font-size:11px">⬜ не прив'язано</span>
               {% endif %}

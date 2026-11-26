@@ -1492,6 +1492,10 @@ class JLCOrderAdmin(admin.ModelAdmin):
                     obj.refresh_from_db()
                 except Exception:  # noqa: BLE001
                     pass
+            try:
+                purchase.mirror_received(obj)                 # прийняли повз JLC (огляд складу, закупівля) — видно тут
+            except Exception:  # noqa: BLE001
+                pass
             extra['jlc_po'] = obj.purchase_order
             extra['can_receive'] = (
                 obj.local_status == JLCOrder.LocalStatus.DELIVERED and purchase.has_open_stock_lines(obj)

@@ -227,3 +227,55 @@ class PostgresLockTests(TestCase):
         sql, _ = purchase._locked_lines(PurchaseOrder(pk=1)).query.get_compiler(connection=pg).as_sql()
         self.assertIn('LEFT OUTER JOIN', sql)
         self.assertTrue(sql.endswith('FOR UPDATE OF "inventory_purchaseorderline"'), sql[-80:])
+
+
+class MirrorReceivedTests(TestCase):
+    """Прийняли повз JLC (огляд складу, картка закупівлі) — картка JLC бачить «Прийнято», кнопки «📥 Прийняти» немає."""
+
+    def setUp(self):
+        cfg = JLCConfig.get()
+        cfg.auto_receive_on_delivered = False
+        cfg.save()
+        self.order, self.prods = _batch()
+        purchase.deliver(self.order)
+        self.order.refresh_from_db()
+        self.first = self.order.purchase_order.lines.get(product=self.prods[0])
+
+    def jlc_line(self, i=0):
+        return self.order.lines.get(product=self.prods[i])
+
+    def test_po_line_received_elsewhere_marks_jlc_line(self):
+        self.first.qty_received = 30
+        self.first.save()                                       # як «✓ Отримати» в огляді складу
+        self.assertTrue(self.jlc_line().is_received)
+        self.assertFalse(self.jlc_line(1).is_received)
+        self.assertEqual(InventoryTransaction.objects.filter(tx_type='Incoming').count(), 1)
+        self.assertEqual(len(purchase.receive(self.order)), 3)  # решта — без першої вдруге
+        self.assertEqual(InventoryTransaction.objects.filter(tx_type='Incoming').count(), 4)
+
+    def test_card_shows_received_and_hides_line_button(self):
+        from django.contrib.auth.models import User
+        from config.models import SystemSettings
+        SystemSettings.objects.update_or_create(pk=1, defaults={'is_onboarding_complete': True})
+        self.client.force_login(User.objects.create_superuser('slava', 's@x.y', 'p'))
+        from inventory.models import PurchaseOrderLine
+        PurchaseOrderLine.objects.filter(pk=self.first.pk).update(qty_received=30)   # прийнято до цієї версії
+        html = self.client.get(f'/admin/jlcpcb/jlcorder/{self.order.pk}/change/').content.decode()
+        self.assertIn('📦 Прийнято 30 шт.', html)
+        self.assertNotIn(f'/line/{self.jlc_line().pk}/receive/', html)
+        self.assertIn(f'/line/{self.jlc_line(1).pk}/receive/', html)
+
+    def test_cron_backfills_and_correction_is_not_undone(self):
+        from inventory.models import PurchaseOrderLine
+        PurchaseOrderLine.objects.filter(pk=self.first.pk).update(qty_received=30)
+        self.assertEqual(purchase.sync_all()['mirrored'], 1)
+        self.assertTrue(self.jlc_line().is_received)
+        JLCOrder.objects.filter(pk=self.order.pk).update(received_qty=30)   # «прийнято все замовлення» (стара позначка)
+        self.first.refresh_from_db()
+        self.first.qty_received = 0                               # людина виправила «Отримано» в закупівлі
+        self.first.save()
+        self.assertEqual(self.jlc_line().received_qty, 0)
+        self.order.refresh_from_db()
+        purchase.sync(self.order)
+        self.first.refresh_from_db()
+        self.assertEqual(self.first.qty_received, 0)              # синхронізація не повертає 30 назад

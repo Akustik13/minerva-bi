@@ -60,9 +60,11 @@ def _items(order) -> list:
             out.append({"key": f"jlc:{ln.pk}", "product": ln.product, "qty": Decimal(ln.quantity or 0),
                         "total": ln.price, "name": ln.file_name, "sku": contents._guess_sku(ln.file_name),
                         "received": Decimal(ln.received_qty or 0), "jlc_line": ln})
-        # колись оприбутковано все замовлення (order.product × order.quantity — перша позиція) — це та позиція
+        # колись оприбутковано все замовлення (order.product × order.quantity — перша позиція) — це та позиція;
+        # лише поки закупівлі ще немає: далі «Отримано» веде закупівля (mirror_received), інакше виправлене в ній
+        # «Отримано» синхронізація повертала б назад
         got = Decimal(order.received_qty or 0)
-        if got > 0 and order.product_id:
+        if got > 0 and order.product_id and not order.purchase_order_id:
             for it in out:
                 if it["product"] is not None and it["product"].pk == order.product_id and it["received"] < it["qty"]:
                     it["received"] = min(it["qty"], max(it["received"], got))
@@ -180,6 +182,38 @@ def has_open_stock_lines(order) -> bool:
     if po is None:
         return False
     return any(ln.product_id and ln.qty_received < ln.qty_ordered for ln in po.lines.all())
+
+
+def mirror_received(order=None, po_line=None) -> int:
+    """«Отримано» позицій закупівлі JLCPCB → позиції замовлення JLC (received_qty), рівно як у закупівлі.
+
+    Закупівлю приймають і повз кнопки JLC — «✓ Отримати» в огляді складу, картка закупівлі, API. Без цього картка
+    JLC не знала, що позицію прийнято: лишалась кнопка «📥 Прийняти», не було «📦 Прийнято N шт.» (на склад кнопка
+    однаково нічого не додавала — рахує від закупівлі). Позиція закупівлі «jlc:order» → JLCOrder.received_qty.
+    po_line — одна позиція (сигнал), order — одне замовлення (картка), нічого — усі (cron). → скільки змінено."""
+    from inventory.models import PurchaseOrderLine
+    from jlcpcb.models import JLCOrder, JLCOrderLine
+    qs = PurchaseOrderLine.objects.filter(purchase_order__external_source=SOURCE, external_line_id__startswith="jlc:")
+    if po_line is not None:
+        qs = qs.filter(pk=po_line.pk)
+    elif order is not None:
+        if not order.purchase_order_id:
+            return 0
+        qs = qs.filter(purchase_order_id=order.purchase_order_id)
+    rows = list(qs.values_list("external_line_id", "qty_received", "purchase_order_id"))
+    by_line = {int(key[4:]): (got, po_id) for key, got, po_id in rows
+               if key != ORDER_KEY and key[4:].isdigit()}
+    changed = 0
+    for pk, cur, po_id in (JLCOrderLine.objects.filter(pk__in=list(by_line))
+                           .values_list("pk", "received_qty", "order__purchase_order_id")):
+        got, want = by_line[pk]
+        if po_id == want and cur != got:
+            changed += JLCOrderLine.objects.filter(pk=pk).update(received_qty=got)
+    for key, got, po_id in rows:
+        if key == ORDER_KEY:
+            changed += (JLCOrder.objects.filter(purchase_order_id=po_id, lines__isnull=True)
+                        .exclude(received_qty=got).update(received_qty=got))
+    return changed
 
 
 def _locked_lines(po):
@@ -315,4 +349,8 @@ def sync_all() -> dict:
             continue
         if po is not None:
             stats["updated" if had else "created"] += 1
+    try:
+        stats["mirrored"] = mirror_received()      # прийняте повз JLC (і до цієї версії) — у позиції JLC
+    except Exception:  # noqa: BLE001
+        logger.warning("JLC: mirror received failed", exc_info=True)
     return stats

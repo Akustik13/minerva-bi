@@ -91,3 +91,16 @@ def sync_jlc_order_from_shipment(sender, instance, **kwargs):
             transaction.on_commit(_deliver)
     except Exception as e:
         logger.warning("JLC signal: date sync failed for shipment #%s: %s", instance.pk, e)
+
+
+@receiver(post_save, sender='inventory.PurchaseOrderLine')
+def jlc_line_received_from_purchase(sender, instance, **kwargs):
+    """«Отримано» позиції закупівлі JLCPCB змінили (огляд складу, картка закупівлі, API) — те саме в позиції JLC,
+    щоб картка замовлення JLC бачила, що прийнято (jlcpcb/services/purchase.mirror_received)."""
+    if not (instance.external_line_id or '').startswith('jlc:'):
+        return
+    try:
+        from jlcpcb.services import purchase
+        purchase.mirror_received(po_line=instance)
+    except Exception as e:  # noqa: BLE001 — прийом на склад не має падати через позначку в JLC
+        logger.warning("JLC signal: mirror received failed for PO line #%s: %s", instance.pk, e)
