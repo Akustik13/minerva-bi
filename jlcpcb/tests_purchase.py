@@ -139,6 +139,51 @@ class DeliverTests(TestCase):
         self.assertEqual(InventoryTransaction.objects.filter(tx_type='Incoming').count(), 4)
 
 
+class CatchUpTests(TestCase):
+    """Посилку доставлено, поки авто-прийом був вимкнений; увімкнули — cron / збереження налаштувань доприймає."""
+
+    def _off(self, on=False):
+        cfg = JLCConfig.get()
+        cfg.auto_receive_on_delivered = on
+        cfg.save()
+
+    def test_turned_on_later_receives_recent_delivery_once(self):
+        self._off()
+        order, _ = _batch()
+        purchase.deliver(order, source='посилка')
+        self.assertEqual(InventoryTransaction.objects.count(), 0)
+        self.assertEqual(purchase.catch_up(), [])                    # вимкнено — нічого
+        self._off(on=True)
+        got = purchase.catch_up()
+        self.assertEqual([(o.jlc_order_id, len(g)) for o, g in got], [('W2026111923107730', 4)])
+        order.refresh_from_db()
+        self.assertEqual(order.purchase_order.status, 'received')
+        self.assertEqual(InventoryTransaction.objects.filter(tx_type='Incoming').count(), 4)
+        self.assertEqual(purchase.catch_up(), [])                    # удруге — нічого
+        self.assertEqual(InventoryTransaction.objects.count(), 4)
+
+    def test_old_delivery_not_touched(self):
+        self._off()
+        order, _ = _batch()
+        purchase.deliver(order)
+        JLCOrder.objects.filter(pk=order.pk).update(delivered_date=timezone.localdate() - timezone.timedelta(days=30))
+        self._off(on=True)
+        self.assertEqual(purchase.catch_up(), [])
+        self.assertEqual(InventoryTransaction.objects.count(), 0)
+
+    def test_cron_pass_runs_catch_up(self):
+        from io import StringIO
+        from django.core.management import call_command
+        self._off()
+        order, _ = _batch()
+        purchase.deliver(order)
+        self._off(on=True)
+        out = StringIO()
+        call_command('sync_jlc_orders', match_only=True, skip_dhl=True, stdout=out)
+        self.assertIn('catch-up auto-receive', out.getvalue())
+        self.assertEqual(InventoryTransaction.objects.filter(tx_type='Incoming').count(), 4)
+
+
 class TrackingTests(TestCase):
     def test_from_raw_and_text(self):
         raw = {'orderItem': [{'pcbItem': {'fileName': 'X'}}], 'logistics': {'expressNo': '1zf1f5420410259015',

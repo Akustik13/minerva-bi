@@ -57,9 +57,14 @@ class JLCConfig(models.Model):
         ),
     )
     notify_email            = models.BooleanField('Email', default=False)
-    notify_email_to         = models.CharField(
-        'Email одержувачів (через кому)', max_length=500, blank=True, default='',
-        help_text='Порожньо = адреса з загальних налаштувань сповіщень',
+    # Кілька адрес «a@x.de, b@y.com» — поле з чипами й «＋ З акаунтів» (core/email_list.py)
+    notify_email_to         = models.TextField(
+        'Кому (email)', blank=True, default='',
+        help_text='Порожньо — адреси «Отримувачі (To)» з «Налаштування → Сповіщення»',
+    )
+    notify_email_cc         = models.TextField(
+        'Копія (CC)', blank=True, default='',
+        help_text='Ці адреси теж отримають лист — у копії',
     )
 
     class Meta:

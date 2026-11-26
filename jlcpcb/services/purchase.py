@@ -263,6 +263,32 @@ def deliver(order, source="", user=None) -> list:
     return on_delivered(order, user)
 
 
+def catch_up(days=HISTORY_DAYS) -> list:
+    """Авто-прийом увімкнули вже після доставки (або посилку доставлено, поки він був вимкнений): замовлення JLC,
+    доставлені за останні days днів, з позиціями, яких ще немає на складі, — на склад. Давніші — ні: їх могли
+    оприбуткувати повз Minerva. Повертає [(замовлення, [(артикул, к-сть)])]; cron sync_jlc_orders — щопроходу."""
+    from datetime import timedelta
+    from jlcpcb.models import JLCConfig, JLCOrder
+    if not JLCConfig.get().auto_receive_on_delivered:
+        return []
+    since = timezone.localdate() - timedelta(days=days)
+    out = []
+    for order in (JLCOrder.objects.filter(local_status=JLCOrder.LocalStatus.DELIVERED, delivered_date__gte=since,
+                                          purchase_order__isnull=False)
+                  .exclude(mapping_status__in=[JLCOrder.MappingStatus.TRACK_ONLY, JLCOrder.MappingStatus.IGNORED])
+                  .select_related("purchase_order").order_by("pk")):
+        if not has_open_stock_lines(order):
+            continue
+        try:
+            got = receive(order)
+        except Exception:  # noqa: BLE001 — одне замовлення не зупиняє решту
+            logger.warning("JLC %s: catch-up receive failed", order.jlc_order_id, exc_info=True)
+            continue
+        if got:
+            out.append((order, got))
+    return out
+
+
 def sync_all() -> dict:
     """Закупівлі для замовлень без неї (і доставлених раніше — історією) та оновлення відкритих."""
     from jlcpcb.models import JLCOrder

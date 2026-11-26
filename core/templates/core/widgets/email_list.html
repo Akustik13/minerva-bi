@@ -1,0 +1,23 @@
+{# ✉️ Кілька email-адрес (core/email_list.py): чипи + «＋ З акаунтів»; справжнє значення — textarea (без JS — видно її). #}
+<div class="mvel" data-mvel>
+  <div class="mvel-box" data-mvel-box>
+    <input type="text" class="mvel-input" data-mvel-input autocomplete="off" spellcheck="false"
+           placeholder="Введіть адресу або виберіть з акаунтів…">
+  </div>
+  {% include "django/forms/widgets/textarea.html" %}
+  {% if widget.groups %}
+  <div class="mvel-bar">
+    <button type="button" class="mvel-add" data-mvel-open aria-expanded="false">＋ З акаунтів <span class="mvel-n">({{ widget.suggest_count }})</span></button>
+    <span class="mvel-hint">Enter, кома або пробіл — додати адресу · ✕ — прибрати · клік на адресі — виправити</span>
+  </div>
+  <div class="mvel-dd" data-mvel-dd hidden>
+    {% for g in widget.groups %}
+    <div class="mvel-grp" data-mvel-grp>
+      <div class="mvel-grp-t">{{ g.title }}</div>
+      {% for s in g.items %}<button type="button" class="mvel-opt" data-mvel-opt data-email="{{ s.email }}" data-label="{{ s.label }}" translate="no" tabindex="-1"><span class="mvel-opt-n">{% if s.label %}{{ s.label }}{% else %}{{ s.email }}{% endif %}</span>{% if s.label %}<span class="mvel-opt-e">{{ s.email }}</span>{% endif %}<span class="mvel-opt-ok" aria-hidden="true">✓</span></button>{% endfor %}
+    </div>
+    {% endfor %}
+    <div class="mvel-none" data-mvel-none hidden>Немає такої адреси серед акаунтів — Enter додасть її як є</div>
+  </div>
+  {% endif %}
+</div>

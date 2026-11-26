@@ -1,0 +1,73 @@
+/* ✉️ Кілька email-адрес (core/email_list.py) — кольори змінними теми адмінки, читабельність перевіряє mv_contrast.js */
+.mvel { position: relative; width: 100%; max-width: 760px; }
+.form-row:has(.mvel) { overflow: visible; }
+.mvel.mvel-on .mvel-raw { display: none; }
+.mvel:not(.mvel-on) .mvel-box, .mvel:not(.mvel-on) .mvel-bar { display: none; }
+.mvel .mvel-raw { width: 100%; max-width: 760px; box-sizing: border-box; }
+
+.mvel-box {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  min-height: 38px; box-sizing: border-box; padding: 5px 8px;
+  border: 1px solid var(--border-color, #ccc); border-radius: 6px;
+  background: var(--body-bg, #fff); cursor: text;
+}
+.mvel-box:focus-within { border-color: var(--primary, #79aec8); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary, #79aec8) 30%, transparent); }
+.mvel.mvel-locked .mvel-box { cursor: default; background: var(--darkened-bg, #f8f8f8); }
+
+.mvel-chip {
+  display: inline-flex; align-items: center; gap: 2px; max-width: 100%;
+  padding: 2px 4px 2px 10px; border-radius: 999px; font-size: 13px; line-height: 20px;
+  background: var(--selected-bg, #e4e4e4); color: var(--body-fg, #333);
+  border: 1px solid var(--border-color, #ccc);
+}
+.mvel.mvel-locked .mvel-chip { padding-right: 10px; }
+.mvel-chip-t { overflow-wrap: anywhere; cursor: text; }
+.mvel.mvel-locked .mvel-chip-t { cursor: default; }
+.mvel-chip.mvel-bad { border-color: #c62828; background: color-mix(in srgb, #c62828 14%, var(--body-bg, #fff)); }
+.mvel-chip.mvel-bad .mvel-chip-t { text-decoration: underline wavy #c62828; }
+.mvel-x {
+  border: 0; background: transparent; color: var(--body-quiet-color, #666); cursor: pointer;
+  font-size: 12px; line-height: 1; width: 20px; height: 20px; border-radius: 50%; padding: 0;
+}
+.mvel-x:hover, .mvel-x:focus-visible { background: color-mix(in srgb, var(--body-fg, #333) 15%, transparent); color: var(--body-fg, #333); }
+
+.mvel .mvel-input {
+  flex: 1 1 180px; min-width: 140px; border: 0 !important; outline: 0; box-shadow: none !important;
+  background: transparent !important; padding: 3px 2px !important; margin: 0; font-size: 13px; color: var(--body-fg, #333);
+}
+
+.mvel-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 6px; }
+.mvel-add {
+  border: 1px solid var(--border-color, #ccc); background: var(--darkened-bg, #f8f8f8); color: var(--body-fg, #333);
+  border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.mvel-add:hover, .mvel-add[aria-expanded="true"] { border-color: var(--primary, #79aec8); }
+.mvel-add .mvel-n { font-weight: 400; color: var(--body-quiet-color, #666); }
+.mvel-hint { font-size: 11px; color: var(--body-quiet-color, #666); }
+
+.mvel-dd {
+  position: absolute; left: 0; right: 0; z-index: 60; margin-top: 4px;
+  max-height: 340px; overflow-y: auto; padding: 6px;
+  background: var(--body-bg, #fff); border: 1px solid var(--border-color, #ccc); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .28);
+}
+.mvel-dd[hidden], .mvel-grp[hidden], .mvel-opt[hidden], .mvel-none[hidden] { display: none; }
+.mvel-grp + .mvel-grp { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--hairline-color, #e8e8e8); }
+.mvel-grp-t { font-size: 11px; font-weight: 700; color: var(--body-quiet-color, #666); padding: 2px 6px 4px; }
+.mvel-opt {
+  display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left;
+  border: 0; background: transparent; color: var(--body-fg, #333); border-radius: 6px;
+  padding: 5px 8px; font-size: 13px; cursor: pointer;
+}
+.mvel-opt:hover, .mvel-opt.hi { background: var(--selected-bg, #e4e4e4); }
+.mvel-opt-n { font-weight: 600; overflow-wrap: anywhere; }
+.mvel-opt-e { color: var(--body-quiet-color, #666); font-size: 12px; overflow-wrap: anywhere; }
+.mvel-opt-ok { margin-left: auto; visibility: hidden; color: #2e7d32; font-weight: 700; }
+.mvel-opt.on .mvel-opt-ok { visibility: visible; }
+.mvel-opt.on .mvel-opt-n { color: var(--body-quiet-color, #666); }
+.mvel-none { font-size: 12px; color: var(--body-quiet-color, #666); padding: 6px 8px; }
+
+@media (max-width: 768px) {
+  .mvel, .mvel .mvel-raw { max-width: none; }
+  .mvel-hint { display: none; }
+}

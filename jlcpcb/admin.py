@@ -82,12 +82,14 @@ class JLCConfigAdmin(admin.ModelAdmin):
             'fields': (
                 'notify_on_shipped', 'notify_on_status_change', 'notify_on_delivered',
                 'notify_telegram', 'telegram_personal_chat_id',
-                'notify_email', 'notify_email_to',
+                'notify_email', 'notify_email_to', 'notify_email_cc',
             ),
             'description': (
                 '💡 <b>Telegram Personal Chat ID</b>: відкрийте <b>@userinfobot</b> у Telegram '
                 'і надішліть йому будь-яке повідомлення — він поверне ваш Chat ID. '
-                'Якщо поле порожнє — сповіщення йдуть в канал із загальних налаштувань.'
+                'Якщо поле порожнє — сповіщення йдуть в канал із загальних налаштувань.<br>'
+                '✉️ <b>Кому / Копія</b>: введіть адресу й натисніть Enter або виберіть у «＋ З акаунтів» — '
+                'користувачі Minerva, скриньки пошти, «Кому» загальних сповіщень.'
             ),
         }),
         ('📋 Лог підключення', {
@@ -96,6 +98,22 @@ class JLCConfigAdmin(admin.ModelAdmin):
         }),
     )
     readonly_fields = ('last_synced_at', 'connection_log')
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        # авто-прийом щойно увімкнули — доставлене, але ще не оприбутковане (за 14 днів) — на склад одразу
+        if obj.auto_receive_on_delivered and 'auto_receive_on_delivered' in form.changed_data:
+            from .services import purchase
+            for order, got in purchase.catch_up():
+                messages.success(request, '📦 {} — на склад: {}'.format(
+                    order.jlc_order_number or order.jlc_order_id,
+                    ', '.join(f'{sku} × {q.normalize():f}' for sku, q in got)))
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name in ('notify_email_to', 'notify_email_cc'):
+            from core import email_list      # адреси чипами + «＋ З акаунтів»
+            return email_list.formfield(db_field, request)
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)

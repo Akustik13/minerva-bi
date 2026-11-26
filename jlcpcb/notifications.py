@@ -86,12 +86,12 @@ def _send_telegram(text: str) -> bool:
 
 
 def _send_html_email(subject: str, html: str, plain: str,
-                     to_addresses: list[str]) -> bool:
+                     to_addresses: list[str], cc: list[str] | None = None) -> bool:
     if not to_addresses:
         return False
     try:
         from django.core.mail import EmailMultiAlternatives
-        msg = EmailMultiAlternatives(subject, plain, None, to_addresses)
+        msg = EmailMultiAlternatives(subject, plain, None, to_addresses, cc=list(cc or []))
         msg.attach_alternative(html, 'text/html')
         msg.send(fail_silently=True)
         return True
@@ -100,17 +100,25 @@ def _send_html_email(subject: str, html: str, plain: str,
         return False
 
 
-def _resolve_email_recipients(cfg) -> list[str]:
-    if cfg.notify_email_to:
-        return [e.strip() for e in cfg.notify_email_to.split(',') if e.strip()]
-    try:
-        from config.models import NotificationSettings
-        s = NotificationSettings.get()
-        if s.alert_email_to:
-            return [e.strip() for e in s.alert_email_to.split(',') if e.strip()]
-    except Exception:
-        pass
-    return []
+def email_targets(cfg) -> tuple[list[str], list[str]]:
+    """(Кому, Копія) листа JLCPCB: «Кому (email)» налаштувань JLCPCB, порожньо — «Отримувачі (To)» з
+    «Налаштування → Сповіщення» (раніше читалось неіснуюче поле й лист не йшов нікому); «Копія (CC)» — без адрес,
+    що вже в «Кому»; «Кому» немає ніде — копія стає «Кому»."""
+    from dashboard.notifications import parse_recipients
+    to, _ = parse_recipients(cfg.notify_email_to)
+    if not to:
+        try:
+            from config.models import NotificationSettings
+            from dashboard.notifications import configured_recipients
+            to = configured_recipients(NotificationSettings.get())
+        except Exception:
+            to = []
+    cc, _ = parse_recipients(getattr(cfg, 'notify_email_cc', ''))
+    seen = {e.lower() for e in to}
+    cc = [e for e in cc if e.lower() not in seen]
+    if not to:
+        to, cc = cc, []
+    return to, cc
 
 
 def _format_eta(expected_date) -> str:
@@ -519,13 +527,13 @@ def notify_jlc_status_change(order, old_status: str, new_status: str,
         _send_telegram(tg_text)
 
     if cfg.notify_email:
-        recipients = _resolve_email_recipients(cfg)
+        recipients, cc = email_targets(cfg)
         if recipients:
             subject   = f'[{company}] JLCPCB {new_label}: {order.jlc_order_id}'
             html_body = _build_jlc_html(
                 order, old_status, new_status, company, eta_str, shipping_method, est_ship_label
             )
-            _send_html_email(subject, html_body, plain_body, recipients)
+            _send_html_email(subject, html_body, plain_body, recipients, cc=cc)
 
     if not force:
         order.last_notified_status = new_status
@@ -632,11 +640,11 @@ def notify_jlc_active_orders_summary() -> dict:
         tg_sent = _send_telegram(tg_text)
 
     if cfg.notify_email:
-        recipients = _resolve_email_recipients(cfg)
+        recipients, cc = email_targets(cfg)
         if recipients:
             email_sent = _send_html_email(
                 f'[{company}] JLCPCB — Статус замовлень ({len(active)} активних)',
-                html_body, plain_body, recipients,
+                html_body, plain_body, recipients, cc=cc,
             )
 
     return {'telegram': tg_sent, 'email': email_sent, 'count': len(active)}

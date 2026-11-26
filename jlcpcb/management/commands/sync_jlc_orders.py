@@ -453,6 +453,9 @@ class Command(BaseCommand):
         st = _purchase.sync_all()
         if st['created'] or st['errors']:
             self.stdout.write(f'  Purchase orders: new {st["created"]}, updated {st["updated"]}, errors {st["errors"]}')
+        # 📥 доставлено, поки авто-прийом був вимкнений (доставлені API-цикл більше не бере) — на склад
+        for order, got in _purchase.catch_up():
+            self.stdout.write(self.style.SUCCESS(f'  {order.jlc_order_id}: catch-up auto-receive {got} → inventory'))
 
         if options.get('skip_dhl'):
             return
