@@ -166,6 +166,9 @@ class PurchaseOrderViewSet(viewsets.GenericViewSet):
         if for_write and not po.external_source:
             raise PurchaseError("Закупівлю створено в Minerva — через API змінюються лише замовлення, "
                                 "які передала зовнішня система.", code="not_external", status=403)
+        if for_write and po.external_source == "jlcpcb":      # веде Minerva з JLCPCB (jlcpcb/services/purchase.py)
+            raise PurchaseError("Закупівлю веде Minerva із замовлення JLCPCB — через API вона лише читається.",
+                                code="not_external", status=403)
         return po
 
     def _by_body(self, data) -> PurchaseOrder:

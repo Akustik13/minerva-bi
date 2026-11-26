@@ -9,6 +9,8 @@ keywords: закупівля, PO, що замовляли, артикул зак
 related: inventory/reorder, inventory/stock, inventory/settings, api/purchases, shipping/carriers
 ---
 
+> 🔧 **Замовлення JLCPCB** — закупівлі веде Minerva сама: для кожного замовлення JLCPCB є закупівля з постачальником JLCPCB («Звідки» — 🔧 JLCPCB · W…), її видно в «Очікується» й «Що замовити»; доставлену посилку Minerva оприбутковує через неї. Вручну дублювати не треба — [Замовлення JLCPCB](guide:inventory/jlcpcb).
+
 ## Що це
 
 **Закупівля (PO)** — замовлення товару в постачальника. Поки вона відкрита, її кількості видно як

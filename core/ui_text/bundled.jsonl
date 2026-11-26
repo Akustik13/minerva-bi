@@ -4352,6 +4352,7 @@
 {"uk": "Авто-прив'язано до {0}", "en": "Auto-linked to {0}", "de": "Automatisch verknüpft mit {0}"}
 {"uk": "Авто-прив'язати", "en": "Auto-link", "de": "Automatisch verknüpfen"}
 {"uk": "Авто-прив'язати до товарів на складі", "en": "Auto-link to products in stock", "de": "Automatisch mit Lagerartikeln verknüpfen"}
+{"uk": "Авто-прийом", "en": "Auto receipt", "de": "Automatischer Wareneingang"}
 {"uk": "Авто-прийом на склад при доставці", "en": "Auto-receipt into stock on delivery", "de": "Automatischer Wareneingang bei Lieferung"}
 {"uk": "Авто-прийом: {0} шт. {1} додано на склад", "en": "Auto-receipt: {0} pcs {1} added to stock", "de": "Automatischer Wareneingang: {0} Stk. {1} ins Lager gebucht"}
 {"uk": "Авто-прийом: {0} шт. {1} додано на склад.", "en": "Auto-receipt: {0} pcs {1} added to stock.", "de": "Automatischer Wareneingang: {0} Stk. {1} ins Lager gebucht."}
@@ -5336,6 +5337,7 @@
 {"uk": "Вебхуки — створення / зміна / видалення", "en": "Webhooks — create / edit / delete", "de": "Webhooks — Anlegen / Bearbeiten / Löschen"}
 {"uk": "Вебхуки → адреса сайту", "en": "Webhooks → website address", "de": "Webhooks → Website-Adresse"}
 {"uk": "Вебчат RAG", "en": "RAG web chat", "de": "RAG-Webchat"}
+{"uk": "Веде Minerva сама із замовлення JLCPCB", "en": "Kept by Minerva itself from the JLCPCB order", "de": "Von Minerva selbst aus dem JLCPCB-Auftrag geführt"}
 {"uk": "Велика Британія", "en": "United Kingdom", "de": "Vereinigtes Königreich"}
 {"uk": "Велика посилка — кур'єрські тарифи (Express) для неї дуже дорогі. Порівняйте з вантажною доставкою", "en": "Large shipment — courier (Express) rates are very expensive for it. Compare with freight", "de": "Große Sendung — Kurier-Tarife (Express) sind dafür sehr teuer. Vergleichen Sie mit Frachtversand"}
 {"uk": "Великий (18px)", "en": "Large (18px)", "de": "Groß (18px)"}
@@ -8132,6 +8134,7 @@
 {"uk": "Закупівель", "en": "Purchase orders", "de": "Bestellungen"}
 {"uk": "Закупівель ще не було.", "en": "No purchase orders yet.", "de": "Noch keine Bestellungen."}
 {"uk": "Закупівлю «{0}» не знайдено.", "en": "Purchase order “{0}” not found.", "de": "Bestellung „{0}“ nicht gefunden."}
+{"uk": "Закупівлю веде Minerva із замовлення JLCPCB — через API вона лише читається.", "en": "Minerva keeps this purchase order from the JLCPCB order — via the API it is read-only.", "de": "Diese Bestellung führt Minerva aus dem JLCPCB-Auftrag — über die API ist sie nur lesbar."}
 {"uk": "Закупівлю вносити самому", "en": "Create the purchase order by itself", "de": "Bestellung selbst anlegen"}
 {"uk": "Закупівлю вносити самому — нову закупівлю (PO) з листа постачальника, якщо такої ще немає", "en": "Create the purchase order by itself — a new purchase order (PO) from the supplier’s e-mail if there is none yet", "de": "Bestellung selbst anlegen — eine neue Bestellung (PO) aus der E-Mail des Lieferanten, falls es sie noch nicht gibt"}
 {"uk": "Закупівлю замовлено", "en": "Purchase ordered", "de": "Einkauf bestellt"}
@@ -8144,6 +8147,7 @@
 {"uk": "Закупівля + <input type=\"text\" class=\"t-mk\" value=\"", "en": "Purchase + <input type=\"text\" class=\"t-mk\" value=\"", "de": "Einkauf + <input type=\"text\" class=\"t-mk\" value=\""}
 {"uk": "Закупівля + націнка з налаштувань", "en": "Purchase + markup from settings", "de": "Einkauf + Aufschlag aus den Einstellungen"}
 {"uk": "Закупівля CRM", "en": "CRM purchase", "de": "CRM-Bestellung"}
+{"uk": "Закупівля Minerva цього замовлення — її видно в «Очікується» складу, «Що замовити», історії постачальника; оприбуткування — через неї", "en": "Minerva purchase order of this order — shown in stock «Expected», «What to order», the supplier history; receiving goes through it", "de": "Minerva-Bestellung zu diesem Auftrag — sichtbar unter «Erwartet» im Lager, «Was bestellen», in der Lieferantenhistorie; der Wareneingang läuft darüber"}
 {"uk": "Закупівля {0}", "en": "Purchase order {0}", "de": "Bestellung {0}"}
 {"uk": "Закупівля {0} з листування «{1}» (документів: {2})", "en": "Purchase order {0} from correspondence «{1}» (documents: {2})", "de": "Bestellung {0} aus der Korrespondenz «{1}» (Dokumente: {2})"}
 {"uk": "Закупівля {0} з листування «{1}» — історія, без складу (документів: {2})", "en": "Purchase order {0} from correspondence «{1}» — history, no stock (documents: {2})", "de": "Bestellung {0} aus der Korrespondenz «{1}» — Verlauf, ohne Lager (Dokumente: {2})"}
@@ -11445,6 +11449,7 @@
 {"uk": "На сайті магазину", "en": "On the shop’s site", "de": "Auf der Website des Shops"}
 {"uk": "На сайті — сторінка /admin/: ключі, паролі, оплата, пошта, магазин без перенесення файлів. Хто має доступ — таблиця «👥 Доступ до адмінки сайту» внизу. Новий сайт підключається кодом: Minerva сама видає йому ключ API й налаштовує вебхук.", "en": "On the site — the /admin/ page: keys, passwords, payment, mail, shop, without transferring files. Who has access — the “👥 Access to the site admin” table at the bottom. A new site is connected with a code: Minerva itself issues it an API key and sets up the webhook.", "de": "Auf der Website — die Seite /admin/: Schlüssel, Passwörter, Zahlung, E-Mail, Shop, ohne Dateiübertragung. Wer Zugriff hat — Tabelle „👥 Zugriff auf die Website-Administration“ unten. Eine neue Website wird per Code verbunden: Minerva stellt ihr selbst einen API-Schlüssel aus und richtet den Webhook ein."}
 {"uk": "На сайті: /admin/ → «🔌 Minerva» → «🔗 Підключити до Minerva кодом»; код — кнопка «🔗 Підключити сайт (код)» у блоці «🌐 Адмінка сайту» (діє 30 хв). Сайт отримає власний ключ і вебхук. Потім — «🔌 Перевірити зв'язок із сайтом».", "en": "On the site: /admin/ → “🔌 Minerva” → “🔗 Connect to Minerva with a code”; the code — the button “🔗 Connect site (code)” in the “🌐 Site admin” block (valid for 30 min). The site gets its own key and webhook. Then — “🔌 Check connection with the site”.", "de": "Auf der Website: /admin/ → „🔌 Minerva“ → „🔗 Per Code mit Minerva verbinden“; den Code erzeugt die Schaltfläche „🔗 Website verbinden (Code)“ im Block „🌐 Website-Verwaltung“ (gültig 30 Min.). Die Website erhält einen eigenen Schlüssel und Webhook. Danach – „🔌 Verbindung zur Website prüfen“."}
+{"uk": "На склад", "en": "To stock", "de": "Ins Lager"}
 {"uk": "На складі", "en": "In stock", "de": "Auf Lager"}
 {"uk": "На складі (точно)", "en": "In stock (exact)", "de": "Auf Lager (exakt)"}
 {"uk": "На складі Minerva ціни немає", "en": "No price in Minerva stock", "de": "Im Minerva-Lager ist kein Preis hinterlegt"}
@@ -13028,6 +13033,7 @@
 {"uk": "Нічого не створено — позначте товари галочкою.", "en": "Nothing created — tick the products.", "de": "Es wurde nichts erstellt — markieren Sie die Artikel per Häkchen."}
 {"uk": "Нічого не чекає на нас. Запишіть «Наступну дію» в полях проєкту.", "en": "Nothing is waiting on us. Enter the \"Next action\" in the project fields.", "de": "Nichts wartet auf uns. Tragen Sie die „Nächste Aktion“ in den Projektfeldern ein."}
 {"uk": "Нічого не чекає: строки, листи, Angebote й закупівлі в порядку.", "en": "Nothing is waiting: deadlines, e-mails, Angebote and purchases are fine.", "de": "Nichts wartet: Termine, E-Mails, Angebote und Einkäufe sind in Ordnung."}
+{"uk": "Нічого оприбутковувати: усе вже на складі або позиції без товару — прив'яжіть товар.", "en": "Nothing to receive: everything is already in stock or the lines have no product — link a product.", "de": "Nichts einzubuchen: alles ist schon im Lager oder die Positionen haben kein Produkt — verknüpfen Sie ein Produkt."}
 {"uk": "Нічого термінового", "en": "Nothing urgent", "de": "Nichts Dringendes"}
 {"uk": "Нічого ще не створено й не надіслано: новий номер буде після «💾 Зберегти».", "en": "Nothing has been created or sent yet: the new number comes after «💾 Save».", "de": "Noch nichts angelegt oder gesendet: die neue Nummer kommt nach «💾 Speichern»."}
 {"uk": "О годині", "en": "At hour", "de": "Zur Stunde"}

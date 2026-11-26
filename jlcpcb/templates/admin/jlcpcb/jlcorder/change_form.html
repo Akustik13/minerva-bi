@@ -215,6 +215,9 @@
       {% if jlc_order.expected_date %}
       <span class="jlc-info-chip">📅 ETA {{ jlc_order.expected_date|date:"d.m.Y" }}</span>
       {% endif %}
+      {% if jlc_po %}
+      <a class="jlc-info-chip" href="{% url 'admin:inventory_purchaseorder_change' jlc_po.pk %}" title="Закупівля Minerva цього замовлення — її видно в «Очікується» складу, «Що замовити», історії постачальника; оприбуткування — через неї">🛒 {{ jlc_po.code }} · {{ jlc_po.get_status_display }}</a>
+      {% endif %}
       {% if jlc_multi %}
       <span class="jlc-info-chip" title="Разом усіх позицій замовлення">🔢 {{ jlc_total_qty }} шт. · позицій: {{ jlc_items_n }}</span>
       {% elif jlc_order.quantity %}

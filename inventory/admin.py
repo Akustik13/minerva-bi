@@ -4475,8 +4475,22 @@ class PurchaseOrderAdmin(ProjectsBlockMixin, admin.ModelAdmin):
     date_hierarchy = "order_date"
     inlines       = (PurchaseOrderLineInline, PurchaseOrderDocumentInline, PurchaseReceiptInline)
     readonly_fields = ("code", "created_at", "updated_at", "external_source", "external_id", "delivered_reported_at",
-                       "parcels_view", "documents_view")
+                       "jlc_view", "parcels_view", "documents_view")
     preserve_filters = True
+
+    def jlc_view(self, obj):
+        """🔧 Замовлення JLCPCB цієї закупівлі (jlcpcb/services/purchase.py веде її саму з JLC)."""
+        if not obj or not obj.pk:
+            return "—"
+        orders = list(obj.jlc_orders.all()[:10])
+        if not orders:
+            return "—"
+        return format_html_join(
+            "", '<div><a href="{}">🔧 {}</a> · {}{}</div>',
+            ((reverse("admin:jlcpcb_jlcorder_change", args=[o.pk]), o.jlc_order_number or o.jlc_order_id,
+              o.get_local_status_display(), f" · 📦 {o.tracking_number}" if o.tracking_number else "")
+             for o in orders))
+    jlc_view.short_description = _("🔧 Замовлення JLCPCB")
 
     def parcels_view(self, obj):
         """📥 Посилки цієї закупівлі на сторінці «Відправлення» (напрямок «До нас»): трек-номер і стан."""
@@ -4780,6 +4794,9 @@ class PurchaseOrderAdmin(ProjectsBlockMixin, admin.ModelAdmin):
     def external_col(self, obj):
         if not obj.external_source:
             return format_html('<span style="opacity:.45">{}</span>', "Minerva")
+        if obj.external_source == "jlcpcb":
+            return format_html('<span title="{}">🔧 JLCPCB · {}</span>',
+                               "Веде Minerva сама із замовлення JLCPCB", obj.external_id)
         return format_html('<span title="{}">🔗 {} · {}</span>',
                            "Передала зовнішня система через REST API", obj.external_source, obj.external_id)
     external_col.short_description = _("Звідки")

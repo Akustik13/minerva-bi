@@ -30,6 +30,20 @@ def sync_jlc_shipment(sender, instance, **kwargs):
         logger.warning("JLC signal: shipment sync failed for %s: %s", instance.jlc_order_number, e)
 
 
+@receiver(post_save, sender='email_assistant.EmailMessage')
+def jlc_tracking_from_mail(sender, instance, created, **kwargs):
+    """📨 Лист JLCPCB «відправлено» з номером замовлення W… і трек-номером → трек-номер у замовлення JLC."""
+    if not created:
+        return
+    try:
+        from django.db import transaction
+        from jlcpcb.services import tracking
+        if tracking.looks_like_jlc_mail(instance):
+            transaction.on_commit(lambda pk=instance.pk: tracking.on_mail(pk))
+    except Exception as e:  # noqa: BLE001
+        logger.warning("JLC signal: mail tracking failed for message #%s: %s", instance.pk, e)
+
+
 @receiver(post_save, sender='shipping.Shipment')
 def sync_jlc_order_from_shipment(sender, instance, **kwargs):
     """
@@ -61,5 +75,19 @@ def sync_jlc_order_from_shipment(sender, instance, **kwargs):
                 "JLC signal: updated JLCOrder %s fields=%s",
                 order.jlc_order_number, changed,
             )
+
+        # 📦 посилку доставлено → замовлення JLC «Доставлено», закупівля «прибула», авто-оприбуткування
+        # (раніше переносилась лише дата, і замовлення лишалось «Відправлено»)
+        if instance.status == 'delivered' and order.local_status in ('ordered', 'reviewed', 'in_production',
+                                                                       'manufactured', 'shipped'):
+            from django.db import transaction
+            from jlcpcb.services import purchase
+
+            def _deliver(pk=order.pk, sh=instance.pk):
+                from jlcpcb.models import JLCOrder
+                fresh = JLCOrder.objects.filter(pk=pk).first()
+                if fresh is not None:
+                    purchase.deliver(fresh, source=f'посилка #{sh} доставлена')
+            transaction.on_commit(_deliver)
     except Exception as e:
         logger.warning("JLC signal: date sync failed for shipment #%s: %s", instance.pk, e)

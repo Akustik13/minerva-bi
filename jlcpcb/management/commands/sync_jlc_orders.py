@@ -97,6 +97,7 @@ class Command(BaseCommand):
             extract_pcb_item, _extract_gerber_images,
         )
         from jlcpcb.notifications import notify_jlc_status_change
+        from jlcpcb.services import purchase, tracking
 
         cfg = JLCConfig.get()
 
@@ -297,6 +298,11 @@ class Command(BaseCommand):
 
             # ── Sync per-file lines from all orderItems ───────────────────────
             _sync_order_lines(order, raw, find_product_for_jlc_name, map_jlc_status)
+            # 📦 трек-номер, якщо API його віддає (поля express / tracking / logistics…)
+            if not order.tracking_number:
+                found = tracking.from_raw(raw)
+                if found:
+                    tracking.apply(order, found[0], found[1] or shipping_method, 'JLCPCB API')
 
             if is_created:
                 created += 1
@@ -329,13 +335,11 @@ class Command(BaseCommand):
                         upd.append('order_date')
                     order.save(update_fields=upd)
                     # Catch-up: delivered but not yet received (e.g. auto-receive was off at delivery time)
-                    if (cfg.auto_receive_on_delivered and order.product_id
-                            and float(order.received_qty) < order.quantity):
-                        tx = receive_into_inventory(order)
-                        if tx:
-                            self.stdout.write(
-                                self.style.SUCCESS(f'  {batch}: catch-up auto-receive {tx.qty} pcs → inventory')
-                            )
+                    purchase.sync(order)
+                    if cfg.auto_receive_on_delivered and purchase.has_open_stock_lines(order):
+                        got = purchase.receive(order)
+                        if got:
+                            self.stdout.write(self.style.SUCCESS(f'  {batch}: catch-up auto-receive {got} → inventory'))
                     self.stdout.write(f'  {batch}: delivered (locked) — API says {new_status}, skip')
                     continue
 
@@ -378,11 +382,8 @@ class Command(BaseCommand):
                     self.stdout.write(f'  {batch}: {old_status} → {new_status}{eta}')
                     notify_jlc_status_change(order, old_status, new_status)
 
-                    if (new_status == 'delivered'
-                            and cfg.auto_receive_on_delivered
-                            and order.product_id
-                            and float(order.received_qty) < order.quantity):
-                        receive_into_inventory(order)
+                    if new_status == 'delivered':
+                        purchase.on_delivered(order)
                 else:
                     order.save(update_fields=update_fields)
                     # Status unchanged but never notified → send now
@@ -398,6 +399,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f'JLCPCB sync complete. New: {created}, Updated: {updated}, Errors: {errors}'
         ))
+
 
         # ── Phase 1.5: WIP production progress for in-production orders ─────────
         self._check_wip(client)
@@ -445,6 +447,13 @@ class Command(BaseCommand):
         Phase 2b — Overdue detection: shipped orders where expected_date < today-3d
                    and no tracking → auto-mark delivered.
         """
+        # 🛒 закупівлі Minerva для замовлень JLC (нові, відкриті; давно доставлені — історією) — щоразу,
+        # навіть коли автосинхронізацію з API вимкнено
+        from jlcpcb.services import purchase as _purchase
+        st = _purchase.sync_all()
+        if st['created'] or st['errors']:
+            self.stdout.write(f'  Purchase orders: new {st["created"]}, updated {st["updated"]}, errors {st["errors"]}')
+
         if options.get('skip_dhl'):
             return
 
@@ -453,20 +462,23 @@ class Command(BaseCommand):
         from jlcpcb.services.api import receive_into_inventory
         from jlcpcb.notifications import notify_jlc_status_change
 
+        from jlcpcb.services import purchase
+
         def _do_deliver(order, source: str):
-            old = order.local_status
-            order.local_status   = JLCOrder.LocalStatus.DELIVERED
-            order.delivered_date = timezone.now().date()
-            order.save(update_fields=['local_status', 'delivered_date', 'updated_at'])
-            self.stdout.write(self.style.SUCCESS(
-                f'    ✅ {order.jlc_order_id}: shipped → delivered ({source})'
-            ))
-            notify_jlc_status_change(order, old, 'delivered')
-            if (cfg.auto_receive_on_delivered and order.product_id
-                    and float(order.received_qty) < order.quantity):
-                tx = receive_into_inventory(order)
-                if tx:
-                    self.stdout.write(f'    📦 Auto-received {tx.qty} pcs → inventory')
+            got = purchase.deliver(order, source=source)
+            self.stdout.write(self.style.SUCCESS(f'    ✅ {order.jlc_order_id}: shipped → delivered ({source})'))
+            if got:
+                self.stdout.write(f'    📦 Auto-received {got} → inventory')
+
+        # ── 2c: посилку вже доставлено (модуль доставки — UPS, DHL, FedEx…) — замовлення JLC теж «Доставлено» ──
+        from shipping.models import Shipment
+        for sh in (Shipment.objects.filter(jlc_order__local_status__in=[
+                JLCOrder.LocalStatus.SHIPPED, JLCOrder.LocalStatus.MANUFACTURED, JLCOrder.LocalStatus.IN_PRODUCTION],
+                status='delivered').select_related('jlc_order')):
+            if sh.delivered_at and not sh.jlc_order.delivered_date:
+                JLCOrder.objects.filter(pk=sh.jlc_order_id).update(delivered_date=sh.delivered_at.date())
+                sh.jlc_order.delivered_date = sh.delivered_at.date()
+            _do_deliver(sh.jlc_order, f'посилка #{sh.pk} доставлена')
 
         shipped = JLCOrder.objects.filter(local_status=JLCOrder.LocalStatus.SHIPPED)
 

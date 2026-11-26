@@ -364,15 +364,12 @@ class JLCOrderAdmin(admin.ModelAdmin):
         if order.local_status != JLCOrder.LocalStatus.DELIVERED:
             messages.error(request, '❌ Прийом тільки для доставлених замовлень.')
             return redirect('admin:jlcpcb_jlcorder_change', pk)
-        if not order.product_id:
-            messages.error(request, "❌ Спочатку прив'яжіть товар до замовлення.")
-            return redirect('admin:jlcpcb_jlcorder_change', pk)
-        from .services.api import receive_into_inventory
-        tx = receive_into_inventory(order, performed_by=request.user)
-        if tx:
-            messages.success(request, f'✅ Додано {tx.qty} шт. {order.product.sku} на склад.')
-        else:
-            messages.warning(request, '⚠️ Прийом вже виконано або кількість = 0.')
+        from .services import purchase
+        got = purchase.receive(order, user=request.user)     # через закупівлю — один шлях на склад
+        if got:
+            messages.success(request, '✅ На склад: ' + ', '.join(f'{sku} × {q.normalize():f}' for sku, q in got))
+        elif not purchase.has_open_stock_lines(JLCOrder.objects.get(pk=pk)):
+            messages.warning(request, "⚠️ Нічого оприбутковувати: усе вже на складі або позиції без товару — прив'яжіть товар.")
         return redirect('admin:jlcpcb_jlcorder_change', pk)
 
     def match_view(self, request, pk):
@@ -391,11 +388,15 @@ class JLCOrderAdmin(admin.ModelAdmin):
 
     def set_track_only_view(self, request, pk):
         JLCOrder.objects.filter(pk=pk).update(mapping_status=JLCOrder.MappingStatus.TRACK_ONLY)
+        from .services import purchase
+        purchase.sync(JLCOrder.objects.get(pk=pk))            # власна закупівля без отриманого — скасовується
         messages.success(request, '👁 Встановлено: Тільки трекінг')
         return redirect('admin:jlcpcb_jlcorder_change', pk)
 
     def set_ignored_view(self, request, pk):
         JLCOrder.objects.filter(pk=pk).update(mapping_status=JLCOrder.MappingStatus.IGNORED)
+        from .services import purchase
+        purchase.sync(JLCOrder.objects.get(pk=pk))
         messages.success(request, '🚫 Замовлення позначено як ігнорувати')
         return redirect('admin:jlcpcb_jlcorder_change', pk)
 
@@ -701,19 +702,11 @@ class JLCOrderAdmin(admin.ModelAdmin):
         if order.local_status not in (JLCOrder.LocalStatus.SHIPPED, JLCOrder.LocalStatus.MANUFACTURED):
             messages.warning(request, '⚠️ Позначити доставленим можна лише для відправлених замовлень.')
             return redirect('admin:jlcpcb_jlcorder_change', pk)
-        old_status = order.local_status
-        order.local_status   = JLCOrder.LocalStatus.DELIVERED
-        order.delivered_date = timezone.now().date()
-        order.save(update_fields=['local_status', 'delivered_date', 'updated_at'])
+        from .services import purchase
+        got = purchase.deliver(order, source='вручну', user=request.user)
         messages.success(request, f'✅ {order.jlc_order_id} позначено як доставлено.')
-        from .notifications import notify_jlc_status_change
-        notify_jlc_status_change(order, old_status, 'delivered')
-        cfg = JLCConfig.get()
-        if cfg.auto_receive_on_delivered and order.product_id and float(order.received_qty) < order.quantity:
-            from .services.api import receive_into_inventory
-            tx = receive_into_inventory(order, performed_by=request.user)
-            if tx:
-                messages.success(request, f'📦 Авто-прийом: {tx.qty} шт. {order.product.sku} додано на склад.')
+        if got:
+            messages.success(request, '📦 Авто-прийом: ' + ', '.join(f'{sku} × {q.normalize():f}' for sku, q in got))
         return redirect('admin:jlcpcb_jlcorder_change', pk)
 
     def send_notification_view(self, request, pk):
@@ -750,6 +743,8 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 if product:
                     line.product = product
                     line.save(update_fields=['product'])
+                    from .services import purchase
+                    purchase.sync(order)                      # 🛒 товар — і в позицію закупівлі
                     # Also sync main order product if none set
                     if not order.product_id:
                         order.product        = product
@@ -793,10 +788,10 @@ class JLCOrderAdmin(admin.ModelAdmin):
             messages.error(request, "❌ Спочатку прив'яжіть товар до цієї позиції.")
             return redirect('admin:jlcpcb_jlcorder_change', pk)
 
-        from .services.api import receive_line_into_inventory
-        tx = receive_line_into_inventory(line, performed_by=request.user)
-        if tx:
-            messages.success(request, f'✅ {tx.qty} шт. {line.product.sku} додано на склад.')
+        from .services import purchase
+        got = purchase.receive(order, user=request.user, line=line)     # через позицію закупівлі
+        if got:
+            messages.success(request, '✅ На склад: ' + ', '.join(f'{sku} × {q.normalize():f}' for sku, q in got))
         else:
             messages.warning(request, '⚠️ Прийом вже виконано або кількість = 0.')
         return redirect('admin:jlcpcb_jlcorder_change', pk)
@@ -1471,10 +1466,17 @@ class JLCOrderAdmin(admin.ModelAdmin):
         obj   = JLCOrder.objects.filter(pk=object_id).select_related('product').first()
         if obj:
             extra['jlc_order'] = obj
+            from .services import purchase
+            if obj.purchase_order_id is None and obj.mapping_status not in (
+                    JLCOrder.MappingStatus.TRACK_ONLY, JLCOrder.MappingStatus.IGNORED):
+                try:
+                    purchase.sync(obj)                        # 🛒 закупівлі ще немає — створити зараз
+                    obj.refresh_from_db()
+                except Exception:  # noqa: BLE001
+                    pass
+            extra['jlc_po'] = obj.purchase_order
             extra['can_receive'] = (
-                obj.local_status == JLCOrder.LocalStatus.DELIVERED
-                and obj.product_id
-                and float(obj.received_qty) < obj.quantity
+                obj.local_status == JLCOrder.LocalStatus.DELIVERED and purchase.has_open_stock_lines(obj)
             )
             extra['is_unmatched'] = obj.mapping_status == JLCOrder.MappingStatus.UNMATCHED
             # Що в замовленні — усі позиції (чипи вгорі картки), а не лише перша
@@ -1701,12 +1703,12 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 if status_can_advance(old, new) and new != obj.last_notified_status:
                     notify_jlc_status_change(obj, old, new)
                 if new == 'delivered':
-                    cfg = JLCConfig.get()
-                    if cfg.auto_receive_on_delivered and obj.product_id and float(obj.received_qty) < obj.quantity:
-                        from .services.api import receive_into_inventory
-                        tx = receive_into_inventory(obj, performed_by=request.user)
-                        if tx:
-                            messages.success(request, f'📦 Авто-прийом: {tx.qty} шт. {obj.product.sku} додано на склад')
+                    from .services import purchase
+                    got = purchase.on_delivered(obj, user=request.user)
+                    if got:
+                        messages.success(request, '📦 Авто-прийом: ' + ', '.join(f'{sku} × {q.normalize():f}' for sku, q in got))
+            from .services import purchase
+            purchase.sync(obj)                                # 🛒 закупівля — як замовлення JLC
         else:
             super().save_model(request, obj, form, change)
             # Auto-match on create

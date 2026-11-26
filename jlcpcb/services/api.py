@@ -183,7 +183,14 @@ def find_product_for_jlc_name(jlc_name: str):
 # ── Inventory receipt ─────────────────────────────────────────────────────────
 
 def receive_into_inventory(jlc_order, location_code: str = None, performed_by=None):
-    """Create InventoryTransaction(Incoming). Idempotent via external_key."""
+    """Застаріле: оприбуткування — jlcpcb/services/purchase.receive (через закупівлю, усі позиції).
+    Лишено для старих викликів; повертає [(артикул, к-сть)]."""
+    from jlcpcb.services import purchase
+    return purchase.receive(jlc_order, user=performed_by)
+
+
+def _old_receive_into_inventory(jlc_order, location_code: str = None, performed_by=None):
+    """(Старе, не використовується.) Create InventoryTransaction(Incoming). Idempotent via external_key."""
     from decimal import Decimal
     from inventory.models import InventoryTransaction, Location
     from jlcpcb.models import JLCConfig
@@ -219,7 +226,13 @@ def receive_into_inventory(jlc_order, location_code: str = None, performed_by=No
 
 
 def receive_line_into_inventory(line, location_code: str = None, performed_by=None):
-    """Receive a single JLCOrderLine into inventory. Idempotent via external_key."""
+    """Застаріле: одна позиція — jlcpcb/services/purchase.receive(order, line=…). Повертає [(артикул, к-сть)]."""
+    from jlcpcb.services import purchase
+    return purchase.receive(line.order, user=performed_by, line=line)
+
+
+def _old_receive_line_into_inventory(line, location_code: str = None, performed_by=None):
+    """(Старе, не використовується.) Receive a single JLCOrderLine into inventory."""
     from decimal import Decimal
     from inventory.models import InventoryTransaction, Location
     from jlcpcb.models import JLCConfig
