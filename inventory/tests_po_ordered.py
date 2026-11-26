@@ -108,7 +108,7 @@ class AdminTests(Base):
         other = PurchaseOrder.objects.create(supplier=self.supplier, status='received')
         D.objects.create(purchase_order=other, category=D.ORDER, title='Gerber_TR240402-01.zip')
         url = reverse('admin:inventory_purchaseorder_changelist')
-        page = self.client.get(url)
+        page = self.client.get(url, follow=True)          # без параметрів → ?view=active (po_views)
         self.assertContains(page, 'Що замовляли')
         self.assertContains(page, reverse('admin:inventory_product_change', args=[pcb.pk]))
         self.assertEqual(list(self.client.get(url, {'q': 'TR240401-01'}).context['cl'].result_list), [self.po])

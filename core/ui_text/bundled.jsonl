@@ -7534,6 +7534,7 @@
 {"uk": "Доставлено", "en": "Delivered", "de": "Geliefert"}
 {"uk": "Доставлено (5)", "en": "Delivered (5)", "de": "Zugestellt (5)"}
 {"uk": "Доставлено ({0})", "en": "Delivered ({0})", "de": "Zugestellt ({0})"}
+{"uk": "Доставлено / отримано", "en": "Delivered / received", "de": "Geliefert / eingegangen"}
 {"uk": "Доставлено {0} з {1}", "en": "Delivered {0} of {1}", "de": "{0} von {1} zugestellt"}
 {"uk": "Доставлено клієнту", "en": "Delivered to the customer", "de": "An den Kunden geliefert"}
 {"uk": "Доставлено частково — SKU і кількість з блоку «Склад» (інакше — уся решта)", "en": "Partially delivered — SKU and quantity from the “Stock” block (otherwise the whole remainder)", "de": "Teilweise geliefert — SKU und Menge aus dem Block „Lager“ (sonst der gesamte Rest)"}
@@ -8376,6 +8377,7 @@
 {"uk": "Замовлення: {0} (джерело {1}), від {2}", "en": "Order: {0} (source {1}), from {2}", "de": "Auftrag: {0} (Quelle {1}), vom {2}"}
 {"uk": "Замовлення: останні, невідправлені, прострочені", "en": "Orders: latest, unshipped, overdue", "de": "Aufträge: letzte, unversendete, überfällige"}
 {"uk": "Замовлено", "en": "Ordered", "de": "Bestellt"}
+{"uk": "Замовлено в постачальника, ще нічого не отримано", "en": "Ordered from the supplier, nothing received yet", "de": "Beim Lieferanten bestellt, noch nichts eingegangen"}
 {"uk": "Замовлень", "en": "Orders", "de": "Aufträge"}
 {"uk": "Замовлень без змін: {0}", "en": "Orders unchanged: {0}", "de": "Aufträge unverändert: {0}"}
 {"uk": "Замовлень в списку: {0}", "en": "Orders in the list: {0}", "de": "Aufträge in der Liste: {0}"}
@@ -13591,6 +13593,7 @@
 {"uk": "Отримано замовлення клієнта", "en": "Customer order received", "de": "Kundenauftrag eingegangen"}
 {"uk": "Отримано лист", "en": "Email received", "de": "E-Mail empfangen"}
 {"uk": "Отримано на склад (шт)", "en": "Received into stock (pcs)", "de": "Ins Lager übernommen (Stk.)"}
+{"uk": "Отримано не все — частину ще чекаємо", "en": "Not everything received — still waiting for part of it", "de": "Nicht alles eingegangen — ein Teil steht noch aus"}
 {"uk": "Отримано трекінг-номер та PDF-етикетку", "en": "Tracking number and PDF label received", "de": "Sendungsnummer und PDF-Etikett erhalten"}
 {"uk": "Отримати дані з DigiKey API", "en": "Get data from DigiKey API", "de": "Daten von der DigiKey API abrufen"}
 {"uk": "Отримати дані клієнта для формування стратегії комунікації.", "en": "Get customer data for building a communication strategy.", "de": "Kundendaten für die Erstellung einer Kommunikationsstrategie abrufen."}
@@ -14682,6 +14685,7 @@
 {"uk": "Показати всі лістинги", "en": "Show all listings", "de": "Alle Listings anzeigen"}
 {"uk": "Показати всім, хто бачить картку", "en": "Show to everyone who can see the card", "de": "Allen zeigen, die die Karte sehen"}
 {"uk": "Показати деталі", "en": "Show details", "de": "Details anzeigen"}
+{"uk": "Показати закупівлі", "en": "Show purchase orders", "de": "Bestellungen anzeigen"}
 {"uk": "Показати знайдені листи без збереження", "en": "Show the found e-mails without saving", "de": "Gefundene E-Mails anzeigen, ohne zu speichern"}
 {"uk": "Показати й коробки без обліку", "en": "Show boxes without tracking too", "de": "Auch Kartons ohne Bestandsführung zeigen"}
 {"uk": "Показати колонки", "en": "Show columns", "de": "Spalten anzeigen"}
@@ -17123,6 +17127,7 @@
 {"uk": "Скасовано.", "en": "Cancelled.", "de": "Abgebrochen."}
 {"uk": "Скасовано: {0}", "en": "Cancelled: {0}", "de": "Storniert: {0}"}
 {"uk": "Скасовано: {0} задач.", "en": "Cancelled: {0} tasks.", "de": "Storniert: {0} Aufgaben."}
+{"uk": "Скасовані закупівлі", "en": "Cancelled purchase orders", "de": "Stornierte Bestellungen"}
 {"uk": "Скасовує закупівлю зовнішньої CRM.", "en": "Cancels a purchase order of the external CRM.", "de": "Storniert eine Bestellung des externen CRM."}
 {"uk": "Скасовує замовлення й повертає товар на склад (restock=false — лише знімає резерв). Відправлене чи доставлене — відмова 409.", "en": "Cancels the order and returns the goods to stock (restock=false — only releases the reservation). Shipped or delivered — rejected with 409.", "de": "Storniert den Auftrag und bucht die Ware ins Lager zurück (restock=false — hebt nur die Reservierung auf). Versendet oder zugestellt — Ablehnung mit 409."}
 {"uk": "Скасовуємо…", "en": "Cancelling…", "de": "Abbruch läuft…"}
@@ -19013,6 +19018,7 @@
 {"uk": "Усе гаразд", "en": "All good", "de": "Alles in Ordnung"}
 {"uk": "Усе замовлення", "en": "Whole order", "de": "Ganzer Auftrag"}
 {"uk": "Усе на екрані", "en": "Fit to screen", "de": "Alles anzeigen"}
+{"uk": "Усе отримано й оприбутковано", "en": "Everything received and booked into stock", "de": "Alles eingegangen und eingebucht"}
 {"uk": "Усе перевірено", "en": "All checked", "de": "Alles geprüft"}
 {"uk": "Усе перекладено. Нові написи з'являються після оновлення Minerva — «🔄 Зібрати написи з коду».", "en": "Everything is translated. New labels appear after a Minerva update — “🔄 Collect labels from code”.", "de": "Alles ist übersetzt. Neue Beschriftungen erscheinen nach einem Minerva-Update — „🔄 Beschriftungen aus dem Code sammeln“."}
 {"uk": "Усе про пропозицію праворуч", "en": "Everything about the offer on the right", "de": "Alles zum Angebot rechts"}
@@ -19044,6 +19050,7 @@
 {"uk": "Усі відправлення й «упаковано»", "en": "All shipments and «packed»", "de": "Alle Sendungen und «Verpackt»"}
 {"uk": "Усі візитки", "en": "All business cards", "de": "Alle Visitenkarten"}
 {"uk": "Усі доріжки", "en": "All lanes", "de": "Alle Spuren"}
+{"uk": "Усі закупівлі, будь-який статус", "en": "All purchase orders, any status", "de": "Alle Bestellungen, jeder Status"}
 {"uk": "Усі замовлення з сайту оплачені.", "en": "All website orders are paid.", "de": "Alle Bestellungen von der Website sind bezahlt."}
 {"uk": "Усі записи відповіді", "en": "All records of the response", "de": "Alle Datensätze der Antwort"}
 {"uk": "Усі запити", "en": "All requests", "de": "Alle Anfragen"}
@@ -19824,6 +19831,7 @@
 {"uk": "Частка відбитої потужності. Норма: > 15 дБ (|S11| < -15 дБ)", "en": "Share of reflected power. Normal: > 15 dB (|S11| < -15 dB)", "de": "Anteil der reflektierten Leistung. Normal: > 15 dB (|S11| < -15 dB)"}
 {"uk": "Часткова помилка: {0}", "en": "Partial error: {0}", "de": "Teilweiser Fehler: {0}"}
 {"uk": "Частково", "en": "Partially", "de": "Teilweise"}
+{"uk": "Частково отримано", "en": "Partially received", "de": "Teilweise eingegangen"}
 {"uk": "Частота", "en": "Frequency", "de": "Frequenz"}
 {"uk": "Частота «{0}»: у діапазоні різні одиниці — краще в одних (напр. 0.650...9 GHz).", "en": "Frequency “{0}”: the range uses different units — better in one unit (e.g. 0.650...9 GHz).", "de": "Frequenz „{0}“: Im Bereich werden unterschiedliche Einheiten verwendet — besser in einer einheitlichen (z. B. 0.650...9 GHz)."}
 {"uk": "Частота сповіщень про затримки", "en": "Delay notification frequency", "de": "Häufigkeit der Verzögerungsbenachrichtigungen"}
@@ -20156,6 +20164,8 @@
 {"uk": "Ще не відповів", "en": "No reply yet", "de": "Noch keine Antwort"}
 {"uk": "Ще не відправлено", "en": "Not shipped yet", "de": "Noch nicht versendet"}
 {"uk": "Ще не завантажено ({0}) — артикул і посилання, з якого качатиметься", "en": "Not downloaded yet ({0}) — SKU and the link it will be downloaded from", "de": "Noch nicht heruntergeladen ({0}) — Artikelnummer und Link, von dem heruntergeladen wird"}
+{"uk": "Ще не закрито: чернетки, замовлено, частково отримано", "en": "Not closed yet: drafts, ordered, partially received", "de": "Noch nicht abgeschlossen: Entwürfe, bestellt, teilweise eingegangen"}
+{"uk": "Ще не замовлено в постачальника", "en": "Not yet ordered from the supplier", "de": "Noch nicht beim Lieferanten bestellt"}
 {"uk": "Ще не заповнено", "en": "Not filled in yet", "de": "Noch nicht ausgefüllt"}
 {"uk": "Ще не надіслано", "en": "Not sent yet", "de": "Noch nicht gesendet"}
 {"uk": "Ще не оновлювався", "en": "Not updated yet", "de": "Noch nicht aktualisiert"}

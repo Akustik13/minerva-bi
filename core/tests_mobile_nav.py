@@ -67,7 +67,7 @@ class MobileNavTests(TestCase):
         html = self.client.get("/admin/").content.decode()
         self.assertIn("localStorage.getItem('mv-view')==='pc'", html)      # до першого малювання
         self.assertLess(html.index('name="viewport"'), html.index("localStorage.getItem('mv-view')"))
-        self.assertIn("/static/admin/js/mv_mobile.js?v=5", html)
+        self.assertIn("/static/admin/js/mv_mobile.js?v=6", html)
         self.assertIn("/static/admin/css/mv_mobile.css?v=5", html)
         from pathlib import Path
         from django.conf import settings

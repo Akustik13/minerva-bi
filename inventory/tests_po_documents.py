@@ -108,7 +108,7 @@ class AdminTests(Base):
         self.assertEqual(list(unpaid), [self.po])
         none = self.client.get(changelist, {'docs': 'none'}).context['cl'].result_list
         self.assertEqual(list(none), [other])
-        self.assertContains(self.client.get(changelist), '🧾')
+        self.assertContains(self.client.get(changelist, follow=True), '🧾')   # → ?view=active
 
     def test_inline_form_checks_type(self):
         from django.core.files.uploadedfile import SimpleUploadedFile

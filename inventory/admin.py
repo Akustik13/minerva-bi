@@ -4468,9 +4468,11 @@ class PurchaseOrderAdmin(ProjectsBlockMixin, admin.ModelAdmin):
     list_display  = ("code", "supplier", "status_badge", "ordered_col", "order_date",
                      "expected_date", "received_date", "lines_count",
                      "total_price", "tracking_number", "docs_col", "external_col")
-    list_filter   = ("supplier", "status", PODocsFilter, "order_date", "external_source")
+    # статус — чипами над списком (inventory/po_views.py: «🔄 В роботі», «🛒 Замовлено»… і вибір людини)
+    list_filter   = ("supplier", PODocsFilter, "order_date", "external_source")
     search_fields = ("code", "tracking_number", "supplier__name", "notes", "external_id", "supplier_order_no",
                      "ordered_skus", "lines__product__sku", "lines__external_sku")
+    change_list_template = "admin/inventory/purchaseorder/change_list.html"
     actions       = ["detect_ordered"]
     date_hierarchy = "order_date"
     inlines       = (PurchaseOrderLineInline, PurchaseOrderDocumentInline, PurchaseReceiptInline)
@@ -4539,9 +4541,27 @@ class PurchaseOrderAdmin(ProjectsBlockMixin, admin.ModelAdmin):
 
     # ── 🔎 Що замовляли (po_documents.detect / update_ordered) ──
 
+    # ── 🔄 Швидкі вигляди над списком (inventory/po_views.py) ──
+
+    def get_changelist(self, request, **kwargs):
+        from inventory.po_views import POChangeList
+        return POChangeList
+
+    def changelist_view(self, request, extra_context=None):
+        """Без параметрів — останній вибраний вигляд людини; явний `?view=` — запам'ятати."""
+        from inventory import po_views
+        start = po_views.start_url(request)
+        if start:
+            return redirect(start)
+        if request.method == "GET" and request.GET.get(po_views.PARAM) in po_views.KEYS:
+            po_views.remember(request.user, request.GET[po_views.PARAM])
+        return super().changelist_view(request, extra_context)
+
     def get_changelist_instance(self, request):
-        """Товари для колонки «Що замовляли» — одним запитом на сторінку."""
+        """Товари для колонки «Що замовляли» — одним запитом на сторінку; чипи виглядів з лічильниками."""
         cl = super().get_changelist_instance(request)
+        from inventory import po_views
+        cl.po_chips = po_views.chips(cl, request)
         from inventory.services.po_documents import ordered_codes
         codes = {c.upper() for po in cl.result_list for c in ordered_codes(po.ordered_skus)}
         self._ordered_products = {sku.upper(): pk for sku, pk in Product.objects.filter(

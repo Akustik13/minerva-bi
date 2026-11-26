@@ -265,7 +265,7 @@ class PurchaseAdminTests(PurchaseBase):
         page = self.client.get(f"/admin/inventory/purchaseorder/{po.pk}/change/")
         self.assertContains(page, "tracking:1z999")
         self.assertContains(page, "AMP-100 × 10,")
-        self.assertContains(self.client.get("/admin/inventory/purchaseorder/"), "🔗 crm · B-2026-0042")
+        self.assertContains(self.client.get("/admin/inventory/purchaseorder/?view=all"), "🔗 crm · B-2026-0042")
         self.assertContains(self.client.get("/admin/inventory/inventorysettings/1/change/"), "api_delivery_mode")
         self.assertContains(self.client.get("/dashboard/api/docs/examples/crm_purchases.py"), "def send_delivered")
         docs = self.client.get("/dashboard/api/docs/")

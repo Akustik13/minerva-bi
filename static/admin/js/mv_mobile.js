@@ -18,7 +18,7 @@
   var mq = window.matchMedia('(max-width: 768px)');
   var bar = null, sheet = null, filterBtn = null, note = null;
   var MAX_FIELDS = 6;
-  var NOT_FILTERS = ['q', 'p', 'o', 'e', 'all', '_popup', '_to_field', '_changelist_filters'];
+  var NOT_FILTERS = ['q', 'p', 'o', 'e', 'all', '_popup', '_to_field', '_changelist_filters', 'view'];  // view — чипи над списком (inventory/po_views.py), не фільтр
 
   function csrf() { return (document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/) || [])[1] || ''; }
   function el(tag, cls, text) {

@@ -213,7 +213,7 @@ class RegistryTests(PanelTestBase):
         sp._registry.pop("inventory.purchaseorder", None)
         with mock.patch.dict(sys.modules, {"core.panel_generic": None}):
             self.assertIsNone(sp.get("inventory.purchaseorder"))
-            r = self.client.get("/admin/inventory/purchaseorder/")
+            r = self.client.get("/admin/inventory/purchaseorder/?view=all")
             self.assertEqual(r.status_code, 200)
             self.assertNotIn("mv-panel-config", r.content.decode())
             # свій постачальник без загальних розділів реєструється й так

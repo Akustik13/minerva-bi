@@ -32,7 +32,7 @@
   var st = cfg.prefs;
   var side = null, snav = null, top = null, foot = null, ctx = null, ctxBack = null, pal = null, palBack = null;
   var fbtn = null, toastT = 0;
-  var NOT_FILTERS = ['q', 'p', 'o', 'e', 'all', '_popup', '_to_field', '_changelist_filters'];
+  var NOT_FILTERS = ['q', 'p', 'o', 'e', 'all', '_popup', '_to_field', '_changelist_filters', 'view'];  // view — чипи над списком (inventory/po_views.py), не фільтр
   var SIDEBAR = ['auto', 'wide', 'rail'];
   var WIDE_W = 268;                                  // ширина повного меню (--mvd-side-w у mv_desktop.css)
   var GROUP_ICON = { digikey: '🔷' };                // у MV_GROUPS теж 🛒, як «Продажі»: у ряду значків — однакові
