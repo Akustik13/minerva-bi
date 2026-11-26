@@ -232,6 +232,14 @@ class Shop(models.Model):
         help_text="Що бачить покупець у касі, у цьому порядку (перший — вибраний за замовчуванням): "
                   "prepayment, invoice, cod, stripe. Порожньо — як у налаштуваннях сайту (shop-config.php).",
     )
+    # ── Оплачене замовлення → статус (shop/paid_status.py) ──
+    paid_order_status = models.CharField(
+        "Після оплати — статус замовлення", max_length=20, blank=True, default="processing",
+        choices=[("processing", "В обробці"), ("", "Не змінювати")],
+        help_text="Щойно замовлення з сайту стало «Оплачено» (Stripe або ви позначили оплату в картці), а статус ще "
+                  "«Отримано», Minerva ставить «В обробці». Інші статуси (уже в обробці, відправлено, скасовано) не "
+                  "змінюються. Склад не рухається: «Отримано» і «В обробці» тримають товар однаково.",
+    )
     # ── Онлайн-оплата Stripe (shop/payments.py) ──
     stripe_enabled = models.BooleanField(
         "Stripe у касі", default=False,

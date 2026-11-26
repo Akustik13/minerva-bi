@@ -1,5 +1,5 @@
-"""Зміна позиції магазину або ступенів цін → вебхук stock.changed для сайтів."""
-from django.db.models.signals import post_delete, post_save
+"""Сигнали магазину: позиції й ступені цін → вебхук stock.changed; оплачене замовлення → статус (paid_status)."""
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 
 from .models import ShopListing, ShopPriceTier, ShopSettings
@@ -47,3 +47,25 @@ def _settings_changed(sender, instance, update_fields=None, **kwargs):
         return
     from .services import reapply_base_prices
     reapply_base_prices()
+
+
+@receiver(pre_save, sender="sales.SalesOrder", dispatch_uid="shop_paid_status_pre")
+def _remember_paid(sender, instance, raw=False, update_fields=None, **kwargs):
+    """Чи було замовлення вже оплачене до цього збереження (лише коли зберігається «Статус оплати»)."""
+    instance._shop_paid_before = None
+    if raw or not instance.pk or (update_fields is not None and "payment_status" not in update_fields):
+        return
+    instance._shop_paid_before = (
+        type(instance).objects.filter(pk=instance.pk).values_list("payment_status", flat=True).first() == "paid")
+
+
+@receiver(post_save, sender="sales.SalesOrder", dispatch_uid="shop_paid_status_post")
+def _order_paid(sender, instance, created=False, raw=False, **kwargs):
+    """Замовлення стало «Оплачено» → після commit правило магазину «Після оплати — статус» (shop/paid_status.py)."""
+    if raw or instance.payment_status != "paid" or instance.status != "received":
+        return
+    if created or getattr(instance, "_shop_paid_before", None) is False:
+        from django.db import transaction
+        from .paid_status import safe_apply
+        pk = instance.pk
+        transaction.on_commit(lambda: safe_apply(pk))

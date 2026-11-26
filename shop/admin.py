@@ -308,7 +308,7 @@ class ShopAdmin(admin.ModelAdmin):
                            "Листи покупцям надсилає Minerva — з «✉️ Пошта магазину» вище.",
         }),
         ("💳 Способи оплати на сайті", {
-            "fields": ["payment_methods", "payment_default", "invoice_auto_send"],
+            "fields": ["payment_methods", "payment_default", "invoice_auto_send", "paid_order_status"],
             "description": "Які способи оплати бачить покупець у касі. Minerva також перевіряє вибір у кожному "
                            "замовленні: вимкнений спосіб не приймається.",
         }),
