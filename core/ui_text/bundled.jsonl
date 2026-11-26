@@ -12610,6 +12610,7 @@
 {"uk": "Немає права змінювати відправлення.", "en": "No permission to change shipments.", "de": "Keine Berechtigung, Sendungen zu ändern."}
 {"uk": "Немає права змінювати доручення", "en": "No permission to change instructions", "de": "Keine Berechtigung, Aufträge zu ändern"}
 {"uk": "Немає права змінювати закупівлю", "en": "No permission to change the purchase order", "de": "Keine Berechtigung, die Bestellung zu ändern"}
+{"uk": "Немає права змінювати закупівлі.", "en": "No permission to change purchase orders.", "de": "Keine Berechtigung, Bestellungen zu ändern."}
 {"uk": "Немає права змінювати замовлення", "en": "No permission to change orders", "de": "Keine Berechtigung, Aufträge zu ändern"}
 {"uk": "Немає права змінювати замовлення.", "en": "No permission to change orders.", "de": "Keine Berechtigung, Aufträge zu ändern."}
 {"uk": "Немає права змінювати запити постачальникам", "en": "No permission to change supplier requests", "de": "Keine Berechtigung, Lieferantenanfragen zu ändern"}
@@ -14756,6 +14757,7 @@
 {"uk": "Поки немає — у кожного товару свій файл (за артикулом).", "en": "None yet — each product has its own file (by SKU).", "de": "Noch keine — jeder Artikel hat seine eigene Datei (nach Artikelnummer)."}
 {"uk": "Поки порожньо — додайте листування з пошти («📁 До проєкту») або на сторінці «Розбір пошти».", "en": "Empty for now — add correspondence from mail (“📁 To project”) or on the “Mail triage” page.", "de": "Noch leer — fügen Sie Korrespondenz aus der E-Mail („📁 Zum Projekt“) oder auf der Seite „E-Mail-Sortierung“ hinzu."}
 {"uk": "Поки порожньо.", "en": "Empty so far.", "de": "Noch leer."}
+{"uk": "Поки сторінка була відкрита, цю позицію вже прийняли: отримано {0} з {1}. Нічого не додано — оновіть сторінку.", "en": "While this page was open, the line was already received: {0} of {1} received. Nothing was added — reload the page.", "de": "Während diese Seite offen war, wurde die Position bereits angenommen: {0} von {1} erhalten. Nichts hinzugefügt — laden Sie die Seite neu."}
 {"uk": "Поклав би чернетку в «📝 Чернетки»", "en": "Would put a draft into «📝 Drafts»", "de": "Würde einen Entwurf in «📝 Entwürfe» legen"}
 {"uk": "Покладіть візитку на темніший фон — зелений контур покаже, що буде вирізано; «⏺ Зробити фото» вирівняє по ньому.", "en": "Place the card on a darker background — the green outline shows what will be cut out; «⏺ Take photo» straightens along it.", "de": "Legen Sie die Karte auf einen dunkleren Hintergrund — der grüne Umriss zeigt, was ausgeschnitten wird; «⏺ Foto aufnehmen» richtet danach aus."}
 {"uk": "Покласти чернетку AI у поле відповіді — перегляньте й допишіть [у дужках]", "en": "Put the AI draft into the reply field — review it and fill in [the brackets]", "de": "Den AI-Entwurf ins Antwortfeld übernehmen — prüfen und [die Klammern] ausfüllen"}

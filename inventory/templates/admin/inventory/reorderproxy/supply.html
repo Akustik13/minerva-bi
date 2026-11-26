@@ -1,5 +1,5 @@
 {% extends "admin/base_site.html" %}
-{% load i18n %}
+{% load i18n l10n %}
 
 {% block title %}{% trans "Склад — огляд залишків" %}{% endblock %}
 
@@ -545,10 +545,10 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
                         <span style="color:var(--text-dim)">—</span>
                       {% endif %}
                     </td>
-                    <td style="white-space:nowrap">
+                    <td style="white-space:nowrap" data-seen="{{ inc.seen }}">
                       <button type="button" class="sv-btn sv-btn-ok"
                               style="font-size:10px;padding:3px 8px"
-                              onclick="svReceive({{ inc.line_pk }}, {{ inc.qty }}, this)">
+                              onclick="svReceive({{ inc.line_pk }}, {{ inc.qty|unlocalize }}, this)">
                         ✓ {% trans "Отримати" %}
                       </button>
                       <button type="button" class="sv-btn"
@@ -1041,17 +1041,23 @@ var _svi = {
 
   function doReceive(btn, linePk, qty) {
     var origText = btn ? btn.textContent : '';
+    // «Отримано», яке бачила сторінка: позицію вже прийняли тим часом — сервер нічого не додасть (409)
+    var cell = btn ? btn.closest('[data-seen]') : null;
+    var seen = cell ? cell.getAttribute('data-seen') : null;
     if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
     fetch(RECV_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
-      body: JSON.stringify({ line_pk: linePk, qty: qty }),
+      body: JSON.stringify({ line_pk: linePk, qty: qty, seen: seen }),
     })
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (d.ok) {
         if (btn) { btn.textContent = '✓✓'; btn.style.background = '#1b5e20'; }
         setTimeout(function(){ location.reload(); }, 400);
+      } else if (d.code === 'changed') {
+        alert(d.error);
+        location.reload();
       } else {
         if (btn) { btn.disabled = false; btn.textContent = origText; }
         alert(_svi.error_prefix + ': ' + (d.error || '?'));

@@ -377,6 +377,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 'po_str':        str(po),
                 'supplier':      str(po.supplier) if po.supplier_id else '—',
                 'qty':           remaining,
+                'seen':          str(l.qty_received),   # «✓ Отримати» — лише якщо ніхто не прийняв тим часом
                 'expected_date': po.expected_date,
                 'is_draft':      po.status == 'draft',
             })
@@ -765,24 +766,40 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         import json
         from django.http import JsonResponse
 
+        from django.db import transaction
+
         if request.method != 'POST':
             return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+        if not request.user.has_perm('inventory.change_purchaseorder'):
+            return JsonResponse({'ok': False, 'error': 'Немає права змінювати закупівлі.'}, status=403)
         try:
             data = json.loads(request.body)
             line_pk  = int(data['line_pk'])
             qty_recv = Decimal(str(data['qty']))
             if qty_recv <= 0:
                 raise ValueError('qty must be > 0')
+            # «Отримано» позиції, яке бачила сторінка; старі сторінки його не шлють — як раніше, без перевірки
+            seen = Decimal(str(data['seen'])) if data.get('seen') not in (None, '') else None
         except (KeyError, ValueError, Exception) as e:
             return JsonResponse({'ok': False, 'error': str(e)}, status=400)
 
-        line = get_object_or_404(PurchaseOrderLine, pk=line_pk)
-        po   = line.purchase_order
+        with transaction.atomic():
+            line = get_object_or_404(PurchaseOrderLine.objects.select_for_update(), pk=line_pk)
+            po   = line.purchase_order
+            # Поки сторінка була відкрита, позицію вже прийняли (авто-прийом JLC, інша людина, друга вкладка) —
+            # не додаємо ще раз: кнопка дозволяє «більше, ніж замовлено», тож інакше товар порахувався б двічі
+            if seen is not None and line.qty_received != seen:
+                return JsonResponse({
+                    'ok': False, 'code': 'changed',
+                    'error': f'Поки сторінка була відкрита, цю позицію вже прийняли: отримано '
+                             f'{line.qty_received.normalize():f} з {line.qty_ordered.normalize():f}. Нічого не '
+                             f'додано — оновіть сторінку.',
+                    'received': float(line.qty_received)}, status=409)
 
-        # Add to qty_received (allow over-delivery — real count takes priority over PO qty)
-        new_received = line.qty_received + qty_recv
-        line.qty_received = new_received
-        line.save()  # triggers update_inventory_on_purchase_receipt signal
+            # Add to qty_received (allow over-delivery — real count takes priority over PO qty)
+            new_received = line.qty_received + qty_recv
+            line.qty_received = new_received
+            line.save()  # triggers update_inventory_on_purchase_receipt signal
 
         # Стан закупівлі — з позицій, кожна не більше замовленого: переотримана позиція не закриває решту
         from inventory.services.purchases import refresh_status

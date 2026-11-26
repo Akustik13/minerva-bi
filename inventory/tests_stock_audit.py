@@ -284,6 +284,51 @@ class OverReceiptTests(StockBase):
         self.assertEqual(po.status, "partial")
         self.assertEqual(self.nums(self.p)[0], 40)
 
+    def _receive(self, client, line, qty, **extra):
+        return client.post("/admin/inventory/reorderproxy/supply/receive/",
+                           json.dumps({"line_pk": line.pk, "qty": qty, **extra}), content_type="application/json")
+
+    def test_stale_overview_page_does_not_receive_twice(self):
+        """Сторінку відкрили до авто-прийому JLC / до колеги: «✓ Отримати» нічого не додає, просить оновити."""
+        po = PurchaseOrder.objects.create(status="ordered")
+        a = PurchaseOrderLine.objects.create(purchase_order=po, product=self.p, qty_ordered=30)
+        c = self.admin_client()
+        self.assertTrue(self._receive(c, a, 30, seen="0").json()["ok"])
+        self.assertEqual(self.nums(self.p)[0], 50)
+        r = self._receive(c, a, 30, seen="0")                          # та сама стара сторінка вдруге
+        self.assertEqual((r.status_code, r.json()["code"]), (409, "changed"))
+        self.assertIn("отримано 30 з 30", r.json()["error"])
+        self.assertEqual(self.nums(self.p)[0], 50)
+        self.assertTrue(self._receive(c, a, 2, seen="30.000").json()["ok"])   # свіжа сторінка — як завжди
+        self.assertEqual(self.nums(self.p)[0], 52)
+
+    def test_old_page_without_seen_works_as_before(self):
+        po = PurchaseOrder.objects.create(status="ordered")
+        a = PurchaseOrderLine.objects.create(purchase_order=po, product=self.p, qty_ordered=30)
+        self.assertTrue(self._receive(self.admin_client(), a, 30).json()["ok"])
+        self.assertEqual(self.nums(self.p)[0], 50)
+
+    def test_overview_page_sends_what_it_saw(self):
+        po = PurchaseOrder.objects.create(status="ordered")
+        a = PurchaseOrderLine.objects.create(purchase_order=po, product=self.p, qty_ordered=30, qty_received=10)
+        a.refresh_from_db()
+        html = self.admin_client().get("/admin/inventory/reorderproxy/supply/").content.decode()
+        self.assertIn(f'data-seen="{a.qty_received}"', html)
+        self.assertIn("seen: seen", html)
+        # кількість — з крапкою: «svReceive(2, 20,0, this)» віддавало кнопці 0 замість себе, а «12,5» — 12
+        self.assertIn(f"svReceive({a.pk}, 20.0, this)", html)
+
+    def test_receive_needs_change_right(self):
+        from django.test import Client
+        from core.tests_hardening2 import person
+        po = PurchaseOrder.objects.create(status="ordered")
+        a = PurchaseOrderLine.objects.create(purchase_order=po, product=self.p, qty_ordered=30)
+        self.admin_client()
+        c = Client()
+        c.force_login(person("vera", "readonly", allowed_modules=["inventory"]))
+        self.assertEqual(self._receive(c, a, 30, seen="0").status_code, 403)
+        self.assertEqual(self.nums(self.p)[0], 20)
+
     def test_incoming_is_never_negative_per_line(self):
         po = PurchaseOrder.objects.create(status="ordered")
         over = PurchaseOrderLine.objects.create(purchase_order=po, product=self.q, qty_ordered=10)
