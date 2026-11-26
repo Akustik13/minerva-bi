@@ -250,7 +250,7 @@ class ShopAdmin(admin.ModelAdmin):
     form = ShopForm
     readonly_fields = ["created_at", "roadmap_col", "search_col", "keys_col", "connection_col", "zones_tools",
                        "accounts_tools",
-                       "mail_tools", "mail_map_col",
+                       "mail_tools", "mail_map_col", "order_flow_col",
                        "site_mail_col",
                        "stripe_col",
                        "assistant_col", "assistant_test_col", "site_admin_col"]
@@ -306,6 +306,11 @@ class ShopAdmin(admin.ModelAdmin):
                            "на сайті. Акаунти зберігаються лише в Minerva; сайт тримає тільки ключ сесії в cookie. "
                            "Ключу сайту додайте права «Акаунти покупців — читання» і «— запис». "
                            "Листи покупцям надсилає Minerva — з «✉️ Пошта магазину» вище.",
+        }),
+        ("🚦 Шлях замовлення — хто що рухає", {
+            "fields": ["order_flow_col"],
+            "description": "Статуси замовлення з сайту за вашими налаштуваннями: хто переводить далі і що тоді "
+                           "відбувається. Лише показ — змінювати за посиланнями в рядках.",
         }),
         ("💳 Способи оплати на сайті", {
             "fields": ["payment_methods", "payment_default", "invoice_auto_send", "paid_order_status"],
@@ -482,6 +487,14 @@ class ShopAdmin(admin.ModelAdmin):
             return "Спершу збережіть магазин."
         from . import mail_map
         return mail_map.render(obj)
+
+    @admin.display(description="Шлях замовлення")
+    def order_flow_col(self, obj):
+        """Статуси замовлення з сайту — хто рухає й що тоді відбувається (shop/order_flow.py, лише читання)."""
+        if not obj or not obj.pk:
+            return "Спершу збережіть магазин."
+        from . import order_flow
+        return order_flow.render(obj)
 
     @admin.display(description="Пошта сайтів")
     def site_mail_col(self, obj):
