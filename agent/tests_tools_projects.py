@@ -250,7 +250,8 @@ class SupplierToolTests(ToolsBase):
         self.assertEqual(tools_suppliers.tools_for(nobody), [])
         self.assertIn('немає права', self.refused('find_suppliers', self.ctx(nobody)))
         viewer = self.person('viewer', 'inventory')
-        self.assertEqual([t['name'] for t in tools_suppliers.tools_for(viewer)], ['find_suppliers', 'get_supplier'])
+        self.assertEqual([t['name'] for t in tools_suppliers.tools_for(viewer)],     # 🧵 історія — право бачити
+                         ['find_suppliers', 'supplier_filters', 'get_supplier', 'propose_supplier_check'])
         self.assertIn('PCB Way Ltd', self.call('get_supplier', self.ctx(viewer), supplier=f'#{self.s.pk}'))
 
 

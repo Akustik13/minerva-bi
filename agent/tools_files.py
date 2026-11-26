@@ -34,13 +34,15 @@ _TARGETS = {
     'mail': {'type': 'integer', 'description': 'id листа (з list_mail / search_mail) — вкладення листа'},
     'customer': {'type': 'string', 'description': 'Клієнт CRM: #номер, компанія або email'},
     'offer': {'type': 'string', 'description': 'Номер Angebot A-РРРР-NNN'},
+    'card': {'type': 'integer', 'description': 'id візитки / флаєра (find_cards) — фото й vCard'},
 }
 
 LIST = {
     'name': 'list_files',
     'description': 'Файли об\'єкта Minerva: документи замовлення (рахунки, інвойси, пакувальні листи, етикетки…), '
                    'даташит і фото товару, документи проєкту й клієнта, файли запиту постачальникам і відповіді '
-                   'постачальників, вкладення листа (лише ваші скриньки), версії Angebot, або uploads: true — файли, '
+                   'постачальників, вкладення листа (лише ваші скриньки), версії Angebot, фото візитки (card), або '
+                   'uploads: true — файли, '
                    'які ви передали в Minerva. Вкажіть один з параметрів. Повертає назву, розмір і ref — для get_file, '
                    'read_file, вкладення в propose_email (attachments) і propose_save_file.',
     'input_schema': {'type': 'object', 'properties': {
@@ -129,7 +131,7 @@ def list_files(ctx, args):
                                       product=args.get('product') or '', project=args.get('project') or '',
                                       request=args.get('request') or '', mail=args.get('mail') or '',
                                       customer=args.get('customer') or '', offer=args.get('offer') or '',
-                                      uploads=bool(args.get('uploads')))
+                                      card=args.get('card') or '', uploads=bool(args.get('uploads')))
     except files.FileError as e:
         raise _err(e) from None
     if not rows:

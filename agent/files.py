@@ -12,6 +12,8 @@
   msg:<pk листа>:<номер>           вкладення листа СВОЇХ скриньок — лише з 🔒 особистим ключем (personal)
   datasheet:<артикул> / photo:<артикул>   даташит / фото товару (inventory.view_product)
   upload:<pk>                      файл, який агент передав у Minerva (AgentFile) — лише власник
+  card:<pk>[:back | :photo:<pk>]   🪪 фото візитки / флаєра (inventory.view_supplier + card_access.can_see)
+  vcard:<pk>                       🪪 vCard візитки (.vcf) — те саме право
 Кожне відкриття перевіряє права людини ключа заново (`open_file`); чуже, неіснуюче, без права — FileError.
 
 Посилання без ключа (агент з оболонкою — curl): `link_token` → GET /api/v1/files/link/<token>/ (завантажити,
@@ -50,7 +52,8 @@ IMAGE_TYPES = ('image/png', 'image/jpeg', 'image/gif', 'image/webp')
 # Посилання, які лишаються посиланнями й у листі (документ читається під час відправки, Angebot / рахунок —
 # «надіслано» після відправки); решта копіюється у вкладення чернетки при ✓ (email_assistant.attachments.store_file).
 KEEP_REF = ('order', 'invoice', 'offer', 'rfq', 'rfqreply', 'kb')
-KINDS = ('order', 'invoice', 'offer', 'rfq', 'rfqreply', 'kb', 'cust', 'msg', 'datasheet', 'photo', 'upload')
+KINDS = ('order', 'invoice', 'offer', 'rfq', 'rfqreply', 'kb', 'cust', 'msg', 'datasheet', 'photo', 'upload',
+         'card', 'vcard')
 REF_RE = re.compile(r'^([a-z]+):(.+)$')
 
 
@@ -273,9 +276,47 @@ def _open_upload(user, rest, personal):
     return f.name, data, f.content_type
 
 
+def _card(user, pk):
+    from suppliers.models import SupplierMedia
+    from suppliers.services import card_access
+    _perm(user, 'inventory.view_supplier', 'постачальники')
+    m = SupplierMedia.objects.filter(pk=int(pk)).first()
+    if m is None or not card_access.can_see(user, m):
+        raise FileError('такої візитки немає (або вона 🔒 чужа)')
+    return m
+
+
+def _card_file(m, side):
+    if side == '':
+        return m.image
+    if side == 'back':
+        return m.image_back
+    if side.startswith('photo:'):
+        photo = m.photos.filter(pk=int(side[len('photo:'):])).first()
+        return photo.image if photo is not None else None
+    raise FileError('такого фото немає')
+
+
+def _open_card(user, rest, personal):
+    pk, _, side = rest.partition(':')
+    f = _card_file(_card(user, pk), side)
+    if not f:
+        raise FileError('цього фото немає')
+    with f.open('rb') as fh:
+        data = fh.read(MAX_BYTES + 1)
+    return os.path.basename(f.name), data, ''
+
+
+def _open_vcard(user, rest, personal):
+    from suppliers.services import cards
+    m = _card(user, rest)
+    return f'{cards.file_stem(m)}.vcf', cards.vcard(m).encode('utf-8'), 'text/vcard'
+
+
 _OPEN = {'order': _open_order, 'invoice': _open_invoice, 'offer': _open_offer, 'rfq': _open_rfq('SupplierRequestFile'),
          'rfqreply': _open_rfq('SupplierReplyFile'), 'kb': _open_kb, 'cust': _open_cust, 'msg': _open_msg,
-         'datasheet': _open_datasheet, 'photo': _open_photo, 'upload': _open_upload}
+         'datasheet': _open_datasheet, 'photo': _open_photo, 'upload': _open_upload, 'card': _open_card,
+         'vcard': _open_vcard}
 
 
 def describe(user, ref, personal=False) -> dict:
@@ -420,6 +461,24 @@ def offer_rows(user, offer) -> list:
     return rows
 
 
+def card_rows(user, m) -> list:
+    """Фото візитки (обидва боки, ще фото групи) і vCard — без читання файлів (розмір — з диска)."""
+    from agent.tools_cards import file_refs
+    out = []
+    for ref, what in file_refs(m):
+        if ref.startswith('vcard:'):
+            out.append(_row(ref, 'vCard.vcf', 0, f'🪪 {what}'))
+            continue
+        try:
+            f = _card_file(m, ref.split(':', 2)[2] if ref.count(':') >= 2 else '')
+            size = f.size if f else 0
+        except (FileError, OSError, ValueError):
+            continue
+        if f:
+            out.append(_row(ref, os.path.basename(f.name), size, f'🪪 {what}'))
+    return out
+
+
 def upload_rows(user) -> list:
     from agent.models import AgentFile
     return [_row(f.ref, f.name, f.size, f'⬆ передано агентом {timezone.localtime(f.created_at):%d.%m %H:%M}')
@@ -427,7 +486,7 @@ def upload_rows(user) -> list:
 
 
 def list_files(user, personal=False, *, order='', product='', project='', request='', mail='', customer='',
-               offer='', uploads=False) -> tuple:
+               offer='', card='', uploads=False) -> tuple:
     """(що, [рядки]) — файли одного об'єкта Minerva, які людина бачить."""
     if str(order or '').strip():
         o = find_order(user, order)
@@ -467,9 +526,12 @@ def list_files(user, personal=False, *, order='', product='', project='', reques
         if o is None:
             raise FileError(f'Angebot «{number}» немає')
         return f'Angebot {o.number}', offer_rows(user, o)
+    if str(card or '').strip():
+        m = _card(user, str(card).strip().lstrip('#'))
+        return f'візитка #{m.pk}', card_rows(user, m)
     if uploads:
         return 'файли, передані агентом', upload_rows(user)
-    raise FileError('вкажіть, чиї файли: order, product, project, request, mail, customer, offer або uploads')
+    raise FileError('вкажіть, чиї файли: order, product, project, request, mail, customer, offer, card або uploads')
 
 
 # ── Передати файл у Minerva ───────────────────────────────────────────────────

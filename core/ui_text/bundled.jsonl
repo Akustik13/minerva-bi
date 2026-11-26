@@ -1097,6 +1097,7 @@
 {"uk": "AI-оцінка", "en": "AI assessment", "de": "KI-Bewertung"}
 {"uk": "AI-оцінка вибраних", "en": "AI assessment of selected", "de": "KI-Bewertung der Ausgewählten"}
 {"uk": "AI-оцінка з вашої пошти · {0} · {1} листів {2}", "en": "AI assessment from your mail · {0} · {1} e-mails {2}", "de": "KI-Bewertung aus Ihrer Post · {0} · {1} E-Mails {2}"}
+{"uk": "AI-оцінка з листування", "en": "AI assessment from correspondence", "de": "KI-Bewertung aus der Korrespondenz"}
 {"uk": "AI-оцінка з листування ({0} листів, ${1})", "en": "AI assessment from correspondence ({0} e-mails, ${1})", "de": "KI-Bewertung aus der Korrespondenz ({0} E-Mails, ${1})"}
 {"uk": "AI-оцінка з листування…", "en": "AI assessment from correspondence…", "de": "KI-Bewertung aus der Korrespondenz…"}
 {"uk": "AI-оцінка постачальника з цього листування", "en": "AI assessment of the supplier from this correspondence", "de": "KI-Bewertung des Lieferanten aus dieser Korrespondenz"}
@@ -3116,6 +3117,7 @@
 {"uk": "{0} (також немає {1})", "en": "{0} (also no {1})", "de": "{0} (auch kein {1})"}
 {"uk": "{0} (текст)", "en": "{0} (text)", "de": "{0} (Text)"}
 {"uk": "{0} (у Minerva: {1})", "en": "{0} (in Minerva: {1})", "de": "{0} (in Minerva: {1})"}
+{"uk": "{0} (у фоні)", "en": "{0} (in the background)", "de": "{0} (im Hintergrund)"}
 {"uk": "{0} (як на сайті: адрес команди в Minerva немає)", "en": "{0} (as on the site: no team addresses in Minerva)", "de": "{0} (wie auf der Website: keine Team-Adressen in Minerva)"}
 {"uk": "{0} (є {1}, треба {2})", "en": "{0} (have {1}, need {2})", "de": "{0} (vorhanden {1}, benötigt {2})"}
 {"uk": "{0} / {1} записів", "en": "{0} / {1} records", "de": "{0} / {1} Einträge"}
@@ -4210,6 +4212,7 @@
 {"uk": "Інструкція з картинками", "en": "Instructions with pictures", "de": "Anleitung mit Bildern"}
 {"uk": "Інструкції для AI", "en": "Instructions for AI", "de": "Anweisungen für die KI"}
 {"uk": "Інструменти", "en": "Tools", "de": "Werkzeuge"}
+{"uk": "Інструменти агента (MCP), доступні ключу", "en": "Agent (MCP) tools available to the key", "de": "Agenten-Werkzeuge (MCP), die dem Schlüssel zur Verfügung stehen"}
 {"uk": "Інструменти діють на", "en": "The tools apply to", "de": "Die Werkzeuge wirken auf"}
 {"uk": "Інструменти й механіка", "en": "Tools and mechanics", "de": "Werkzeuge und Mechanik"}
 {"uk": "Інтеграція з UPS: розрахунок вартості, відстеження, валідація адрес. Автоматизація = реальна економія часу.", "en": "UPS integration: cost calculation, tracking, address validation. Automation = real time savings.", "de": "UPS-Integration: Kostenberechnung, Sendungsverfolgung, Adressvalidierung. Automatisierung = echte Zeitersparnis."}
@@ -4281,6 +4284,7 @@
 {"uk": "Історія бекапів", "en": "Backup history", "de": "Sicherungsverlauf"}
 {"uk": "Історія з листування: заведено вже отриманою — без складу й без «Очікується», дата отримання невідома. Позицій не додавайте — інакше вони потраплять на склад.", "en": "History from correspondence: created as already received — no stock and no «Expected», receipt date unknown. Do not add lines — otherwise they will go into stock.", "de": "Verlauf aus der Korrespondenz: als bereits erhalten angelegt — ohne Lager und ohne «Erwartet», Eingangsdatum unbekannt. Keine Positionen hinzufügen — sonst kommen sie ins Lager."}
 {"uk": "Історія з нами", "en": "History with us", "de": "Verlauf mit uns"}
+{"uk": "Історія з пошти", "en": "History from e-mail", "de": "Verlauf aus E-Mails"}
 {"uk": "Історія з пошти для вибраних", "en": "History from mail for selected", "de": "Verlauf aus der Post für Ausgewählte"}
 {"uk": "Історія замовлень", "en": "Order history", "de": "Auftragshistorie"}
 {"uk": "Історія запитів", "en": "Request history", "de": "Anfrageverlauf"}
@@ -5521,6 +5525,7 @@
 {"uk": "Видалити весь план (фази й кроки)? Листи, замовлення й закупівлі проєкту лишаться.", "en": "Delete the whole plan (phases and steps)? The project’s e-mails, orders and purchases stay.", "de": "Den ganzen Plan (Phasen und Schritte) löschen? E-Mails, Aufträge und Einkäufe des Projekts bleiben."}
 {"uk": "Видалити вибрані", "en": "Delete selected", "de": "Ausgewählte löschen"}
 {"uk": "Видалити вказані події назавжди. Використовуй тільки після явного підтвердження юзером.", "en": "Delete the specified events permanently. Use only after explicit confirmation from the user.", "de": "Die angegebenen Termine endgültig löschen. Nur nach ausdrücklicher Bestätigung durch den Benutzer verwenden."}
+{"uk": "Видалити візитку", "en": "Delete business card", "de": "Visitenkarte löschen"}
 {"uk": "Видалити демо-дані", "en": "Delete demo data", "de": "Demodaten löschen"}
 {"uk": "Видалити демо-дані | Minerva", "en": "Delete demo data | Minerva", "de": "Demodaten löschen | Minerva"}
 {"uk": "Видалити документ з бази знань? RAG теж його прибере.", "en": "Delete the document from the knowledge base? RAG will remove it too.", "de": "Dokument aus der Wissensdatenbank löschen? RAG entfernt es ebenfalls."}
@@ -5606,6 +5611,7 @@
 {"uk": "Визначити, що замовляли", "en": "Detect ordered items", "de": "Bestellte Artikel ermitteln"}
 {"uk": "Визначити, що замовляли (з документів)", "en": "Detect ordered items (from documents)", "de": "Bestellte Artikel ermitteln (aus Dokumenten)"}
 {"uk": "Вийти", "en": "Log out", "de": "Abmelden"}
+{"uk": "Виклик інструмента агента (MCP) звичайним REST", "en": "Calling an agent (MCP) tool via plain REST", "de": "Aufruf eines Agenten-Werkzeugs (MCP) über normales REST"}
 {"uk": "Виконавець", "en": "Assignee", "de": "Bearbeiter"}
 {"uk": "Виконавця не знайдено або його вимкнено", "en": "Assignee not found or deactivated", "de": "Bearbeiter nicht gefunden oder deaktiviert"}
 {"uk": "Виконай завдання для цього товару.", "en": "Carry out the task for this product.", "de": "Führe die Aufgabe für diesen Artikel aus."}
@@ -6608,13 +6614,16 @@
 {"uk": "Відхід", "en": "Clock-out", "de": "Gehen"}
 {"uk": "Відхід за замовчуванням", "en": "Default clock-out", "de": "Standard-Gehen"}
 {"uk": "Відхід має бути пізніше за прихід (той самий день; 00:00 — кінець доби).", "en": "Clock-out must be later than clock-in (same day; 00:00 — end of day).", "de": "Gehen muss später sein als Kommen (am selben Tag; 00:00 – Ende des Tages)."}
+{"uk": "Візитка", "en": "Business card", "de": "Visitenkarte"}
 {"uk": "Візитка / флаєр", "en": "Business card / flyer", "de": "Visitenkarte / Flyer"}
 {"uk": "Візитка покупця — внести клієнтом у CRM", "en": "A buyer's business card — add as a CRM customer", "de": "Visitenkarte eines Käufers — als CRM-Kunden erfassen"}
 {"uk": "Візитка: контакти, хто зняв і звідки", "en": "Business card: contacts, who took it and from where", "de": "Visitenkarte: Kontakte, wer sie aufgenommen hat und woher"}
+{"uk": "Візитка: прочитане, люди, QR, фото (ref для файлів)", "en": "Business card: what was read, people, QR, photos (ref for files)", "de": "Visitenkarte: Gelesenes, Personen, QR, Fotos (ref für Dateien)"}
 {"uk": "Візитки ({0})", "en": "Business cards ({0})", "de": "Visitenkarten ({0})"}
 {"uk": "Візитки в Minerva: список", "en": "Business cards in Minerva: list", "de": "Visitenkarten in Minerva: Liste"}
 {"uk": "Візитки з Minerva — з пошуком і ⚙ фільтрами; 🔒 — приватна.", "en": "Business cards from Minerva — with search and ⚙ filters; 🔒 — private.", "de": "Visitenkarten aus Minerva — mit Suche und ⚙ Filtern; 🔒 — privat."}
 {"uk": "Візитки й флаєри", "en": "Business cards & flyers", "de": "Visitenkarten & Flyer"}
+{"uk": "Візитки й флаєри (лише ті, які бачить людина ключа)", "en": "Business cards and flyers (only those the key's person can see)", "de": "Visitenkarten und Flyer (nur die, die die Person des Schlüssels sieht)"}
 {"uk": "Візитки й фото постачальника", "en": "The supplier's business cards and photos", "de": "Visitenkarten und Fotos des Lieferanten"}
 {"uk": "Візитки немає", "en": "No such business card", "de": "Keine solche Visitenkarte"}
 {"uk": "Візитки немає — можливо, її видалили в Minerva.", "en": "No such business card — it may have been deleted in Minerva.", "de": "Keine solche Visitenkarte — vielleicht wurde sie in Minerva gelöscht."}
@@ -8538,6 +8547,7 @@
 {"uk": "Запит постачальникам", "en": "Request to suppliers", "de": "Lieferantenanfrage"}
 {"uk": "Запит постачальникам {0}", "en": "Request to suppliers {0}", "de": "Lieferantenanfrage {0}"}
 {"uk": "Запит постачальникам — відкриється з цим постачальником праворуч", "en": "Supplier request — opens with this supplier on the right", "de": "Lieferantenanfrage — öffnet sich mit diesem Lieferanten rechts"}
+{"uk": "Запит постачальникам: поля, лист, файли, отримувачі й пропозиції", "en": "Supplier request: fields, letter, files, recipients and offers", "de": "Lieferantenanfrage: Felder, Brief, Dateien, Empfänger und Angebote"}
 {"uk": "Запит постачальнику", "en": "Supplier request", "de": "Lieferantenanfrage"}
 {"uk": "Запит прийнято", "en": "Request accepted", "de": "Anfrage angenommen"}
 {"uk": "Запит пройде: Minerva видалить вебхук «{0}» ({1}).", "en": "The request will go through: Minerva will delete webhook “{0}” ({1}).", "de": "Die Anfrage wird durchgehen: Minerva löscht den Webhook „{0}“ ({1})."}
@@ -8585,6 +8595,7 @@
 {"uk": "Запити постачальникам", "en": "Requests to suppliers", "de": "Lieferantenanfragen"}
 {"uk": "Запити постачальникам (RFQ)", "en": "Requests to suppliers (RFQ)", "de": "Lieferantenanfragen (RFQ)"}
 {"uk": "Запити постачальникам (RFQ): отримувачі, пропозиції, порівняння, файли; листування — лише своїх скриньок", "en": "Supplier requests (RFQ): recipients, offers, comparison, files; correspondence — only from own mailboxes", "de": "Lieferantenanfragen (RFQ): Empfänger, Angebote, Vergleich, Dateien; Korrespondenz – nur aus eigenen Postfächern"}
+{"uk": "Запити постачальникам за фільтрами списку", "en": "Supplier requests by the list filters", "de": "Lieferantenanfragen nach den Listenfiltern"}
 {"uk": "Запити пропозицій з пошти", "en": "Quote requests from mail", "de": "Angebotsanfragen aus E-Mail"}
 {"uk": "Запити пропозицій у пошті", "en": "Quote requests in mail", "de": "Angebotsanfragen in der E-Mail"}
 {"uk": "Запити пропозицій у пошті без Angebot: {0}", "en": "Quote requests in mail without an Angebot: {0}", "de": "Angebotsanfragen in der E-Mail ohne Angebot: {0}"}
@@ -9265,6 +9276,7 @@
 {"uk": "Змінилось", "en": "Changed", "de": "Geändert"}
 {"uk": "Змінити", "en": "Edit", "de": "Bearbeiten"}
 {"uk": "Змінити вебхук (усі поля)", "en": "Edit webhook (all fields)", "de": "Webhook bearbeiten (alle Felder)"}
+{"uk": "Змінити візитку", "en": "Edit business card", "de": "Visitenkarte ändern"}
 {"uk": "Змінити деталі відправлення", "en": "Edit shipment details", "de": "Sendungsdetails bearbeiten"}
 {"uk": "Змінити джерело", "en": "Change source", "de": "Quelle ändern"}
 {"uk": "Змінити джерело...", "en": "Change source...", "de": "Quelle ändern..."}
@@ -9410,6 +9422,7 @@
 {"uk": "Знайти розділ або сторінку, напр. DigiKey", "en": "Find a section or page, e.g. DigiKey", "de": "Bereich oder Seite suchen, z. B. DigiKey"}
 {"uk": "Знайти та синхронізувати один конкретний SKU (Supplier SKU DigiKey)", "en": "Find and sync one specific SKU (DigiKey Supplier SKU)", "de": "Eine bestimmte SKU (DigiKey Supplier SKU) suchen und synchronisieren"}
 {"uk": "Знайти товари складу за артикулом, назвою, виробником, категорією чи параметром. Повертає до 15 товарів (артикул, назва, доступно на складі).", "en": "Find stock products by SKU, name, manufacturer, category or parameter. Returns up to 15 products (SKU, name, available in stock).", "de": "Lagerartikel nach Artikelnummer, Name, Hersteller, Kategorie oder Parameter finden. Liefert bis zu 15 Artikel (Artikelnummer, Name, verfügbar im Lager)."}
+{"uk": "Знайти фірму в інтернеті (AI, платно)", "en": "Find the company online (AI, paid)", "de": "Firma im Internet finden (KI, kostenpflichtig)"}
 {"uk": "Знайти ще раз", "en": "Search again", "de": "Erneut suchen"}
 {"uk": "Знаходили", "en": "Found", "de": "Gefunden"}
 {"uk": "Знаходити різницю й питати (оновлення — після підтвердження)", "en": "Find differences and ask (update only after confirmation)", "de": "Unterschiede finden und nachfragen (Aktualisierung erst nach Bestätigung)"}
@@ -9420,6 +9433,7 @@
 {"uk": "Значення {", "en": "Value {", "de": "Wert {"}
 {"uk": "Значення не підходить.", "en": "The value is not valid.", "de": "Der Wert ist nicht zulässig."}
 {"uk": "Значення правильне — більше не підсвічувати", "en": "The value is correct — stop highlighting", "de": "Der Wert stimmt — nicht mehr hervorheben"}
+{"uk": "Значення фільтрів постачальників: категорії, стани, звідки, де взяли, країни", "en": "Supplier filter values: categories, statuses, origin, where met, countries", "de": "Werte der Lieferantenfilter: Kategorien, Status, Herkunft, wo kennengelernt, Länder"}
 {"uk": "Значення — як їх зберіг Excel (формули — їхнім результатом).", "en": "Values as Excel saved them (formulas as their result).", "de": "Werte so, wie Excel sie gespeichert hat (Formeln als Ergebnis)."}
 {"uk": "Значки й назви", "en": "Icons and names", "de": "Symbole und Namen"}
 {"uk": "Значки категорій і проєктів", "en": "Category and project icons", "de": "Symbole für Kategorien und Projekte"}
@@ -9667,6 +9681,7 @@
 {"uk": "Картка магазину: редактор країн зон доставки (як на DigiKey) — регіони з галочками, пошук, країни інших зон (перенести сюди), «усі інші країни», винятки країни (своя ціна / термін). Дані: прихований JSON у полі «Країни» і «Винятки» кожної зони (shop/admin.py → CountryPickerWidget).", "en": "Shop card: shipping zone country editor (as on DigiKey) — regions with checkboxes, search, countries of other zones (move here), “all other countries”, country exceptions (own price / lead time). Data: hidden JSON in the “Countries” and “Exceptions” fields of each zone (shop/admin.py → CountryPickerWidget).", "de": "Shop-Karte: Länder-Editor der Versandzonen (wie bei DigiKey) – Regionen mit Kontrollkästchen, Suche, Länder anderer Zonen (hierher verschieben), „alle übrigen Länder“, Länderausnahmen (eigener Preis / eigene Lieferzeit). Daten: verstecktes JSON in den Feldern „Länder“ und „Ausnahmen“ jeder Zone (shop/admin.py → CountryPickerWidget)."}
 {"uk": "Картка постачальника", "en": "Supplier card", "de": "Lieferantenkarte"}
 {"uk": "Картка постачальника — у новій вкладці", "en": "Supplier card — in a new tab", "de": "Lieferantenkarte — in neuem Tab"}
+{"uk": "Картка постачальника: контакти, закупівлі, запити, історія, аналізи", "en": "Supplier card: contacts, purchases, requests, history, analyses", "de": "Lieferantenkarte: Kontakte, Einkäufe, Anfragen, Verlauf, Analysen"}
 {"uk": "Картка постачальника: стан, категорії, адреса, умови оплати, що роблять; контактні особи (посада, email, телефон); закупівлі — підсумок, відкриті й останні 10 (код, дата, стан, сума); запити (RFQ) останні 10 (що, стан, пропозиція); історія останні 10; аналізи (з інтернету; оцінка з вашого листування — лише ваша). supplier — #pk, email або назва.", "en": "Supplier card: state, categories, address, payment terms, what they make; contact persons (position, e-mail, phone); purchase orders — summary, open and last 10 (code, date, state, amount); requests (RFQ) last 10 (what, state, offer); history last 10; analyses (from the internet; the assessment from your correspondence — only yours). supplier — #pk, e-mail or name.", "de": "Lieferantenkarte: Status, Kategorien, Adresse, Zahlungsbedingungen, was sie herstellen; Ansprechpartner (Position, E-Mail, Telefon); Bestellungen — Übersicht, offene und letzte 10 (Code, Datum, Status, Betrag); Anfragen (RFQ) letzte 10 (was, Status, Angebot); Verlauf letzte 10; Analysen (aus dem Internet; die Bewertung aus Ihrer Korrespondenz — nur Ihre). supplier — #pk, E-Mail oder Name."}
 {"uk": "Картка проєкту", "en": "Project card", "de": "Projektkarte"}
 {"uk": "Картка товару", "en": "Product card", "de": "Artikelkarte"}
@@ -10202,6 +10217,7 @@
 {"uk": "Контакти", "en": "Contacts", "de": "Kontakte"}
 {"uk": "Контактна особа", "en": "Contact person", "de": "Ansprechpartner"}
 {"uk": "Контактна особа (білінг)", "en": "Contact person (billing)", "de": "Ansprechpartner (Rechnung)"}
+{"uk": "Контактна особа постачальника", "en": "Supplier contact person", "de": "Ansprechpartner des Lieferanten"}
 {"uk": "Контактна особа.", "en": "Contact person.", "de": "Ansprechpartner."}
 {"uk": "Контактна особа: {0}", "en": "Contact person: {0}", "de": "Ansprechpartner: {0}"}
 {"uk": "Контактна форма", "en": "Contact form", "de": "Kontaktformular"}
@@ -12805,6 +12821,7 @@
 {"uk": "Новий магазин за хвилину", "en": "A new shop in a minute", "de": "Neuer Shop in einer Minute"}
 {"uk": "Новий магазин отримає всі налаштування «{0}»", "en": "The new shop will get all settings of “{0}”", "de": "Der neue Shop erhält alle Einstellungen von „{0}“"}
 {"uk": "Новий пароль", "en": "New password", "de": "Neues Passwort"}
+{"uk": "Новий постачальник", "en": "New supplier", "de": "Neuer Lieferant"}
 {"uk": "Новий пресет: назва, де взяли, що це, хто це, позначки", "en": "New preset: name, where taken, what it is, who it is, marks", "de": "Neue Voreinstellung: Name, wo erhalten, was es ist, wer es ist, Markierungen"}
 {"uk": "Новий провайдер на сайті → після оплати", "en": "New provider on the website → after payment", "de": "Neuer Anbieter auf der Website → nach der Zahlung"}
 {"uk": "Новий профіль", "en": "New profile", "de": "Neues Profil"}
@@ -15192,6 +15209,7 @@
 {"uk": "Постачальник: назва фірми (не людини, що переслала лист), email, країна ISO-2", "en": "Supplier: company name (not the person who forwarded the email), email, country ISO-2", "de": "Lieferant: Firmenname (nicht die Person, die die E-Mail weitergeleitet hat), E-Mail, Land ISO-2"}
 {"uk": "Постачальники", "en": "Suppliers", "de": "Lieferanten"}
 {"uk": "Постачальники з пошти", "en": "Suppliers from mail", "de": "Lieferanten aus der Post"}
+{"uk": "Постачальники за фільтрами списку (категорія, стан, звідки, де взяли, країна) — від імені людини ключа", "en": "Suppliers by the list filters (category, status, origin, where met, country) — on behalf of the key's person", "de": "Lieferanten nach den Listenfiltern (Kategorie, Status, Herkunft, wo kennengelernt, Land) — im Namen der Person des Schlüssels"}
 {"uk": "Постачальники й запити (RFQ)", "en": "Suppliers and requests (RFQ)", "de": "Lieferanten und Anfragen (RFQ)"}
 {"uk": "Постачальники → 🪪 Візитки й флаєри → «📱 Додаток на телефон»", "en": "Suppliers → 🪪 Business cards & flyers → «📱 Додаток на телефон»", "de": "Lieferanten → 🪪 Visitenkarten & Flyer → «📱 Додаток на телефон»"}
 {"uk": "Постачальників", "en": "Suppliers", "de": "Lieferanten"}
@@ -15312,6 +15330,7 @@
 {"uk": "Пошук", "en": "Search", "de": "Suche"}
 {"uk": "Пошук / фільтр списку", "en": "Search / list filter", "de": "Suche / Listenfilter"}
 {"uk": "Пошук будь-якого компонента або виробника через DigiKey Product Information V4 API. Показує наявність, ціни та цінові сходинки, lead time, статус.", "en": "Search for any component or manufacturer via the DigiKey Product Information V4 API. Shows availability, prices and price breaks, lead time, status.", "de": "Suche nach beliebigen Bauteilen oder Herstellern über die DigiKey Product Information V4 API. Zeigt Verfügbarkeit, Preise und Staffelpreise, Lead Time, Status."}
+{"uk": "Пошук в інтернеті (AI)", "en": "Internet search (AI)", "de": "Internetsuche (KI)"}
 {"uk": "Пошук в інтернеті (якщо дозволено в завданні)", "en": "Web search (if allowed in the task)", "de": "Internetsuche (wenn in der Aufgabe erlaubt)"}
 {"uk": "Пошук в інтернеті для вибраних", "en": "Internet search for selected", "de": "Internetsuche für Ausgewählte"}
 {"uk": "Пошук в історії RAG: листи своїх скриньок і документи бази знань, лише перевірені Minerva (право «🔎»)", "en": "Search in RAG history: e-mails of your own mailboxes and knowledge base documents, only those verified by Minerva (“🔎” right)", "de": "Suche in der RAG-Historie: E-Mails der eigenen Postfächer und Dokumente der Wissensdatenbank, nur von Minerva geprüfte (Recht „🔎“)"}
@@ -15881,6 +15900,7 @@
 {"uk": "Прочитані AI листи", "en": "Emails read by AI", "de": "Von der KI gelesene E-Mails"}
 {"uk": "Прочитані сторінки", "en": "Pages read", "de": "Gelesene Seiten"}
 {"uk": "Прочитати AI", "en": "Read with AI", "de": "Mit AI lesen"}
+{"uk": "Прочитати AI (платно)", "en": "Read with AI (paid)", "de": "Mit KI lesen (kostenpflichtig)"}
 {"uk": "Прочитати AI всі фото разом", "en": "Read all photos together with AI", "de": "Alle Fotos zusammen mit AI lesen"}
 {"uk": "Прочитати AI заново", "en": "Read with AI again", "de": "Erneut mit KI lesen"}
 {"uk": "Прочитати QR з фото", "en": "Read QR from photo", "de": "QR vom Foto lesen"}
@@ -17522,6 +17542,7 @@
 {"uk": "Старі → Нові", "en": "Oldest → Newest", "de": "Älteste → Neueste"}
 {"uk": "Статистика", "en": "Statistics", "de": "Statistik"}
 {"uk": "Статистика візиток", "en": "Business card statistics", "de": "Visitenkarten-Statistik"}
+{"uk": "Статистика візиток по подіях (де взяли)", "en": "Business card statistics by event (where met)", "de": "Visitenkarten-Statistik nach Veranstaltung (wo kennengelernt)"}
 {"uk": "Статистика продажів з фільтрами по даті, джерелу, категорії. KPI, графіки, топ SKU, клієнти, географія, доставка.", "en": "Sales statistics with filters by date, source, category. KPIs, charts, top SKUs, customers, geography, shipping.", "de": "Verkaufsstatistik mit Filtern nach Datum, Quelle, Kategorie. KPIs, Diagramme, Top-SKUs, Kunden, Geografie, Versand."}
 {"uk": "Статистика — KPI, графіки, фільтри", "en": "Statistics — KPIs, charts, filters", "de": "Statistik — KPIs, Diagramme, Filter"}
 {"uk": "Статистика — Minerva", "en": "Statistics — Minerva", "de": "Statistik — Minerva"}
@@ -19906,6 +19927,7 @@
 {"uk": "Читайте та відповідайте на повідомлення покупців DigiKey Marketplace. Нові повідомлення покупця й оператора DigiKey Minerva перевіряє сама (за «Інтервалом перевірки») і надсилає в Telegram і листом — з повним текстом і посиланням на відповідь. Telegram-бот та SMTP налаштовуються в", "en": "Read and reply to DigiKey Marketplace buyer messages. Minerva checks new messages from the buyer and the DigiKey operator by itself (per \"Check interval\") and sends them to Telegram and by e-mail — with the full text and a link to reply. The Telegram bot and SMTP are set up in", "de": "Lesen und beantworten Sie Käufernachrichten im DigiKey Marketplace. Neue Nachrichten des Käufers und des DigiKey-Operators prüft Minerva selbst (laut „Prüfintervall“) und sendet sie an Telegram und per E-Mail — mit vollem Text und Link zum Antworten. Telegram-Bot und SMTP werden eingerichtet in"}
 {"uk": "Читання", "en": "Reads", "de": "Lesezugriffe"}
 {"uk": "Читання (GET)", "en": "Reads (GET)", "de": "Lesen (GET)"}
+{"uk": "Читання нічого не змінює; propose_* — лише пропозиції в «🧩 Завдання агенту» (змінює людина ✓); upload_* — зберігає файл для людини ключа.", "en": "Reading changes nothing; propose_* — only proposals in «🧩 Agent tasks» (the person applies ✓); upload_* — stores a file for the key's person.", "de": "Lesen ändert nichts; propose_* — nur Vorschläge in «🧩 Agenten-Aufgaben» (die Person übernimmt ✓); upload_* — speichert eine Datei für die Person des Schlüssels."}
 {"uk": "Читання стрічки змін; Minerva фіксує звернення RAG (стан на сторінці «База знань»).", "en": "Reading the change feed; Minerva records RAG’s access (status on the “Knowledge base” page).", "de": "Lesen des Änderungs-Feeds; Minerva protokolliert den Zugriff von RAG (Status auf der Seite „Wissensdatenbank“)."}
 {"uk": "Читання та синхронізація", "en": "Reading and sync", "de": "Lesen und Synchronisierung"}
 {"uk": "Читання; ?mail_site=… — записує звіт сайту. Відповідь містить пароль SMTP скриньки магазину.", "en": "Read; ?mail_site=… records the website’s report. The response contains the SMTP password of the shop mailbox.", "de": "Lesen; ?mail_site=… speichert den Bericht der Website. Die Antwort enthält das SMTP-Passwort des Shop-Postfachs."}
@@ -20336,6 +20358,7 @@
 {"uk": "Що ще треба до першого запису", "en": "What is still needed before the first recording", "de": "Was vor der ersten Aufnahme noch fehlt"}
 {"uk": "Що я вмію", "en": "What I can do", "de": "Was ich kann"}
 {"uk": "Що я вмію для вас", "en": "What I can do for you", "de": "Was ich für Sie tun kann"}
+{"uk": "Що є у формі нового запиту: форми й поля, мови, змінні, категорії", "en": "What the new request form offers: forms and fields, languages, variables, categories", "de": "Was das Formular für neue Anfragen bietet: Formulare und Felder, Sprachen, Variablen, Kategorien"}
 {"uk": "Що індексувати", "en": "What to index", "de": "Was indexiert wird"}
 {"uk": "Що: {0}", "en": "What: {0}", "de": "Was: {0}"}
 {"uk": "Щоб встановити новий пароль, перейдіть за посиланням", "en": "To set a new password, follow the link", "de": "Um ein neues Passwort festzulegen, folgen Sie dem Link"}
@@ -21030,6 +21053,8 @@
 {"uk": "видно {0} з {1}", "en": "{0} of {1} visible", "de": "{0} von {1} sichtbar"}
 {"uk": "виду роботи «{0}» немає", "en": "work type “{0}” does not exist", "de": "Tätigkeitsart „{0}“ gibt es nicht"}
 {"uk": "визначає що робити з офферами DigiKey, для яких немає відповідного товару на складі.", "en": "determines what to do with DigiKey offers that have no matching product in stock.", "de": "legt fest, was mit DigiKey-Offers geschehen soll, für die es im Lager keinen passenden Artikel gibt."}
+{"uk": "виклик інструмента агента — без наслідків не перевірити (propose_* лягають у завдання)", "en": "calls an agent tool — cannot be checked without side effects (propose_* go into the task)", "de": "ruft ein Agenten-Werkzeug auf — ohne Folgen nicht prüfbar (propose_* landen in der Aufgabe)"}
+{"uk": "викликав інструмент агента", "en": "called an agent tool", "de": "hat ein Agenten-Werkzeug aufgerufen"}
 {"uk": "викликів {0} · з кешу {1} · помилок {2} · витрачено ≈ {3} · токенів: вхід {4}, з кешу промпту {5}, запис у кеш {6}, відповідь {7}", "en": "calls {0} · from cache {1} · errors {2} · spent ≈ {3} · tokens: input {4}, from prompt cache {5}, cache write {6}, output {7}", "de": "Aufrufe {0} · aus dem Cache {1} · Fehler {2} · ausgegeben ≈ {3} · Tokens: Eingabe {4}, aus dem Prompt-Cache {5}, Cache-Schreibvorgang {6}, Antwort {7}"}
 {"uk": "виконано", "en": "done", "de": "erledigt"}
 {"uk": "виконано {0}", "en": "completed {0}", "de": "abgeschlossen {0}"}
@@ -21317,6 +21342,8 @@
 {"uk": "відхилив {0}", "en": "rejected by {0}", "de": "abgelehnt von {0}"}
 {"uk": "відхилити — організатор отримає «✕»", "en": "decline — the organiser gets «✕»", "de": "ablehnen — der Organisator erhält «✕»"}
 {"uk": "відхід раніше за прихід", "en": "clock-out earlier than clock-in", "de": "Gehen früher als Kommen"}
+{"uk": "візитка", "en": "business card", "de": "Visitenkarte"}
+{"uk": "візитки", "en": "business cards", "de": "Visitenkarten"}
 {"uk": "візиток — фото, примітки й позначки? Постачальники й клієнти CRM, створені з них, лишаться.", "en": "business cards — photos, notes and marks? Suppliers and CRM customers created from them will stay.", "de": "Visitenkarten — Fotos, Notizen und Markierungen? Daraus angelegte Lieferanten und CRM-Kunden bleiben."}
 {"uk": "вікно {0}–{1}", "en": "window {0}–{1}", "de": "Fenster {0}–{1}"}
 {"uk": "вікно запису застаріло (не той ключ надсилання)", "en": "recording window outdated (wrong push key)", "de": "Aufnahmefenster veraltet (falscher Sendeschlüssel)"}
@@ -21968,6 +21995,7 @@
 {"uk": "запит до RAG-ПК", "en": "request to the RAG PC", "de": "Anfrage an den RAG-PC"}
 {"uk": "запит завеликий", "en": "request too large", "de": "Anfrage zu groß"}
 {"uk": "запит на прочитання — ще не підтверджено", "en": "read receipt requested — not confirmed yet", "de": "Lesebestätigung angefordert — noch nicht bestätigt"}
+{"uk": "запит постачальникам", "en": "supplier request", "de": "Lieferantenanfrage"}
 {"uk": "запит постачальнику", "en": "request to supplier", "de": "Anfrage an Lieferanten"}
 {"uk": "запит постачальнику в цій гілці", "en": "supplier request in this thread", "de": "Lieferantenanfrage in diesem Verlauf"}
 {"uk": "запит пропозиції", "en": "request for quotation", "de": "Angebotsanfrage"}
@@ -21979,6 +22007,7 @@
 {"uk": "запитання", "en": "question", "de": "Frage"}
 {"uk": "запитанням сама — посилання на форму не вигадуй.", "en": "the question itself — do not invent a link to the form.", "de": "der Frage selbst ein — erfinden Sie keinen Link zum Formular."}
 {"uk": "запитати", "en": "ask", "de": "nachfragen"}
+{"uk": "запити постачальникам", "en": "supplier requests", "de": "Lieferantenanfragen"}
 {"uk": "запиту «{0}» немає в Minerva — знайдіть його через find_supplier_requests", "en": "request «{0}» is not in Minerva — find it with find_supplier_requests", "de": "Anfrage „{0}“ gibt es in Minerva nicht – suchen Sie sie mit find_supplier_requests"}
 {"uk": "запиту вже немає в Minerva", "en": "the request is no longer in Minerva", "de": "die Anfrage gibt es in Minerva nicht mehr"}
 {"uk": "запитів", "en": "requests", "de": "Anfragen"}
@@ -22230,6 +22259,7 @@
 {"uk": "картка DigiKey Marketplace", "en": "DigiKey Marketplace listing", "de": "DigiKey-Marketplace-Eintrag"}
 {"uk": "картка клієнта", "en": "customer card", "de": "Kundenkarte"}
 {"uk": "картка коробки", "en": "box card", "de": "Kartonkarte"}
+{"uk": "картка постачальника", "en": "supplier card", "de": "Lieferantenkarte"}
 {"uk": "картка товару або впишіть адресу тут", "en": "product card, or enter the address here", "de": "Artikelkarte oder Adresse hier eintragen"}
 {"uk": "картка товару складу", "en": "stock product record", "de": "Lagerartikel"}
 {"uk": "картка: {0}", "en": "card: {0}", "de": "Karte: {0}"}
@@ -24281,6 +24311,8 @@
 {"uk": "прочитав вебхук #{0}", "en": "read webhook #{0}", "de": "hat Webhook #{0} gelesen"}
 {"uk": "прочитав відправлення {0}", "en": "read shipment {0}", "de": "hat Sendung {0} gelesen"}
 {"uk": "прочитав відправлення й трекінг", "en": "read shipments and tracking", "de": "hat Sendungen und Tracking gelesen"}
+{"uk": "прочитав візитки", "en": "read business cards", "de": "hat Visitenkarten gelesen"}
+{"uk": "прочитав візитку", "en": "read a business card", "de": "hat eine Visitenkarte gelesen"}
 {"uk": "прочитав документ бази знань", "en": "read a knowledge base document", "de": "hat ein Dokument der Wissensdatenbank gelesen"}
 {"uk": "прочитав доставки вебхука", "en": "read webhook deliveries", "de": "hat Zustellungen eines Webhooks gelesen"}
 {"uk": "прочитав доставку магазину", "en": "read shop shipping", "de": "hat den Versand des Shops gelesen"}
@@ -24292,6 +24324,9 @@
 {"uk": "прочитав замовлення {0}", "en": "read order {0}", "de": "hat Auftrag {0} gelesen"}
 {"uk": "прочитав замовлення покупця", "en": "read a buyer order", "de": "hat einen Käuferauftrag gelesen"}
 {"uk": "прочитав замовлення покупця {0}", "en": "read buyer order {0}", "de": "hat Käuferauftrag {0} gelesen"}
+{"uk": "прочитав запит постачальникам", "en": "read a supplier request", "de": "hat eine Lieferantenanfrage gelesen"}
+{"uk": "прочитав запити постачальникам", "en": "read supplier requests", "de": "hat Lieferantenanfragen gelesen"}
+{"uk": "прочитав картку постачальника", "en": "read a supplier card", "de": "hat eine Lieferantenkarte gelesen"}
 {"uk": "прочитав каталог магазину", "en": "read the shop catalog", "de": "hat den Shop-Katalog gelesen"}
 {"uk": "прочитав категорію товарів", "en": "read a product category", "de": "hat eine Artikelkategorie gelesen"}
 {"uk": "прочитав категорії товарів", "en": "read product categories", "de": "hat Artikelkategorien gelesen"}
@@ -24307,14 +24342,19 @@
 {"uk": "прочитав рух складу", "en": "read a stock movement", "de": "hat eine Lagerbewegung gelesen"}
 {"uk": "прочитав свої вебхуки", "en": "read its own webhooks", "de": "hat seine eigenen Webhooks gelesen"}
 {"uk": "прочитав список замовлень", "en": "read the order list", "de": "hat die Auftragsliste gelesen"}
+{"uk": "прочитав список постачальників", "en": "read the supplier list", "de": "hat die Lieferantenliste gelesen"}
 {"uk": "прочитав список товарів", "en": "read the product list", "de": "hat die Artikelliste gelesen"}
 {"uk": "прочитав список файлів", "en": "read the file list", "de": "hat die Dateiliste gelesen"}
 {"uk": "прочитав способи оплати", "en": "read payment methods", "de": "hat Zahlungsarten gelesen"}
+{"uk": "прочитав статистику візиток", "en": "read business card statistics", "de": "hat die Visitenkarten-Statistik gelesen"}
 {"uk": "прочитав сторінку знімка бази знань", "en": "read a knowledge base snapshot page", "de": "hat eine Snapshot-Seite der Wissensdatenbank gelesen"}
 {"uk": "прочитав стрічку змін бази знань", "en": "read the knowledge base change feed", "de": "hat den Änderungs-Feed der Wissensdatenbank gelesen"}
 {"uk": "прочитав текст файлу", "en": "read the file text", "de": "hat den Dateitext gelesen"}
 {"uk": "прочитав товар {0}", "en": "read product {0}", "de": "hat Artikel {0} gelesen"}
 {"uk": "прочитав товар магазину {0}", "en": "read shop product {0}", "de": "hat Shop-Artikel {0} gelesen"}
+{"uk": "прочитав форму запиту", "en": "read the request form", "de": "hat das Anfrageformular gelesen"}
+{"uk": "прочитав фільтри постачальників", "en": "read the supplier filters", "de": "hat die Lieferantenfilter gelesen"}
+{"uk": "прочитав інструменти агента", "en": "read the agent tools", "de": "hat die Agenten-Werkzeuge gelesen"}
 {"uk": "прочитано", "en": "read", "de": "gelesen"}
 {"uk": "прочитано AI", "en": "read by AI", "de": "von KI gelesen"}
 {"uk": "прочитано {0}", "en": "read {0}", "de": "gelesen {0}"}
@@ -24684,6 +24724,7 @@
 {"uk": "список акаунтів: стан, замовлення, останній вхід, фільтри", "en": "account list: status, orders, last login, filters", "de": "Kontoliste: Status, Aufträge, letzte Anmeldung, Filter"}
 {"uk": "список невідправлених замовлень.", "en": "list of unshipped orders.", "de": "Liste nicht versendeter Aufträge."}
 {"uk": "список оновлено", "en": "list updated", "de": "Liste aktualisiert"}
+{"uk": "список постачальників", "en": "supplier list", "de": "Lieferantenliste"}
 {"uk": "список файлів", "en": "file list", "de": "Dateiliste"}
 {"uk": "списується з нашого UPS-акаунту.", "en": "is charged to our UPS account.", "de": "wird von unserem UPS-Konto abgebucht."}
 {"uk": "сповіщення команді: {0}", "en": "team notifications: {0}", "de": "Teambenachrichtigungen: {0}"}
@@ -24731,6 +24772,7 @@
 {"uk": "старі копії з розширенням «.php». Посилання в товарах вона не змінює; DigiKey отримує посилання, а не копію.", "en": "old copies with the “.php” extension. It does not change the links in products; DigiKey receives the link, not the copy.", "de": "alte Kopien mit der Endung „.php“. Die Links in den Artikeln ändert sie nicht; DigiKey erhält den Link, nicht die Kopie."}
 {"uk": "старіші за {0}", "en": "older than {0}", "de": "älter als {0}"}
 {"uk": "статистика", "en": "statistics", "de": "Statistik"}
+{"uk": "статистика візиток", "en": "business card statistics", "de": "Visitenkarten-Statistik"}
 {"uk": "статистика, KPI, графіки", "en": "statistics, KPIs, charts", "de": "Statistik, KPIs, Diagramme"}
 {"uk": "статус", "en": "status", "de": "Status"}
 {"uk": "статус DigiKey API", "en": "DigiKey API status", "de": "Status der DigiKey API"}
@@ -25386,6 +25428,7 @@
 {"uk": "факт", "en": "actual", "de": "Ist"}
 {"uk": "форма «Kontakt»; «Відповісти» — пише тому, хто заповнив", "en": "the «Kontakt» form; «Reply» writes to whoever filled it in", "de": "Formular „Kontakt“; „Antworten“ schreibt dem, der es ausgefüllt hat"}
 {"uk": "форма з даними замовлення → DOCX/PDF у документи замовлення", "en": "a form with the order data → DOCX/PDF into the order documents", "de": "Formular mit den Auftragsdaten → DOCX/PDF in die Auftragsdokumente"}
+{"uk": "форма запиту", "en": "request form", "de": "Anfrageformular"}
 {"uk": "форма: {0} [{1}]", "en": "form: {0} [{1}]", "de": "Formular: {0} [{1}]"}
 {"uk": "формат «кількість: ціна», напр. «10: 4.52»", "en": "format “quantity: price”, e.g. “10: 4.52”", "de": "Format „Menge: Preis“, z. B. „10: 4.52“"}
 {"uk": "форму для введення результату", "en": "a form for entering the result", "de": "ein Formular zur Eingabe des Ergebnisses"}
@@ -25417,6 +25460,7 @@
 {"uk": "фільтра", "en": "filter", "de": "Filter"}
 {"uk": "фільтрах і виборі категорії: «📡 Антени».", "en": "filters and category selection: «📡 Antennas».", "de": "Filtern und der Kategorieauswahl: «📡 Antennen»."}
 {"uk": "фільтри", "en": "filters", "de": "Filter"}
+{"uk": "фільтри постачальників", "en": "supplier filters", "de": "Lieferantenfilter"}
 {"uk": "фірма", "en": "company", "de": "Firma"}
 {"uk": "фірма (з «Бухгалтерія → Налаштування компанії»)", "en": "company (from “Accounting → Company settings”)", "de": "Firma (aus „Buchhaltung → Firmeneinstellungen“)"}
 {"uk": "характеристики товарів, даташити й наявність на складі", "en": "product specifications, datasheets and stock availability", "de": "Artikeleigenschaften, Datenblätter und Lagerverfügbarkeit"}
@@ -25896,6 +25940,8 @@
 {"uk": "індексацію пошти вимкнено («🧠 База знань»)", "en": "mail indexing is disabled (“🧠 Knowledge base”)", "de": "die E-Mail-Indexierung ist deaktiviert („🧠 Wissensdatenbank“)"}
 {"uk": "індексація", "en": "indexing", "de": "Indexierung"}
 {"uk": "інструкція з картинками", "en": "instructions with pictures", "de": "Anleitung mit Bildern"}
+{"uk": "інструмент агента", "en": "agent tool", "de": "Agenten-Werkzeug"}
+{"uk": "інструменти агента", "en": "agent tools", "de": "Agenten-Werkzeuge"}
 {"uk": "інша валюта — × курс із «Налаштувань цін» магазину; ціна, введена вручну, — як є", "en": "another currency — × the rate from the web shop's “Price settings”; a manually entered price — as is", "de": "andere Währung — × Kurs aus den „Preiseinstellungen“ des Webshops; ein manuell eingegebener Preis — unverändert"}
 {"uk": "інша компанія з власним UPS-акаунтом; заповніть акаунт і адресу.", "en": "another company with its own UPS account; fill in the account and address.", "de": "ein anderes Unternehmen mit eigenem UPS-Konto; tragen Sie Konto und Adresse ein."}
 {"uk": "інша компанія з власним UPS-акаунтом; заповніть акаунт і адресу. Назва й контактна особа зберігаються в Minerva, в UPS передаються акаунт і адреса.", "en": "another company with its own UPS account; fill in the account and address. The name and contact person are stored in Minerva; the account and address are sent to UPS.", "de": "ein anderes Unternehmen mit eigenem UPS-Konto; tragen Sie Konto und Adresse ein. Name und Ansprechpartner werden in Minerva gespeichert, an UPS werden Konto und Adresse übermittelt."}

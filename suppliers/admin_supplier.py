@@ -203,9 +203,6 @@ class EventFilter(admin.SimpleListFilter):
         return queryset
 
 
-BULK_AI_MAX = 20          # 🧠 / 🌐 за один запуск — платно, кожен постачальник — окремий запит AI
-
-
 class SupplierCardMixin:
     """Підмішується в inventory.admin.SupplierAdmin."""
     inlines = (SupplierContactInline,)
@@ -261,9 +258,7 @@ class SupplierCardMixin:
     def bulk_view(self, request):
         """GET — що зробити з вибраними (період, закупівлі з PI / модель AI); POST — фоново по одному, хід — у
         jobs.state («3 / 16 · PCBWay»), підсумок по кожному. 🧵 — право бачити, 🧠 / 🌐 — змінювати (як у картці)."""
-        from inventory.models import Supplier
-        from suppliers.services import ai, history, jobs, mailscan
-        from suppliers.services.overview import purchases
+        from suppliers.services import ai, bulk, history, jobs
         do = request.GET.get("do") or request.POST.get("do")
         titles = {"history": "🧵 Історія з пошти для вибраних", "evaluate": "🧠 AI-оцінка вибраних",
                   "research": "🌐 Пошук в інтернеті для вибраних"}
@@ -273,7 +268,7 @@ class SupplierCardMixin:
         sups = [s for s in self.get_queryset(request).filter(pk__in=ids[:100]).order_by("name")
                 if (self.has_view_permission(request, s) if do == "history" else self.has_change_permission(request, s))]
         if do != "history":
-            sups = sups[:BULK_AI_MAX]
+            sups = sups[:bulk.AI_MAX]
         user = request.user
         if request.method == "POST":
             if not sups:
@@ -286,50 +281,17 @@ class SupplierCardMixin:
                 as_history = bool(request.POST.get("po_history"))
 
                 def run(report):
-                    rows, tot = [], {"messages": 0, "topics": 0, "contacts": 0, "pos": 0}
-                    for i, s in enumerate(Supplier.objects.filter(pk__in=pks).order_by("name"), 1):
-                        report(f"{i} / {len(pks)} · {s.name}")
-                        out = history.rebuild(s, user, date_from=date_from, date_to=date_to)
-                        made = history.make_purchases(s, user, as_history=as_history)["pos"] if make_po else []
-                        for k in ("messages", "topics", "contacts"):
-                            tot[k] += out.get(k) or 0
-                        tot["pos"] += len(made)
-                        rows.append({"name": s.name, "url": reverse("admin:inventory_supplier_change", args=[s.pk]),
-                                     "text": f"листів {out['messages']}, тем {out['topics']}"
-                                             + (f", 👥 +{out['contacts']}" if out.get("contacts") else "")
-                                             + (f", 🛒 {', '.join(p.code for p in made)}" if made else "")
-                                             + (" · ⚠️ понад 1500 листів" if out.get("truncated") else "")})
-                    return {"message": f"🧵 Готово: постачальників {len(rows)}, листів {tot['messages']}, тем "
-                                       f"{tot['topics']}, нових контактних осіб {tot['contacts']}"
-                                       + (f", закупівель {tot['pos']}" if make_po else ""), "rows": rows}
+                    return bulk.history(pks, user, date_from, date_to, make_po=make_po, as_history=as_history,
+                                        report=report)
             else:
                 model = ai.model_of(request.POST.get("model"))
 
                 def run(report):
-                    rows, done, streak = [], 0, 0
-                    for i, s in enumerate(Supplier.objects.filter(pk__in=pks).order_by("name"), 1):
-                        report(f"{i} / {len(pks)} · {s.name}")
-                        url = reverse("admin:inventory_supplier_change", args=[s.pk])
-                        try:
-                            if do == "evaluate":
-                                a = ai.evaluate(s, user, mailscan.scan(s, user), purchases(s), model=model)
-                                text = f"оцінка {a.result.get('rating') or '—'}/5"
-                            else:
-                                ai.research(s, user=user, model=model)
-                                text = "✓ знайдено"
-                            done, streak = done + 1, 0
-                        except ai.AIError as e:
-                            text, streak = f"⚠️ {e}", streak + 1
-                        rows.append({"name": s.name, "url": url, "text": text})
-                        if streak >= 3:
-                            rows.append({"name": "", "url": "", "text": "⏹ Зупинено після трьох помилок поспіль."})
-                            break
-                    return {"message": f"{'🧠' if do == 'evaluate' else '🌐'} Готово: {done} з {len(pks)}",
-                            "rows": rows}
+                    return bulk.ai(do, pks, user, model, report=report)
             return JsonResponse({"job": jobs.start(user, f"suppliers bulk {do}", run, progress=True)})
         return TemplateResponse(request, "admin/suppliers/bulk.html", self._ctx(
             request, titles[do], do=do, sups=sups, ids=",".join(str(s.pk) for s in sups), asked=len(ids),
-            periods=history.PERIODS, default_period=str(history.YEARS), ai_max=BULK_AI_MAX,
+            periods=history.PERIODS, default_period=str(history.YEARS), ai_max=bulk.AI_MAX,
             po_opts=po_options() if do == "history" and user.has_perm("inventory.add_purchaseorder") else "",
             back=reverse("admin:inventory_supplier_changelist")))
 

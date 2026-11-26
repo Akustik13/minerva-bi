@@ -41,6 +41,7 @@ SECTIONS = [
     ("customers", "👥 Клієнти CRM"), ("purchases", "📥 Закупівлі"), ("packaging", "📦 Упаковка (коробки)"),
     ("shop", "🏪 Магазин і сайт"),
     ("account", "👤 Кабінет покупця"), ("payments", "💳 Оплати"), ("webhooks", "🔔 Вебхуки"),
+    ("suppliers", "🏭 Постачальники й запити (RFQ)"),
     ("knowledge", "🧠 База знань (RAG)"), ("meetings", "🎙 Наради (RAG-ПК)"), ("service", "🔌 Службові"),
 ]
 
@@ -71,7 +72,8 @@ def section_of(path: str) -> str:
     for prefix, name in (("stock", "stock"), ("locations", "stock"), ("products", "products"),
                          ("categories", "products"), ("orders", "orders"), ("shipments", "shipments"),
                          ("customers", "customers"), ("purchase-orders", "purchases"), ("webhooks", "webhooks"),
-                         ("knowledge", "knowledge"), ("meetings/", "meetings"), ("packaging", "packaging")):
+                         ("knowledge", "knowledge"), ("meetings/", "meetings"), ("packaging", "packaging"),
+                         ("supplier", "suppliers")):
         if rest.startswith(prefix):
             return name
     return "service"
@@ -158,6 +160,18 @@ SUMMARIES = {
     "FileUploadLinkView.post": "📎 Передати файл за посиланням з upload_link (без ключа, діє 30 хв)",
     "RagDatasheetsView.get": "🔎 RAG-ПК: пошук по всіх даташитах і каталогу",
     "RagHistoryView.get": "🔎 RAG-ПК: пошук в історії пошти й документах бази знань (лише 🔒 особистий ключ)",
+    "SuppliersView.get": "🏭 Постачальники за фільтрами списку (категорія, стан, звідки, де взяли, країна) — від імені "
+                         "людини ключа",
+    "SupplierFiltersView.get": "🏭 Значення фільтрів постачальників: категорії, стани, звідки, де взяли, країни",
+    "SupplierDetailView.get": "🏭 Картка постачальника: контакти, закупівлі, запити, історія, аналізи",
+    "CardsView.get": "🪪 Візитки й флаєри (лише ті, які бачить людина ключа)",
+    "CardStatsView.get": "🪪 Статистика візиток по подіях (де взяли)",
+    "CardDetailView.get": "🪪 Візитка: прочитане, люди, QR, фото (ref для файлів)",
+    "RequestsView.get": "📨 Запити постачальникам за фільтрами списку",
+    "RequestFormView.get": "📨 Що є у формі нового запиту: форми й поля, мови, змінні, категорії",
+    "RequestDetailView.get": "📨 Запит постачальникам: поля, лист, файли, отримувачі й пропозиції",
+    "AgentToolsView.get": "🤖 Інструменти агента (MCP), доступні ключу",
+    "AgentToolCallView.post": "🤖 Виклик інструмента агента (MCP) звичайним REST",
 }
 
 EFFECTS = {
@@ -173,6 +187,8 @@ EFFECTS = {
     "FilesView.post": "Зберігає файл у Minerva (лише для людини ключа, 30 днів) — даних Minerva не змінює: лист чи "
                       "документ замовлення — лише пропозицією через MCP і ✓ людини.",
     "FileUploadLinkView.post": "Зберігає файли в Minerva (лише для людини ключа, 30 днів) — даних не змінює.",
+    "AgentToolCallView.post": "Читання нічого не змінює; propose_* — лише пропозиції в «🧩 Завдання агенту» (змінює "
+                              "людина ✓); upload_* — зберігає файл для людини ключа.",
     "StockViewSet.check": "Лише перевіряє наявність — нічого не змінює (тому досить права читання).",
     "PackagingViewSet.create": "Додає коробку в «Пакувальні матеріали» (запас — лише через прихід / інвентаризацію).",
     "PackagingViewSet.partial_update": "Змінює поля коробки; is_active: false — в архів (нові відправлення її не "
@@ -375,6 +391,7 @@ SIMULATE_NO = {
     "FilesView.post": "зберігає файл — без наслідків не перевірити",
     "FileUploadLinkView.": "лише за підписаним посиланням з upload_link",
     "FileLinkView.": "лише за підписаним посиланням з get_file",
+    "AgentToolCallView.": "виклик інструмента агента — без наслідків не перевірити (propose_* лягають у завдання)",
 }
 
 

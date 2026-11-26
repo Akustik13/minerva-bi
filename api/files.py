@@ -23,7 +23,7 @@ from .mcp import MCPKeyAuthentication
 from .models import APIKey
 
 logger = logging.getLogger(__name__)
-LIST_PARAMS = ('order', 'product', 'project', 'request', 'mail', 'customer', 'offer')
+LIST_PARAMS = ('order', 'product', 'project', 'request', 'mail', 'customer', 'offer', 'card')
 
 
 def _person(request):
@@ -104,7 +104,8 @@ def _save_uploads(request, user, key, source):
 
 
 class FilesView(APIView):
-    """GET — файли об'єкта Minerva (одне з: order, product, project, request, mail, customer, offer; або uploads=1);
+    """GET — файли об'єкта Minerva (одне з: order, product, project, request, mail, customer, offer, card; або
+    uploads=1);
     POST — передати файл у Minerva (multipart «file», кілька; або JSON {name, content_base64 | text | url})
     → ref «upload:<номер>» для вкладення в лист (MCP propose_email attachments) чи propose_save_file."""
     authentication_classes = [MCPKeyAuthentication]

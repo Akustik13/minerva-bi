@@ -409,7 +409,7 @@
 
 | Метод | Адреса | Що |
 |---|---|---|
-| GET | `/files/?order=<номер>` (або `product`, `project`, `request`, `customer`, `offer`, `mail`, `uploads=1`) | файли об'єкта → `{what, files: [{ref, name, size, what, download}]}` |
+| GET | `/files/?order=<номер>` (або `product`, `project`, `request`, `customer`, `offer`, `mail`, `card`, `uploads=1`) | файли об'єкта → `{what, files: [{ref, name, size, what, download}]}` |
 | GET | `/files/download/?ref=<ref>` | сам файл (завантаженням, nosniff) |
 | GET | `/files/text/?ref=<ref>&first_page=&last_page=` | текст файлу |
 | POST | `/files/` | multipart `file` (кілька) або JSON `{name, content_base64 \| text \| url}` → `{files: [{ref: "upload:<pk>", …}]}` (`agent:write`) |
@@ -419,8 +419,30 @@
 | GET | `/rag/history/?q=&customer=&project=&limit=` | 🔎 RAG-ПК: історія пошти й документи бази знань (🔒) → `{coverage, items}` |
 
 ref: `order:<pk>:<файл>`, `invoice:<pk>`, `offer:<pk версії>`, `rfq:<pk>`, `rfqreply:<pk>`, `kb:<pk>`,
-`cust:<pk>:<файл>`, `msg:<pk листа>:<номер>`, `datasheet:<артикул>`, `photo:<артикул>`, `upload:<pk>` — їх же
-приймає MCP `propose_email` (`attachments`) і `propose_save_file`.
+`cust:<pk>:<файл>`, `msg:<pk листа>:<номер>`, `datasheet:<артикул>`, `photo:<артикул>`, `upload:<pk>`,
+`card:<pk>` / `card:<pk>:back` / `card:<pk>:photo:<pk>` (фото візитки), `vcard:<pk>` — їх же приймає MCP
+`propose_email` (`attachments`), `propose_save_file`, `propose_new_card` і `propose_supplier_request` (`files`).
+
+## 5c. Постачальники, візитки, запити (RFQ) і інструменти агента (`/suppliers/`, `/supplier-requests/`, `/agent/tools/`)
+
+Ключ — як для MCP (`agent:read`, від імені людини ключа, з її правами `inventory.view_supplier` /
+`suppliers.view_supplierrequest`; 🔒 чужі приватні візитки — нікому). Відбори — ті самі, що в MCP і на сторінках
+(`agent/tools_suppliers.supplier_queryset`, `tools_cards.card_queryset`, `tools_rfq.request_queryset`), views —
+`api/suppliers.py`, `api/agent_tools.py`, гід — `docs/guide/api/suppliers.md`.
+
+| Метод | Адреса | Що |
+|---|---|---|
+| GET | `/suppliers/?q=&category=&status=&source=&where=&country=&has_email=&rating_min=&limit=&offset=` | постачальники → `{count, results}` |
+| GET | `/suppliers/filters/` | категорії (дерево, кількості), стани, звідки, де взяли, країни |
+| GET | `/suppliers/<id>/` | картка: контакти, закупівлі, запити, історія (лист чужої скриньки — без тексту), аналізи (свої) |
+| GET | `/suppliers/cards/?query=&show=&role=&event=&ai=&category=&mark=&visibility=&kind=&limit=` | візитки |
+| GET | `/suppliers/cards/stats/` | статистика візиток по подіях |
+| GET | `/suppliers/cards/<id>/` | візитка: прочитане, люди, QR, фото (ref), схожі постачальники й клієнти |
+| GET | `/supplier-requests/?status=&query=&project=&supplier=&category=&group=&created_from=&created_to=&mine=&overdue=` | запити |
+| GET | `/supplier-requests/form/` | форми й поля нового запиту, мови, змінні, приклади, категорії, групи, проєкти |
+| GET | `/supplier-requests/<RFQ-…\|id>/` | запит: поля, лист, файли (ref), отримувачі з пропозиціями |
+| GET | `/agent/tools/` | інструменти MCP, доступні ключу (як `tools/list`) |
+| POST | `/agent/tools/<назва>/` | виклик інструмента: тіло — аргументи (або `{arguments: {…}}`) → `{tool, text, is_error, review_url}`; читання — `agent:read`, `propose_*` / `upload_*` — `agent:write`; пропозиції — у завдання ключа на сьогодні, застосовує людина ✓ |
 
 ## 6. Вебхуки (Minerva → магазин)
 

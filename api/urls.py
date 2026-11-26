@@ -1,7 +1,8 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from . import accounts, files, mcp, media, packaging, payments, purchases, search, site_admin
+from . import accounts, agent_tools, files, mcp, media, packaging, payments, purchases, search, site_admin
+from . import suppliers as sup
 from .views import (
     SalesOrderViewSet, ProductViewSet, CustomerViewSet, StockViewSet, MovementViewSet,
     LocationViewSet, CategoryViewSet, ShipmentViewSet, WebhookViewSet, ShopProductViewSet, ShopShippingView,
@@ -84,6 +85,19 @@ urlpatterns = [
     path("files/upload/<str:token>/", files.FileUploadLinkView.as_view(), name="agent-file-upload-link"),
     path("rag/datasheets/", files.RagDatasheetsView.as_view(), name="rag-datasheets"),   # 🔎 RAG-ПК
     path("rag/history/", files.RagHistoryView.as_view(), name="rag-history"),
+    # 🏭 Постачальники, 🪪 візитки, 📨 запити (RFQ) — читання від імені людини ключа (api/suppliers.py)
+    path("suppliers/", sup.SuppliersView.as_view(), name="agent-suppliers"),
+    path("suppliers/filters/", sup.SupplierFiltersView.as_view(), name="agent-supplier-filters"),
+    path("suppliers/cards/", sup.CardsView.as_view(), name="agent-supplier-cards"),
+    path("suppliers/cards/stats/", sup.CardStatsView.as_view(), name="agent-supplier-card-stats"),
+    path("suppliers/cards/<int:pk>/", sup.CardDetailView.as_view(), name="agent-supplier-card"),
+    path("suppliers/<int:pk>/", sup.SupplierDetailView.as_view(), name="agent-supplier"),
+    path("supplier-requests/", sup.RequestsView.as_view(), name="agent-supplier-requests"),
+    path("supplier-requests/form/", sup.RequestFormView.as_view(), name="agent-supplier-request-form"),
+    path("supplier-requests/<str:ref>/", sup.RequestDetailView.as_view(), name="agent-supplier-request"),
+    # 🤖 інструменти агента (MCP) звичайним REST (api/agent_tools.py)
+    path("agent/tools/", agent_tools.AgentToolsView.as_view(), name="agent-tools"),
+    path("agent/tools/<str:name>/", agent_tools.AgentToolCallView.as_view(), name="agent-tool-call"),
     path("mcp/", mcp.MCPView.as_view(), name="mcp"),
     path("mcp", mcp.MCPView.as_view(), name="mcp_no_slash"),   # клієнти, де адресу вписано без «/» у кінці   # 🤖 MCP-сервер для зовнішніх агентів (agent/mcp.py)
     path("", include(router.urls)),

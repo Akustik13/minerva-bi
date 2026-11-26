@@ -9,10 +9,17 @@
                            (`rfq_compare.ai_lines` — як 🏆 порада), статистика (`rfq_stats.stats`), 🏆 порада AI,
                            кого з категорії ще не питали, історія (подія з листом чужої скриньки — без тексту);
   read_rfq_file          — текст файлу запиту або файлу, який надіслав постачальник (уже збережений у запиті —
-                           його бачать усі, хто бачить запит): `rfq_files.read`.
+                           його бачать усі, хто бачить запит): `rfq_files.read`;
+  supplier_request_form  — що є у формі «📨 Новий запит»: форми й поля (`rfq.TEMPLATES`), мови, змінні листа,
+                           приклади, категорії (їхня форма), групи, відкриті проєкти, «чекаємо до» за замовчуванням;
+  preview_rfq_letter     — 👁 лист одному постачальнику (`rfq.render` / `cc_for` / `letter` з підписом — лише з
+                           🔒 особистим ключем) з наявного запиту або чернетки з полів — нічого не зберігає.
 Зміни — propose_* (одна пропозиція `AgentProposal.RFQ`, дія в `data.action`) → людина ✓ на сторінці завдання →
 `apply` тими самими функціями, що кнопки сторінки (`suppliers/services/rfq.py`, `rfq_match`, `rfq_talk`):
-  propose_supplier_request — новий запит (чернетка) або зміна полів наявного (`create` / `edit`);
+  propose_supplier_request — новий запит (чернетка) або зміна полів наявного (`create` / `edit`); 📋 copy_from —
+                             копія іншого (`rfq_copy.draft` / `recipients` / `copy_files`, `review` — що перевірити,
+                             як після «📋 Копіювати»); files — ref файлів Minerva / переданих агентом (agent/files.py)
+                             → файли запиту (`rfq.add_file`), remove_files — прибрати;
   propose_rfq_recipients   — додати постачальників (`rfq.add_recipients`), прибрати ще не надісланих;
   propose_rfq_quote        — внести / виправити пропозицію постачальника (`rfq.set_quote`; не вказане лишається);
   propose_rfq_state        — стан отримувача (📥 відповів, 💶 є пропозиція, 🙅 відмовився, 🔕 не відповів…);
@@ -72,12 +79,17 @@ FIND = {
                    'open (за замовчуванням: надіслано / є відповіді) / all / draft / sent / answered / closed / '
                    'cancelled; project — код P-… ; supplier — #pk або назва постачальника серед отримувачів; '
                    'category — назва або #id; mine — лише ті, що ведете ви; overdue — є ті, хто не відповів після '
-                   '«чекаємо до». Повертає номер, назву, стан, проєкт, категорію, групу, скільки відповіли й '
-                   'дали ціну, до коли чекаємо, хто вибраний. Повністю — get_supplier_request.',
+                   '«чекаємо до»; group — група / тема; created_from / created_to — дата створення. Повертає '
+                   'номер, назву, стан, проєкт, категорію, групу, скільки відповіли й дали ціну, до коли чекаємо, хто '
+                   'вибраний, з якого скопійовано й що ще перевірити після копіювання. Повністю — '
+                   'get_supplier_request.',
     'input_schema': {'type': 'object', 'properties': {
         'query': {'type': 'string'}, 'status': {'type': 'string', 'enum': list(STATUS_FILTERS)},
         'project': {'type': 'string'}, 'supplier': {'type': 'string'}, 'category': {'type': 'string'},
         'mine': {'type': 'boolean'}, 'overdue': {'type': 'boolean'},
+        'group': {'type': 'string', 'description': 'Група / тема (частина назви)'},
+        'created_from': {'type': 'string', 'description': 'Створено від YYYY-MM-DD'},
+        'created_to': {'type': 'string', 'description': 'Створено до YYYY-MM-DD'},
         'limit': {'type': 'integer', 'minimum': 1, 'maximum': LIST_MAX}}}}
 GET = {
     'name': 'get_supplier_request',
@@ -109,7 +121,11 @@ PROPOSE_REQUEST = {
                    'language — en / de / uk; reply_by — YYYY-MM-DD; category — назва або #id категорії '
                    'постачальників; project — код P-…; suppliers — кому (лише для нового; #pk / назва / email); '
                    'body — текст листа (порожньо — Minerva складе з полів; змінні {greeting} {name} {company} {code}); '
-                   'cc — копія кожному листу.',
+                   'cc — копія кожному листу; contacts — {постачальник: email контактної особи}. 📋 copy_from — номер '
+                   'запиту, з якого скопіювати (поля, кому, файли; що зазвичай треба змінити — людині підсвітиться); '
+                   'skip_files — id файлів старого запиту, які не брати. files — ref файлів (list_files / upload_file: '
+                   'креслення, BOM, Gerber) → у файли запиту; remove_files — id файлів запиту, які прибрати. Форми, '
+                   'поля, категорії — supplier_request_form; як вийде лист — preview_rfq_letter.',
     'input_schema': {'type': 'object', 'properties': {
         'request': {'type': 'string', 'description': 'Номер наявного запиту; порожньо — новий'},
         'title': {'type': 'string'}, 'template': {'type': 'string'}, 'category': {'type': 'string'},
@@ -119,7 +135,34 @@ PROPOSE_REQUEST = {
         'subject': {'type': 'string'}, 'body': {'type': 'string'}, 'cc': {'type': 'string'},
         'cc_contacts': {'type': 'boolean', 'description': 'Копія іншим контактним особам постачальника'},
         'suppliers': {'type': 'array', 'items': {'type': 'string'}},
+        'contacts': {'type': 'object', 'additionalProperties': {'type': 'string'}},
+        'copy_from': {'type': 'string', 'description': 'Номер запиту RFQ-…, з якого скопіювати (лише новий)'},
+        'skip_files': {'type': 'array', 'items': {'type': 'integer'}},
+        'files': {'type': 'array', 'items': {'type': 'string'}, 'description': 'ref файлів → у запит'},
+        'remove_files': {'type': 'array', 'items': {'type': 'integer'}},
         'evidence': _EVIDENCE, 'source': _SOURCE}}}
+FORM = {
+    'name': 'supplier_request_form',
+    'description': 'Що є у формі «📨 Новий запит постачальникам»: форми (template) з полями (ключі для specs, '
+                   'підказки), мови листа, змінні листа ({greeting} {name} …), приклад листа кожною мовою, категорії '
+                   '(з формою запиту категорії й скільки постачальників), останні групи, відкриті проєкти, «чекаємо '
+                   'до» за замовчуванням. template — лише поля цієї форми.',
+    'input_schema': {'type': 'object', 'properties': {'template': {'type': 'string'}}}}
+PREVIEW = {
+    'name': 'preview_rfq_letter',
+    'description': '👁 Як виглядатиме лист запиту одному постачальнику: кому, копія, тема й текст зі змінними, '
+                   'вкладення (і підпис скриньки — з 🔒 особистим ключем) — нічого не зберігає й не надсилає. request — '
+                   'наявний запит (вказані поля — як після зміни); без request — чернетка нового з полів (порожній '
+                   'body — Minerva складе з полів; copy_from — як копія). supplier — кому (#pk / назва / email), '
+                   'contact — email контактної особи.',
+    'input_schema': {'type': 'object', 'properties': {
+        'request': {'type': 'string'}, 'copy_from': {'type': 'string'}, 'supplier': _SUPPLIER,
+        'contact': {'type': 'string'}, 'title': {'type': 'string'}, 'template': {'type': 'string'},
+        'category': {'type': 'string'}, 'quantities': {'type': 'string'},
+        'language': {'type': 'string', 'enum': ['en', 'de', 'uk']}, 'reply_by': {'type': 'string'},
+        'specs': {'type': 'object', 'additionalProperties': {'type': 'string'}}, 'notes': {'type': 'string'},
+        'subject': {'type': 'string'}, 'body': {'type': 'string'}, 'cc': {'type': 'string'},
+        'cc_contacts': {'type': 'boolean'}}, 'required': ['supplier']}}
 PROPOSE_RECIPIENTS = {
     'name': 'propose_rfq_recipients',
     'description': 'Запропонувати, кому ще надіслати запит (add — #pk / назва / email постачальника з find_suppliers; '
@@ -218,7 +261,7 @@ PROPOSE_ADVICE = {
         'details': {'type': 'array', 'items': {'type': 'string'}},
         'source': _SOURCE}, 'required': ['request', 'summary']}}
 
-READ_TOOLS = [FIND, GET, FILE]
+READ_TOOLS = [FIND, GET, FILE, FORM, PREVIEW]
 CHANGE_TOOLS = [PROPOSE_RECIPIENTS, PROPOSE_QUOTE, PROPOSE_STATE, PROPOSE_DECISION, PROPOSE_STATUS, PROPOSE_SEND,
                 PROPOSE_ADVICE]
 TOOLS = READ_TOOLS + [PROPOSE_REQUEST] + CHANGE_TOOLS + [PROPOSE_PURCHASE]
@@ -384,11 +427,12 @@ def _decision_text(r) -> str:
 
 # ── find_supplier_requests ───────────────────────────────────────────────────
 
-def find_supplier_requests(ctx, args) -> str:
+def request_queryset(user, args):
+    """Відбір запитів — фільтри списку «📨 Запити постачальникам» (find_supplier_requests і REST
+    /supplier-requests/); анотації _sent, _planned, _ans, _quoted, _waiting, найновіші першими."""
     from suppliers.models import SupplierRequest, SupplierRequestRecipient as R
-    user = ctx.task.owner
-    require(user, VIEW_PERM)
-    qs = SupplierRequest.objects.select_related('project', 'category', 'owner')
+    args = args or {}
+    qs = SupplierRequest.objects.select_related('project', 'category', 'owner', 'copied_from')
     status = str(args.get('status') or 'open')
     if status not in STATUS_FILTERS:
         raise ToolError(f'status — один з: {", ".join(STATUS_FILTERS)}')
@@ -410,15 +454,33 @@ def find_supplier_requests(ctx, args) -> str:
     if args.get('overdue'):
         qs = qs.filter(reply_by__lt=timezone.localdate(),
                        pk__in=R.objects.filter(state=R.SENT).values('request_id'))
-    total = qs.count()
-    limit = clamp(args.get('limit'), 20, 1, LIST_MAX)
-    rows = list(qs.annotate(
+    group = ' '.join(str(args.get('group') or '').split())
+    if group:
+        qs = qs.filter(group__icontains=group)
+    for key, lookup in (('created_from', 'created_at__date__gte'), ('created_to', 'created_at__date__lte')):
+        if str(args.get(key) or '').strip():
+            day = parse_date(args[key])
+            if day is None:
+                raise ToolError(f'{key} — YYYY-MM-DD')
+            qs = qs.filter(**{lookup: day})
+    return qs.annotate(
         _sent=Count('recipients', filter=~Q(recipients__state__in=[R.PLANNED, R.FAILED]), distinct=True),
         _planned=Count('recipients', filter=Q(recipients__state__in=[R.PLANNED, R.FAILED]), distinct=True),
         _ans=Count('recipients', filter=Q(recipients__state__in=[R.REPLIED, R.QUOTED, R.DECLINED]), distinct=True),
         _quoted=Count('recipients', filter=Q(recipients__state=R.QUOTED), distinct=True),
-        _waiting=Count('recipients', filter=Q(recipients__state=R.SENT), distinct=True))
-        .order_by('-created_at')[:limit])
+        _waiting=Count('recipients', filter=Q(recipients__state=R.SENT), distinct=True)).order_by('-created_at')
+
+
+def find_supplier_requests(ctx, args) -> str:
+    from suppliers.models import SupplierRequestRecipient as R
+    from suppliers.services import rfq_copy
+    user = ctx.task.owner
+    require(user, VIEW_PERM)
+    status = str(args.get('status') or 'open')
+    qs = request_queryset(user, args)
+    total = qs.count()
+    limit = clamp(args.get('limit'), 20, 1, LIST_MAX)
+    rows = list(qs[:limit])
     if not rows:
         return f'Запитів за цим відбором немає (стан: {status}).'
     chosen = {}
@@ -446,6 +508,11 @@ def find_supplier_requests(ctx, args) -> str:
         if chosen.get(req.pk):
             bits.append('🏆 ' + ', '.join(chosen[req.pk][:3]))
         bits.append(f'створено {fmt_date(req.created_at)}' + (f', веде {_person(req.owner)}' if req.owner_id else ''))
+        if req.copied_from_id and req.copied_from:
+            bits.append(f'📋 з {req.copied_from.code}')
+        left = rfq_copy.pending(req)
+        if left:
+            bits.append(f'⚠️ перевірити після копіювання: {", ".join(x["label"] for x in left)}')
         lines.append(f'{req.code} «{one_line(req.title, 120)}» · ' + ' · '.join(bits))
     return _wrap('ЗАПИТИ ПОСТАЧАЛЬНИКАМ', lines)
 
@@ -500,7 +567,7 @@ def get_supplier_request(ctx, args) -> str:
     files = list(req.files.all())
     if files:
         lines.append(f'\nНаші файли запиту ({len(files)}): '
-                     + '; '.join(f'файл #{f.pk} {f.name} ({_size(f.size)})' for f in files))
+                     + '; '.join(f'файл #{f.pk} {f.name} ({_size(f.size)}, ref rfq:{f.pk})' for f in files))
 
     recips = list(req.recipients.select_related('supplier', 'contact').order_by('pk'))
     reply_files = {}
@@ -535,7 +602,8 @@ def get_supplier_request(ctx, args) -> str:
             lines.append(f'  рішення: {decided}')
         if reply_files.get(r.pk):
             lines.append('  файли постачальника: ' + '; '.join(
-                f'файл постачальника #{f.pk} {f.name} ({_size(f.size)})' for f in reply_files[r.pk][:10]))
+                f'файл постачальника #{f.pk} {f.name} ({_size(f.size)}, ref rfqreply:{f.pk})'
+                for f in reply_files[r.pk][:10]))
     overdue = rfq.waiting_overdue(req)
     if overdue:
         lines.append('⚠️ Не відповіли після «чекаємо до»: ' + ', '.join(r.supplier.name for r in overdue))
@@ -813,42 +881,250 @@ def _fields_text(fields) -> str:
     return ' · '.join(parts)
 
 
+FILES_MAX = 20
+
+
+def _copy_fields(src, user) -> dict:
+    """📋 Поля копії запиту src (`rfq_copy.draft`) у вигляді `_clean_request_fields`."""
+    from suppliers.services import rfq_copy
+    req, _info = rfq_copy.draft(src, user)
+    out = {'title': req.title, 'template': req.template or 'generic', 'group': req.group,
+           'quantities': req.quantities, 'language': req.language, 'specs': dict(req.specs or {}), 'cc': req.cc,
+           'cc_contacts': bool(req.cc_contacts), 'reply_by': req.reply_by.isoformat() if req.reply_by else ''}
+    if req.category_id:
+        out['category'] = req.category_id
+    if req.project_id:
+        out['project'] = req.project_id
+    if req.subject:
+        out['subject'] = req.subject
+    if req.body:
+        out['body'] = req.body
+    return out
+
+
+def _new_fields(args, src, user) -> dict:
+    """Поля нового запиту: 📋 копії src (параметри — тієї самої форми) + вказані в args."""
+    if src is None:
+        return _clean_request_fields(args, None)
+    from suppliers.services import rfq_copy
+    draft, _info = rfq_copy.draft(src, user)
+    return {**_copy_fields(src, user), **_clean_request_fields(args, draft)}
+
+
+def _file_refs(ctx, values) -> list:
+    """files — ref файлів, які людина ключа може відкрити (agent/files.py) → [{ref, name, size}]."""
+    from agent import files
+    from suppliers.services import rfq
+    if values in (None, ''):
+        return []
+    if not isinstance(values, list):
+        raise ToolError('files — список ref (з list_files / upload_file)')
+    if len(values) > FILES_MAX:
+        raise ToolError(f'за раз — до {FILES_MAX} файлів')
+    out = []
+    for ref in values:
+        try:
+            f = files.describe(ctx.task.owner, ' '.join(str(ref or '').split()), getattr(ctx, 'personal', True))
+        except files.FileError as e:
+            raise ToolError(f'{ref}: {e}') from None
+        if files.ext_of(f['name']) in files.BLOCKED_EXT:
+            raise ToolError(f'{f["name"]}: програми й скрипти не додаються')
+        if f['size'] > rfq.ATTACH_MAX_MB * 1024 * 1024:
+            raise ToolError(f'{f["name"]}: понад {rfq.ATTACH_MAX_MB} МБ')
+        out.append({'ref': f['ref'], 'name': f['name'], 'size': f['size']})
+    files.keep([f['ref'] for f in out])
+    return out
+
+
+def _contact_map(suppliers, values) -> dict:
+    """contacts {постачальник: email} → {pk постачальника: pk контакту}."""
+    from suppliers.models import SupplierContact
+    if not values:
+        return {}
+    if not isinstance(values, dict):
+        raise ToolError('contacts — {постачальник: email контактної особи}')
+    out = {}
+    for who, email in values.items():
+        s = _supplier(who)
+        if s.pk not in {x.pk for x in suppliers}:
+            raise ToolError(f'«{s.name}» немає серед suppliers')
+        c = SupplierContact.objects.filter(supplier=s, email__iexact=str(email or '').strip()).first()
+        if c is None:
+            raise ToolError(f'у «{s.name}» немає контакту з email {email}')
+        out[str(s.pk)] = c.pk
+    return out
+
+
 def propose_supplier_request(ctx, args) -> str:
+    from inventory.models import Supplier
     from suppliers.services import rfq
     user = ctx.task.owner
     ref = str(args.get('request') or '').strip()
     req = get_request(ref) if ref else None
     require(user, CHANGE_PERM if req is not None else ADD_PERM)
-    fields = _clean_request_fields(args, req)
     evidence, source = _evidence(args), args.get('source')
+    new_files = _file_refs(ctx, args.get('files'))
     if req is None:
+        if args.get('remove_files'):
+            raise ToolError('remove_files — лише для наявного запиту')
+        src = get_request(args['copy_from']) if str(args.get('copy_from') or '').strip() else None
+        fields = _new_fields(args, src, user)
         if not fields.get('title'):
             raise ToolError('для нового запиту потрібна назва (title) — що запитуємо')
+        values = args.get('suppliers')
+        contacts_in = dict(args.get('contacts') or {}) if isinstance(args.get('contacts'), dict) else args.get('contacts')
+        if src is not None and not values:              # 📋 кому було (без ⛔ «Не працювати»), контакт — той самий
+            from suppliers.services import rfq_copy
+            rc = rfq_copy.recipients(src)
+            picked = list(Supplier.objects.filter(pk__in=rc['all']).prefetch_related('contacts'))
+            contacts = {str(k): v for k, v in rc['contacts'].items() if v and v != -1}
+        else:
+            picked = [_supplier(v) for v in values or []]
+            contacts = _contact_map(picked, contacts_in)
         suppliers, skipped = [], []
-        for value in args.get('suppliers') or []:
-            s = _supplier(value)
-            email, _c = rfq.pick_email(s)
+        for s in picked:
+            email, _c = rfq.pick_email(s, s.contacts.filter(pk=contacts.get(str(s.pk)) or 0).first())
             (suppliers if email else skipped).append(s)
-        if skipped:
+        if skipped and not (src is not None and not values):
             raise ToolError('без email (лист нема куди надіслати): ' + ', '.join(s.name for s in skipped)
                             + ' — додайте email у картці постачальника або приберіть їх')
         names = [s.name for s in suppliers]
-        _propose(ctx, 'create', None, {'fields': fields, 'suppliers': [s.pk for s in suppliers], 'names': names},
-                 new=f'«{fields["title"]}»' + (f' → {", ".join(names)}' if names else ''), evidence=evidence,
-                 source=source, key=f'create:{fields["title"].lower()}')
+        skip_files = [int(x) for x in (args.get('skip_files') or []) if str(x).isdigit()]
+        old_files = [f.name for f in src.files.all() if f.pk not in skip_files] if src is not None else []
+        text = (f'«{fields["title"]}»' + (f' 📋 з {src.code}' if src is not None else '')
+                + (f' → {", ".join(names)}' if names else '')
+                + (f' · файли: {", ".join(old_files + [f["name"] for f in new_files])}'
+                   if old_files or new_files else ''))
+        _propose(ctx, 'create', None, {'fields': fields, 'suppliers': [s.pk for s in suppliers], 'names': names,
+                                       'contacts': contacts, 'copy_from': src.pk if src is not None else None,
+                                       'skip_files': skip_files, 'files': new_files},
+                 new=text, evidence=evidence, source=source, key=f'create:{fields["title"].lower()}')
         return (f'Запропоновано новий запит «{fields["title"]}» (чернетка' + (f', кому: {", ".join(names)}' if names
-                                                                             else ', без отримувачів') +
+                                                                             else ', без отримувачів')
+                + (f'; без email не додано: {", ".join(s.name for s in skipped)}' if skipped else '') +
                 ') — людина підтвердить ✓; надіслати — потім propose_rfq_send.')
-    if args.get('suppliers'):
+    if args.get('suppliers') or args.get('contacts'):
         raise ToolError('отримувачів наявного запиту змінює propose_rfq_recipients')
+    if str(args.get('copy_from') or '').strip():
+        raise ToolError('copy_from — лише для нового запиту')
+    fields = _clean_request_fields(args, req)
     old = _snapshot(req)
     changed = {k: v for k, v in fields.items() if old.get(k) != v}
-    if not changed:
+    have = {f.pk: f.name for f in req.files.all()}
+    remove = [int(x) for x in (args.get('remove_files') or []) if str(x).isdigit()]
+    unknown = [x for x in remove if x not in have]
+    if unknown:
+        raise ToolError(f'у запиті {req.code} немає файлів #{", #".join(map(str, unknown))} — є: '
+                        + ('; '.join(f'#{k} {v}' for k, v in have.items()) or 'жодного'))
+    if not changed and not new_files and not remove:
         return f'У запиті {req.code} уже так — змінювати нічого.'
-    _propose(ctx, 'edit', req, {'fields': changed, 'old': {k: old.get(k) for k in changed}},
-             new=_fields_text(changed), old=_fields_text({k: old.get(k) for k in changed}), evidence=evidence,
-             source=source, key=f'edit:{req.code}:{",".join(sorted(changed))}')
-    return f'Запропоновано зміни запиту {req.code}: {", ".join(changed)} — людина підтвердить ✓.'
+    parts = [_fields_text(changed)] if changed else []
+    if new_files:
+        parts.append('+ файли: ' + ', '.join(f['name'] for f in new_files))
+    if remove:
+        parts.append('− файли: ' + ', '.join(have[x] for x in remove))
+    _propose(ctx, 'edit', req, {'fields': changed, 'old': {k: old.get(k) for k in changed}, 'files': new_files,
+                                'remove_files': remove},
+             new=' · '.join(parts), old=_fields_text({k: old.get(k) for k in changed}), evidence=evidence,
+             source=source, key=f'edit:{req.code}:{",".join(sorted(changed))}:{len(new_files)}:{len(remove)}')
+    return f'Запропоновано зміни запиту {req.code}: {", ".join(list(changed) + (["файли"] if new_files or remove else []))} — людина підтвердить ✓.'
+
+
+# ── supplier_request_form / preview_rfq_letter ───────────────────────────────
+
+def supplier_request_form(ctx, args) -> str:
+    from projects.models import Project
+    from suppliers.models import SupplierCategory, SupplierRequest
+    from suppliers.services import rfq
+    user = ctx.task.owner
+    require(user, VIEW_PERM)
+    only = str(args.get('template') or '').strip()
+    if only and only not in rfq.TEMPLATES:
+        raise ToolError(f'template — одна з форм: {_templates()}')
+    lines = ['Форми (template) і поля (specs — {ключ: значення}; notes — «Ще деталі»):']
+    for key, (label, fields) in rfq.TEMPLATES.items():
+        if only and key != only:
+            continue
+        lines.append(f'- {key} — {label}:')
+        lines += [f'    {f[0]} — {f[1]} / {f[2]}' + (f' (напр. {f[4]})' if f[4] else '') for f in fields]
+    if not only:
+        lines.append('\nМови листа (language): ' + ', '.join(f'{k} {v}' for k, v in SupplierRequest.LANGS))
+        lines.append('Змінні в темі й тексті листа: ' + '; '.join(f'{{{k}}} — {v}' for k, v in rfq.PLACEHOLDERS))
+        for lang, (subj, body) in rfq.EXAMPLES.items():
+            lines.append(f'\nПриклад листа [{lang}] — тема: {subj}\n{body}')
+        counts = dict(SupplierCategory.objects.values_list('pk').annotate(n=Count('suppliers', distinct=True))
+                      .values_list('pk', 'n'))
+        cats = list(SupplierCategory.objects.filter(is_active=True).order_by('order', 'name'))
+        if cats:
+            lines.append('\nКатегорії (category; форма — template, яку бере новий запит категорії):')
+            lines += [f'- #{c.pk} {c.icon} {one_line(c.name, 80)} · постачальників {counts.get(c.pk, 0)}'
+                      + (f' · форма {c.request_template}' if c.request_template else '') for c in cats]
+        groups = list(dict.fromkeys(SupplierRequest.objects.exclude(group='').order_by('-created_at')
+                                    .values_list('group', flat=True)[:200]))[:30]
+        if groups:
+            lines.append('\nГрупи (group), останні: ' + '; '.join(one_line(g, 60) for g in groups))
+        projects = list(Project.objects.filter(status__in=Project.OPEN_STATUSES).order_by('-pk')[:40])
+        if projects:
+            lines.append('Відкриті проєкти (project): ' + '; '.join(f'{p.code} {one_line(p.name, 50)}'
+                                                                     for p in projects))
+        day = timezone.localdate() + datetime.timedelta(days=7)
+        lines.append(f'«Чекаємо відповідь до» за замовчуванням: {day.isoformat()} (+7 днів).')
+        lines.append('Кому — find_suppliers (фільтри — supplier_filters); лист — preview_rfq_letter; створити — '
+                     'propose_supplier_request.')
+    return _wrap('ФОРМА ЗАПИТУ', lines)
+
+
+def preview_rfq_letter(ctx, args) -> str:
+    from suppliers.models import SupplierContact, SupplierRequest, SupplierRequestRecipient as R
+    from suppliers.services import rfq
+    user = ctx.task.owner
+    require(user, VIEW_PERM)
+    ref = str(args.get('request') or '').strip()
+    req = get_request(ref) if ref else None
+    src = get_request(args['copy_from']) if not req and str(args.get('copy_from') or '').strip() else None
+    fields = {**_snapshot(req), **_clean_request_fields(args, req)} if req is not None else _new_fields(args, src, user)
+    draft = SupplierRequest(pk=req.pk if req is not None else None, code=req.code if req is not None else 'RFQ-…',
+                            title=fields.get('title') or 'Запит', template=fields.get('template') or 'generic',
+                            quantities=fields.get('quantities') or '', language=fields.get('language') or 'en',
+                            specs=fields.get('specs') or {}, subject=fields.get('subject') or '',
+                            body=fields.get('body') or '', cc=fields.get('cc') or '',
+                            cc_contacts=bool(fields.get('cc_contacts')),
+                            account_id=req.account_id if req is not None else None)
+    draft.reply_by = parse_date(fields['reply_by']) if fields.get('reply_by') else (
+        None if req is not None else timezone.localdate() + datetime.timedelta(days=7))
+    s = _supplier(args.get('supplier'))
+    contact = None
+    if str(args.get('contact') or '').strip():
+        contact = SupplierContact.objects.filter(supplier=s, email__iexact=str(args['contact']).strip()).first()
+        if contact is None:
+            raise ToolError(f'у «{s.name}» немає контакту {args["contact"]}')
+    had = req.recipients.filter(supplier=s).select_related('contact').first() if req is not None else None
+    if had is not None and contact is None:
+        r = R(request=draft, supplier=s, contact=had.contact, email=had.email, cc=had.cc)
+    else:
+        email, contact = rfq.pick_email(s, contact)
+        r = R(request=draft, supplier=s, contact=contact, email=email)
+    built = not draft.body.strip()
+    if built:
+        draft.body = rfq.build_body(draft)
+    subject, body = rfq.render(draft, r)
+    personal = getattr(ctx, 'personal', True)
+    account = rfq.account_for(user, draft) if personal else None
+    if account is not None:
+        body = rfq.letter(account, body)[0]
+    names = [f.name for f in req.files.all()] if req is not None else (
+        [f.name for f in src.files.all()] if src is not None else [])
+    lines = [f'Кому: {r.email or "⚠️ немає email — лист нема куди надіслати"}'
+             + (f' ({r.contact.name})' if r.contact_id and r.contact else ''),
+             f'Копія: {", ".join(rfq.cc_for(draft, r)) or "—"}',
+             f'Від: {account.email_address}' if account is not None else
+             'Від: зі скриньки людини, яка ✓ (підпис скриньки додасться при надсиланні)',
+             f'Тема: {subject}', f'Вкладення: {", ".join(names) or "—"}' + (' (+ files з пропозиції)' if not req else ''),
+             '' if not built else '(текст склала Minerva з полів — як «💾 Зберегти» з порожнім текстом)',
+             '', body]
+    if had is not None and had.state != R.PLANNED:
+        lines.insert(0, f'⚠️ Цьому постачальнику вже {had.get_state_display().lower()} — це лише перегляд.')
+    return _wrap('ЛИСТ ЗАПИТУ', [x for x in lines if x is not None])
 
 
 def propose_rfq_recipients(ctx, args) -> str:
@@ -1282,7 +1558,8 @@ HANDLERS = {'find_supplier_requests': find_supplier_requests, 'get_supplier_requ
             'propose_rfq_recipients': propose_rfq_recipients, 'propose_rfq_quote': propose_rfq_quote,
             'propose_rfq_state': propose_rfq_state, 'propose_rfq_decision': propose_rfq_decision,
             'propose_rfq_status': propose_rfq_status, 'propose_rfq_send': propose_rfq_send,
-            'propose_rfq_purchase': propose_rfq_purchase, 'propose_rfq_advice': propose_rfq_advice}
+            'propose_rfq_purchase': propose_rfq_purchase, 'propose_rfq_advice': propose_rfq_advice,
+            'supplier_request_form': supplier_request_form, 'preview_rfq_letter': preview_rfq_letter}
 
 
 # ── ✓ людини ─────────────────────────────────────────────────────────────────
@@ -1300,7 +1577,7 @@ def apply(p, user) -> str:
         if action == 'create':
             if not _can(user, ADD_PERM):
                 return 'немає права створювати запити постачальникам'
-            req = _apply_create(d, user)
+            req = _apply_create(d, user, owner=p.task.owner_id == user.pk)
             p.result_url = _work_url(req)
             p.new_value = (f'{req.code} · {p.new_value}')[:2000]
             p.save(update_fields=['result_url', 'new_value'])
@@ -1340,7 +1617,7 @@ def _recipient_of(req, d):
     return r
 
 
-def _apply_create(d, user):
+def _apply_create(d, user, owner=True):
     from inventory.models import Supplier
     from suppliers.models import SupplierRequest
     from suppliers.services import rfq
@@ -1361,13 +1638,48 @@ def _apply_create(d, user):
         cat = SupplierCategory.objects.filter(pk=req.category_id).first()
         if cat is not None and cat.request_template:
             req.template = cat.request_template
+    src = SupplierRequest.objects.filter(pk=d['copy_from']).first() if d.get('copy_from') else None
+    if d.get('copy_from') and src is None:
+        raise ToolError('запиту, з якого копіювати, уже немає')
+    req.copied_from = src
     req.save()
+    if src is not None:
+        from suppliers.services import rfq_copy
+        rfq_copy.copy_files(src, req, user, skip=d.get('skip_files') or ())
+    error = _add_files(req, d.get('files'), user, owner=owner)
+    if error:
+        raise ToolError(error)
     sups = list(Supplier.objects.filter(pk__in=d.get('suppliers') or []).prefetch_related('contacts'))
-    rfq.add_recipients(req, sups)
+    contacts = {}
+    for s in sups:
+        cid = (d.get('contacts') or {}).get(str(s.pk))
+        c = s.contacts.filter(pk=cid).first() if cid else None
+        if c is not None:
+            contacts[s.pk] = c
+    rfq.add_recipients(req, sups, contacts)
     req.body = f.get('body') or rfq.build_body(req)
     req.subject = f.get('subject') or rfq.subject_for(req)
     req.save(update_fields=['body', 'subject'])
+    if src is not None:             # 📋 що зазвичай треба змінити — підсвітити людині, як після «📋 Копіювати»
+        from suppliers.services import rfq_copy
+        base = rfq_copy.initial(rfq_copy.draft(src, user)[0], list(src.files.all()))
+        req.review = rfq_copy.settle(base, req)
+        req.save(update_fields=['review'])
     return req
+
+
+def _add_files(req, items, user, owner=True) -> str:
+    """Файли з пропозиції (ref) → файли запиту (`rfq.add_file`); '' — усе додано, інакше — чому ні."""
+    from django.core.files.base import ContentFile
+    from agent import files
+    from suppliers.services import rfq
+    for item in items or []:
+        try:
+            name, data, _ctype = files.open_file(user, item.get('ref'), personal=owner)
+        except files.FileError as e:
+            return f'{item.get("name") or item.get("ref")}: {e}'
+        rfq.add_file(req, ContentFile(data, name=name), user)
+    return ''
 
 
 def _apply_edit(p, req, d, user):
@@ -1387,7 +1699,12 @@ def _apply_edit(p, req, d, user):
     if 'template' in fields and req.template not in rfq.TEMPLATES:
         req.template = 'generic'
     req.save()
-    return ''
+    for fid in d.get('remove_files') or []:
+        f = req.files.filter(pk=fid).first()
+        if f is not None:
+            f.file.delete(save=False)
+            f.delete()
+    return _add_files(req, d.get('files'), user, owner=p.task.owner_id == user.pk)
 
 
 def _apply_recipients(p, req, d, user):
