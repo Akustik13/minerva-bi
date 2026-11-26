@@ -26,12 +26,14 @@ PROPOSE_EMAIL = {
     'description': 'Підготувати лист або відповідь зі скриньки людини (людина перевірить «Кому», текст і надішле ✓ у '
                    'Minerva — сам лист не йде). reply_to_id — id листа з list_mail / search_mail, на який відповідаємо '
                    '(тоді порожній to — відправнику цього листа, тема — «Re: …» сама не додається: напишіть її). '
-                   'cc — копія. attach_datasheets — артикули складу, чиї даташити додати.',
+                   'cc — копія. attach_datasheets — артикули складу, чиї даташити додати. attachments — будь-які файли '
+                   'Minerva за ref (list_files, read_email, upload_file / upload_link для файлів з вашого диска).',
     'input_schema': {'type': 'object', 'properties': {
         'to': {'type': 'array', 'items': {'type': 'string'}}, 'cc': {'type': 'array', 'items': {'type': 'string'}},
         'subject': {'type': 'string'}, 'body': {'type': 'string'},
         'reply_to_id': {'type': 'integer', 'description': 'id листа, на який це відповідь (необов’язково)'},
-        'attach_datasheets': {'type': 'array', 'items': {'type': 'string'}}},
+        'attach_datasheets': {'type': 'array', 'items': {'type': 'string'}},
+        'attachments': {'type': 'array', 'items': {'type': 'string'}, 'description': 'Вкладення — ref файлів з list_files / upload_file / read_email: документи замовлення («order:…»), рахунок («invoice:…»), Angebot («offer:…»), вкладення листа («msg:<id>:<номер>»), файли запиту постачальникам, документи проєкту чи клієнта, даташит / фото («datasheet:<артикул>»), передані агентом («upload:<номер>»); до 10 файлів, 25 МБ разом'}},
         'required': ['subject', 'body']}}
 
 SEARCH = {

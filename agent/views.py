@@ -100,3 +100,16 @@ def save_view(request, pk):
                          'draft': out['draft'].pk if out['draft'] else None,
                          'task': task.pk if task else None,
                          'task_url': f'/admin/agent/agenttask/{task.pk}/review/' if task else ''})
+
+
+@staff_member_required
+def file_view(request):
+    """📎 Файл з пропозиції агента (вкладення листа, файл до замовлення…) — лише якщо людина сама має право його
+    бачити (agent/files.py: ті самі права, що в MCP; вкладення пошти — лише своїх скриньок)."""
+    from agent import files
+    from email_assistant.views import _attachment_response
+    try:
+        name, data, ctype = files.open_file(request.user, request.GET.get('ref', ''), personal=True)
+    except files.FileError:
+        raise Http404
+    return _attachment_response(data, name, ctype, force_download=request.GET.get('download') == '1')

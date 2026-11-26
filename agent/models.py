@@ -375,6 +375,7 @@ class AgentProposal(models.Model):
     CRM_NOTE, MOMENT, WORKTIME, DK_REPLY = 'crm_note', 'moment', 'worktime', 'dk_reply'   # agent/toolsets.py
     PACKAGING, PACK_MERGE = 'packaging', 'pack_merge'                                     # agent/tools_packaging.py
     RFQ = 'rfq'                                       # agent/tools_rfq.py, tools_rfq_mail.py — дія в data.action
+    FILE = 'file'                                     # agent/tools_files.py — 📎 файл до замовлення / проєкту / клієнта
     KINDS = [(FIELD, 'Поле товару'), (ATTRIBUTE, 'Технічний параметр'), (MAIL, 'Лист'),
              (STOCK_IN, '📦 Прихід на склад'), (PRODUCT, '🆕 Новий товар'), (EVENT, '📅 Подія в календарі'),
              (SHOP, '🏪 Інтернет-магазин'), (DK_PRICES, '💲 Ціни на DigiKey'), (DK_LEAD, '⏱ Строк на DigiKey'),
@@ -382,7 +383,8 @@ class AgentProposal(models.Model):
              (PURCHASE, '🛒 Закупівля'), (PARCEL, '📥 Посилка до нас'), (OFFER, '📝 Чернетка Angebot'),
              (CRM_NOTE, '👤 Нотатка клієнту CRM'), (MOMENT, '📌 Момент проєкту'),
              (WORKTIME, '⏱ Час в askDANTE'), (DK_REPLY, '💬 Відповідь покупцю DigiKey'),
-             (PACKAGING, '📦 Коробка'), (PACK_MERGE, '📦 Злити коробки'), (RFQ, '📨 Запит постачальникам')]
+             (PACKAGING, '📦 Коробка'), (PACK_MERGE, '📦 Злити коробки'), (RFQ, '📨 Запит постачальникам'),
+             (FILE, '📎 Файл у Minerva')]
     PENDING, APPLIED, REJECTED, FAILED = 'pending', 'applied', 'rejected', 'failed'
     STATUSES = [(PENDING, '👀 Чекає'), (APPLIED, '✓ Застосовано'), (REJECTED, '✕ Відхилено'),
                 (FAILED, '⚠️ Не вдалося')]
@@ -419,3 +421,46 @@ class AgentProposal(models.Model):
 
     def __str__(self):
         return f'{self.get_kind_display()}: {self.field or self.mail_subject}'
+
+
+def _agent_file_path(instance, filename):
+    """MEDIA_ROOT/agent_files/<uuid>/<назва> — /media/ цю теку не віддає нікому (tabele/media.py NOBODY): файл бачить
+    лише власник через agent/files.py (MCP, REST API, сторінка перевірки)."""
+    import uuid
+    from email_assistant.attachments import safe_name
+    return f'agent_files/{uuid.uuid4().hex}/{safe_name(filename)}'
+
+
+class AgentFile(models.Model):
+    """📎 Файл, який зовнішній агент (MCP / REST API) передав у Minerva — вкласти в лист, покласти до замовлення,
+    проєкту чи клієнта. Посилання для агента — «upload:<pk>»; бачить і використовує лише власник (людина ключа).
+    Лежить `KEEP_DAYS` (agent/files.py), пропозиція з ним подовжує строк; потім cron agent_runs прибирає."""
+    MCP, API, LINK, URL = 'mcp', 'api', 'link', 'url'
+    SOURCES = [(MCP, 'MCP (інструмент upload_file)'), (API, 'REST API'), (LINK, 'Посилання для вивантаження'),
+               (URL, 'З адреси в інтернеті')]
+
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='+',
+                              verbose_name='Чий файл')
+    api_key = models.ForeignKey('api.APIKey', null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+                                verbose_name='Ключ API')
+    name = models.CharField('Назва', max_length=255)
+    content_type = models.CharField('Тип', max_length=100, blank=True, default='')
+    size = models.PositiveIntegerField('Розмір, байт', default=0)
+    sha256 = models.CharField(max_length=64, blank=True, default='')
+    file = models.FileField(upload_to=_agent_file_path, max_length=300)
+    source = models.CharField('Звідки', max_length=8, choices=SOURCES, default=MCP)
+    url = models.CharField('Адреса', max_length=500, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField('Прибрати після', db_index=True)
+
+    class Meta:
+        verbose_name = 'Файл від агента'
+        verbose_name_plural = 'Файли від агента'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def ref(self) -> str:
+        return f'upload:{self.pk}'

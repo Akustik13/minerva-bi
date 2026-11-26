@@ -186,6 +186,31 @@ def _settle(task):
         AgentTask.objects.filter(pk=task.pk).update(status=AgentTask.DONE)
 
 
+def _mail_files(proposal, user, account, items) -> str:
+    """Вкладення пропозиції за ref (agent/files.py) → записи чернетки / запланованого листа; '' — готово.
+    Документи Minerva (замовлення, рахунок, Angebot, файли запитів, база знань) лишаються посиланням — читаються під
+    час відправки з правами власника скриньки, Angebot / рахунок після відправки — «надіслано»; решта (вкладення
+    листа, даташит, фото, файл від агента) — копією у вкладеннях листа."""
+    from agent import files
+    from email_assistant import attachments
+    for a in (proposal.data or {}).get('attachments') or []:
+        ref = str((a or {}).get('ref') or '')
+        label = (a or {}).get('name') or ref
+        kind = ref.split(':', 1)[0]
+        if kind in files.KEEP_REF:
+            att = attachments.load_ref(account, ref)
+            if att is None:
+                return f'вкладення «{label}» недоступне (немає файлу або права його бачити)'
+            items.append({'ref': ref, 'name': att['name']})
+            continue
+        try:
+            name, content, ctype = files.open_file(user, ref, personal=True)
+        except files.FileError as e:
+            return f'вкладення «{label}»: {e}'
+        items.append(attachments.store_file(name, content, ctype))
+    return ''
+
+
 def mail(proposal, user, *, send=False, to='', subject='', body='', cc=None) -> str:
     """Лист з пропозиції (можна з правками людини) → чернетка або відправка. '' — готово, інакше — чому ні.
     «Кому» — лише адреси з тексту завдання; «Копія (CC)» — адреси, які ввела людина на сторінці перевірки
@@ -232,6 +257,9 @@ def mail(proposal, user, *, send=False, to='', subject='', body='', cc=None) -> 
         except ToolError as e:
             return f'даташит {sku}: {e}'
         items.append(attachments.store_file(f'{sku}-datasheet.pdf', data, 'application/pdf'))
+    error = _mail_files(proposal, user, account, items)
+    if error:
+        return error
     if send:
         sched = ScheduledEmail.objects.create(account=account, subject=subject, to_emails=addresses, body=body,
                                               cc_emails=cc_emails, attachments=items, scheduled_at=timezone.now(),

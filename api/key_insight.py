@@ -149,6 +149,15 @@ SUMMARIES = {
     "MeetingMomentsView.post": "RAG-ПК: ключові моменти наради (локальна модель)",
     "MeetingSyncView.post": "RAG-ПК: звірка записів нарад — що лишити, видалити, повторити",
     "MeetingPingView.get": "RAG-ПК: перевірка ключа для нарад",
+    "FilesView.get": "📎 Файли об'єкта Minerva (замовлення, товар, проєкт, запит, лист, клієнт, Angebot) — від імені "
+                     "людини ключа",
+    "FilesView.post": "📎 Передати файл у Minerva → посилання upload:N (вкласти в лист, покласти до замовлення)",
+    "FileDownloadView.get": "📎 Завантажити файл за ref",
+    "FileTextView.get": "📎 Текст файлу за ref (PDF по сторінках, DOCX, XLSX, TXT, CSV)",
+    "FileLinkView.get": "📎 Файл за посиланням з get_file (без ключа, діє годину)",
+    "FileUploadLinkView.post": "📎 Передати файл за посиланням з upload_link (без ключа, діє 30 хв)",
+    "RagDatasheetsView.get": "🔎 RAG-ПК: пошук по всіх даташитах і каталогу",
+    "RagHistoryView.get": "🔎 RAG-ПК: пошук в історії пошти й документах бази знань (лише 🔒 особистий ключ)",
 }
 
 EFFECTS = {
@@ -161,6 +170,9 @@ EFFECTS = {
                                "повідомляє того, хто записав.",
     "MeetingSyncView.post": "З блоком bench — оновлює «RAG-ПК на зв'язку»; хід обробки нарад, які ще йдуть.",
     "MeetingPingView.get": "Нічого не змінює (і «RAG-ПК на зв'язку» — теж).",
+    "FilesView.post": "Зберігає файл у Minerva (лише для людини ключа, 30 днів) — даних Minerva не змінює: лист чи "
+                      "документ замовлення — лише пропозицією через MCP і ✓ людини.",
+    "FileUploadLinkView.post": "Зберігає файли в Minerva (лише для людини ключа, 30 днів) — даних не змінює.",
     "StockViewSet.check": "Лише перевіряє наявність — нічого не змінює (тому досить права читання).",
     "PackagingViewSet.create": "Додає коробку в «Пакувальні матеріали» (запас — лише через прихід / інвентаризацію).",
     "PackagingViewSet.partial_update": "Змінює поля коробки; is_active: false — в архів (нові відправлення її не "
@@ -360,6 +372,9 @@ SIMULATE_NO = {
     "SiteEventView.": "службовий запис журналу сайту",
     "MediaStatusView.": "службовий звіт сайту",
     "PairView.": "видає новий ключ — лише справжнім кодом підключення",
+    "FilesView.post": "зберігає файл — без наслідків не перевірити",
+    "FileUploadLinkView.": "лише за підписаним посиланням з upload_link",
+    "FileLinkView.": "лише за підписаним посиланням з get_file",
 }
 
 

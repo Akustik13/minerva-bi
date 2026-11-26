@@ -21,6 +21,10 @@ class Command(BaseCommand):
             if any(out.values()):
                 self.stdout.write(f"agent mail: у черзі +{out['queued']}, оброблено {out['done']}, "
                                   f"перервано {out['stale']}")
+        from agent import files                                   # 📎 прострочені файли від агента — раз на годину
+        n = files.cleanup_due()
+        if n:
+            self.stdout.write(f'agent files: прибрано {n}')
         if AgentTask.objects.filter(status__in=(AgentTask.QUEUED, AgentTask.RUNNING)).exists():
             from agent import tasks
             out = tasks.run_due()

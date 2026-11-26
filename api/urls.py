@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from . import accounts, mcp, media, packaging, payments, purchases, search, site_admin
+from . import accounts, files, mcp, media, packaging, payments, purchases, search, site_admin
 from .views import (
     SalesOrderViewSet, ProductViewSet, CustomerViewSet, StockViewSet, MovementViewSet,
     LocationViewSet, CategoryViewSet, ShipmentViewSet, WebhookViewSet, ShopProductViewSet, ShopShippingView,
@@ -77,6 +77,13 @@ urlpatterns = [
     path("meetings/<int:meeting_id>/status/", mv.MeetingStatusView.as_view(), name="meetings-status"),
     path("meetings/<int:meeting_id>/transcript/", mv.MeetingTranscriptView.as_view(), name="meetings-transcript"),
     path("meetings/<int:meeting_id>/moments/", mv.MeetingMomentsView.as_view(), name="meetings-moments"),
+    path("files/", files.FilesView.as_view(), name="agent-files"),                 # 📎 файли агента (api/files.py)
+    path("files/download/", files.FileDownloadView.as_view(), name="agent-file-download"),
+    path("files/text/", files.FileTextView.as_view(), name="agent-file-text"),
+    path("files/link/<str:token>/", files.FileLinkView.as_view(), name="agent-file-link"),
+    path("files/upload/<str:token>/", files.FileUploadLinkView.as_view(), name="agent-file-upload-link"),
+    path("rag/datasheets/", files.RagDatasheetsView.as_view(), name="rag-datasheets"),   # 🔎 RAG-ПК
+    path("rag/history/", files.RagHistoryView.as_view(), name="rag-history"),
     path("mcp/", mcp.MCPView.as_view(), name="mcp"),
     path("mcp", mcp.MCPView.as_view(), name="mcp_no_slash"),   # клієнти, де адресу вписано без «/» у кінці   # 🤖 MCP-сервер для зовнішніх агентів (agent/mcp.py)
     path("", include(router.urls)),

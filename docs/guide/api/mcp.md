@@ -5,8 +5,8 @@ summary: Підключіть Minerva до Claude Code чи Claude Desktop — �
 where: 🤖 API та скрипти → REST API → 🔑 API ключі → ключ з правами «Агент (MCP)»; 📦 Склад → 🤖 Завдання агенту
 urls: /admin/api/apikey/, /admin/api/apikey/add/, /admin/agent/agenttask/, /admin/api/oauthclient/
 roles: адміністратор (ключ), менеджер (перевірка пропозицій)
-keywords: MCP, Model Context Protocol, RFQ через MCP, запит постачальникам через агента, пропозиції постачальників, пошта через MCP, календар, CRM, продажі, аналітика, проєкти, постачальники, askDANTE, робочий час, повідомлення DigiKey, особистий ключ, RAG, search_datasheets, Claude Code, Claude Desktop, mcp-remote, агент, зовнішній агент, інструменти, tools, Bearer, підключити Claude, connector, Konnektor, OAuth, Custom connector, Claude.ai, ChatGPT, «Дозволити», без ключа, Authorize
-related: inventory/agent-tasks, ai/product-assistant, api/keys, api/overview, api/key-insight, mail/agent
+keywords: MCP, Model Context Protocol, файли через MCP, вкладення в лист через агента, upload_file, get_file, list_files, search_history, RFQ через MCP, запит постачальникам через агента, пропозиції постачальників, пошта через MCP, календар, CRM, продажі, аналітика, проєкти, постачальники, askDANTE, робочий час, повідомлення DigiKey, особистий ключ, RAG, search_datasheets, Claude Code, Claude Desktop, mcp-remote, агент, зовнішній агент, інструменти, tools, Bearer, підключити Claude, connector, Konnektor, OAuth, Custom connector, Claude.ai, ChatGPT, «Дозволити», без ключа, Authorize
+related: api/files, inventory/agent-tasks, ai/product-assistant, api/keys, api/overview, api/key-insight, mail/agent
 ---
 
 ## Що це
@@ -17,7 +17,10 @@ related: inventory/agent-tasks, ai/product-assistant, api/keys, api/overview, ap
 - **читати** — усі розділи Minerva, на які в людини ключа є право: пошта й календар (лише свої), продажі й аналітика,
   CRM, склад, закупівлі, відправлення й перевізники, інтернет-магазини, DigiKey (лістинги, ціни, повідомлення покупців),
   Angebote, проєкти, постачальники й [запити їм (RFQ)](guide:inventory/supplier-requests) — отримувачі, пропозиції,
-  порівняння, файли, листування (лише своє), робочий час askDANTE (лише свій), а ще **пошук по всіх даташитах у RAG**;
+  порівняння, файли, листування (лише своє), робочий час askDANTE (лише свій), а ще **пошук по всіх даташитах у RAG**
+  і (з 🔒 особистим ключем) **пошук в історії вашої пошти й документах бази знань у RAG**;
+- **📎 файли** — знайти й завантажити документи (рахунок, Angebot, файли замовлення, даташит, вкладення листа…),
+  передати свій файл у Minerva й **вкласти його в лист** — див. [📎 Файли й RAG-ПК через API та MCP](guide:api/files);
 - **пропонувати** — лист чи відповідь, нотатку клієнту, момент проєкту, час в askDANTE, відповідь покупцю DigiKey,
   зміну в картці товару, прихід, новий товар, подію в календарі, показ / ціну в магазині, ціни чи строк на DigiKey,
   чернетку відправлення чи Angebot, закупівлю, трек-номер чи статус замовлення; у запитах постачальникам — новий
@@ -32,8 +35,8 @@ related: inventory/agent-tasks, ai/product-assistant, api/keys, api/overview, ap
 > ви самі. Через спільний ключ агент їх не бачить, а в хронології клієнта й проєктах замість теми листа — «лист з
 > іншої скриньки».
 
-> ℹ️ Історії листування з RAG і пошуку в інтернеті через MCP немає. Історію з RAG шукає лише агент
-> [🧩 Завдань агенту](guide:inventory/agent-tasks).
+> ℹ️ Пошук в історії листування з RAG (`search_history`) — лише через 🔒 особистий ключ: це ваша пошта. Пошуку в
+> інтернеті через MCP немає.
 
 ## Як підключити
 
@@ -125,6 +128,8 @@ Claude Desktop підключається через `mcp-remote` (потріб�
 - «Проаналізуй RFQ-2026-003: прочитай усі відповіді постачальників і їхні вкладення, внеси ціни в таблицю, порівняй
   для кожної кількості з разовими витратами й строками і запиши пораду в запит».
 - «Нагадай тим, хто не відповів на RFQ-2026-005, і додай до запиту ще двох виробників плат із категорії».
+- «Надішли клієнту замовлення 102497269 рахунок і пакувальний лист з документів замовлення».
+- «Додай до листа Максу файл ./Angebot_ACME.pdf з мого диска» (Claude Code передасть файл через `upload_link`).
 
 Перша пропозиція створює завдання «MCP · <назва клієнта> · <дата>» у **🧩 Завданнях агенту** людини ключа (одне на
 сесію Claude; усі пропозиції сесії — разом). Агент отримує посилання на сторінку перевірки й може його показати вам.
@@ -135,6 +140,10 @@ Claude Desktop підключається через `mcp-remote` (потріб�
 | `find_products`, `get_product` | пошук і картка товару | `agent:read` |
 | `read_datasheet` | текст даташита (файл, посилання або правило посилань складу) | `agent:read` |
 | `search_datasheets` | пошук по всіх даташитах і каталогу в RAG: товари (чи є в Minerva), документ, сторінка, текст. Є, коли помічник по продукції налаштований і людина ключа має право «📦 Помічник по продукції» | `agent:read` |
+| `search_history` | 🔒 пошук в історії вашої пошти (і вкладеннях) та документах бази знань у RAG — лише фрагменти, які Minerva перевірила; фільтр за клієнтом CRM чи проєктом. Є з правом «🔎 Пошук у базі знань» | `agent:read` |
+| `list_files`, `get_file`, `read_file` | 📎 файли замовлення, товару, проєкту, клієнта, запиту постачальникам, Angebot, листа (🔒) → ref; завантажити (посилання на годину, картинку видно одразу); текст файлу | `agent:read` |
+| `upload_file`, `upload_link` | 📎 передати файл у Minerva (base64, текст, адреса в інтернеті або `curl` за посиланням) → `upload:<номер>` | `agent:write` |
+| `propose_save_file` | 📎 покласти файл до замовлення, проєкту чи клієнта (людина ✓) | `agent:write` |
 | `list_locations`, `list_shops`, `get_sales_channels` | локації, магазини, позиції в магазинах і на DigiKey | `agent:read` |
 | `propose_change`, `propose_attribute` | зміна поля картки / технічного параметра | `agent:write` |
 | `propose_stock_in`, `propose_product` | прихід на склад, новий товар | `agent:write` |
@@ -157,7 +166,7 @@ Claude Desktop підключається через `mcp-remote` (потріб�
 | `list_packaging`, `packaging_usage`, `similar_packaging` | 📦 коробки: каталог із запасом, скільки використали за період, розміри посилок без коробки, групи схожих коробок (±см) | `agent:read` |
 | `propose_packaging`, `propose_packaging_merge` | нова коробка, зміна полів, прихід, інвентаризація; злити схожі коробки в одну (людина ✓) | `agent:write` |
 | `list_mail`, `search_mail`, `read_email`, `read_mail_attachment`, `open_mail` | 🔒 ваші листи: останні, пошук (слова, відправник, клієнт, проєкт), лист повністю, вкладення | `agent:read` |
-| `propose_email` | 🔒 лист або відповідь (`reply_to_id`) з вашої скриньки — надсилаєте ви ✓ | `agent:write` |
+| `propose_email` | 🔒 лист або відповідь (`reply_to_id`) з вашої скриньки з вкладеннями (`attachments` — будь-які ref файлів) — надсилаєте ви ✓ | `agent:write` |
 | `calendar_days`, `calendar_events` | 🔒 ваш календар: сьогодні й наступні дні, період | `agent:read` |
 | `my_worktime`, `worktime_projects`, `propose_worktime` | 🔒 ваш робочий час askDANTE, проєкти askDANTE, запис часу (записує Minerva після ✓) | `agent:read` / `agent:write` |
 
@@ -194,6 +203,10 @@ Minerva (з `https://`). Після «Не дозволяти» чи відкл�
 **Немає `search_mail`, `calendar_events` чи `my_worktime`.** Ключ спільний або «🤖 Агент (MCP)» — не власник
 ключа. Створіть [особистий ключ](guide:api/keys) («🔒 Лише я») і вкажіть агентом себе. Для робочого часу ще потрібен
 ваш працівник askDANTE у Minerva.
+
+**Агент не може додати файл до листа.** Потрібен 🔒 особистий ключ (лист — з вашої скриньки) і `agent:write`.
+Файл з Minerva — `list_files` → ref у `attachments`; файл з вашого диска — `upload_link` (Claude Code сам виконає
+`curl`) або `upload_file`. Детально — [📎 Файли й RAG-ПК](guide:api/files).
 
 **Лист на чужу адресу?** Адресатів обирає агент, тому на сторінці перевірки над листом — «⚠️ адресатів обрав
 зовнішній агент». Перевірте «Кому» перед «✉️ Надіслати».

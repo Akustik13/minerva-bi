@@ -1825,6 +1825,7 @@
 {"uk": "Linear (лінійна), Circular (кругова) тощо", "en": "Linear, Circular, etc.", "de": "Linear, Circular (zirkular) usw."}
 {"uk": "Lobby / Лобі", "en": "Lobby / Lobby", "de": "Lobby / Lobby"}
 {"uk": "M — 5…15 л", "en": "M — 5…15 l", "de": "M — 5…15 l"}
+{"uk": "MCP (інструмент upload_file)", "en": "MCP (upload_file tool)", "de": "MCP (Werkzeug upload_file)"}
 {"uk": "MCP-клієнт", "en": "MCP client", "de": "MCP-Client"}
 {"uk": "MINERVA BI — КАРТА МОДУЛІВ", "en": "MINERVA BI — MODULE MAP", "de": "MINERVA BI — MODULÜBERSICHT"}
 {"uk": "MINERVA · ПІДТВЕРДЖЕННЯ", "en": "MINERVA · CONFIRMATION", "de": "MINERVA · BESTÄTIGUNG"}
@@ -2224,6 +2225,8 @@
 {"uk": "RAG-ПК: обміняти одноразовий квиток вікна запису на нараду й ключ надсилання", "en": "RAG PC: exchange the one-time recording window ticket for the meeting and a push key", "de": "RAG-PC: Einmal-Ticket des Aufnahmefensters gegen Besprechung und Sendeschlüssel tauschen"}
 {"uk": "RAG-ПК: перевірка ключа для нарад", "en": "RAG PC: meetings key check", "de": "RAG-PC: Prüfung des Besprechungsschlüssels"}
 {"uk": "RAG-ПК: потік відповіді закривається, програми й моделі не зупиняються.", "en": "RAG PC: the response stream is closed; programs and models are not stopped.", "de": "RAG-PC: Der Antwortstrom wird geschlossen, Programme und Modelle werden nicht angehalten."}
+{"uk": "RAG-ПК: пошук в історії пошти й документах бази знань (лише 🔒 особистий ключ)", "en": "RAG PC: search mail history and knowledge base documents (🔒 personal key only)", "de": "RAG-PC: Suche im E-Mail-Verlauf und in Dokumenten der Wissensdatenbank (nur 🔒 persönlicher Schlüssel)"}
+{"uk": "RAG-ПК: пошук по всіх даташитах і каталогу", "en": "RAG PC: search all datasheets and the catalogue", "de": "RAG-PC: Suche in allen Datenblättern und im Katalog"}
 {"uk": "RAG-ПК: стан запису наради (згода, запис, розшифровка, готово, помилка)", "en": "RAG PC: meeting recording status (consent, recording, transcription, done, error)", "de": "RAG-PC: Status der Besprechungsaufnahme (Einwilligung, Aufnahme, Transkription, fertig, Fehler)"}
 {"uk": "RAG-ПК: частина розшифровки наради", "en": "RAG PC: part of a meeting transcript", "de": "RAG-PC: Teil eines Besprechungstranskripts"}
 {"uk": "RAG-ПК: що зараз робить", "en": "RAG PC: what it is doing now", "de": "RAG-PC: Was er gerade tut"}
@@ -7766,6 +7769,7 @@
 {"uk": "З БД", "en": "From DB", "de": "Aus DB"}
 {"uk": "З ПДВ (Німеччина / покупець без USt-IdNr)", "en": "With VAT (Germany / buyer without VAT ID)", "de": "Mit MwSt. (Deutschland / Käufer ohne USt-IdNr.)"}
 {"uk": "З адреси", "en": "From address", "de": "Von Adresse"}
+{"uk": "З адреси в інтернеті", "en": "From a web address", "de": "Von einer Internetadresse"}
 {"uk": "З блоком bench — оновлює «RAG-ПК на зв'язку»; хід обробки нарад, які ще йдуть.", "en": "With the bench block — updates “RAG PC online”; progress of meetings still being processed.", "de": "Mit dem bench-Block — aktualisiert „RAG-PC erreichbar“; Fortschritt noch laufender Besprechungen."}
 {"uk": "З будь-якої адреси.", "en": "From any address.", "de": "Von jeder Adresse."}
 {"uk": "З валюти", "en": "From currency", "de": "Von Währung"}
@@ -7981,6 +7985,7 @@
 {"uk": "Завантажити тему з .json файлу", "en": "Load theme from a .json file", "de": "Design aus einer .json-Datei laden"}
 {"uk": "Завантажити файл", "en": "Download file", "de": "Datei herunterladen"}
 {"uk": "Завантажити файл бекапу з ПК…", "en": "Upload a backup file from PC…", "de": "Sicherungsdatei vom PC hochladen…"}
+{"uk": "Завантажити файл за ref", "en": "Download a file by ref", "de": "Datei per ref herunterladen"}
 {"uk": "Завантажити цей файл", "en": "Download this file", "de": "Diese Datei herunterladen"}
 {"uk": "Завантажити і знайти SKU", "en": "Upload and find SKU", "de": "Hochladen und SKU suchen"}
 {"uk": "Завантажити і переглянути", "en": "Upload and preview", "de": "Hochladen und ansehen"}
@@ -8986,6 +8991,8 @@
 {"uk": "Зберігаю…", "en": "Saving…", "de": "Speichern…"}
 {"uk": "Зберігає instance._old_status", "en": "Stores instance._old_status", "de": "Speichert instance._old_status"}
 {"uk": "Зберігає кошик покупця.", "en": "Saves the buyer’s cart.", "de": "Speichert den Warenkorb des Käufers."}
+{"uk": "Зберігає файл у Minerva (лише для людини ключа, 30 днів) — даних Minerva не змінює: лист чи документ замовлення — лише пропозицією через MCP і ✓ людини.", "en": "Stores the file in Minerva (only for the key's person, 30 days) — does not change Minerva data: an e-mail or an order document only as a proposal via MCP and the person's ✓.", "de": "Speichert die Datei in Minerva (nur für die Person des Schlüssels, 30 Tage) — ändert keine Minerva-Daten: E-Mail oder Auftragsdokument nur als Vorschlag über MCP und ✓ der Person."}
+{"uk": "Зберігає файли в Minerva (лише для людини ключа, 30 днів) — даних не змінює.", "en": "Stores the files in Minerva (only for the key's person, 30 days) — changes no data.", "de": "Speichert die Dateien in Minerva (nur für die Person des Schlüssels, 30 Tage) — ändert keine Daten."}
 {"uk": "Зберігаємо…", "en": "Saving…", "de": "Wird gespeichert…"}
 {"uk": "Зберігається автоматично після check_digikey_messages або оновлення в хабі.", "en": "Saved automatically after check_digikey_messages or an update in the hub.", "de": "Wird nach check_digikey_messages oder einer Aktualisierung im Hub automatisch gespeichert."}
 {"uk": "Збираю листи…", "en": "Collecting emails…", "de": "E-Mails werden gesammelt…"}
@@ -14086,6 +14093,8 @@
 {"uk": "Передати закупівлю {0}: {1} шт «{2}»?", "en": "Transfer purchase order {0}: {1} pcs of “{2}”?", "de": "Bestellung {0} übergeben: {1} Stk. „{2}“?"}
 {"uk": "Передати закупівлю із зовнішньої CRM", "en": "Transfer a purchase order from an external CRM", "de": "Bestellung aus einem externen CRM übergeben"}
 {"uk": "Передати замовлення", "en": "Transfer order", "de": "Auftrag übergeben"}
+{"uk": "Передати файл за посиланням з upload_link (без ключа, діє 30 хв)", "en": "Upload a file via an upload_link link (no key, valid for 30 min)", "de": "Datei über einen upload_link-Link übergeben (ohne Schlüssel, 30 Min. gültig)"}
+{"uk": "Передати файл у Minerva → посилання upload:N (вкласти в лист, покласти до замовлення)", "en": "Upload a file to Minerva → reference upload:N (attach to an e-mail, add to an order)", "de": "Datei an Minerva übergeben → Verweis upload:N (an eine E-Mail anhängen, zum Auftrag legen)"}
 {"uk": "Передає замовлення постачальнику із зовнішньої CRM: створює або оновлює закупівлю й позиції (постачальник — за назвою чи email, нового створює).", "en": "Transfers a supplier order from an external CRM: creates or updates the purchase order and lines (supplier — by name or email, creates a new one if needed).", "de": "Übergibt eine Lieferantenbestellung aus einem externen CRM: legt die Bestellung und Positionen an oder aktualisiert sie (Lieferant — nach Name oder E-Mail, bei Bedarf wird ein neuer angelegt)."}
 {"uk": "Передоплата (Vorkasse)", "en": "Prepayment (Vorkasse)", "de": "Vorkasse"}
 {"uk": "Передоплата (Vorkasse) і рахунок — без Stripe: коли прийде переказ, поставте в замовленні «Статус оплати» → «Оплачено». Нижче — лише спроби онлайн-оплати Stripe.", "en": "Prepayment (Vorkasse) and invoice — without Stripe: when the transfer arrives, set “Payment status” → “Paid” in the order. Below — only Stripe online payment attempts.", "de": "Vorkasse und Rechnung — ohne Stripe: Wenn die Überweisung eingeht, im Auftrag „Zahlungsstatus“ → „Bezahlt“ setzen. Unten — nur Online-Zahlungsversuche über Stripe."}
@@ -15080,6 +15089,7 @@
 {"uk": "Посилання (URL)", "en": "Link (URL)", "de": "Link (URL)"}
 {"uk": "Посилання (пріоритет) → потім локальний файл", "en": "Link (priority) → then local file", "de": "Link (Priorität) → danach lokale Datei"}
 {"uk": "Посилання вже використано або термін дії минув.", "en": "The link has already been used or has expired.", "de": "Der Link wurde bereits verwendet oder ist abgelaufen."}
+{"uk": "Посилання для вивантаження", "en": "Upload link", "de": "Upload-Link"}
 {"uk": "Посилання дійсне 48 годин.", "en": "The link is valid for 48 hours.", "de": "Der Link ist 48 Stunden gültig."}
 {"uk": "Посилання дійсне {0} годин. Доступ до системи відкриє адміністратор.", "en": "The link is valid for {0} hours. The administrator will open your access to the system.", "de": "Der Link ist {0} Stunden gültig. Den Zugang zum System gibt der Administrator frei."}
 {"uk": "Посилання діє 3 дні.", "en": "The link is valid for 3 days.", "de": "Der Link ist 3 Tage gültig."}
@@ -15497,6 +15507,7 @@
 {"uk": "Прибрати позначку", "en": "Remove the mark", "de": "Markierung entfernen"}
 {"uk": "Прибрати проєкт з наради", "en": "Remove the project from the meeting", "de": "Projekt aus der Besprechung entfernen"}
 {"uk": "Прибрати пункт разом з його підпунктами?", "en": "Remove the item together with its sub-items?", "de": "Punkt samt seinen Unterpunkten entfernen?"}
+{"uk": "Прибрати після", "en": "Remove after", "de": "Entfernen nach"}
 {"uk": "Прибрати свій мінімум — діятиме загальний з «Налаштувань доставки»", "en": "Remove the own minimum — the general one from «Shipping settings» applies", "de": "Eigenen Mindestbestand entfernen — es gilt der allgemeine aus den «Versandeinstellungen»"}
 {"uk": "Прибрати спам і події від відправників, від яких ви більше не хочете термінів — спершу видно, що саме прибереться", "en": "Remove spam and events from senders you no longer want deadlines from — you will first see exactly what will be removed", "de": "Spam und Termine von Absendern entfernen, von denen Sie keine Fristen mehr wollen — zuerst sehen Sie genau, was entfernt wird"}
 {"uk": "Прибрати сторону «", "en": "Remove the party «", "de": "Beteiligten entfernen «"}
@@ -18095,6 +18106,7 @@
 {"uk": "Текст порожній", "en": "The text is empty", "de": "Der Text ist leer"}
 {"uk": "Текст розшифровки {0} в {1} (Anthropic, США) {2} — учасники погодились (підтвердив той, хто записав)", "en": "Transcript text {0} in {1} (Anthropic, USA) {2} — participants agreed (confirmed by the person who recorded)", "de": "Transkripttext {0} in {1} (Anthropic, USA) {2} — Teilnehmende haben zugestimmt (bestätigt von der Person, die aufgenommen hat)"}
 {"uk": "Текст сторінки за посиланням (Minerva забирає сама)", "en": "Text of the page at the link (Minerva fetches it itself)", "de": "Text der Seite unter dem Link (Minerva holt ihn selbst ab)"}
+{"uk": "Текст файлу за ref (PDF по сторінках, DOCX, XLSX, TXT, CSV)", "en": "File text by ref (PDF page by page, DOCX, XLSX, TXT, CSV)", "de": "Text einer Datei per ref (PDF seitenweise, DOCX, XLSX, TXT, CSV)"}
 {"uk": "Текст файлу запиту (наш: креслення, BOM, стекап, ZIP з Gerber — назви й README) або файлу, який надіслав постачальник (його пропозиція, PI): file — id з get_supplier_request («файл #N» — наш, «файл постачальника #N» — kind=reply). PDF, DOCX, XLSX, CSV, TXT, ZIP.", "en": "Text of a request file (ours: drawing, BOM, stack-up, ZIP with Gerber — names and README) or of a file the supplier sent (their offer, PI): file — id from get_supplier_request («файл #N» — ours, «файл постачальника #N» — kind=reply). PDF, DOCX, XLSX, CSV, TXT, ZIP.", "de": "Text einer Datei der Anfrage (unsere: Zeichnung, BOM, Lagenaufbau, ZIP mit Gerber – Namen und README) oder einer Datei des Lieferanten (sein Angebot, PI): file – ID aus get_supplier_request („файл #N“ – unsere, „файл постачальника #N“ – kind=reply). PDF, DOCX, XLSX, CSV, TXT, ZIP."}
 {"uk": "Текст файлів постачальника (за замовчуванням — так)", "en": "Text of the supplier's files (default — yes)", "de": "Text der Dateien des Lieferanten (Standard – ja)"}
 {"uk": "Текст із форми листа разом із підписом і цитатою; порожньо — лише текст (AI)", "en": "Text from the email form with signature and quote; empty — text only (AI)", "de": "Text aus dem E-Mail-Formular samt Signatur und Zitat; leer — nur Text (KI)"}
@@ -19151,10 +19163,12 @@
 {"uk": "Файл в архіві завеликий для перегляду — завантажте його.", "en": "The file in the archive is too large to view — download it.", "de": "Die Datei im Archiv ist zu groß für die Ansicht — laden Sie sie herunter."}
 {"uk": "Файл в архіві зашифровано паролем — завантажте архів і відкрийте його на ПК.", "en": "The file in the archive is password-protected — download the archive and open it on your PC.", "de": "Die Datei im Archiv ist mit einem Passwort geschützt — laden Sie das Archiv herunter und öffnen Sie es am PC."}
 {"uk": "Файл в архіві стиснуто підозріло сильно — Minerva його не розпаковує; завантажте архів.", "en": "The file in the archive is suspiciously highly compressed — Minerva does not unpack it; download the archive.", "de": "Die Datei im Archiv ist verdächtig stark komprimiert — Minerva entpackt sie nicht; laden Sie das Archiv herunter."}
+{"uk": "Файл від агента", "en": "File from the agent", "de": "Datei vom Agenten"}
 {"uk": "Файл даташита в картці товару — прив'язаний до товару (посилання на сайт виробника не завантажуються).", "en": "The datasheet file on the product card — linked to the product (links to the manufacturer's website are not downloaded).", "de": "Datenblatt-Datei in der Artikelkarte – dem Artikel zugeordnet (Links zur Website des Herstellers werden nicht heruntergeladen)."}
 {"uk": "Файл до запиту AI", "en": "File for an AI request", "de": "Datei zur KI-Anfrage"}
 {"uk": "Файл етикетки не знайдено — зніміть галочку «Етикетка»", "en": "Label file not found — untick «Label»", "de": "Etikettendatei nicht gefunden — Haken bei «Etikett» entfernen"}
 {"uk": "Файл з ПК", "en": "File from PC", "de": "Datei vom PC"}
+{"uk": "Файл за посиланням з get_file (без ключа, діє годину)", "en": "File via a get_file link (no key, valid for one hour)", "de": "Datei über einen get_file-Link (ohne Schlüssel, eine Stunde gültig)"}
 {"uk": "Файл завантажиться з правильною кількістю (QTY з рядка замовлення).", "en": "The file downloads with the correct quantity (QTY from the order line).", "de": "Die Datei wird mit der richtigen Menge heruntergeladen (QTY aus der Auftragsposition)."}
 {"uk": "Файл завеликий для перегляду в Minerva ({0}) — завантажте його.", "en": "The file is too large to view in Minerva ({0}) — download it.", "de": "Die Datei ist zu groß für die Ansicht in Minerva ({0}) — laden Sie sie herunter."}
 {"uk": "Файл завеликий — не більше {0} МБ", "en": "The file is too large — no more than {0} MB", "de": "Die Datei ist zu groß — höchstens {0} MB"}
@@ -19178,6 +19192,7 @@
 {"uk": "Файл понад {0} МБ.", "en": "File over {0} MB.", "de": "Datei über {0} MB."}
 {"uk": "Файл порожній.", "en": "The file is empty.", "de": "Die Datei ist leer."}
 {"uk": "Файл пошкоджений або невірний формат.", "en": "The file is corrupted or in the wrong format.", "de": "Die Datei ist beschädigt oder hat ein falsches Format."}
+{"uk": "Файл у Minerva", "en": "File in Minerva", "de": "Datei in Minerva"}
 {"uk": "Файл шаблону", "en": "Template file", "de": "Vorlagendatei"}
 {"uk": "Файл шаблону не є коректним Word документом (.docx). Відкрийте шаблон у Microsoft Word і збережіть через «Зберегти як» → «Word документ (.docx)», потім завантажте знову.", "en": "The template file is not a valid Word document (.docx). Open the template in Microsoft Word and save it via “Save As” → “Word Document (.docx)”, then upload it again.", "de": "Die Vorlagendatei ist kein gültiges Word-Dokument (.docx). Öffnen Sie die Vorlage in Microsoft Word und speichern Sie sie über „Speichern unter“ → „Word-Dokument (.docx)“, laden Sie sie dann erneut hoch."}
 {"uk": "Файл ще не сформовано", "en": "The file has not been generated yet", "de": "Die Datei wurde noch nicht erstellt"}
@@ -19191,6 +19206,7 @@
 {"uk": "Файли / Товари", "en": "Files / Products", "de": "Dateien / Artikel"}
 {"uk": "Файли агенд нарад", "en": "Meeting agenda files", "de": "Dateien der Tagesordnungen"}
 {"uk": "Файли в картку", "en": "Files to the record", "de": "Dateien in den Artikel"}
+{"uk": "Файли від агента", "en": "Files from the agent", "de": "Dateien vom Agenten"}
 {"uk": "Файли дня", "en": "Files of the day", "de": "Dateien des Tages"}
 {"uk": "Файли до запитів AI", "en": "Files for AI requests", "de": "Dateien zu KI-Anfragen"}
 {"uk": "Файли з ПК або телефона", "en": "Files from a PC or phone", "de": "Dateien vom PC oder Telefon"}
@@ -19208,6 +19224,7 @@
 {"uk": "Файли нашого запиту ({0})", "en": "Files of our request ({0})", "de": "Dateien unserer Anfrage ({0})"}
 {"uk": "Файли не вибрані", "en": "No files selected", "de": "Keine Dateien ausgewählt"}
 {"uk": "Файли не знайдено. Відкрийте DevTools (F12) → Console і скопіюйте вивід «Order files debug»", "en": "No files found. Open DevTools (F12) → Console and copy the output of “Order files debug”", "de": "Keine Dateien gefunden. Öffnen Sie DevTools (F12) → Console und kopieren Sie die Ausgabe von „Order files debug“"}
+{"uk": "Файли об'єкта Minerva (замовлення, товар, проєкт, запит, лист, клієнт, Angebot) — від імені людини ключа", "en": "Files of a Minerva object (order, product, project, request, e-mail, customer, Angebot) — on behalf of the key's person", "de": "Dateien eines Minerva-Objekts (Auftrag, Artikel, Projekt, Anfrage, E-Mail, Kunde, Angebot) — im Namen der Person des Schlüssels"}
 {"uk": "Файли постачальника ({0})", "en": "Supplier's files ({0})", "de": "Dateien des Lieferanten ({0})"}
 {"uk": "Файли постачальників", "en": "Supplier files", "de": "Dateien der Lieferanten"}
 {"uk": "Файли разом завеликі для листа (понад {0} МБ) — зніміть «📎 Додати файли» або приберіть частину файлів", "en": "The files together are too large for an e-mail (over {0} MB) — untick «📎 Attach files» or remove some files", "de": "Die Dateien sind zusammen zu groß für eine E-Mail (über {0} MB) — «📎 Dateien anhängen» abwählen oder einige Dateien entfernen"}
@@ -19870,6 +19887,7 @@
 {"uk": "Чи прочитав AI", "en": "Whether AI has read it", "de": "Ob die KI gelesen hat"}
 {"uk": "Чи підключається скринька до IMAP і SMTP і чи доходить лист.", "en": "Whether the mailbox connects to IMAP and SMTP and whether e-mail arrives.", "de": "Ob sich das Postfach mit IMAP und SMTP verbindet und ob E-Mails ankommen."}
 {"uk": "Чий акаунт і роль — до підключення", "en": "Whose account and role — before connecting", "de": "Wessen Konto und Rolle — vor dem Verbinden"}
+{"uk": "Чий файл", "en": "Whose file", "de": "Wessen Datei"}
 {"uk": "Чилі", "en": "Chile", "de": "Chile"}
 {"uk": "Чим «Ціна продажу» товару відрізняється від ціни в магазині?", "en": "How does the product’s “Sale price” differ from the price in the shop?", "de": "Wie unterscheidet sich der „Verkaufspreis“ des Artikels vom Preis im Shop?"}
 {"uk": "Чим зараз відповідає RAG (локальна модель — без оплати, хмара — платить ключ RAG), що він робить, хто звертається; зупинка зайвого запиту й звільнення відеопам'яті.", "en": "What RAG is currently answering with (a local model — free, cloud — paid by the RAG key), what it is doing, who is calling; stopping an unnecessary request and freeing video memory.", "de": "Womit RAG derzeit antwortet (lokales Modell — kostenlos, Cloud — bezahlt über den RAG-Schlüssel), was es tut, wer anfragt; Abbrechen einer überflüssigen Anfrage und Freigabe des Grafikspeichers."}
@@ -21776,6 +21794,8 @@
 {"uk": "завантаження…", "en": "loading…", "de": "wird geladen…"}
 {"uk": "завантажено файли .dymo", "en": ".dymo files downloaded", "de": ".dymo-Dateien heruntergeladen"}
 {"uk": "завантажив документ замовлення", "en": "downloaded an order document", "de": "hat ein Auftragsdokument abgerufen"}
+{"uk": "завантажив файл", "en": "downloaded a file", "de": "hat eine Datei heruntergeladen"}
+{"uk": "завантажив файл за посиланням", "en": "downloaded a file via a link", "de": "hat eine Datei über einen Link heruntergeladen"}
 {"uk": "завантажити файл", "en": "download the file", "de": "Datei herunterladen"}
 {"uk": "завантажить на DigiKey, передасть разом із трек-номером і після підтвердження перевірить, чи DigiKey показує", "en": "uploads it to DigiKey, sends it with the tracking number and after the confirmation checks whether DigiKey shows", "de": "lädt es zu DigiKey hoch, sendet es mit der Sendungsnummer und prüft nach der Bestätigung, ob DigiKey"}
 {"uk": "завантажте файли з ПК вище", "en": "upload files from the PC above", "de": "laden Sie oben Dateien vom PC hoch"}
@@ -22026,6 +22046,7 @@
 {"uk": "зберіг кошик покупця", "en": "saved a buyer’s cart", "de": "hat den Warenkorb eines Käufers gespeichert"}
 {"uk": "зберігай структуру листа (абзаци, нумерацію, списки)", "en": "зберігай структуру листа (абзаци, нумерацію, списки)", "de": "зберігай структуру листа (абзаци, нумерацію, списки)"}
 {"uk": "зберігаються 60 днів.", "en": "are kept for 60 days.", "de": "werden 60 Tage aufbewahrt."}
+{"uk": "зберігає файл — без наслідків не перевірити", "en": "stores a file — cannot be checked without side effects", "de": "speichert eine Datei — ohne Folgen nicht prüfbar"}
 {"uk": "збій розподільника", "en": "router failure", "de": "Fehler des Verteilers"}
 {"uk": "зв'язки проєктів", "en": "project links", "de": "Projektverknüpfungen"}
 {"uk": "зведення за розкладом", "en": "summary on schedule", "de": "Übersicht nach Zeitplan"}
@@ -22603,6 +22624,8 @@
 {"uk": "лише з неповних", "en": "only from incomplete ones", "de": "nur aus unvollständigen"}
 {"uk": "лише з офером", "en": "only with an offer", "de": "nur mit Offer"}
 {"uk": "лише з пропозицією ({0})", "en": "only with an offer ({0})", "de": "nur mit Angebot ({0})"}
+{"uk": "лише за підписаним посиланням з get_file", "en": "only via a signed get_file link", "de": "nur über einen signierten get_file-Link"}
+{"uk": "лише за підписаним посиланням з upload_link", "en": "only via a signed upload_link link", "de": "nur über einen signierten upload_link-Link"}
 {"uk": "лише замовлення магазину «{0}» (джерело {1}); чуже — 404", "en": "only orders of shop “{0}” (source {1}); others’ — 404", "de": "nur Aufträge des Shops „{0}“ (Quelle {1}); fremde — 404"}
 {"uk": "лише звук наради", "en": "meeting audio only", "de": "nur Besprechungston"}
 {"uk": "лише звіти, чий час настав", "en": "only reports that are due", "de": "nur Berichte, deren Zeit gekommen ist"}
@@ -23725,11 +23748,15 @@
 {"uk": "перед тестом переконайтесь що у розділі", "en": "before the test make sure that in the section", "de": "stellen Sie vor dem Test sicher, dass im Bereich"}
 {"uk": "передав закупівлю {0}", "en": "transferred purchase order {0}", "de": "hat Bestellung {0} übergeben"}
 {"uk": "передав трек-номер закупівлі {0}", "en": "transferred the tracking number of purchase order {0}", "de": "hat die Sendungsnummer der Bestellung {0} übergeben"}
+{"uk": "передав файл за посиланням", "en": "uploaded a file via a link", "de": "hat eine Datei über einen Link übergeben"}
+{"uk": "передав файл у Minerva", "en": "uploaded a file to Minerva", "de": "hat eine Datei an Minerva übergeben"}
 {"uk": "передано", "en": "sent", "de": "übertragen"}
 {"uk": "передано {0}", "en": "handed over {0}", "de": "übergeben {0}"}
 {"uk": "передано в базу знань", "en": "passed to the knowledge base", "de": "an die Wissensdatenbank übergeben"}
 {"uk": "передано в базу знань (листів {0} · документів {1})", "en": "sent to the knowledge base ({0} e-mails · {1} documents)", "de": "an die Wissensdatenbank übertragen ({0} E-Mails · {1} Dokumente)"}
 {"uk": "передано, RAG ще не обробив", "en": "sent, RAG has not processed it yet", "de": "übertragen, RAG hat es noch nicht verarbeitet"}
+{"uk": "передати файл", "en": "upload a file", "de": "Datei übergeben"}
+{"uk": "передати файл за посиланням", "en": "upload a file via a link", "de": "Datei über einen Link übergeben"}
 {"uk": "передача закупівлі", "en": "purchase order transfer", "de": "Übergabe einer Bestellung"}
 {"uk": "перезавантажити сторінку.", "en": "reload the page.", "de": "die Seite neu laden."}
 {"uk": "перезаписані", "en": "overwritten", "de": "überschrieben"}
@@ -24095,6 +24122,7 @@
 {"uk": "пошту, розмови й особисті документи ця сторінка не показує й нічого не виконує від її імені.", "en": "mail, conversations and personal documents are not shown on this page, and nothing is executed on their behalf.", "de": "E-Mails, Gespräche und persönliche Dokumente zeigt diese Seite nicht an, und in ihrem Namen wird nichts ausgeführt."}
 {"uk": "пошук", "en": "search", "de": "Suche"}
 {"uk": "пошук {0} без RAG → unavailable < 10 с", "en": "search {0} without RAG → unavailable < 10 s", "de": "Suche {0} ohne RAG → unavailable < 10 s"}
+{"uk": "пошук в історії RAG", "en": "RAG history search", "de": "Suche im RAG-Verlauf"}
 {"uk": "пошук в історії недоступний: база знань RAG не налаштована", "en": "history search is unavailable: the RAG knowledge base is not configured", "de": "Suche in der Historie nicht verfügbar: Die RAG-Wissensdatenbank ist nicht eingerichtet"}
 {"uk": "пошук готовий", "en": "search ready", "de": "Suche bereit"}
 {"uk": "пошук за темою знаходить сам лист (3 випадкові листи)", "en": "searching by subject finds the e-mail itself (3 random e-mails)", "de": "die Suche nach dem Betreff findet die E-Mail selbst (3 zufällige E-Mails)"}
@@ -24102,6 +24130,7 @@
 {"uk": "пошук категорії: filter, antenna, coaxial…", "en": "category search: filter, antenna, coaxial…", "de": "Kategoriesuche: filter, antenna, coaxial…"}
 {"uk": "пошук по даташитах RAG недоступний: помічник по продукції не налаштований або немає права «📦 Помічник по продукції»", "en": "RAG datasheet search is unavailable: the product assistant is not configured or you lack the “📦 Product assistant” right", "de": "Suche in den RAG-Datenblättern nicht verfügbar: Der Produktassistent ist nicht eingerichtet oder das Recht „📦 Produktassistent“ fehlt"}
 {"uk": "пошук товарів DigiKey) і з ваших лістингів цієї категорії. Каталог оновлюється сам раз на тиждень.", "en": "product search) and from your listings of this category. The catalog updates itself once a week.", "de": "Artikelsuche) und aus Ihren Listings dieser Kategorie. Der Katalog aktualisiert sich einmal pro Woche selbst."}
+{"uk": "пошук у даташитах RAG", "en": "RAG datasheet search", "de": "Suche in den RAG-Datenblättern"}
 {"uk": "пошук у звичайних розмовах — вмикати за потреби, збільшує витрати на кожне повідомлення.", "en": "search in regular conversations — enable as needed, increases the cost of every message.", "de": "Suche in normalen Gesprächen — bei Bedarf aktivieren, erhöht die Kosten jeder Nachricht."}
 {"uk": "пошук: {0}", "en": "search: {0}", "de": "Suche: {0}"}
 {"uk": "пошук: хіт має id, ревізію, content_version і уривок", "en": "search: the hit has an id, revision, content_version and snippet", "de": "Suche: Treffer enthält id, Revision, content_version und Ausschnitt"}
@@ -24279,9 +24308,11 @@
 {"uk": "прочитав свої вебхуки", "en": "read its own webhooks", "de": "hat seine eigenen Webhooks gelesen"}
 {"uk": "прочитав список замовлень", "en": "read the order list", "de": "hat die Auftragsliste gelesen"}
 {"uk": "прочитав список товарів", "en": "read the product list", "de": "hat die Artikelliste gelesen"}
+{"uk": "прочитав список файлів", "en": "read the file list", "de": "hat die Dateiliste gelesen"}
 {"uk": "прочитав способи оплати", "en": "read payment methods", "de": "hat Zahlungsarten gelesen"}
 {"uk": "прочитав сторінку знімка бази знань", "en": "read a knowledge base snapshot page", "de": "hat eine Snapshot-Seite der Wissensdatenbank gelesen"}
 {"uk": "прочитав стрічку змін бази знань", "en": "read the knowledge base change feed", "de": "hat den Änderungs-Feed der Wissensdatenbank gelesen"}
+{"uk": "прочитав текст файлу", "en": "read the file text", "de": "hat den Dateitext gelesen"}
 {"uk": "прочитав товар {0}", "en": "read product {0}", "de": "hat Artikel {0} gelesen"}
 {"uk": "прочитав товар магазину {0}", "en": "read shop product {0}", "de": "hat Shop-Artikel {0} gelesen"}
 {"uk": "прочитано", "en": "read", "de": "gelesen"}
@@ -24653,6 +24684,7 @@
 {"uk": "список акаунтів: стан, замовлення, останній вхід, фільтри", "en": "account list: status, orders, last login, filters", "de": "Kontoliste: Status, Aufträge, letzte Anmeldung, Filter"}
 {"uk": "список невідправлених замовлень.", "en": "list of unshipped orders.", "de": "Liste nicht versendeter Aufträge."}
 {"uk": "список оновлено", "en": "list updated", "de": "Liste aktualisiert"}
+{"uk": "список файлів", "en": "file list", "de": "Dateiliste"}
 {"uk": "списується з нашого UPS-акаунту.", "en": "is charged to our UPS account.", "de": "wird von unserem UPS-Konto abgebucht."}
 {"uk": "сповіщення команді: {0}", "en": "team notifications: {0}", "de": "Teambenachrichtigungen: {0}"}
 {"uk": "сповіщення про нові листи, mailto:. Підключення — кнопкою з браузера, без пароля.", "en": "notifications about new e-mails, mailto:. Connect with a button from the browser, no password.", "de": "Benachrichtigungen über neue E-Mails, mailto:. Verbinden per Schaltfläche im Browser, ohne Passwort."}
@@ -24882,6 +24914,7 @@
 {"uk": "текст", "en": "text", "de": "Text"}
 {"uk": "текст збережено в браузері.", "en": "text saved in the browser.", "de": "Text im Browser gespeichert."}
 {"uk": "текст між", "en": "текст між", "de": "текст між"}
+{"uk": "текст файлу", "en": "file text", "de": "Dateitext"}
 {"uk": "текст: «{0}»", "en": "text: “{0}”", "de": "Text: „{0}“"}
 {"uk": "тексти (підстановки вже заповнені)", "en": "texts (placeholders already filled in)", "de": "Texte (Platzhalter bereits ausgefüllt)"}
 {"uk": "тексти всіх листів — «Шаблони листів» (DE / EN, перегляд, тестовий лист)", "en": "texts of all e-mails — “E-mail templates” (DE / EN, preview, test e-mail)", "de": "Texte aller E-Mails — „E-Mail-Vorlagen“ (DE / EN, Vorschau, Test-E-Mail)"}
@@ -25315,6 +25348,7 @@
 {"uk": "файл даташита в Minerva", "en": "datasheet file in Minerva", "de": "Datenblattdatei in Minerva"}
 {"uk": "файл етикетки", "en": "label file", "de": "Etikettendatei"}
 {"uk": "файл з бази", "en": "file from the database", "de": "Datei aus der Datenbank"}
+{"uk": "файл за посиланням", "en": "file via a link", "de": "Datei über einen Link"}
 {"uk": "файл завеликий (понад {0} МБ)", "en": "file is too large (over {0} MB)", "de": "Datei ist zu groß (über {0} MB)"}
 {"uk": "файл завеликий для сервера (обмеження проксі NAS)", "en": "file too large for the server (NAS proxy limit)", "de": "Datei zu groß für den Server (Begrenzung des NAS-Proxys)"}
 {"uk": "файл не завантажено", "en": "file not downloaded", "de": "Datei nicht heruntergeladen"}
@@ -25612,6 +25646,8 @@
 {"uk": "шт?", "en": "pcs?", "de": "Stk.?"}
 {"uk": "штат", "en": "state", "de": "Bundesstaat"}
 {"uk": "штрихкод", "en": "barcode", "de": "Barcode"}
+{"uk": "шукав в історії пошти RAG", "en": "searched the RAG mail history", "de": "hat im RAG-E-Mail-Verlauf gesucht"}
+{"uk": "шукав у даташитах RAG", "en": "searched the RAG datasheets", "de": "hat in den RAG-Datenblättern gesucht"}
 {"uk": "шукати в інтернеті", "en": "search the internet", "de": "im Internet suchen"}
 {"uk": "шукає за «Товарами проєкту» — додайте їх у полях нижче", "en": "searches by \"Project products\" — add them in the fields below", "de": "sucht nach „Projektartikeln“ — fügen Sie sie in den Feldern unten hinzu"}
 {"uk": "шукає ключові моменти… (зазвичай 1–3 хв; сторінку можна не тримати відкритою)", "en": "is looking for key points… (usually 1–3 min; you do not need to keep the page open)", "de": "sucht Kernpunkte… (meist 1–3 Min.; die Seite muss nicht offen bleiben)"}

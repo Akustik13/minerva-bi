@@ -401,6 +401,27 @@
 
 ---
 
+## 5b. Файли для агента і RAG-ПК (`/files/`, `/rag/`)
+
+Ключ — як для MCP (`agent:read` / `agent:write`, «🤖 Агент (MCP) — від імені кого»; `Token` або `Bearer`). Права —
+людини ключа; вкладення листів і `/rag/history/` — лише 🔒 особистий ключ. Логіка — `agent/files.py`, views —
+`api/files.py`, гід — `docs/guide/api/files.md`.
+
+| Метод | Адреса | Що |
+|---|---|---|
+| GET | `/files/?order=<номер>` (або `product`, `project`, `request`, `customer`, `offer`, `mail`, `uploads=1`) | файли об'єкта → `{what, files: [{ref, name, size, what, download}]}` |
+| GET | `/files/download/?ref=<ref>` | сам файл (завантаженням, nosniff) |
+| GET | `/files/text/?ref=<ref>&first_page=&last_page=` | текст файлу |
+| POST | `/files/` | multipart `file` (кілька) або JSON `{name, content_base64 \| text \| url}` → `{files: [{ref: "upload:<pk>", …}]}` (`agent:write`) |
+| GET | `/files/link/<token>/` | файл за посиланням з MCP `get_file` (без ключа, 1 год) |
+| POST | `/files/upload/<token>/` | файли за посиланням з MCP `upload_link` (без ключа, 30 хв) |
+| GET | `/rag/datasheets/?q=&limit=` | 🔎 RAG-ПК: пошук по даташитах і каталогу → `{products, fragments}` |
+| GET | `/rag/history/?q=&customer=&project=&limit=` | 🔎 RAG-ПК: історія пошти й документи бази знань (🔒) → `{coverage, items}` |
+
+ref: `order:<pk>:<файл>`, `invoice:<pk>`, `offer:<pk версії>`, `rfq:<pk>`, `rfqreply:<pk>`, `kb:<pk>`,
+`cust:<pk>:<файл>`, `msg:<pk листа>:<номер>`, `datasheet:<артикул>`, `photo:<артикул>`, `upload:<pk>` — їх же
+приймає MCP `propose_email` (`attachments`) і `propose_save_file`.
+
 ## 6. Вебхуки (Minerva → магазин)
 
 Замість опитування магазин отримує POST при кожній зміні.

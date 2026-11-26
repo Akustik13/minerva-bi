@@ -57,10 +57,11 @@ ATTR = {'name': 'propose_attribute', 'description': 'Запропонувати 
             'required': ['sku', 'name', 'value', 'evidence', 'source']}}
 MAIL = {'name': 'propose_email', 'description': 'Підготувати лист (людина перевірить і надішле). Адреси — лише ті, '
         'що є в тексті завдання або в «Кому надсилати листи» (порожній to — саме їм); копію додає Minerva сама. '
-        'attach_datasheets — артикули, чиї даташити додати до листа.',
+        'attach_datasheets — артикули, чиї даташити додати до листа; attachments — інші файли (ref).',
         'input_schema': {'type': 'object', 'properties': {
             'to': {'type': 'array', 'items': {'type': 'string'}}, 'subject': {'type': 'string'},
-            'body': {'type': 'string'}, 'attach_datasheets': {'type': 'array', 'items': {'type': 'string'}}},
+            'body': {'type': 'string'}, 'attach_datasheets': {'type': 'array', 'items': {'type': 'string'}},
+            'attachments': {'type': 'array', 'items': {'type': 'string'}, 'description': 'Вкладення — ref файлів з list_files / upload_file / read_email: документи замовлення («order:…»), рахунок («invoice:…»), Angebot («offer:…»), вкладення листа («msg:<id>:<номер>»), файли запиту постачальникам, документи проєкту чи клієнта, даташит / фото («datasheet:<артикул>»), передані агентом («upload:<номер>»); до 10 файлів, 25 МБ разом'}},
             'required': ['to', 'subject', 'body']}}
 WEB_SEARCH = {'type': 'web_search_20260209', 'name': 'web_search', 'max_uses': 8}
 # Haiku 5.5 — без динамічної фільтрації (web_search_20260209 лише в Opus / Sonnet): попередня версія пошуку
@@ -357,15 +358,51 @@ def _mail(ctx, args):
     body = str(args.get('body') or '').strip()
     if not subject or not body:
         raise ToolError('потрібні тема й текст листа')
+    files_ = _mail_files(ctx, args.get('attachments'), attach)
     cc = [a.lower() for a in EMAIL_RE.findall(' '.join(str(x) for x in (args.get('cc') or [])))] or task_cc
     data = {'cc': cc} if cc else {}
     if reply is not None:
         data['reply_to'] = reply.pk
+    if files_:
+        data['attachments'] = files_
     AgentProposal.objects.create(task=ctx.task, kind=AgentProposal.MAIL, mail_to=', '.join(to), mail_subject=subject,
                                  mail_body=body[:20000], mail_attach=attach, data=data)
     ctx.proposed += 1
+    what = ([f'даташити {", ".join(attach)}'] if attach else []) + [f['name'] for f in files_]
     return (f'Лист на {", ".join(to)} підготовлено' + (f' (відповідь на лист #{reply.pk})' if reply is not None else '')
-            + ' — людина перевірить і надішле' + (f' (вкладення: даташити {", ".join(attach)})' if attach else ''))
+            + ' — людина перевірить і надішле' + (f' (вкладення: {"; ".join(what)})' if what else ''))
+
+
+def _mail_files(ctx, refs, datasheets=()) -> list:
+    """Вкладення листа за ref (agent/files.py): кожен файл справді відкривається для людини завдання (вкладення пошти
+    — лише з 🔒 особистим ключем), не програма, до MAIL_MAX_FILES і MAIL_MAX_BYTES разом. → [{ref, name, size}]"""
+    from agent import files
+    if not refs:
+        return []
+    if not isinstance(refs, list):
+        raise ToolError('attachments — список ref файлів (з list_files / upload_file)')
+    out, seen, total = [], set(), 0
+    skip = {f'datasheet:{s}'.lower() for s in datasheets}
+    for raw in refs:
+        ref = ' '.join(str(raw or '').split())
+        if not ref or ref.lower() in seen or ref.lower() in skip:
+            continue
+        seen.add(ref.lower())
+        try:
+            info = files.describe(ctx.task.owner, ref, getattr(ctx, 'personal', True))
+        except files.FileError as e:
+            raise ToolError(f'вкладення «{ref}»: {e}') from None
+        if files.ext_of(info['name']) in files.BLOCKED_EXT:
+            raise ToolError(f'«{info["name"]}» — програма чи скрипт, таке в лист не вкладаємо')
+        total += info['size']
+        out.append({'ref': ref, 'name': info['name'], 'size': info['size']})
+    if len(out) + len(datasheets) > files.MAIL_MAX_FILES:
+        raise ToolError(f'забагато вкладень — до {files.MAIL_MAX_FILES} файлів')
+    if total > files.MAIL_MAX_BYTES:
+        raise ToolError(f'вкладення разом {files.human_size(total)} — більше за '
+                        f'{files.MAIL_MAX_BYTES // 1024 // 1024} МБ, поштовики такий лист не приймуть')
+    files.keep([f['ref'] for f in out])
+    return out
 
 
 def _reply_to(ctx, value):

@@ -150,6 +150,8 @@
       <label>Текст</label>
       <textarea name="body" rows="8" {% if m.status != 'pending' %}readonly{% endif %} translate="no">{{ m.mail_body }}</textarea>
       {% if m.mail_attach %}<div class="agt-muted" style="margin-top:6px">📎 Даташити: <span translate="no">{{ m.mail_attach|join:", " }}</span></div>{% endif %}
+      {% if m.data.attachments %}<div class="agt-muted" style="margin-top:6px">📎 Вкладення:
+        {% for a in m.data.attachments %}<a href="{% url 'agent:file' %}?ref={{ a.ref|urlencode }}" target="_blank" translate="no">{{ a.name }}</a>{% if a.size %} <span class="agt-muted">({{ a.size|filesizeformat }})</span>{% endif %}{% if not forloop.last %} · {% endif %}{% endfor %}</div>{% endif %}
       {% if m.status == 'pending' %}
       <div class="agt-redo">
         <div class="agt-redo-row">
