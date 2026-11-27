@@ -5,7 +5,9 @@
                    постачальника; таблиця переводить у валюту Minerva й позначає найнижче; text — короткий текст.
   columns(req)   — чисті колонки [{key, name, kind, hint}];
   add / edit / delete — змінити колонки (delete прибирає й значення в усіх рядках);
-  set_value(r, key, qty, value, user) — вписати вручну (src user: AI його не перезаписує);
+  set_value(r, key, qty, value, user, src) — вписати вручну (src user) або з пропозиції агента після ✓ людини (src
+                   agent, MCP — agent/tools_rfq_table.py); такого AI не перезаписує;
+  number(value)  — «711,46» / «1.291,69» → Decimal ≥ 0 (None — не число);
   ai_prompt(req) / apply_ai(r, data) — що просити в 🧠 «Розібрати відповідь» і як записати (лише не вписане людиною);
   cells(cmp, req) — для шаблону й ⚖ порівняння: на кожен рядок — колонки, по кількостях значення, найнижче.
 """
@@ -85,8 +87,18 @@ def delete(req, key):
             R.objects.filter(pk=r.pk).update(extra=x)
 
 
+_EXP = re.compile(r"\d+(?:\.\d+)?[eE][+-]?\d+")
+
+
 def _num(value):
-    s = re.sub(r"[^\d,.\-]", "", str(value or "")).strip()
+    raw = str(value or "").strip()
+    if _EXP.fullmatch(raw):              # «4.5E+2» — так до 11.2026 зберігалось кругле 450 (і показувалось 4,52)
+        try:
+            d = Decimal(raw)
+        except InvalidOperation:
+            return None
+        return d.quantize(Decimal("0.0001"), ROUND_HALF_UP) if d >= 0 else None
+    s = re.sub(r"[^\d,.\-]", "", raw).strip()
     if not s:
         return None
     if "," in s and "." in s:            # 1.291,69 / 1,291.69 — остання — десятковий знак
@@ -100,8 +112,18 @@ def _num(value):
     return d.quantize(Decimal("0.0001"), ROUND_HALF_UP) if d >= 0 else None
 
 
-def set_value(r, key, qty, value, user=None) -> dict:
-    """Вписати значення вручну: ціна — для кількості qty (порожньо — прибрати), текст — увесь."""
+number = _num
+
+
+def plain(d) -> str:
+    """Decimal → рядок без експоненти: 450 → «450» (str(normalize()) дає «4.5E+2»)."""
+    return format(d.normalize(), "f")
+
+KEPT = ("user", "agent")        # вписала людина / агент після ✓ — 🧠 AI не перезаписує
+
+
+def set_value(r, key, qty, value, user=None, src="user") -> dict:
+    """Вписати значення: ціна — для кількості qty (порожньо — прибрати), текст — увесь. src — user / agent."""
     from suppliers.models import SupplierRequestRecipient as R
     col = next((c for c in columns(r.request) if c["key"] == key), None)
     if col is None:
@@ -123,9 +145,9 @@ def set_value(r, key, qty, value, user=None) -> dict:
         if d is None:
             vals.pop(str(q), None)
         else:
-            vals[str(q)] = str(d.normalize())
+            vals[str(q)] = plain(d)
         cur["v"] = vals
-    cur.update(src="user", at=timezone.now().isoformat())
+    cur.update(src=src if src in KEPT else "user", at=timezone.now().isoformat())
     if cur["v"] in ("", {}):
         x.pop(key, None)
     else:
@@ -173,21 +195,21 @@ def clean_ai(req, data) -> dict:
                     continue
                 d = _num(n) if not isinstance(n, bool) else None
                 if qi > 0 and d is not None:
-                    vals[str(qi)] = str(d.normalize())
+                    vals[str(qi)] = plain(d)
             if vals:
                 out[c["key"]] = vals
     return out
 
 
 def apply_ai(r, extra: dict) -> None:
-    """Значення від AI — у колонки, які людина не вписала сама (src user лишається)."""
+    """Значення від AI — у колонки, які людина (чи агент з її ✓) не вписала сама (src user / agent лишається)."""
     if not extra:
         return
     from suppliers.models import SupplierRequestRecipient as R
     x = dict(r.extra or {})
     now = timezone.now().isoformat()
     for key, v in extra.items():
-        if (x.get(key) or {}).get("src") == "user":
+        if (x.get(key) or {}).get("src") in KEPT:
             continue
         x[key] = {"v": v, "src": "ai", "at": now}
     R.objects.filter(pk=r.pk).update(extra=x)
@@ -221,7 +243,7 @@ def cells(cmp, req) -> dict:
                     qs.append({"qty": q, "text": "", "sort": ""})
                     continue
                 home = (d * rate).quantize(CENT, ROUND_HALF_UP) if rate is not None else None
-                qs.append({"qty": q, "text": f"{money(d)} {cur}", "raw": str(d.normalize()),
+                qs.append({"qty": q, "text": f"{money(d)} {cur}", "raw": plain(d),
                            "home_text": f"{money(home)} {cmp['home']}" if home is not None and cur != cmp["home"].upper()
                            else "", "v": float(home) if home is not None else None,
                            "main": f"{money(home)}" if home is not None else f"{money(d)} {cur}",

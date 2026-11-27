@@ -94,6 +94,7 @@ urlpatterns = [
     path("suppliers/<int:pk>/", sup.SupplierDetailView.as_view(), name="agent-supplier"),
     path("supplier-requests/", sup.RequestsView.as_view(), name="agent-supplier-requests"),
     path("supplier-requests/form/", sup.RequestFormView.as_view(), name="agent-supplier-request-form"),
+    path("supplier-requests/<str:ref>/table/", sup.RequestTableView.as_view(), name="agent-supplier-request-table"),
     path("supplier-requests/<str:ref>/", sup.RequestDetailView.as_view(), name="agent-supplier-request"),
     # 🤖 інструменти агента (MCP) звичайним REST (api/agent_tools.py)
     path("agent/tools/", agent_tools.AgentToolsView.as_view(), name="agent-tools"),

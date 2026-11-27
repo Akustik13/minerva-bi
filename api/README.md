@@ -440,7 +440,8 @@ ref: `order:<pk>:<файл>`, `invoice:<pk>`, `offer:<pk версії>`, `rfq:<p
 | GET | `/suppliers/cards/<id>/` | візитка: прочитане, люди, QR, фото (ref), схожі постачальники й клієнти |
 | GET | `/supplier-requests/?status=&query=&project=&supplier=&category=&group=&created_from=&created_to=&mine=&overdue=` | запити |
 | GET | `/supplier-requests/form/` | форми й поля нового запиту, мови, змінні, приклади, категорії, групи, проєкти |
-| GET | `/supplier-requests/<RFQ-…\|id>/` | запит: поля, лист, файли (ref), отримувачі з пропозиціями |
+| GET | `/supplier-requests/<RFQ-…\|id>/` | запит: поля, лист, файли (ref), отримувачі з пропозиціями, свої колонки (`columns`; у рядку — `columns` {ключ: {value, source, at}}) і 🏷 `label` |
+| GET | `/supplier-requests/<RFQ-…\|id>/table/` | таблиця пропозицій сторінки: `qtys`, `home`, `columns` {standard, own}, `rows` (📌 закріплені першими): `cells` по кількостях (`unit`, `unit_home`, `total`, `total_home`, `best`, `fast`, `lead_days`, `in_sum`, `lacks`), `columns` (+ `home`, `best`), `label`; `marks` — кольори й наліпки. Змінити колонки, значення, позначки — `POST /agent/tools/propose_rfq_columns\|propose_rfq_column_values\|propose_rfq_marks/` → людина ✓ |
 | GET | `/agent/tools/` | інструменти MCP, доступні ключу (як `tools/list`) |
 | POST | `/agent/tools/<назва>/` | виклик інструмента: тіло — аргументи (або `{arguments: {…}}`) → `{tool, text, is_error, review_url}`; читання — `agent:read`, `propose_*` / `upload_*` — `agent:write`; пропозиції — у завдання ключа на сьогодні, застосовує людина ✓ |
 

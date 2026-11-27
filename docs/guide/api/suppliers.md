@@ -5,7 +5,7 @@ summary: Зовнішній агент (Claude Code, Claude.ai, ваша про�
 where: 🤖 API та скрипти → REST API → 🔑 API ключі → ключ з правами «Агент (MCP)»; 📦 Склад → 🤖 Завдання агенту
 urls: /admin/inventory/supplier/, /admin/inventory/supplier/cards/, /admin/suppliers/supplierrequest/, /admin/suppliers/supplierrequest/new/, /admin/agent/agenttask/
 roles: адміністратор (ключ), складник і менеджер (перевірка пропозицій)
-keywords: постачальники через API, постачальники через MCP, find_suppliers, supplier_filters, propose_supplier, propose_supplier_contact, propose_supplier_check, find_suppliers_in_mail, supplier_from_mail, find_cards, get_card, card_stats, propose_card, propose_new_card, supplier_request_form, preview_rfq_letter, копія запиту через агента, copy_from, файли до запиту, візитка через агента, агент прочитав візитку, фото візитки, vCard, /api/v1/suppliers/, /api/v1/supplier-requests/, /api/v1/agent/tools/, REST для інструментів агента, Lieferant API, Visitenkarte, RFQ API
+keywords: постачальники через API, постачальники через MCP, find_suppliers, supplier_filters, propose_supplier, propose_supplier_contact, propose_supplier_check, find_suppliers_in_mail, supplier_from_mail, find_cards, get_card, card_stats, propose_card, propose_new_card, supplier_request_form, preview_rfq_letter, копія запиту через агента, copy_from, файли до запиту, візитка через агента, агент прочитав візитку, фото візитки, vCard, /api/v1/suppliers/, /api/v1/supplier-requests/, /api/v1/supplier-requests/<RFQ>/table/, propose_rfq_columns, propose_rfq_column_values, propose_rfq_marks, /api/v1/agent/tools/, REST для інструментів агента, Lieferant API, Visitenkarte, RFQ API
 related: api/mcp, api/files, inventory/suppliers, inventory/supplier-requests, inventory/cards-app, inventory/agent-tasks, api/keys
 ---
 
@@ -74,7 +74,8 @@ related: api/mcp, api/files, inventory/suppliers, inventory/supplier-requests, i
 | `GET /api/v1/suppliers/cards/<id>/` | візитка: прочитане, люди, фото (ref) |
 | `GET /api/v1/supplier-requests/?status=all&group=` | запити постачальникам |
 | `GET /api/v1/supplier-requests/form/` | форми й поля нового запиту |
-| `GET /api/v1/supplier-requests/RFQ-2026-003/` | запит: поля, лист, файли, отримувачі й пропозиції |
+| `GET /api/v1/supplier-requests/RFQ-2026-003/` | запит: поля, лист, файли, отримувачі й пропозиції, свої колонки таблиці (`columns`) і значення кожного рядка, 🏷 позначка рядка (`label`) |
+| `GET /api/v1/supplier-requests/RFQ-2026-003/table/` | таблиця пропозицій, як на сторінці: кількості, колонки (стандартні й свої), рядки (📌 закріплені першими) — числами: ціна за шт. і сума з разовими у валюті постачальника й Minerva, 🥇 / ⚡, що враховано в сумі (`in_sum`: y / n / u), свої колонки (`source`: ai / user / agent), довідник кольорів і наліпок |
 
 Змінювати через REST — **тими самими інструментами**: `GET /api/v1/agent/tools/` — що доступно ключу,
 `POST /api/v1/agent/tools/<назва>/` з аргументами інструмента (JSON) → `{text, is_error, review_url}`. Читання —

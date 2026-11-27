@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 MODULES = ('agent.tools_mail', 'agent.tools_sales', 'agent.tools_crm', 'agent.tools_projects',
            'agent.tools_suppliers', 'agent.tools_suppliers_mail', 'agent.tools_cards', 'agent.tools_rfq',
-           'agent.tools_rfq_mail', 'agent.tools_worktime', 'agent.tools_digikey', 'agent.tools_stock',
+           'agent.tools_rfq_table', 'agent.tools_rfq_mail', 'agent.tools_worktime', 'agent.tools_digikey', 'agent.tools_stock',
            'agent.tools_packaging', 'agent.tools_files')
 # Особисте людини (її пошта й календар, її робочий час, листування з постачальниками запитів) — лише через 🔒 особистий ключ, де агент — сам власник
 # (`APIKey.personal_ok`): спільний ключ бачать і можуть використати інші люди.

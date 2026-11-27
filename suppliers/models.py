@@ -445,7 +445,7 @@ class SupplierRequestRecipient(models.Model):
     reject_reason = models.CharField("Чому не взяли", max_length=255, blank=True, default="")
     # 🏷 позначка рядка в таблиці пропозицій: {color, stickers, text, by, at} — suppliers/services/rfq_marks.py
     label = models.JSONField("Позначка", default=dict, blank=True)
-    # ➕ значення своїх колонок запиту: {key: {v: {кількість: сума} | текст, src: ai | user, at}}
+    # ➕ значення своїх колонок запиту: {key: {v: {кількість: сума} | текст, src: ai | user | agent, at}}
     extra = models.JSONField("Свої колонки", default=dict, blank=True)
 
     class Meta:

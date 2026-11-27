@@ -306,6 +306,7 @@
 {"uk": "(вимкнений)", "en": "(disabled)", "de": "(deaktiviert)"}
 {"uk": "(вимкнено)", "en": "(disabled)", "de": "(deaktiviert)"}
 {"uk": "(вкладення: даташити {0})", "en": "(attachments: datasheets {0})", "de": "(Anhänge: Datenblätter {0})"}
+{"uk": "(вписав 🤖 агент, ви ✓)", "en": "(entered by 🤖 the agent, you ✓)", "de": "(eingetragen von 🤖 Agent, Sie ✓)"}
 {"uk": "(вписав 🧠 AI з листів)", "en": "(entered by 🧠 AI from the e-mails)", "de": "(von 🧠 AI aus den E-Mails eingetragen)"}
 {"uk": "(вручну)", "en": "(manual)", "de": "(manuell)"}
 {"uk": "(входи, хеш)", "en": "(sign-ins, hash)", "de": "(Anmeldungen, Hash)"}
@@ -5989,6 +5990,7 @@
 {"uk": "Востаннє надіслано", "en": "Last sent", "de": "Zuletzt gesendet"}
 {"uk": "Впевненість", "en": "Confidence", "de": "Sicherheit"}
 {"uk": "Вперше", "en": "First time", "de": "Erstmals"}
+{"uk": "Вписав 🤖 агент (MCP) — після вашого", "en": "Entered by 🤖 the agent (MCP) — after your", "de": "Eingetragen von 🤖 Agent (MCP) — nach Ihrem"}
 {"uk": "Вписав 🧠 AI з листів", "en": "Entered by 🧠 AI from the e-mails", "de": "Von 🧠 AI aus den E-Mails eingetragen"}
 {"uk": "Вписати вручну", "en": "Enter manually", "de": "Manuell eintragen"}
 {"uk": "Вписати свій курс для DigiKey", "en": "Enter your own rate for DigiKey", "de": "Eigenen Kurs für DigiKey eintragen"}
