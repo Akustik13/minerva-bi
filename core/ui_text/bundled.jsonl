@@ -506,6 +506,7 @@
 {"uk": "(ціни — у {0}, дані Minerva без запиту до DigiKey)", "en": "(prices in {0}, Minerva data without a request to DigiKey)", "de": "(Preise in {0}, Minerva-Daten ohne Anfrage an DigiKey)"}
 {"uk": "(чекаємо вже {0})", "en": "(waiting for {0} already)", "de": "(wir warten schon {0})"}
 {"uk": "(червоних", "en": "(red", "de": "(rot"}
+{"uk": "(черга {0}/{1}: товар спершу іде замовленням вище в черзі)", "en": "(queue {0}/{1}: stock goes first to orders higher in the queue)", "de": "(Warteschlange {0}/{1}: Ware geht zuerst an Bestellungen weiter oben in der Warteschlange)"}
 {"uk": "(через RAG API помічника Minerva)", "en": "(via the RAG API of the Minerva assistant)", "de": "(über die RAG-API des Minerva-Assistenten)"}
 {"uk": "(числа з запасом зручніші — легше вставити між ними).", "en": "(numbers with gaps are more convenient — easier to insert between them).", "de": "(Zahlen mit Abstand sind praktischer — so lässt sich leichter etwas dazwischen einfügen)."}
 {"uk": "(шаблонів немає)", "en": "(no templates)", "de": "(keine Vorlagen)"}
@@ -3762,6 +3763,7 @@
 {"uk": "{0}тема {1} · {2} · «{3}» · останнє {4} — {5} {6}", "en": "{0}topic {1} · {2} · “{3}” · last {4} — {5} {6}", "de": "{0}Thema {1} · {2} · „{3}“ · zuletzt {4} — {5} {6}"}
 {"uk": "{0}хв {1}с", "en": "{0}m {1}s", "de": "{0} Min. {1} Sek."}
 {"uk": "{0}–{1} дн.", "en": "{0}–{1} days", "de": "{0}–{1} Tage"}
+{"uk": "{0}🔢 черга {1}/{2}", "en": "{0}🔢 queue {1}/{2}", "de": "{0}🔢 Warteschlange {1}/{2}"}
 {"uk": "{{ _(\"Кур", "en": "{{ _(\"Кур", "de": "{{ _(\"Кур"}
 {"uk": "{артикул: кількість}", "en": "{SKU: quantity}", "de": "{Artikelnummer: Menge}"}
 {"uk": "{домен сайту: {at, file, file_enabled, file_url, file_key}} — сайт повідомляє, що в його private/minerva-config.php (без ключа), разом із запитом налаштувань.", "en": "{site domain: {at, file, file_enabled, file_url, file_key}} — the site reports what is in its private/minerva-config.php (without the key), together with the settings request.", "de": "{Domain der Website: {at, file, file_enabled, file_url, file_key}} – die Website meldet, was in ihrer private/minerva-config.php steht (ohne Schlüssel), zusammen mit der Einstellungsanfrage."}
@@ -5002,6 +5004,7 @@
 {"uk": "Боти → DigiKey API", "en": "Bots → DigiKey API", "de": "Bots → DigiKey-API"}
 {"uk": "Ботсвана", "en": "Botswana", "de": "Botsuana"}
 {"uk": "Бразилія", "en": "Brazil", "de": "Brasilien"}
+{"uk": "Бракує для цього замовлення", "en": "Short for this order", "de": "Fehlt für diese Bestellung"}
 {"uk": "Бракує перекладу", "en": "Translation missing", "de": "Übersetzung fehlt"}
 {"uk": "Брати й інші сторінки сайту", "en": "Also take other pages of the site", "de": "Auch weitere Seiten der Website übernehmen"}
 {"uk": "Брати онлайн-курс ЄЦБ", "en": "Use the online ECB rate", "de": "Online-EZB-Kurs verwenden"}
@@ -6171,6 +6174,9 @@
 {"uk": "Віддалити", "en": "Zoom out", "de": "Herauszoomen"}
 {"uk": "Віддалити (Ctrl + коліщатко)", "en": "Zoom out (Ctrl + wheel)", "de": "Herauszoomen (Strg + Mausrad)"}
 {"uk": "Віддалити — довший період (Ctrl + коліщатко над діаграмою)", "en": "Zoom out — a longer period (Ctrl + wheel over the chart)", "de": "Herauszoomen — längerer Zeitraum (Strg + Mausrad über dem Diagramm)"}
+{"uk": "Віддати товар першим", "en": "Give stock first", "de": "Ware zuerst zuteilen"}
+{"uk": "Віддати товар цьому замовленню першим", "en": "Give stock to this order first", "de": "Ware zuerst an diese Bestellung"}
+{"uk": "Віддати товар цьому замовленню першим? Інші замовлення з цим товаром можуть чекати поставку.", "en": "Give stock to this order first? Other orders with this product may have to wait for delivery.", "de": "Ware zuerst an diese Bestellung? Andere Bestellungen mit diesem Artikel müssen eventuell auf die Lieferung warten."}
 {"uk": "Віддає: {0}", "en": "Delivers to: {0}", "de": "Liefert an: {0}"}
 {"uk": "Відеопам'ять", "en": "Video memory", "de": "Videospeicher"}
 {"uk": "Відкат злиття #{0}", "en": "Merge #{0} undone", "de": "Zusammenführung #{0} rückgängig"}
@@ -9505,6 +9511,8 @@
 {"uk": "Зняти позначку «новинка»", "en": "Remove the “new” mark", "de": "Markierung „Neuheit“ entfernen"}
 {"uk": "Зняти позначку — лист знову в «Що зараз»", "en": "Remove the mark — the e-mail is back in «What now»", "de": "Markierung entfernen — die E-Mail steht wieder unter «Was jetzt»"}
 {"uk": "Зняти цей параметр", "en": "Remove this parameter", "de": "Diesen Parameter entfernen"}
+{"uk": "Зняти 📌: замовлення повернеться в чергу за дедлайном", "en": "Remove 📌: the order goes back into the queue by deadline", "de": "📌 entfernen: die Bestellung kommt zurück in die Warteschlange nach Frist"}
+{"uk": "Зняти 📌? Замовлення повернеться в чергу за дедлайном.", "en": "Remove 📌? The order goes back into the queue by deadline.", "de": "📌 entfernen? Die Bestellung kommt zurück in die Warteschlange nach Frist."}
 {"uk": "Знято з виробництва (EOL)", "en": "Discontinued (EOL)", "de": "Nicht mehr in Produktion (EOL)"}
 {"uk": "Знято з календаря", "en": "Removed from the calendar", "de": "Aus dem Kalender entfernt"}
 {"uk": "Знято — коробка в архіві: не пропонується в упаковці відправлень, нові відправлення її не списують, «мало коробок» про неї не надсилається. Список показує її лише з фільтром «🗄 В архіві».", "en": "Unchecked — the box is archived: not suggested for shipment packaging, new shipments do not deduct it, no «low on boxes» alert is sent for it. The list shows it only with the «🗄 Archived» filter.", "de": "Nicht angehakt — der Karton ist im Archiv: wird nicht als Verpackung für Sendungen vorgeschlagen, neue Sendungen buchen ihn nicht ab, keine Meldung «Kartons knapp». Die Liste zeigt ihn nur mit dem Filter «🗄 Im Archiv»."}
@@ -11445,6 +11453,9 @@
 {"uk": "На developer.dhl.com перевір статус API у своєму App: має бути Aktiviert, а не Pending.", "en": "On developer.dhl.com check the API status in your App: it must be Aktiviert, not Pending.", "de": "Prüfen Sie auf developer.dhl.com den API-Status in Ihrer App: Er muss Aktiviert lauten, nicht Pending."}
 {"uk": "На supplier.digikey.com не налаштовано жодного способу доставки.", "en": "No shipping method is set up on supplier.digikey.com.", "de": "Auf supplier.digikey.com ist keine Versandart eingerichtet."}
 {"uk": "На весь екран", "en": "Full screen", "de": "Vollbild"}
+{"uk": "На всі замовлення не вистачає — товар іде за чергою: 📌 закріплені → дедлайн відправки → дата замовлення. ✅ — можна відправляти, ⏳ — чекає поставку.", "en": "Not enough for all orders — stock goes by queue: 📌 pinned → shipping deadline → order date. ✅ — ready to ship, ⏳ — waiting for delivery.", "de": "Nicht genug für alle Bestellungen — die Ware wird nach Warteschlange zugeteilt: 📌 angeheftet → Versandfrist → Bestelldatum. ✅ — versandbereit, ⏳ — wartet auf Lieferung."}
+{"uk": "На всі незакриті замовлення не вистачає: для них є", "en": "Not enough for all open orders: available for them", "de": "Nicht genug für alle offenen Bestellungen: für sie verfügbar"}
+{"uk": "На всі незакриті замовлення не вистачає: для них є {0}, потрібно {1}. Товар іде за чергою: 📌 закріплені → дедлайн відправки → дата замовлення.", "en": "Not enough for all open orders: {0} available for them, {1} needed. Stock goes by queue: 📌 pinned → shipping deadline → order date.", "de": "Nicht genug für alle offenen Bestellungen: für sie verfügbar {0}, benötigt {1}. Die Ware wird nach Warteschlange zugeteilt: 📌 angeheftet → Versandfrist → Bestelldatum."}
 {"uk": "На візитці немає ні імені, ні фірми, ні email — заповніть поля вище.", "en": "The business card has no name, company or e-mail — fill in the fields above.", "de": "Auf der Visitenkarte gibt es weder Name, Firma noch E-Mail — füllen Sie die Felder oben aus."}
 {"uk": "На головну", "en": "Go to home page", "de": "Zur Startseite"}
 {"uk": "На екранах вужче 768px з'являється кнопка", "en": "On screens narrower than 768px a button appears", "de": "Auf Bildschirmen schmaler als 768px erscheint die Schaltfläche"}
@@ -12336,6 +12347,7 @@
 {"uk": "Не передано product_code.", "en": "product_code not provided.", "de": "product_code nicht übergeben."}
 {"uk": "Не передано tariff_id.", "en": "tariff_id not provided.", "de": "tariff_id nicht übergeben."}
 {"uk": "Не перекриває наявні записи. Записи askDANTE через API не видаляються.", "en": "Does not overlap existing entries. askDANTE entries cannot be deleted via the API.", "de": "Überschneidet sich nicht mit vorhandenen Einträgen. askDANTE-Einträge können über die API nicht gelöscht werden."}
+{"uk": "Не покриває навіть уже замовлене в постачальника — дозамовити", "en": "Not covered even by what is already ordered from the supplier — reorder", "de": "Auch die bereits beim Lieferanten bestellte Menge reicht nicht — nachbestellen"}
 {"uk": "Не постачальник", "en": "Not a supplier", "de": "Kein Lieferant"}
 {"uk": "Не потрапили («Не працювати»)", "en": "Left out («Do not work with»)", "de": "Nicht übernommen («Nicht zusammenarbeiten»)"}
 {"uk": "Не потрапляють у документ.", "en": "Not included in the document.", "de": "Erscheinen nicht im Dokument."}
@@ -18532,6 +18544,9 @@
 {"uk": "Товар складу", "en": "Stock product", "de": "Lagerartikel"}
 {"uk": "Товар списується зі складу, замовлення входить у статистику дашборду. Вимкнено — лише облік (зразки, тест).", "en": "The product is deducted from stock, the order is included in the dashboard statistics. Disabled — bookkeeping only (samples, test).", "de": "Der Artikel wird aus dem Lager abgebucht, der Auftrag fließt in die Dashboard-Statistik ein. Deaktiviert — nur Erfassung (Muster, Test)."}
 {"uk": "Товар створено / затверджено", "en": "Product created / approved", "de": "Artikel erstellt / freigegeben"}
+{"uk": "Товар іде за чергою: 📌 закріплені → дедлайн відправки → дата замовлення.", "en": "Stock goes by queue: 📌 pinned → shipping deadline → order date.", "de": "Die Ware wird nach Warteschlange zugeteilt: 📌 angeheftet → Versandfrist → Bestelldatum."}
+{"uk": "Товар — цьому замовленню першим", "en": "Stock to this order first", "de": "Ware zuerst an diese Bestellung"}
+{"uk": "Товар — цьому замовленню першим (з {0})", "en": "Stock to this order first (since {0})", "de": "Ware zuerst an diese Bestellung (seit {0})"}
 {"uk": "Товар: {0}", "en": "Product: {0}", "de": "Artikel: {0}"}
 {"uk": "Товар: {0} SKU: {1} Доступно: {2} | Точка дозамовлення: {3}", "en": "Product: {0} SKU: {1} Available: {2} | Reorder point: {3}", "de": "Artikel: {0} SKU: {1} Verfügbar: {2} | Meldebestand: {3}"}
 {"uk": "Товари", "en": "Products", "de": "Artikel"}
@@ -18565,6 +18580,7 @@
 {"uk": "Товарна, багатоцільова", "en": "Product, multipurpose", "de": "Artikel, Mehrzweck"}
 {"uk": "Товару {0} немає на складі — дані лише зі старого файлу.", "en": "Product {0} is not in stock — data only from the old file.", "de": "Artikel {0} ist nicht im Lager — Daten nur aus der alten Datei."}
 {"uk": "Товару «{0}» немає в Minerva — позицію збережено без товару, на складі вона не рахується.", "en": "Product “{0}” does not exist in Minerva — the line was saved without a product and is not counted in stock.", "de": "Artikel „{0}“ existiert in Minerva nicht — die Position wurde ohne Artikel gespeichert und wird im Lager nicht gezählt."}
+{"uk": "Товару вистачає — можна відправляти", "en": "Enough stock — ready to ship", "de": "Genug Ware — versandbereit"}
 {"uk": "Товару й офера на DigiKey не прочитано — нижче дані Minerva, які вона надіслала б.", "en": "The product and offer on DigiKey were not read — below is the Minerva data it would send.", "de": "Artikel und Offer bei DigiKey wurden nicht gelesen — unten stehen die Minerva-Daten, die gesendet würden."}
 {"uk": "Товару немає на DigiKey (лістинг не створено).", "en": "The product is not on DigiKey (no listing created).", "de": "Der Artikel ist nicht auf DigiKey (Listing nicht erstellt)."}
 {"uk": "Товару немає на DigiKey.", "en": "The product is not on DigiKey.", "de": "Der Artikel ist nicht auf DigiKey."}
@@ -19802,6 +19818,7 @@
 {"uk": "Цієї адреси Minerva не знає. Дозволяйте, лише якщо ви самі щойно підключали цю програму.", "en": "Minerva does not know this address. Allow it only if you yourself have just connected this app.", "de": "Minerva kennt diese Adresse nicht. Erlauben Sie es nur, wenn Sie diese App gerade selbst verbunden haben."}
 {"uk": "Цієї підказки вже немає — оновіть список", "en": "This suggestion is no longer there — refresh the list", "de": "Diesen Vorschlag gibt es nicht mehr — Liste aktualisieren"}
 {"uk": "ЧАСОВИЙ ПОЯ", "en": "TIME ZONE", "de": "ZEITZONE"}
+{"uk": "ЧЕРГА", "en": "QUEUE", "de": "WARTESCHLANGE"}
 {"uk": "ЧЕХІЯ", "en": "CZECHIA", "de": "TSCHECHIEN"}
 {"uk": "ЧОГО БРАКУЄ — пункти [уточнити].", "en": "WHAT IS MISSING — [clarify] items.", "de": "WAS FEHLT — [klären]-Punkte."}
 {"uk": "Чад", "en": "Chad", "de": "Tschad"}
@@ -19903,6 +19920,7 @@
 {"uk": "Червень", "en": "June", "de": "Juni"}
 {"uk": "Червона", "en": "Red", "de": "Rot"}
 {"uk": "Червона рамка", "en": "Red border", "de": "Roter Rahmen"}
+{"uk": "Черга: дедлайн відправки → дата замовлення. Віддати товар цьому замовленню раніше за інші?", "en": "Queue: shipping deadline → order date. Give stock to this order before the others?", "de": "Warteschlange: Versandfrist → Bestelldatum. Ware dieser Bestellung vor den anderen zuteilen?"}
 {"uk": "Через «;», напр. «10; 100; 500» — ціна на кожну.", "en": "Separated by «;», e.g. «10; 100; 500» — a price for each.", "de": "Getrennt mit «;», z. B. «10; 100; 500» — ein Preis je Menge."}
 {"uk": "Через кому, напр. archiv@… Копія листів «Ласкаво просимо», «Оплату отримано» тощо; листи з одноразовими посиланнями (підтвердження, новий пароль, запрошення) не копіюються.", "en": "Comma-separated, e.g. archiv@… A copy of the “Welcome”, “Payment received” e-mails etc.; e-mails with one-time links (confirmation, new password, invitation) are not copied.", "de": "Durch Komma getrennt, z. B. archiv@… Kopie der E-Mails „Willkommen“, „Zahlung eingegangen“ usw.; E-Mails mit einmaligen Links (Bestätigung, neues Passwort, Einladung) werden nicht kopiert."}
 {"uk": "Через кому, напр. «pcbway.com, pcbway.cn» — листи з цих доменів належать постачальнику (домен з email, сайту й контактних осіб Minerva бере й так).", "en": "Comma-separated, e.g. «pcbway.com, pcbway.cn» — e-mails from these domains belong to the supplier (Minerva takes the domain from the e-mail, website and contact persons anyway).", "de": "Durch Komma getrennt, z. B. «pcbway.com, pcbway.cn» — E-Mails aus diesen Domains gehören zum Lieferanten (die Domain aus E-Mail, Website und Ansprechpartnern nimmt Minerva ohnehin)."}
@@ -20936,6 +20954,7 @@
 {"uk": "бракує {0}", "en": "{0} short", "de": "es fehlen {0}"}
 {"uk": "бракує {0}.", "en": "{0} short.", "de": "es fehlen {0}."}
 {"uk": "бракує {0}: потрібно {1}, вільно {2}", "en": "{0} is short: need {1}, available {2}", "de": "{0} fehlt: benötigt {1}, verfügbar {2}"}
+{"uk": "бракує {0}: потрібно {1}, вільно {2}{3}", "en": "{0} is short: needed {1}, free {2}{3}", "de": "{0} fehlt: benötigt {1}, frei {2}{3}"}
 {"uk": "бракує даних чи погодження. probability і impact — 1 (мало) … 3 (дуже).", "en": "missing data or approval. probability and impact — 1 (low) … 3 (high).", "de": "fehlende Daten oder Freigabe. probability und impact — 1 (gering) … 3 (hoch)."}
 {"uk": "бракує прав", "en": "missing rights", "de": "fehlende Rechte"}
 {"uk": "браузер", "en": "browser", "de": "Browser"}
@@ -21619,6 +21638,8 @@
 {"uk": "додати й застосувати", "en": "add and apply", "de": "hinzufügen und übernehmen"}
 {"uk": "додати й показати", "en": "add and show", "de": "hinzufügen und anzeigen"}
 {"uk": "додає замовлення яких не було в базі", "en": "adds orders that were not in the database", "de": "fügt Aufträge hinzu, die in der Datenbank nicht vorhanden waren"}
+{"uk": "дозамовити", "en": "reorder", "de": "nachbestellen"}
+{"uk": "дозамовити {0}", "en": "reorder {0}", "de": "nachbestellen {0}"}
 {"uk": "дозволено", "en": "allowed", "de": "erlaubt"}
 {"uk": "дозволено / лише оригінал", "en": "allowed / original only", "de": "erlaubt / nur Original"}
 {"uk": "дозволено, але всі підрозділи заблоковано — фактичний доступ відсутній.", "en": "allowed, but all subsections are blocked — there is no effective access.", "de": "erlaubt, aber alle Unterbereiche sind gesperrt — es besteht kein tatsächlicher Zugriff."}
@@ -22245,6 +22266,7 @@
 {"uk": "зняти зворотний бік", "en": "take the back side", "de": "Rückseite aufnehmen"}
 {"uk": "знято з виробництва; плюс «Рекомендована заміна».", "en": "discontinued; plus “Recommended replacement”.", "de": "abgekündigt; zusätzlich „Empfohlener Ersatz“."}
 {"uk": "знято з виробництва; плюс «Рекомендована заміна». На сайті жовта (NRND) або сіра (EOL) наліпка на фото, попередження і посилання «Empfohlener Nachfolger». EOL продається лише із залишку на складі (без «під замовлення»), такі товари — внизу каталогу.", "en": "discontinued; plus “Recommended replacement”. On the website: a yellow (NRND) or grey (EOL) sticker on the photo, a warning and a link “Empfohlener Nachfolger”. EOL items are sold only from stock on hand (no “on order”), and such products are at the bottom of the catalog.", "de": "abgekündigt; zusätzlich „Empfohlener Ersatz“. Auf der Website: gelber (NRND) oder grauer (EOL) Aufkleber auf dem Foto, ein Warnhinweis und der Link „Empfohlener Nachfolger“. EOL wird nur aus dem Lagerbestand verkauft (nicht „auf Bestellung“), solche Artikel stehen am Ende des Katalogs."}
+{"uk": "знято: черга за дедлайном", "en": "removed: queue by deadline", "de": "entfernt: Warteschlange nach Frist"}
 {"uk": "знімати само, коли контур тримається", "en": "shoot automatically when the outline holds steady", "de": "automatisch aufnehmen, wenn der Umriss ruhig bleibt"}
 {"uk": "знімає всі фільтри і повертає до дефолтних 90 днів.", "en": "clears all filters and returns to the default 90 days.", "de": "entfernt alle Filter und setzt auf die Standardeinstellung von 90 Tagen zurück."}
 {"uk": "знімається «🧠 Передати в базу знань» у листі", "en": "cleared by “🧠 Send to knowledge base” in the e-mail", "de": "wird durch „🧠 In die Wissensdatenbank übertragen“ in der E-Mail aufgehoben"}
@@ -22850,6 +22872,7 @@
 {"uk": "модуль вимкнено для всіх («Модулі»)", "en": "module disabled for everyone (“Modules”)", "de": "Modul für alle deaktiviert („Module“)"}
 {"uk": "модуль запису нарад, транскрипція розмови додасться до цієї зустрічі.", "en": "the meeting recording module is ready, the transcript will be added to this meeting.", "de": "das Modul zur Besprechungsaufzeichnung läuft, kommt das Transkript zu dieser Besprechung dazu."}
 {"uk": "модулі ще не зареєстровано — усі працюють", "en": "modules are not registered yet — all are active", "de": "Module sind noch nicht registriert — alle sind aktiv"}
+{"uk": "можна відправляти", "en": "ready to ship", "de": "versandbereit"}
 {"uk": "можна з повним префіксом", "en": "may include the full prefix", "de": "auch mit vollständigem Präfix möglich"}
 {"uk": "можна зібрати {0}", "en": "can build {0}", "de": "herstellbar: {0}"}
 {"uk": "можна кількома рядками — кожне побажання з нового рядка", "en": "several lines are fine — each wish on a new line", "de": "mehrere Zeilen möglich — jeder Wunsch in einer neuen Zeile"}
@@ -24194,6 +24217,7 @@
 {"uk": "потрібна підстава — цитата з повідомлення покупця", "en": "a basis is required — a quote from the buyer's message", "de": "Grundlage erforderlich — Zitat aus der Nachricht des Käufers"}
 {"uk": "потрібна сесія покупця; читання запам'ятовує адреси кабінету", "en": "a buyer session is required; reading remembers the account page addresses", "de": "eine Käufersitzung ist erforderlich; das Lesen merkt sich die Adressen des Kundenkontos"}
 {"uk": "потрібне оновлення RAG-ПК (private_rag з підтримкою document). До того документи працюють лише в Minerva: «❓ Запитати» й огляди карток беруть їх напряму.", "en": "the RAG PC needs to be updated (private_rag with document support). Until then documents work only in Minerva: “❓ Ask” and card overviews use them directly.", "de": "der RAG-PC muss aktualisiert werden (private_rag mit document-Unterstützung). Bis dahin funktionieren Dokumente nur in Minerva: „❓ Fragen“ und Kartenübersichten greifen direkt auf sie zu."}
+{"uk": "потрібно", "en": "needed", "de": "benötigt"}
 {"uk": "потрібні артикул і назва", "en": "the SKU and name are required", "de": "Artikelnummer und Name erforderlich"}
 {"uk": "потрібні назва параметра й значення", "en": "the parameter name and value are required", "de": "Parametername und Wert sind erforderlich"}
 {"uk": "потрібні позиції (lines)", "en": "lines are required", "de": "Positionen (lines) erforderlich"}
@@ -25693,6 +25717,7 @@
 {"uk": "червень", "en": "June", "de": "Juni"}
 {"uk": "червня", "en": "June", "de": "Juni"}
 {"uk": "червоним", "en": "in red", "de": "rot"}
+{"uk": "черга", "en": "queue", "de": "Warteschlange"}
 {"uk": "через", "en": "via", "de": "über"}
 {"uk": "через AJAX.", "en": "via AJAX.", "de": "über AJAX."}
 {"uk": "через API", "en": "via API", "de": "über API"}
@@ -26114,6 +26139,8 @@
 {"uk": "✅ Скопійовано — вставте в додатку «⌨ Ввести або вставити код».", "en": "✅ Copied — paste it in the app via «⌨ Enter or paste the code».", "de": "✅ Kopiert — in der App über «⌨ Code eingeben oder einfügen» einfügen."}
 {"uk": "📋 Без камери — скопіюйте код", "en": "📋 No camera — copy the code", "de": "📋 Ohne Kamera — Code kopieren"}
 {"uk": "📋 Копіювати код", "en": "📋 Copy code", "de": "📋 Code kopieren"}
+{"uk": "📌 Віддати товар цьому замовленню першим", "en": "📌 Give stock to this order first", "de": "📌 Ware zuerst an diese Bestellung"}
+{"uk": "📌 Віддати товар цьому замовленню першим? Інші замовлення з цим товаром можуть чекати поставку.", "en": "📌 Give stock to this order first? Other orders with this product may have to wait for delivery.", "de": "📌 Ware zuerst an diese Bestellung? Andere Bestellungen mit diesem Artikel müssen eventuell auf die Lieferung warten."}
 {"uk": "📱 Пошта на телефоні", "en": "📱 Mail on phone", "de": "📱 Mail auf dem Telefon"}
 {"uk": "📱 Підключити телефон", "en": "📱 Connect phone", "de": "📱 Telefon verbinden"}
 {"uk": "📱 Телефони з поштою Minerva", "en": "📱 Phones with Minerva mail", "de": "📱 Telefone mit Minerva-Mail"}

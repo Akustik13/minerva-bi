@@ -406,7 +406,8 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model  = SalesOrder
         fields = "__all__"
-        read_only_fields = ["source", "order_number", "customer_key", "status_source"]
+        # stock_first_at — «📌 товар першим» черги на товар; ставить людина в картці замовлення
+        read_only_fields = ["source", "order_number", "customer_key", "status_source", "stock_first_at"]
 
 
 class OrderLineInputSerializer(serializers.Serializer):

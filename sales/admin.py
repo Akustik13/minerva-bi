@@ -265,6 +265,12 @@ class SalesOrderLineInline(admin.TabularInline):
         if sent and needed <= 0:
             return format_html('<span style="background:#2e7d32;color:#fff;padding:2px 8px;border-radius:8px;'
                                'font-size:11px">📦 ✓ {} відправлено</span>', int(sent))
+        # товару на всі незакриті замовлення не вистачає — місце в черзі (кому вже є, а кому чекати)
+        return format_html('{}{}', self._stock_badge(stock, needed, sent, wait), _queue_html(cover.get("queue")))
+    stock_status.short_description = "На складі"
+
+    @staticmethod
+    def _stock_badge(stock, needed, sent, wait):
         if sent:
             # частину відправлено посилками: явно «ще відправити N», вільно на складі — для залишку
             tone = "#4caf50" if stock >= needed else ("#ff9800" if stock > 0 else "#f44336")
@@ -278,7 +284,27 @@ class SalesOrderLineInline(admin.TabularInline):
         elif stock < needed:
             return format_html('<span style="background:#ff9800;color:#fff;padding:2px 8px;border-radius:8px;font-size:11px">⚠️ {} / {}</span>{}', int(stock), int(needed), wait)
         return format_html('<span style="background:#4caf50;color:#fff;padding:2px 8px;border-radius:8px;font-size:11px">✅ {} шт.</span>', int(stock))
-    stock_status.short_description = "На складі"
+
+
+def _queue_title(q):
+    """Пояснення черги (підказка): скільки є, скільки треба всім, правило."""
+    return (f"На всі незакриті замовлення не вистачає: для них є {int(q['pool'])}, потрібно {int(q['total'])}. "
+            "Товар іде за чергою: 📌 закріплені → дедлайн відправки → дата замовлення.")
+
+
+def _queue_html(q, wait_text=True):
+    """«🔢 черга 3/3 · бракує 3 · ⚠️ дозамовити 2» для позиції, коли товару на всіх не вистачає (stock.lines_cover)."""
+    if not q:
+        return ""
+    parts = [format_html('{}🔢 черга {}/{}', "📌 " if q["pinned"] else "", q["rank"], q["of"])]
+    if q["short"] > 0:
+        parts.append(format_html('<b style="color:#ff9800">⏳ бракує {}</b>', int(q["short"])))
+        if wait_text and q["wait"] > 0:
+            parts.append(format_html('<b style="color:#f44336">⚠️ дозамовити {}</b>', int(q["wait"])))
+    else:
+        parts.append(format_html('<b style="color:#4caf50">✅ можна відправляти</b>'))
+    return format_html('<div style="font-size:11px;color:var(--text-muted);margin-top:3px" title="{}">{}</div>',
+                       _queue_title(q), mark_safe(" · ".join(parts)))
 
 
 def _line_cover(line):
@@ -925,21 +951,27 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
                                  for l in line_objs]
                     product_ids = list({lp['product_id'] for lp in line_data})
                     # «Склад зараз» = доступно (на складі − резерв) + те, що вже взяло це замовлення:
-                    # списане чи заброньоване під нього не рахується як нестача (stock.line_cover_held —
+                    # списане чи заброньоване під нього не рахується як нестача; товару на всі незакриті
+                    # замовлення не вистачає — скільки лишилось для нього за чергою (stock.lines_cover —
                     # так само, як картка замовлення)
-                    avail = {pid: p._available for pid, p in stock_service.stock_map(product_ids).items()}
                     ships_late = stock_service._ships_late()     # налаштування складу — раз на сторінку
+                    cover = stock_service.lines_cover(line_objs, ships_late)
                     order_stock = {}
                     line_rows = []
                     for l in line_objs:
-                        free = avail.get(l.product_id, 0) + stock_service.line_cover_held(l, ships_late)
-                        sent = stock_service.line_sent(l)       # відправлено посилками — уже пішло
+                        c = cover[l.pk]
+                        sent = c['sent']                        # відправлено посилками — уже пішло
                         row = {
                             'pid':   l.product_id,
                             'need':  max(0, int((l.qty or 0) - sent)),
                             'sent':  int(sent),
-                            'stock': max(0, int(free)),
+                            'stock': max(0, int(c['free'])),
                         }
+                        q = c.get('queue')
+                        if q:
+                            # 🔢 черга: на всі незакриті замовлення товару не вистачає
+                            row['q'] = {'r': q['rank'], 'n': q['of'], 'pin': q['pinned'], 'pool': int(q['pool']),
+                                        'total': int(q['total']), 'short': int(q['short']), 'wait': int(q['wait'])}
                         line_rows.append(row)
                         order_stock.setdefault(str(l.order_id), []).append(row)
                     response.context_data['sv_order_stock_json'] = _json.dumps(order_stock)
@@ -1308,11 +1340,13 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
     readonly_fields = ['stock_summary', 'label_buttons_detail',
                        'documents_list', 'upload_widget', 'doc_buttons', 'doc_templates_panel',
                        'packaging_panel', 'status_source', 'crm_link', 'bom_assembly_status',
-                       'documents_view', 'doc_buttons_view', 'parcel_tracking', 'payment_invoice_panel']
+                       'documents_view', 'doc_buttons_view', 'parcel_tracking', 'payment_invoice_panel',
+                       'stock_summary_view']
 
-    # Хто замовлення лише переглядає — документи без «🗑️», «📤 Завантажити» й «💾» (ті самі дії сервер і так
-    # відхиляє: _list_edit_refused)
-    _VIEW_ONLY_FIELDS = {'documents_list': 'documents_view', 'doc_buttons': 'doc_buttons_view', 'upload_widget': None}
+    # Хто замовлення лише переглядає — документи без «🗑️», «📤 Завантажити» й «💾», склад без «📌» (ті самі дії
+    # сервер і так відхиляє: _list_edit_refused)
+    _VIEW_ONLY_FIELDS = {'documents_list': 'documents_view', 'doc_buttons': 'doc_buttons_view', 'upload_widget': None,
+                         'stock_summary': 'stock_summary_view'}
 
     @staticmethod
     def _parcel_shipments(obj):
@@ -3020,21 +3054,70 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
     # ── Склад ──────────────────────────────────────────────────────────────────
 
     def stock_summary(self, obj):
+        return self._stock_summary(obj, editable=True)
+    stock_summary.short_description = "📦 Залишки на складі"
+
+    def stock_summary_view(self, obj):
+        """Склад для того, хто замовлення лише переглядає: без «📌 Товар — цьому замовленню першим»."""
+        return self._stock_summary(obj, editable=False)
+    stock_summary_view.short_description = "📦 Залишки на складі"
+
+    @staticmethod
+    def _stock_first_html(obj, editable):
+        """«📌 Товар — цьому замовленню першим» (stock.queue_key): лише коли товару на всіх не вистачає."""
+        from django.utils import timezone
+        pinned = obj.stock_first_at
+        if pinned:
+            text = format_html('📌 Товар — цьому замовленню першим (з {})',
+                               timezone.localtime(pinned).strftime('%d.%m.%Y %H:%M'))
+        else:
+            text = format_html('Черга: дедлайн відправки → дата замовлення. Віддати товар цьому замовленню '
+                               'раніше за інші?')
+        button = ''
+        if editable:
+            button = format_html(
+                '<button type="button" class="sv-stock-first" data-pk="{}" data-on="{}" '
+                'onclick="svStockFirst(this)" style="margin-left:10px;padding:5px 12px;border-radius:6px;'
+                'border:1px solid #1976d2;background:{};color:{};cursor:pointer;font-size:12px;font-weight:600">'
+                '{}</button>'
+                '<script>window.svStockFirst=window.svStockFirst||function(b){{'
+                'var on=b.dataset.on==="1";if(!confirm(on?"Зняти 📌? Замовлення повернеться в чергу за дедлайном.":'
+                '"📌 Віддати товар цьому замовленню першим? Інші замовлення з цим товаром можуть чекати поставку."))return;'
+                'var t=document.querySelector("[name=csrfmiddlewaretoken]");b.disabled=true;'
+                'fetch("/admin/sales/salesorder/"+b.dataset.pk+"/stock-first/",{{method:"POST",credentials:"same-origin",'
+                'headers:{{"X-CSRFToken":t?t.value:"","Content-Type":"application/json"}},body:JSON.stringify({{on:!on}})}})'
+                '.then(function(r){{return r.json()}}).then(function(d){{if(d.ok){{location.reload()}}else{{'
+                'b.disabled=false;alert(d.error||"Не вдалося")}}}}).catch(function(){{b.disabled=false}})}}</script>',
+                obj.pk, "1" if pinned else "0",
+                "#1976d2" if pinned else "transparent", "#fff" if pinned else "#1976d2",
+                "✕ Зняти 📌" if pinned else "📌 Віддати товар першим")
+        return format_html('<div style="margin:0 0 12px;padding:8px 12px;border-radius:6px;font-size:12px;'
+                           'background:rgba(25,118,210,.08);border:1px solid rgba(25,118,210,.3)">{}{}</div>',
+                           text, button)
+
+    def _stock_summary(self, obj, editable=True):
         from inventory.services import stock as stock_service
         if not obj.pk:
             return mark_safe('<em style="color:#607d8b">Збережіть замовлення</em>')
         lines = obj.lines.all()
         if not lines:
             return "Немає позицій"
-        # доступно + те, що вже взяло це замовлення (його списання / резерв не рахуються як нестача)
+        # доступно + те, що вже взяло це замовлення (його списання / резерв не рахуються як нестача);
+        # товару на всі незакриті замовлення не вистачає — за чергою (stock.lines_cover)
         cover = stock_service.order_lines_cover(obj)
-        rows, has_problems = [], False
+        rows, has_problems, queued = [], False, False
         for line in lines:
-            sku = line.product.sku if line.product else line.sku_raw
-            name = line.product.name if line.product else "— SKU не знайдено —"
+            sku = escape(line.product.sku if line.product else line.sku_raw)
+            name = escape(line.product.name if line.product else "— SKU не знайдено —")
             needed = float(line.qty or 0)
+            qnote = ""
             if line.product:
-                stock = float(cover.get(line.pk, {}).get("free", 0))
+                c = cover.get(line.pk, {})
+                stock = float(c.get("free", 0))
+                needed = float(c.get("need", needed))
+                if c.get("queue"):
+                    queued = True
+                    qnote = _queue_html(c["queue"])
                 if stock <= 0:
                     s = "🚫 НЕМАЄ"
                     row_style = "border-left:4px solid #f44336"
@@ -3059,18 +3142,20 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
                 f"<td style='padding:10px;font-weight:bold'>{sku}</td>"
                 f"<td style='padding:10px'>{name}</td>"
                 f"<td style='padding:10px;text-align:center'>{int(needed)}</td>"
-                f"<td style='padding:10px;color:{tc};font-weight:bold'>{s}</td></tr>"
+                f"<td style='padding:10px;color:{tc};font-weight:bold'>{s}{qnote}</td></tr>"
             )
 
         summary_icon = "⚠️" if has_problems else "✅"
         summary_text = "Є проблеми з наявністю!" if has_problems else "Всі товари є на складі"
         summary_color = "#f44336" if has_problems else "#4caf50"
+        first = self._stock_first_html(obj, editable) if (queued or obj.stock_first_at) else ""
 
         return mark_safe(
             f'<div style="border-left:4px solid {summary_color};padding:10px 16px;'
             f'margin-bottom:12px;border-radius:4px;font-weight:bold;'
             f'color:{summary_color}">'
             f'{summary_icon} {summary_text}</div>'
+            + first +
             '<table style="border-collapse:collapse;width:100%;'
             'border-radius:8px;overflow:hidden;border:1px solid rgba(128,128,128,0.2)">'
             '<thead><tr style="background:rgba(55,71,79,0.9);color:#eceff1">'
@@ -3083,7 +3168,6 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
             + "".join(rows) +
             '</tbody></table>'
         )
-    stock_summary.short_description = "📦 Залишки на складі"
 
     def bom_assembly_status(self, obj):
         """Показує статус БОМ: чи можна зібрати товари в замовленні."""
@@ -3286,6 +3370,10 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
             path('<int:pk>/stock-avail/',
                  self.admin_site.admin_view(self.stock_avail_view),
                  name='sales_salesorder_stock_avail'),
+            # 📌 Товар — цьому замовленню першим (черга на товар, stock.queue_key)
+            path('<int:pk>/stock-first/',
+                 self.admin_site.admin_view(self.stock_first_view),
+                 name='sales_salesorder_stock_first'),
         ]
         return custom_urls + urls
 
@@ -3385,6 +3473,7 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
                 except Exception:
                     bom_status = ''
 
+            q = (cover.get(line.pk) or {}).get('queue')
             result.append({
                 'sku': p.sku, 'name': p.name, 'product_pk': p.pk,
                 'needed': needed, 'stock': stock, 'status': status, 'short': short,
@@ -3392,6 +3481,10 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
                 'po_date': po_ed.strftime('%d.%m.%Y') if po_ed else '',
                 'bom_status': bom_status,
                 'bom_components': bom_components,
+                # 🔢 черга: товару на всі незакриті замовлення не вистачає (stock.lines_cover)
+                'queue': ({'r': q['rank'], 'n': q['of'], 'pin': q['pinned'], 'pool': int(q['pool']),
+                           'total': int(q['total']), 'short': int(q['short']), 'wait': int(q['wait'])}
+                          if q else None),
             })
         return JsonResponse({'ok': True, 'lines': result,
                              'ok_count': ok_count, 'bad_count': bad_count})
@@ -3417,6 +3510,27 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
         order = get_object_or_404(SalesOrder, pk=pk, **lookup)
         refused = self._list_edit_refused(request, order)
         return (None, refused) if refused is not None else (order, None)
+
+    def stock_first_view(self, request, pk):
+        """POST {on: true|false}: «📌 Товар — цьому замовленню першим» — коли товару на всі незакриті замовлення не
+        вистачає, це замовлення отримує його раніше за чергу за дедлайном (stock.queue_key). Склад не рухає.
+        Лише POST і з правом змінювати замовлення (_order_to_change)."""
+        from django.http import JsonResponse
+        from django.utils import timezone
+        import json as _json
+        order, refused = self._order_to_change(request, pk)
+        if refused is not None:
+            return refused
+        try:
+            data = _json.loads(request.body or b'{}')
+        except ValueError:
+            data = {}
+        on = bool(data.get('on', not order.stock_first_at))
+        if on != bool(order.stock_first_at):
+            order.stock_first_at = timezone.now() if on else None
+            order.save(update_fields=['stock_first_at'])
+            self.log_change(request, order, '📌 Товар — цьому замовленню першим' if on else '📌 знято: черга за дедлайном')
+        return JsonResponse({'ok': True, 'on': bool(order.stock_first_at)})
 
     def flag_order_view(self, request, pk):
         from django.http import JsonResponse

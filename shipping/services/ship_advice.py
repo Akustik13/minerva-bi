@@ -114,7 +114,11 @@ def checks(order, stock=None, shipments=None) -> list:
         if line.product_id is None:
             add('warn', f'позиція {line.sku_raw or "?"} без товару складу')
         elif c is not None and c['free'] < c.get('need', line.qty or 0):
-            add('warn', f'бракує {line.product.sku}: потрібно {num(c.get("need", line.qty))}, вільно {num(c["free"])}')
+            q = c.get('queue')
+            # товару на всі замовлення не вистачає — він іде за чергою (stock.queue_key)
+            place = f' (черга {q["rank"]}/{q["of"]}: товар спершу іде замовленням вище в черзі)' if q else ''
+            add('warn', f'бракує {line.product.sku}: потрібно {num(c.get("need", line.qty))}, '
+                        f'вільно {num(max(c["free"], 0))}{place}')
     if code and code not in eu():
         no_hs = [l.product.sku for l in lines if l.product_id and not hs(l.product)]
         if no_hs:

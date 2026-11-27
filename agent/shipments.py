@@ -215,6 +215,12 @@ def get_order(ctx, args):
         if c:
             row['free_on_stock'] = _n(c['free'])
             row['short'] = c['free'] < (line.qty or 0)
+            q = c.get('queue')
+            if q:
+                # на всі незакриті замовлення товару не вистачає: місце в черзі (stock.queue_key) — кому вже є
+                row['queue'] = {'place': q['rank'], 'of': q['of'], 'pinned_first': q['pinned'],
+                                'can_ship_now': q['short'] <= 0, 'short': _n(q['short']),
+                                'covered_by_purchase_orders': _n(q['inc']), 'reorder': _n(q['wait'])}
         lines.append(row)
     to = _ship_to(o)
     pack = _packaging(to)

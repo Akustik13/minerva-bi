@@ -41,6 +41,7 @@ import copy
 import math
 import re
 import uuid
+from datetime import date
 from decimal import Decimal
 
 from django.db import transaction
@@ -385,18 +386,118 @@ def line_cover_held(line, ships_late=None):
 
 
 def order_lines_cover(order):
-    """{pk позиції: {available, held, free, sent, need}} для картки замовлення: free = доступно + те, що вже взяло
-    це замовлення (його списання / резерв / бронь не рахуються як нестача). Відправлене й списане — free = available.
-    Відправлене посилками (sent) уже пішло: need = кількість − sent — скільки ще потрібно для залишку."""
+    """{pk позиції: {available, held, free, sent, need, queue}} для картки замовлення: free = доступно + те, що вже
+    взяло це замовлення (його списання / резерв / бронь не рахуються як нестача). Відправлене й списане — free =
+    available. Відправлене посилками (sent) уже пішло: need = кількість − sent — скільки ще потрібно для залишку.
+    Товару на всі незакриті замовлення не вистачає — free і queue з черги (lines_cover, stock_queue)."""
     lines = list(annotate_line_held(order.lines.filter(product__isnull=False)).select_related("order"))
-    avail = {pid: p._available for pid, p in stock_map({l.product_id for l in lines}).items()}
+    return lines_cover(lines)
+
+
+# ── Черга на товар: кому товару вистачає, а кому чекати ───────────────────────
+#
+# «Доступно» — те, що лишиться після ВСІХ незакритих замовлень. Коли на всіх не вистачає (доступно < 0), кожне
+# замовлення окремо бачило б «бракує» (доступно + своє), хоча товару на складі вистачає на кілька з них. Черга
+# вирішує, кому товар зараз: queue_key. Лише читання — склад нічого не рухає.
+
+_LAST = date.max
+
+
+def queue_key(order):
+    """Хто отримує товар першим, коли на всіх не вистачає: уже відправлене, але ще не списане (режим «при
+    Доставлено» — товару на полиці вже немає) → 📌 «Товар — цьому замовленню першим» (`stock_first_at`, раніше
+    закріплене — раніше) → дедлайн відправки (без дедлайну — у кінці) → дата замовлення → pk. Без 📌 — той самий
+    порядок, що «📦 Відправка сьогодні» (shipping.services.ship_advice.queue)."""
+    pinned = getattr(order, "stock_first_at", None)
+    return (0 if order.status in SHIPPED_STATUSES else 1,
+            0 if pinned else 1, pinned.timestamp() if pinned else 0,
+            order.shipping_deadline or _LAST, order.order_date or _LAST, order.pk or 0)
+
+
+def stock_queue(product_ids, settings=None) -> dict:
+    """Черга незакритих замовлень на кожен товар: {pk товару: {available, pool, need, short, lines, by_line}}.
+
+    pool — скільки товару є для незакритих замовлень: «Доступно» + усе, що вони тримають (резерв, бронь ще не
+    записаного, списане, але не відправлене); ручні резерви поза замовленнями лишаються відняті. need — скільки
+    тримають усі разом; short — на всіх не вистачає (доступно < 0). lines — позиції за чергою (queue_key), кожна:
+    {line, order, need, ahead, free, give, short, inc, wait, rank, of, pinned}: free = pool − що бере черга перед
+    нею (скільки лишилось для неї), give — скільки з цього її (0…need), short — чого бракує; inc — скільки з
+    бракованого покриють уже замовлені закупівлі (incoming_info, у тій самій черзі), wait — чого бракує навіть з
+    ними (треба дозамовити). by_line — те саме за pk позиції."""
+    from sales.models import SalesOrderLine
+    ids = {int(pk) for pk in product_ids if pk}
+    if not ids:
+        return {}
+    s = settings or InventorySettings.get()
+    late = _ships_late(s)
+    stock = stock_map(ids)
+    pending = set(pending_order_lines(s).filter(product_id__in=ids).values_list("pk", flat=True))
+    lines = (annotate_line_held(SalesOrderLine.objects
+                                .filter(product_id__in=ids, order__affects_stock=True, qty__gt=0)
+                                .exclude(order__status__in=NOT_PENDING_STATUSES))
+             .select_related("order"))
+    held = {}
+    for line in lines:
+        if (getattr(line, "_held_tx", None) or 0) <= 0 and line.pk not in pending:
+            continue      # без руху й не бронь (відправлене до обліку складу) — товару не тримає
+        h = line_cover_held(line, late)
+        if h > 0:
+            held.setdefault(line.product_id, []).append((line, h))
+    short_ids = {pid for pid in ids if stock.get(pid) is not None and stock[pid]._available < 0}
+    incoming = incoming_info(short_ids) if short_ids else {}
+    out = {}
+    for pid in ids:
+        p = stock.get(pid)
+        available = p._available if p is not None else Decimal("0")
+        rows = sorted(held.get(pid, ()), key=lambda r: queue_key(r[0].order))
+        need = sum((h for _, h in rows), Decimal("0"))
+        pool = available + need
+        left = max(pool, Decimal("0"))
+        inc_left = (incoming.get(pid) or {}).get("qty") or Decimal("0")
+        ahead = Decimal("0")
+        entries = []
+        for rank, (line, h) in enumerate(rows, 1):
+            give = min(h, left)
+            left -= give
+            short = h - give
+            inc = min(short, inc_left)
+            inc_left -= inc
+            entries.append({"line": line, "order": line.order, "need": h, "ahead": ahead, "free": pool - ahead,
+                            "give": give, "short": short, "inc": inc, "wait": short - inc,
+                            "rank": rank, "of": len(rows),
+                            "pinned": bool(getattr(line.order, "stock_first_at", None))})
+            ahead += h
+        out[pid] = {"available": available, "pool": pool, "need": need, "short": available < 0 and bool(rows),
+                    "lines": entries, "by_line": {e["line"].pk: e for e in entries}}
+    return out
+
+
+def queue_place(entry, product_queue) -> dict:
+    """Місце позиції в черзі для показу (картка, список, огляд складу): числа без об'єктів моделей."""
+    return {"rank": entry["rank"], "of": entry["of"], "pinned": entry["pinned"], "need": entry["need"],
+            "give": entry["give"], "short": entry["short"], "inc": entry["inc"], "wait": entry["wait"],
+            "pool": product_queue["pool"], "total": product_queue["need"]}
+
+
+def lines_cover(lines, ships_late=None) -> dict:
+    """{pk позиції: {available, held, free, sent, need, queue}} — order_lines_cover для будь-яких позицій
+    (annotate_line_held + select_related("order")): картка й список замовлень. Товару вистачає на всі незакриті
+    замовлення — free = доступно + своє, queue = None. Не вистачає — free = скільки лишилось для цієї позиції після
+    черги перед нею (stock_queue), queue — її місце (queue_place): кому товар уже є, а кому чекати."""
+    lines = list(lines)
+    queue = stock_queue({l.product_id for l in lines if l.product_id})
     out = {}
     for line in lines:
-        a = avail.get(line.product_id, Decimal("0"))
-        h = line_cover_held(line)
+        q = queue.get(line.product_id) or {}
+        a = q.get("available", Decimal("0"))
+        h = line_cover_held(line, ships_late)
         sent = line_sent(line)
-        out[line.pk] = {"available": a, "held": h, "free": a + h, "sent": sent,
-                        "need": max((line.qty or Decimal("0")) - sent, Decimal("0"))}
+        free, place = a + h, None
+        entry = q.get("by_line", {}).get(line.pk) if q.get("short") else None
+        if entry is not None:
+            free, place = entry["free"], queue_place(entry, q)
+        out[line.pk] = {"available": a, "held": h, "free": free, "sent": sent,
+                        "need": max((line.qty or Decimal("0")) - sent, Decimal("0")), "queue": place}
     return out
 
 

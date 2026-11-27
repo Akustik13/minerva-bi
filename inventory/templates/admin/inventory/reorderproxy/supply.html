@@ -473,9 +473,13 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
               <div class="sv-detail-section">
                 <h4>📋 {% trans "Резервації (незакриті замовлення)" %}</h4>
                 <p class="sv-sub-empty" style="margin:0 0 6px">{% trans "У «Резерв» рахуються 🔒 резерви й ⏳ ще не списані замовлення; ✓ уже списані вже відняті від «На складі»." %}</p>
+                {% if row.queue_short %}
+                <p class="sv-sub-empty" style="margin:0 0 6px;color:var(--warn,#ff9800)">🔢 {% trans "На всі замовлення не вистачає — товар іде за чергою: 📌 закріплені → дедлайн відправки → дата замовлення. ✅ — можна відправляти, ⏳ — чекає поставку." %}</p>
+                {% endif %}
                 {% if row.reservations %}
                 <table class="sv-sub-table">
                   <tr>
+                    {% if row.queue_short %}<td style="color:var(--text-dim);font-size:10px;font-weight:700">{% trans "ЧЕРГА" %}</td>{% endif %}
                     <td style="color:var(--text-dim);font-size:10px;font-weight:700">{% trans "ЗАМОВНИК" %}</td>
                     <td style="color:var(--text-dim);font-size:10px;font-weight:700">{% trans "№ ЗАМ." %}</td>
                     <td style="color:var(--text-dim);font-size:10px;font-weight:700;text-align:right">{% trans "К-СТЬ" %}</td>
@@ -485,6 +489,24 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
                   </tr>
                   {% for res in row.reservations %}
                   <tr>
+                    {% if row.queue_short %}
+                    <td style="font-size:11px;white-space:nowrap">
+                      {% with q=res.queue %}{% if q %}
+                        {% if q.pinned %}📌 {% endif %}<b>{{ q.rank }}</b>
+                        {% if q.short > 0 %}
+                          <span style="color:var(--warn,#ff9800);font-weight:700" title="{% trans "Бракує для цього замовлення" %}">⏳ −{{ q.short|floatformat:"0" }}</span>
+                          {% if q.wait > 0 %}<span style="color:var(--err,#ef5350);font-weight:700" title="{% trans "Не покриває навіть уже замовлене в постачальника — дозамовити" %}">⚠️ +{{ q.wait|floatformat:"0" }}</span>{% endif %}
+                        {% else %}
+                          <span style="color:var(--ok,#66bb6a);font-weight:700" title="{% trans "Товару вистачає — можна відправляти" %}">✅</span>
+                        {% endif %}
+                        {% if can_pin %}
+                          <button type="button" class="sv-btn" data-pk="{{ res.order_pk }}" data-on="{% if q.pinned %}1{% else %}0{% endif %}"
+                                  onclick="svStockFirst(this)" style="font-size:10px;padding:1px 6px;margin-left:4px"
+                                  title="{% if q.pinned %}{% trans "Зняти 📌: замовлення повернеться в чергу за дедлайном" %}{% else %}{% trans "📌 Віддати товар цьому замовленню першим" %}{% endif %}">{% if q.pinned %}✕{% else %}📌{% endif %}</button>
+                        {% endif %}
+                      {% else %}<span style="color:var(--text-dim)">—</span>{% endif %}{% endwith %}
+                    </td>
+                    {% endif %}
                     <td>
                       <a href="/admin/sales/salesorder/{{ res.order_pk }}/change/"
                          style="color:var(--link-fg);font-weight:600;text-decoration:none"
@@ -1027,6 +1049,23 @@ var _svi = {
   // Apply filter/search
   applyVisibility();
 })();
+
+/* ── 📌 Товар — цьому замовленню першим (черга на товар; право змінювати замовлення перевіряє сервер) ── */
+window.svStockFirst = function(btn) {
+  var on = btn.getAttribute('data-on') === '1';
+  if (!confirm(on ? '{% trans "Зняти 📌? Замовлення повернеться в чергу за дедлайном." %}'
+                  : '{% trans "📌 Віддати товар цьому замовленню першим? Інші замовлення з цим товаром можуть чекати поставку." %}')) return;
+  var m = document.cookie.match(/csrftoken=([^;]+)/);
+  var el = document.querySelector('[name=csrfmiddlewaretoken]');
+  btn.disabled = true;
+  fetch('/admin/sales/salesorder/' + btn.getAttribute('data-pk') + '/stock-first/', {
+    method: 'POST', credentials: 'same-origin',
+    headers: {'X-CSRFToken': m ? m[1] : (el ? el.value : ''), 'Content-Type': 'application/json'},
+    body: JSON.stringify({on: !on})
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) { location.reload(); } else { btn.disabled = false; alert(d.error || '{% trans "Не вдалося" %}'); }
+  }).catch(function() { btn.disabled = false; });
+};
 
 /* ── Receive PO line ── */
 (function() {

@@ -6,7 +6,7 @@ where: 📦 Склад → Огляд складу · Транзакції
 urls: /admin/inventory/reorderproxy/supply/, /admin/inventory/inventorytransaction/, /admin/inventory/inventorytransaction/add/, /admin/inventory/location/
 roles: адміністратор, складник
 keywords: залишок, склад, stock, Bestand, резерв, доступно, транзакція, прихід, витрата, списання, коригування, інвентаризація, set stock, локація, MAIN, рух товару, від'ємний залишок, скасування, повернення на склад
-related: inventory/products, inventory/purchases, inventory/reorder, inventory/settings, sales/orders, api/stock-orders
+related: inventory/products, inventory/stock-queue, inventory/purchases, inventory/reorder, inventory/settings, sales/orders, api/stock-orders
 ---
 
 ## Що це
@@ -122,7 +122,9 @@ related: inventory/products, inventory/purchases, inventory/reorder, inventory/s
 Кнопка **▶** у рядку розгортає деталі:
 
 - **«📋 Резервації (незакриті замовлення)»** — замовник, № замовлення, кількість, статус, **«Склад»**
-  (🔒 резерв · ⏳ ще не списано · ✓ уже списано) і термін відвантаження. У **«Резерв»** рахуються лише 🔒 і ⏳;
+  (🔒 резерв · ⏳ ще не списано · ✓ уже списано) і термін відвантаження. У **«Резерв»** рахуються лише 🔒 і ⏳.
+  Не вистачає на всіх — рядки йдуть у порядку черги, колонка **«ЧЕРГА»** показує ✅ / ⏳ і кнопку 📌
+  ([черга на товар](guide:inventory/stock-queue));
 - **«📦 Очікуваний прихід (відкриті PO)»** — постачальник, скільки ще прийде, дата; **«✓ Отримати»**
   оприбутковує весь залишок рядка, ✏️ — іншу кількість; позицію вже прийняли, поки сторінка була відкрита, —
   нічого не додасть і попросить оновити сторінку;

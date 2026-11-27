@@ -135,6 +135,11 @@ class SalesOrder(models.Model):
     shipping_currency = models.CharField(max_length=8, blank=True, default="EUR", verbose_name="Валюта доставки")
     is_flagged    = models.BooleanField("⭐ Важливе", default=False, db_index=True)
     internal_note = models.CharField("Нотатка", max_length=500, blank=True, default="")
+    stock_first_at = models.DateTimeField(
+        "📌 Товар — цьому замовленню першим", null=True, blank=True,
+        help_text="Коли товару на всі незакриті замовлення не вистачає, це замовлення отримує його першим "
+                  "(inventory.services.stock.queue_key). Ставить кнопка «📌» у блоці «Склад» картки.",
+    )
 
     # ── EU Invoice ────────────────────────────────────────────────────────────
     eu_invoice_number = models.IntegerField(

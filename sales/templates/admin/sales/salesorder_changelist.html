@@ -1266,6 +1266,21 @@ function svOpenLabel(url) { svLabelAction('ask', url); }
 function _svEsc(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+// 🔢 Черга на товар (stock.lines_cover): на всі незакриті замовлення не вистачає — місце цього замовлення,
+// чи йому вже є товар, чого бракує й чи треба дозамовити понад уже замовлене в постачальника
+function _svQueue(q) {
+  if (!q) return '';
+  var title = '{% trans "На всі незакриті замовлення не вистачає: для них є" %} ' + q.pool
+    + ', {% trans "потрібно" %} ' + q.total + '. {% trans "Товар іде за чергою: 📌 закріплені → дедлайн відправки → дата замовлення." %}';
+  var html = (q.pin ? '📌 ' : '') + '🔢 {% trans "черга" %} ' + q.r + '/' + q.n;
+  if (q.short > 0) {
+    html += ' · <b style="color:var(--warn,#ff9800)">⏳ {% trans "бракує" %} ' + q.short + '</b>';
+    if (q.wait > 0) html += ' · <b style="color:var(--err)">⚠️ {% trans "дозамовити" %} ' + q.wait + '</b>';
+  } else {
+    html += ' · <b style="color:var(--ok)">✅ {% trans "можна відправляти" %}</b>';
+  }
+  return '<div style="font-size:10px;color:var(--text-dim);white-space:nowrap" title="' + _svEsc(title) + '">' + html + '</div>';
+}
 (function() {
   var stockData = {{ sv_order_stock_json|default:"{}"|safe }};
 
@@ -1363,6 +1378,7 @@ function _svEsc(s) {
         sentLine += '<div style="font-size:10px;color:var(--link-fg,#58a6ff)" title="{% trans "Чекаємо поставку від постачальника" %}">📥 +'
           + l.inc + ' ' + _svEsc(l.inc_po) + (l.inc_date ? ' · ' + _svEsc(l.inc_date) : '') + '</div>';
       }
+      sentLine += _svQueue(l.q);
 
       if (l.sent && !l.need) {
         // усе з позиції вже відправлено посилками: на складі зараз — l.stock
@@ -1620,7 +1636,7 @@ if (!window._cexDelDocDef) {
       var afterTxt = after >= 0
         ? '<span style="color:var(--ok)">→ ' + after + ' {% trans "залишок" %}</span>'
         : '<span style="color:var(--err)">→ ' + after + ' {% trans "дефіцит" %}</span>';
-      var stockTxt = icon + ' <b>' + l.stock + '</b> ' + afterTxt;
+      var stockTxt = icon + ' <b>' + l.stock + '</b> ' + afterTxt + _svQueue(l.queue);
 
       /* PO info badge (shown for any line with active PO) or cart-add button */
       var cartBtn = '';

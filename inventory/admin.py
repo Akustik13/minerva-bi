@@ -338,6 +338,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         for l, state in stock_service.open_order_lines(product_pks):
             o = l.order
             reservations_detail[l.product_id].append({
+                'line_pk':          l.pk,
                 'order_number':     o.order_number,
                 'order_pk':         o.pk,
                 'qty':              float(getattr(l, '_open_qty', l.qty)),
@@ -350,6 +351,19 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 'state_label':  STATE_LABELS[state],
                 'in_reserved':  state != 'deducted',
             })
+
+        # 🔢 Черга: товару на всі незакриті замовлення не вистачає (доступно < 0) — рядки в порядку черги
+        # (stock.queue_key) і кому товар уже є, а кому чекати (stock.stock_queue — те саме, що картка замовлення)
+        queue_short = set()
+        short_pks = [pk for pk, p in stock_rows.items() if p._available < 0]
+        for pid, q in (stock_service.stock_queue(short_pks).items() if short_pks else ()):
+            if not q['short']:
+                continue
+            queue_short.add(pid)
+            for res in reservations_detail[pid]:
+                entry = q['by_line'].get(res['line_pk'])
+                res['queue'] = stock_service.queue_place(entry, q) if entry else None
+            reservations_detail[pid].sort(key=lambda r: (r['queue'] is None, r['queue']['rank'] if r['queue'] else 0))
 
         # Incoming PO qty + details (split: draft=cart, ordered/partial=confirmed)
         incoming_map = defaultdict(float)
@@ -466,6 +480,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 'earliest_expected_date': earliest_date,
                 'last_tx':               last_tx_map.get(pk),
                 'reservations':          reservations_detail[pk],
+                'queue_short':           pk in queue_short,
                 'po_detail':             po_items,
                 'bom_info':              bom_info,
                 'buildable_qty':         bom_info.get('buildable_qty', 0) if bom_info else 0,
@@ -476,6 +491,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             'title':    _('Склад — огляд залишків та руху'),
             'subtitle': None,
             'rows':     rows,
+            'can_pin':  request.user.has_perm('sales.change_salesorder'),   # 📌 у черзі «Резервацій»
             'params':   param_filters.params_map(products),   # пошук за параметрами на сторінці
             'cats':     category_badges.info(),               # кнопки категорій: значок, назва, колір
             'opts':     ReorderProxy._meta,
