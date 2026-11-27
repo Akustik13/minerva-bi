@@ -243,3 +243,16 @@ class ChangeKindOnMoveTests(LocationsBase):
         self.cable.refresh_from_db()
         self.assertEqual(self.cable.kind, Product.Kind.FINISHED)
         self.assertEqual(self.where(self.cable), {"PRODUCTS": 14})
+
+
+class ProductListLocationColumnTests(LocationsBase):
+    def test_list_shows_where_each_product_lies(self):
+        stock.move_stock(product=self.cable, source=self.loc, target=self.comp, qty=10)
+        c = self.admin_client()
+        r = c.get("/admin/inventory/product/")
+        self.assertContains(r, "📍 Склад")
+        html = r.content.decode()
+        row = html[html.index("CA-SMAM-RG316-1000-SMAM"):]
+        row = row[:row.index("</tr>")]
+        self.assertIn(f"/admin/inventory/location/{self.comp.pk}/stock/", row)
+        self.assertLess(row.index(">COMPONENTS</a> 10"), row.index(">MAIN</a> 4"))   # більше — першим

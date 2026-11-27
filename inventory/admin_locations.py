@@ -283,6 +283,21 @@ def where_html(product, where=None):
     return format_html('{} <span style="color:var(--text-muted);font-size:11px">· також {}</span>', head, more)
 
 
+def where_list_html(product, rows=None):
+    """Колонка «📍 Склад» списку товарів: «COMPONENTS 14 · MAIN 3», код — посилання на сторінку складу, перший —
+    де найбільше (звідси списується компонент). rows — з on_hand_by_location сторінки (None — прочитати самому)."""
+    if rows is None:
+        rows = stock.on_hand_by_location([product.pk]).get(product.pk, [])
+    if not rows:
+        return format_html('<span style="color:var(--text-dim)">—</span>')
+    return format_html_join(
+        '<span style="color:var(--text-dim)"> · </span>',
+        '<span style="white-space:nowrap" title="{}"><a href="{}" translate="no" style="{}">{}</a> {}</span>',
+        ((r["name"] or r["code"], reverse("admin:inventory_location_stock", args=[r["location_id"]]),
+          "font-weight:700" if i == 0 else "color:var(--text-muted)", r["code"], _num(r["qty"]))
+         for i, r in enumerate(rows)))
+
+
 def locations_panel(product):
     """Блок «📍 Склади» в картці товару: де скільки лежить, резерв, доступно + «🔀 Перемістити між складами»."""
     if product is None or not product.pk:

@@ -2356,7 +2356,7 @@ class ProductAdmin(GroupedActionsMixin, ProjectsBlockMixin, AuditableMixin, admi
     change_list_template = "admin/inventory/product/change_list.html"
     list_display = (
         "sku", "media_col", "sku_short", "category_col", "shops_col", "kind", "bom_type", "is_active",
-        "stock_qty", "reserved_qty", "stock_badge", "incoming_qty", "buildable_qty",
+        "stock_qty", "location_col", "reserved_qty", "stock_badge", "incoming_qty", "buildable_qty",
         "reorder_badge", "label_btn", "set_stock_link",
     )
     search_fields = ("sku", "sku_short", "name")
@@ -2881,7 +2881,22 @@ class ProductAdmin(GroupedActionsMixin, ProjectsBlockMixin, AuditableMixin, admi
             response.context_data.update(param_filters.panel_context(request, response.context_data["cl"], "category"))
         return response
 
+    def get_changelist_instance(self, request):
+        """«📍 Склад» — де лежить кожен товар сторінки, одним запитом (stock.on_hand_by_location)."""
+        from inventory.services.stock import on_hand_by_location
+        cl = super().get_changelist_instance(request)
+        self._where_page = on_hand_by_location([o.pk for o in cl.result_list])
+        return cl
+
     # ── Computed columns ──────────────────────────────────────────────────────
+
+    @admin.display(description="📍 Склад")
+    def location_col(self, obj):
+        """«COMPONENTS 14 · MAIN 3»: де лежить товар; перший — де його найбільше (звідси списується компонент),
+        код — посилання на сторінку складу."""
+        from .admin_locations import where_list_html
+        page = getattr(self, "_where_page", None)
+        return where_list_html(obj, page.get(obj.pk, []) if page is not None else None)
 
     def stock_qty(self, obj):
         if hasattr(obj, '_stock_total'):
