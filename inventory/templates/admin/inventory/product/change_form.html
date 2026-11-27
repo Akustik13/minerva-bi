@@ -73,6 +73,10 @@ document.addEventListener('DOMContentLoaded', function () {
   border-left: 4px solid var(--primary, #1976d2); border-radius: 6px;
 }
 #components-group.inv-bom-here h2 { font-size: 13px; margin: 0 0 8px; border-radius: 4px; }
+#components-group.inv-bom-here { overflow-x: auto; }
+#components-group.inv-bom-here td.field-where { white-space: nowrap; font-size: 12px; }
+#components-group.inv-bom-here td.field-qty_per input { width: 6em; }
+#components-group.inv-bom-here td.field-note input { width: 10em; }
 #components-group.bom-hidden, .form-row.inv-bom-off { display: none !important; }
 .inv-bom-open { display: inline-block; margin: 6px 0 0; font-size: 12px; cursor: pointer;
   color: var(--link-fg, #58a6ff); background: none; border: 0; padding: 0; }

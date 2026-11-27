@@ -1,0 +1,119 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+{% comment %}🔀 Склади товару й переміщення між ними — inventory/admin_locations.py (рух — stock.move_stock).{% endcomment %}
+
+{% block extrastyle %}{{ block.super }}
+<style>
+.mvs-box { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 8px;
+  padding: 14px 16px; margin: 12px 0; color: var(--text); max-width: 900px; }
+.mvs-box h2 { font-size: 14px; margin: 0 0 10px; background: none; color: var(--text); padding: 0; }
+.mvs-t { border-collapse: collapse; width: 100%; font-size: 13px; }
+.mvs-t th { text-align: left; font-size: 11px; color: var(--text-dim); padding: 4px 8px;
+  border-bottom: 1px solid var(--border-strong); }
+.mvs-t td { padding: 6px 8px; border-bottom: 1px solid var(--border-color, rgba(128,128,128,.15)); }
+.mvs-t td.n { text-align: right; font-variant-numeric: tabular-nums; }
+.mvs-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.mvs-form label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 3px; }
+.mvs-form select, .mvs-form input { min-width: 180px; }
+.mvs-hint { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+.mvs-ok { color: var(--ok, #4caf50); } .mvs-bad { color: var(--err, #ef5350); }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans "Домівка" %}</a> ›
+  <a href="{% url 'admin:inventory_product_changelist' %}">{% trans "Товари" %}</a> ›
+  {% if bulk %}{% trans "Перемістити на склад" %}{% else %}<a href="{{ card_url }}">{{ product.sku }}</a> › {% trans "Склади" %}{% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+{% if not bulk %}
+<div class="mvs-box">
+  <h2>📍 {% trans "Де лежить" %} <span translate="no">{{ product.sku }}</span>
+    <span style="font-weight:400;color:var(--text-muted)">· {{ product.get_kind_display }}</span></h2>
+  {% if rows %}
+  <table class="mvs-t">
+    <tr><th>{% trans "Склад" %}</th><th>{% trans "Тип" %}</th><th style="text-align:right">{% trans "На складі" %}</th>
+        <th style="text-align:right">{% trans "Резерв" %}</th><th style="text-align:right">{% trans "Доступно" %}</th></tr>
+    {% for r in rows %}
+    <tr>
+      <td><b translate="no">{{ r.location }}</b> <span style="color:var(--text-muted)">{{ r.location_name }}</span>
+        {% if home and home.code == r.location %}<span title="{% trans "Звідси списують продаж і BOM" %}">· {% trans "списується звідси" %}</span>{% endif %}</td>
+      <td style="color:var(--text-muted)">{% if r.loc %}{{ r.loc.get_location_type_display }}{% endif %}</td>
+      <td class="n">{{ r.on_hand|floatformat:"-3" }}</td>
+      <td class="n" style="color:var(--text-muted)">{% if r.reserved %}{{ r.reserved|floatformat:"-3" }}{% else %}—{% endif %}</td>
+      <td class="n">{{ r.available|floatformat:"-3" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}<p style="color:var(--text-dim)">{% trans "Руху цього товару ще не було." %}</p>{% endif %}
+  <p class="mvs-hint">{% if product.kind == "component" %}{% trans "Компонент списується (продаж, BOM виробу) і приходить туди, де його найбільше." %}{% else %}{% trans "Готовий товар продається з локації за замовчуванням." %}{% endif %}</p>
+</div>
+
+{% if can %}
+<div class="mvs-box">
+  <h2>🔀 {% trans "Перемістити між складами" %}</h2>
+  <form method="post" class="mvs-form">{% csrf_token %}
+    <div><label for="mvs-src">{% trans "З якого складу" %}</label>
+      <select name="source" id="mvs-src" required>
+        <option value="">—</option>
+        {% for s in sources %}<option value="{{ s.location_id }}" data-qty="{{ s.qty|floatformat:'-3' }}"
+          {% if form.source == s.location_id|stringformat:'s' %}selected{% endif %}>{{ s.code }} · {{ s.qty|floatformat:"-3" }}</option>{% endfor %}
+      </select></div>
+    <div><label for="mvs-dst">{% trans "На який склад" %}</label>
+      <select name="target" id="mvs-dst" required>
+        <option value="">—</option>
+        {% for t in targets %}<option value="{{ t.loc.pk }}" {% if not t.ok %}disabled title="{{ t.why }}"{% endif %}
+          {% if form.target == t.loc.pk|stringformat:'s' %}selected{% endif %}>{{ t.loc.code }} · {{ t.loc.name }}{% if not t.ok %} ✕{% endif %}</option>{% endfor %}
+      </select></div>
+    <div><label for="mvs-qty">{% trans "Скільки (порожньо — усе)" %}</label>
+      <input type="text" name="qty" id="mvs-qty" value="{{ form.qty }}" inputmode="decimal" placeholder="{% trans "усе" %}"></div>
+    <div><button type="submit" class="button default">🔀 {% trans "Перемістити" %}</button></div>
+  </form>
+  <p class="mvs-hint">{% trans "Два рухи «Коригування» (мінус там, плюс тут) — загальний залишок не змінюється, історія лишається. Перемістили все — броні замовлень переходять разом з товаром." %}
+    <a href="{{ new_location_url }}" target="_blank">＋ {% trans "Створити склад" %}</a></p>
+</div>
+{% endif %}
+<p><a href="{{ card_url }}">← {% trans "До картки товару" %}</a></p>
+
+{% else %}
+{% if results %}
+<div class="mvs-box">
+  <h2>{% trans "Результат" %}</h2>
+  <table class="mvs-t">
+    {% for r in results %}<tr><td translate="no"><b>{{ r.product.sku }}</b></td>
+      <td class="{% if r.ok %}mvs-ok{% else %}mvs-bad{% endif %}">{% if r.ok %}✓{% else %}✕{% endif %} {{ r.text }}</td></tr>{% endfor %}
+  </table>
+</div>
+{% endif %}
+<div class="mvs-box">
+  <h2>📍 {% trans "Вибрані товари й де вони зараз" %} ({{ rows|length }})</h2>
+  <table class="mvs-t">
+    <tr><th>{% trans "Артикул" %}</th><th>{% trans "Тип" %}</th><th>{% trans "Де лежить" %}</th></tr>
+    {% for r in rows %}
+    <tr><td translate="no"><a href="{% url 'admin:inventory_product_move_stock' r.product.pk %}">{{ r.product.sku }}</a></td>
+      <td style="color:var(--text-muted)">{{ r.product.get_kind_display }}</td>
+      <td>{% for w in r.where %}<span translate="no">{{ w.code }}</span> {{ w.qty|floatformat:"-3" }}{% if not forloop.last %} · {% endif %}{% empty %}<span style="color:var(--text-dim)">—</span>{% endfor %}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+<div class="mvs-box">
+  <h2>🔀 {% trans "Перемістити все на склад" %}</h2>
+  <form method="post" class="mvs-form">{% csrf_token %}
+    <input type="hidden" name="ids" value="{{ ids }}">
+    <div><label for="mvs-dst">{% trans "На який склад" %}</label>
+      <select name="target" id="mvs-dst" required>
+        <option value="">—</option>
+        {% for t in targets %}<option value="{{ t.loc.pk }}">{{ t.loc.code }} · {{ t.loc.name }} ({{ t.loc.get_location_type_display }})</option>{% endfor %}
+      </select></div>
+    <div><button type="submit" class="button default"
+      onclick="return confirm('{% trans "Перемістити все, що лежить, на вибраний склад?" %}')">🔀 {% trans "Перемістити" %}</button></div>
+  </form>
+  <p class="mvs-hint">{% trans "Товар, якому склад не підходить (компонент — на склад готової продукції й навпаки), пропускається з поясненням." %}
+    <a href="{{ new_location_url }}" target="_blank">＋ {% trans "Створити склад" %}</a></p>
+</div>
+<p><a href="{{ changelist_url }}">← {% trans "До списку товарів" %}</a></p>
+{% endif %}
+{% endblock %}

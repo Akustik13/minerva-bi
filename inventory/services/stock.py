@@ -256,8 +256,9 @@ def stock_map(product_ids, location=None):
 
 def location_breakdown(product):
     """Залишки товару по кожній локації: [{location, on_hand, reserved, available}]. Сума «reserved» усіх
-    рядків = reserved товару: ще не записані замовлення бронюють товар на локації за замовчуванням — і тоді,
-    коли там цього товару ще немає жодного руху (рядок 0 / резерв / мінус)."""
+    рядків = reserved товару: ще не записані замовлення бронюють товар там, звідки його спишуть — готовий товар
+    на локації за замовчуванням, компонент там, де лежить (home_location), — і тоді, коли там цього товару ще
+    немає жодного руху (рядок 0 / резерв / мінус)."""
     rows = list(InventoryTransaction.objects.filter(product=product)
                 .values("location__code", "location__name")
                 .annotate(
@@ -268,6 +269,8 @@ def location_breakdown(product):
     pending = (pending_order_lines().filter(product=product)
                .aggregate(t=Sum("qty"))["t"]) or Decimal("0")
     default = _default_location_code()
+    if pending and product.kind == Product.Kind.COMPONENT:
+        default = home_location(product.pk).code
     if pending and not any(r["location__code"] == default for r in rows):
         loc = Location.objects.filter(code=default).values("name").first()
         rows.append({"location__code": default, "location__name": loc["name"] if loc else default,
@@ -870,6 +873,82 @@ def home_location(product_id, settings=None):
     s = settings or InventorySettings.get()
     return (Location.objects.filter(code=(s.default_location or "MAIN").strip(), is_active=True).first()
             or order_location(s))
+
+
+def on_hand_by_location(product_ids) -> dict:
+    """{pk товару: [{location_id, code, name, type, qty}]} — фізичний залишок по активних локаціях (без
+    резервів), нулі й мінуси не показуються; більше — першим, тож перший рядок — звідки списується компонент
+    (home_location). Одним запитом — для BOM у картці товару, огляду складу й сторінки переміщення."""
+    ids = [pk for pk in product_ids if pk]
+    out = {}
+    if not ids:
+        return out
+    rows = (InventoryTransaction.objects
+            .filter(product_id__in=ids, location__is_active=True)
+            .exclude(tx_type=TX.RESERVED)
+            .order_by().values("product_id", "location_id", "location__code", "location__name",
+                               "location__location_type")
+            .annotate(t=Sum("qty")).filter(t__gt=0)
+            .order_by("product_id", "-t", "location_id"))
+    for r in rows:
+        out.setdefault(r["product_id"], []).append({
+            "location_id": r["location_id"], "code": r["location__code"], "name": r["location__name"],
+            "type": r["location__location_type"], "qty": r["t"]})
+    return out
+
+
+def move_stock(*, product, source, target, qty, performed_by=None):
+    """🔀 Переміщення товару між складами: два рухи «Коригування» з одним ключем move:<uuid>:out|in — −qty на
+    source, +qty на target; загальний залишок не змінюється. qty > 0, не більше, ніж лежить на source (без
+    резервів), ціле для штук; локації різні й активні; target має підходити товару (_check_location_kind:
+    компонент — не на склад готової продукції й навпаки; «Інше» — будь-що), забрати можна з будь-якого складу.
+    Перемістили все, що лежало на source, — резерви замовлень цього товару там переходять на target (бронь іде
+    за товаром). Під блокуванням рядка товару: подвійний клік не перемістить двічі. Повертає (рух out, рух in)."""
+    qty = Decimal(str(qty))
+    if source is None or target is None or source.pk == target.pk:
+        raise StockError("Виберіть два різні склади.", code="same_location")
+    if not source.is_active or not target.is_active:
+        raise StockError("Склад неактивний.", code="location_inactive")
+    if qty <= 0:
+        raise StockError("Кількість має бути більшою за 0.", code="zero_qty")
+    _check_location_kind(product, target)
+    performer = _performer(performed_by)
+    with transaction.atomic():
+        Product.objects.select_for_update().filter(pk=product.pk).first()
+        there = annotate_stock(Product.objects.filter(pk=product.pk), location=source).get()._on_hand
+        if qty != there:
+            # усе, що лежить, можна й з половинкою (кабель 0,5 на антену), частину — лише цілими штуками
+            _validate_qty(product, qty)
+        if qty > there:
+            raise StockError(f"На «{source.code}» лежить {_num(max(there, Decimal('0')))} «{product.sku}», "
+                             f"перемістити {_num(qty)} не можна.", code="insufficient_stock",
+                             details={"on_hand": str(there), "requested": str(qty)})
+        key = f"move:{uuid.uuid4()}"
+        doc = f"🔀 Переміщення {source.code} → {target.code}"
+        now = timezone.now()
+        out_tx = InventoryTransaction.objects.create(
+            tx_type=TX.ADJUSTMENT, qty=-qty, product=product, location=source, ref_doc=doc,
+            external_key=f"{key}:out", tx_date=now, performed_by=performer)
+        in_tx = InventoryTransaction.objects.create(
+            tx_type=TX.ADJUSTMENT, qty=qty, product=product, location=target, ref_doc=doc,
+            external_key=f"{key}:in", tx_date=now, performed_by=performer)
+        if qty == there:
+            (InventoryTransaction.objects
+             .filter(product=product, location=source, tx_type=TX.RESERVED, external_key__startswith="so:")
+             .update(location=target))
+    return out_tx, in_tx
+
+
+def move_all(product, target, performed_by=None) -> list:
+    """Усе, що лежить на інших складах, — на target (дія списку «🔀 Перемістити на склад…»). → [(склад, к-сть)]."""
+    moved = []
+    for row in on_hand_by_location([product.pk]).get(product.pk, []):
+        if row["location_id"] == target.pk:
+            continue
+        source = Location.objects.get(pk=row["location_id"])
+        move_stock(product=product, source=source, target=target, qty=row["qty"], performed_by=performed_by)
+        moved.append((source, row["qty"]))
+    return moved
 
 
 def _move_location(product, settings, cache):

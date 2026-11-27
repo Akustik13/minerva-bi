@@ -24,7 +24,7 @@ from . import category_badges, param_filters, thumbs
 from .admin_category import ProductCategoryAdminForm
 from .admin_currency import BaseCurrencyFilter
 from django.utils import timezone
-from django.utils.html import format_html, format_html_join
+from django.utils.html import escape, format_html, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from datetime import timedelta
@@ -409,6 +409,15 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             ).values('product_id', 'tx_type', 'qty', 'tx_date', 'ref_doc'):
                 last_tx_map[tx['product_id']] = tx
 
+        # 📍 BOM: з якого складу піде кожен компонент — одним запитом для всіх виробів сторінки
+        comp_ids = (ProductComponent.objects
+                    .filter(parent_id__in=[p.pk for p in products if p.bom_type == Product.BomType.KEY])
+                    .values_list("component_id", flat=True))
+        comp_where = stock_service.on_hand_by_location(set(comp_ids))
+
+        def _where_text(cid):
+            return " · ".join(f"{w['code']} {w['qty'].normalize():f}" for w in comp_where.get(cid, []))
+
         # Build rows (all products)
         rows = []
         for p in products:
@@ -442,6 +451,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                                     'stock': float(comp.get('stock', 0)),
                                     'buildable': int(float(comp.get('stock', 0)) / float(comp.get('qty_per', 1))) if comp.get('qty_per') else 0,
                                     'optional': comp.get('optional', False),
+                                    'where': _where_text(comp['product'].pk),
                                 })
                             except (KeyError, ValueError, TypeError):
                                 continue
@@ -2164,8 +2174,18 @@ class ProductComponentInline(admin.TabularInline):
     fk_name = "parent"
     extra = 0
     autocomplete_fields = ("component",)
-    fields = ("component", "qty_per", "optional", "note")
+    fields = ("component", "where", "qty_per", "optional", "note")
+    readonly_fields = ("where",)
     verbose_name_plural = "Components (BOM)"
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("component")
+
+    @admin.display(description="📍 Звідки")
+    def where(self, obj):
+        """З якого складу піде компонент, коли продадуть виріб (stock.home_location — де його найбільше)."""
+        from .admin_locations import where_html
+        return where_html(obj.component if obj and obj.component_id else None)
 
 
 class ProductPackagingInline(admin.TabularInline):
@@ -2291,7 +2311,7 @@ class ProductAdmin(GroupedActionsMixin, ProjectsBlockMixin, AuditableMixin, admi
     actions       = ["action_set_category", "action_set_lifecycle", "action_archive", "action_unarchive", "action_base_editor", "action_base_from_dk",
                      "action_base_to_home", "action_sale_price_from_base", "action_media_links", "action_shared_media",
                      "bulk_sync_digikey_attrs", "action_dk_prices", "action_dk_from_stock", "action_agent_task",
-                     "action_publish_shop"]
+                     "action_publish_shop", "action_move_stock"]
 
     @admin.display(description=_("Категорія"), ordering="category")
     def category_col(self, obj):
@@ -2353,7 +2373,8 @@ class ProductAdmin(GroupedActionsMixin, ProjectsBlockMixin, AuditableMixin, admi
 
     # Меню «Дія» — групами (core/admin_actions.py)
     ACTION_GROUPS = [
-        ("📦 Товар", ["action_set_category", "action_set_lifecycle", "action_archive", "action_unarchive"]),
+        ("📦 Товар", ["action_set_category", "action_set_lifecycle", "action_archive", "action_unarchive",
+                     "action_move_stock"]),
         ("🏪 Інтернет-магазин", ["action_publish_shop"]),
         ("💰 Ціни", ["action_base_editor", "action_base_to_home", "action_sale_price_from_base"]),
         ("🖼 Фото й даташити", ["action_media_links", "action_shared_media"]),
@@ -2414,6 +2435,12 @@ class ProductAdmin(GroupedActionsMixin, ProjectsBlockMixin, AuditableMixin, admi
             p.save(update_fields=["is_active"])
             n += 1
         self.message_user(request, f"{label}: {n}")
+
+    @admin.action(description="🔀 Перемістити на склад…", permissions=["change"])
+    def action_move_stock(self, request, queryset):
+        """Сторінка переміщення (inventory/admin_locations.py): усе, що лежить, — на вибраний склад."""
+        ids = ",".join(str(pk) for pk in queryset.values_list("pk", flat=True)[:500])
+        return redirect(reverse("admin:inventory_product_move_stock_bulk") + "?ids=" + ids)
 
     @admin.action(description="💰 Редактор базових цін для вибраних…")
     def action_base_editor(self, request, queryset):
@@ -2552,7 +2579,7 @@ class ProductAdmin(GroupedActionsMixin, ProjectsBlockMixin, AuditableMixin, admi
         return product_panel(obj)
 
     inlines       = (ProductComponentInline, ProductPackagingInline)
-    readonly_fields = ("stock_qty", "reserved_qty", "incoming_qty", "buildable_qty",
+    readonly_fields = ("stock_qty", "reserved_qty", "incoming_qty", "stock_locations", "buildable_qty",
                        "set_stock_link", "reorder_info", "label_detail", "bom_availability",
                        "image_preview", "datasheet_link", "movement_history", "shop_listings_info",
                        "shop_lot_info", "base_prices_info", "shop_media_panel", "dk_price_panel", "weight_panel")
@@ -2562,7 +2589,7 @@ class ProductAdmin(GroupedActionsMixin, ProjectsBlockMixin, AuditableMixin, admi
         ("♻️ Життєвий цикл", {"fields": ("lifecycle_status", "successor"),
                              "description": "Діє в усіх інтернет-магазинах (NRND і EOL — наліпки та посилання на заміну). "
                                             "Лише для одного магазину — «Асортимент і ціни» → позиція → «Життєвий цикл у цьому магазині»."}),
-        ("📦 Availability", {"fields": ("stock_qty", "reserved_qty", "incoming_qty",
+        ("📦 Availability", {"fields": ("stock_qty", "reserved_qty", "incoming_qty", "stock_locations",
                                         "buildable_qty", "bom_availability", "reorder_info")}),
         ("💰 Ціни та закупівля", {
             "fields": (
@@ -2921,6 +2948,12 @@ class ProductAdmin(GroupedActionsMixin, ProjectsBlockMixin, AuditableMixin, admi
         return val
     incoming_qty.short_description = "Incoming"
 
+    @admin.display(description="📍 Склади")
+    def stock_locations(self, obj):
+        """Де скільки лежить + «🔀 Перемістити між складами» (inventory/admin_locations.py)."""
+        from .admin_locations import locations_panel
+        return locations_panel(obj)
+
     def buildable_qty(self, obj):
         if obj.bom_type == Product.BomType.NONE:
             return "-"
@@ -2962,18 +2995,22 @@ class ProductAdmin(GroupedActionsMixin, ProjectsBlockMixin, AuditableMixin, admi
 
         is_whole = obj.unit_type == Product.UnitType.PIECE
 
-        # Таблиця компонентів
+        # Таблиця компонентів; 📍 — з якого складу піде компонент (stock.home_location)
+        from .admin_locations import where_html
+        from .services.stock import on_hand_by_location
+        where = on_hand_by_location([c['product'].pk for c in analysis['components']])
         rows = []
         for comp_info in analysis['components']:
-            comp_sku = comp_info['product'].sku
-            stock = int(comp_info['stock'])
+            comp_sku = escape(comp_info['product'].sku)
+            stock = comp_info['stock']
             qty_per = comp_info['qty_per']
-            buildable = int(stock / qty_per) if qty_per else 0
+            buildable = int(Decimal(str(stock)) / Decimal(str(qty_per))) if qty_per else 0
 
-            # Форматування чисел
-            qty_per_fmt = format_qty(qty_per, is_whole)
-            stock_fmt = format_qty(stock, is_whole)
-            buildable_fmt = format_qty(buildable, is_whole)
+            # Форматування чисел: кількість на виріб і залишок — як є (кабель 0,5 на антену, залишок 13,5)
+            qty_per_fmt = format_qty(qty_per)
+            stock_fmt = format_qty(stock)
+            buildable_fmt = format_qty(buildable, True)
+            where_fmt = where_html(comp_info['product'], where.get(comp_info['product'].pk, []))
 
             # Колір залежно від статусу
             if stock <= 0:
@@ -2993,6 +3030,7 @@ class ProductAdmin(GroupedActionsMixin, ProjectsBlockMixin, AuditableMixin, admi
                 f'<td style="padding:8px;text-align:center">{stock_fmt}</td>'
                 f'<td style="padding:8px;text-align:center;color:{status_color};font-weight:bold">'
                 f'{status_icon} {buildable_fmt}</td>'
+                f'<td style="padding:8px;font-size:12px">{where_fmt}</td>'
                 f'</tr>'
             )
 
@@ -3024,6 +3062,7 @@ class ProductAdmin(GroupedActionsMixin, ProjectsBlockMixin, AuditableMixin, admi
             '<th style="padding:8px;text-align:center">Кількість/одиниця</th>'
             '<th style="padding:8px;text-align:center">На складі</th>'
             '<th style="padding:8px;text-align:center">Можна зібрати</th>'
+            '<th style="padding:8px;text-align:left">📍 Звідки</th>'
             '</tr></thead>'
             '<tbody style="background:transparent">'
             + "".join(rows) +
@@ -3548,6 +3587,11 @@ class ProductAdmin(GroupedActionsMixin, ProjectsBlockMixin, AuditableMixin, admi
             path("import-excel/",
                  self.admin_site.admin_view(self.import_excel_view),
                  name="inventory_product_import_excel"),
+            # 🔀 Перемістити між складами (inventory/admin_locations.py, stock.move_stock)
+            path("move-stock/", self.admin_site.admin_view(self._move_stock_bulk_view),
+                 name="inventory_product_move_stock_bulk"),
+            path("<int:pk>/move-stock/", self.admin_site.admin_view(self._move_stock_view),
+                 name="inventory_product_move_stock"),
             path("<int:pk>/datasheet/",
                  self.admin_site.admin_view(self.serve_datasheet_view),
                  name="inventory_product_serve_datasheet"),
@@ -3595,6 +3639,14 @@ class ProductAdmin(GroupedActionsMixin, ProjectsBlockMixin, AuditableMixin, admi
     def _report_view(self, request, pk):
         from .admin_report import report_view   # «📄 Звіт по товару»: ціни й продажі (services/product_report.py)
         return report_view(self, request, pk)
+
+    def _move_stock_view(self, request, pk):
+        from .admin_locations import move_view
+        return move_view(self, request, pk)
+
+    def _move_stock_bulk_view(self, request):
+        from .admin_locations import bulk_move_view
+        return bulk_move_view(self, request)
 
     def _report_csv_view(self, request, pk):
         from .admin_report import report_csv_view
