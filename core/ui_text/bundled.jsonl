@@ -4271,6 +4271,7 @@
 {"uk": "Іншим шляхом", "en": "Another way", "de": "Auf anderem Weg"}
 {"uk": "Іншому…", "en": "To someone else…", "de": "An jemand anderen…"}
 {"uk": "Іншу папку NAS — змонтувати в", "en": "Another NAS folder — mount it in", "de": "Anderer NAS-Ordner — einbinden in"}
+{"uk": "Інші адреси", "en": "Other addresses", "de": "Weitere Adressen"}
 {"uk": "Інші дії", "en": "More actions", "de": "Weitere Aktionen"}
 {"uk": "Інші замовлення клієнта {0}", "en": "Other orders of customer {0}", "de": "Weitere Aufträge des Kunden {0}"}
 {"uk": "Інші коди", "en": "Other codes", "de": "Weitere Codes"}
@@ -10153,6 +10154,7 @@
 {"uk": "Колір — # і 6 знаків 0-9 / a-f, напр. #e91e63", "en": "Colour — # and 6 characters 0-9 / a-f, e.g. #e91e63", "de": "Farbe — # und 6 Zeichen 0-9 / a-f, z. B. #e91e63"}
 {"uk": "Колір — # і 6 знаків 0-9 / a-f, напр. #e91e63.", "en": "Colour — # and 6 characters 0-9 / a-f, e.g. #e91e63.", "de": "Farbe — # und 6 Zeichen 0-9 / a-f, z. B. #e91e63."}
 {"uk": "Колір — з «Потребує уваги»: є термінове — червоний, важливе — жовтий, нічого — зелений", "en": "The colour comes from \"Needs attention\": urgent — red, important — yellow, nothing — green", "de": "Die Farbe kommt aus „Erfordert Aufmerksamkeit“: dringend — rot, wichtig — gelb, nichts — grün"}
+{"uk": "Команда Minerva", "en": "Minerva team", "de": "Minerva-Team"}
 {"uk": "Команда не вказана", "en": "No command specified", "de": "Kein Befehl angegeben"}
 {"uk": "Команди", "en": "Commands", "de": "Befehle"}
 {"uk": "Команди: /reset — нова розмова, /myid — твій Telegram ID, /help — довідка", "en": "Commands: /reset — new conversation, /myid — your Telegram ID, /help — help", "de": "Befehle: /reset – neue Unterhaltung, /myid – deine Telegram-ID, /help – Hilfe"}
@@ -11310,6 +11312,7 @@
 {"uk": "Можна скласти до висоти (см)", "en": "Can be folded down to height (cm)", "de": "Faltbar auf Höhe (cm)"}
 {"uk": "Можна створити й за покупця", "en": "You can also create one on behalf of the customer", "de": "Sie können auch im Namen des Kunden eines erstellen"}
 {"uk": "Можна шукати в інтернеті", "en": "Web search allowed", "de": "Internetsuche erlaubt"}
+{"uk": "Можуть бути потрібні", "en": "Might be needed", "de": "Könnten gebraucht werden"}
 {"uk": "Мозамбік", "en": "Mozambique", "de": "Mosambik"}
 {"uk": "Молдова", "en": "Moldova", "de": "Moldau"}
 {"uk": "Момент", "en": "Moment", "de": "Moment"}
@@ -13055,6 +13058,7 @@
 {"uk": "Нічого не знайдено", "en": "Nothing found", "de": "Nichts gefunden"}
 {"uk": "Нічого не знайдено для бекапу (БД порожня або недоступна).", "en": "Nothing found to back up (the DB is empty or unavailable).", "de": "Nichts zu sichern gefunden (die DB ist leer oder nicht erreichbar)."}
 {"uk": "Нічого не знайдено за запитом «{0}»", "en": "Nothing found for “{0}”", "de": "Keine Treffer für „{0}“"}
+{"uk": "Нічого не знайдено — допишіть адресу повністю", "en": "Nothing found — type the full address", "de": "Nichts gefunden — Adresse vollständig eingeben"}
 {"uk": "Нічого не знайдено — змініть пошук або тип файлу.", "en": "Nothing found — change the search or the file type.", "de": "Nichts gefunden — ändern Sie die Suche oder den Dateityp."}
 {"uk": "Нічого не знайдено — ні в її меню, ні серед розділів, яких вона ще не має.", "en": "Nothing found — neither in their menu nor among the sections they do not have yet.", "de": "Nichts gefunden — weder im Menü dieser Person noch unter den Bereichen, die sie noch nicht hat."}
 {"uk": "Нічого не знайдено — спробуйте інші слова або перегляньте розділи нижче.", "en": "Nothing found — try other words or browse the sections below.", "de": "Nichts gefunden — versuchen Sie andere Begriffe oder sehen Sie sich die Bereiche unten an."}
@@ -18913,6 +18917,7 @@
 {"uk": "У товарів цієї категорії немає технічних параметрів для фільтра — синхронізуйте з DigiKey або додайте їх у картці товару («📡 Технічні атрибути»).", "en": "Products in this category have no technical parameters for the filter — sync with DigiKey or add them in the product card (“📡 Technical attributes”).", "de": "Die Artikel dieser Kategorie haben keine technischen Parameter für den Filter — synchronisieren Sie mit DigiKey oder fügen Sie sie in der Artikelkarte hinzu („📡 Technische Attribute“)."}
 {"uk": "У фазу", "en": "To phase", "de": "In Phase"}
 {"uk": "У цього акаунта Minerva немає скриньки пошти — додайте її в «Email → Акаунти».", "en": "This Minerva account has no mailbox — add it in «Email → Accounts».", "de": "Dieses Minerva-Konto hat kein Postfach — fügen Sie es unter «E-Mail → Konten» hinzu."}
+{"uk": "У цьому листуванні", "en": "In this conversation", "de": "In diesem Schriftverkehr"}
 {"uk": "У цьому періоді на вибраних доріжках подій немає — віддаліть масштаб чи ввімкніть доріжки.", "en": "No events in this period on the chosen lanes — zoom out or turn lanes on.", "de": "In diesem Zeitraum keine Ereignisse auf den gewählten Spuren — herauszoomen oder Spuren einschalten."}
 {"uk": "У цій посилці", "en": "In this parcel", "de": "In diesem Paket"}
 {"uk": "У цінових тирах є кількість < 1 або ціна ≤ 0", "en": "Price tiers contain a quantity < 1 or a price ≤ 0", "de": "In den Preisstufen gibt es eine Menge < 1 oder einen Preis ≤ 0"}
@@ -20787,9 +20792,11 @@
 {"uk": "адреси через кому", "en": "addresses separated by commas", "de": "Adressen mit Komma"}
 {"uk": "адреси через кому, напр. колега", "en": "addresses separated by commas, e.g. a colleague", "de": "Adressen durch Komma, z. B. ein Kollege"}
 {"uk": "адреси через кому, необов’язково", "en": "addresses comma-separated, optional", "de": "Adressen durch Komma getrennt, optional"}
+{"uk": "адреси через кому, необов’язково · клікніть у поле: спершу команда, учасники листування, потім решта; пишіть частину імені чи адреси", "en": "addresses separated by commas, optional · click into the field: the team first, then conversation participants, then everyone else; type part of a name or address", "de": "Adressen durch Komma getrennt, optional · ins Feld klicken: zuerst das Team, dann die Beteiligten des Schriftverkehrs, dann alle anderen; Teil eines Namens oder einer Adresse eingeben"}
 {"uk": "адреси через кому; у копію кожного листа агента", "en": "addresses separated by commas; CC of every agent email", "de": "Adressen mit Komma; in CC jeder Agent-E-Mail"}
 {"uk": "адреси. Нічого не відкривається й не виконується від імені людини. «✏️ Змінити доступ» (core/access_editor.py)", "en": "address check. Nothing is opened or executed on behalf of the person. “✏️ Change access” (core/access_editor.py)", "de": "Adressprüfung. Im Namen der Person wird nichts geöffnet oder ausgeführt. „✏️ Zugriff ändern“ (core/access_editor.py)"}
 {"uk": "адресна книга", "en": "address book", "de": "Adressbuch"}
+{"uk": "адресна книга · {0} раз", "en": "address book · used {0} times", "de": "Adressbuch · {0}-mal verwendet"}
 {"uk": "адресу — у листі; Angebot лишається чернеткою", "en": "address — in the e-mail; the Angebot remains a draft", "de": "Adresse — in der E-Mail; das Angebot bleibt ein Entwurf"}
 {"uk": "акаунт не потрібен — UPS виставить рахунок при доставці.", "en": "no account needed — UPS will bill on delivery.", "de": "kein Konto erforderlich — UPS stellt bei der Zustellung die Rechnung."}
 {"uk": "акаунт покупця видалено", "en": "buyer account deleted", "de": "Käuferkonto gelöscht"}
@@ -21086,6 +21093,7 @@
 {"uk": "ви відкриваєте його в пошті й надсилаєте самі.", "en": "you open it in Mail and send it yourself.", "de": "Sie öffnen ihn in der E-Mail-Ansicht und senden ihn selbst."}
 {"uk": "ви платите доставку, хоча за договором не мали. UPS не видасть помилки.", "en": "you pay for shipping although you were not supposed to under the contract. UPS will not raise an error.", "de": "Sie zahlen den Versand, obwohl Sie laut Vertrag nicht müssten. UPS gibt keinen Fehler aus."}
 {"uk": "ви підтвердите ✓ на сторінці завдання, тоді Minerva запише в askDANTE.", "en": "you will confirm ✓ on the task page, then Minerva will record it in askDANTE.", "de": "Sie bestätigen ✓ auf der Aufgabenseite, dann trägt Minerva es in askDANTE ein."}
+{"uk": "ви — копія собі", "en": "you — copy to yourself", "de": "Sie — Kopie an sich selbst"}
 {"uk": "виберіть аркуш, налаштуйте маппінг колонок та натисніть «Імпортувати».", "en": "select the sheet, configure the column mapping and click “Import”.", "de": "wählen Sie das Blatt, konfigurieren Sie die Spaltenzuordnung und klicken Sie auf „Importieren“."}
 {"uk": "виберіть дату", "en": "choose a date", "de": "Datum wählen"}
 {"uk": "виберіть календарі «👁»", "en": "choose the calendars “👁”", "de": "wählen Sie die Kalender „👁“"}
@@ -22470,6 +22478,7 @@
 {"uk": "кожні {0} дн.", "en": "every {0} days", "de": "alle {0} Tage"}
 {"uk": "кожні {0} хв", "en": "every {0} min", "de": "alle {0} Min."}
 {"uk": "колега", "en": "colleague", "de": "Kollege"}
+{"uk": "колега в Minerva", "en": "colleague in Minerva", "de": "Kollege in Minerva"}
 {"uk": "колега@фірма", "en": "colleague@company", "de": "kollege@firma"}
 {"uk": "колега@фірма — кожен лист піде і йому", "en": "colleague@company — every letter also goes to them", "de": "kollege@firma — jeder Brief geht auch an ihn"}
 {"uk": "колеги", "en": "a colleague", "de": "eines Kollegen"}
@@ -22510,6 +22519,7 @@
 {"uk": "конектор", "en": "connector", "de": "Steckverbinder"}
 {"uk": "контакт", "en": "contact", "de": "Kontakt"}
 {"uk": "контакт {0}", "en": "contact {0}", "de": "Kontakt {0}"}
+{"uk": "контакт постачальника {0}", "en": "supplier contact {0}", "de": "Lieferantenkontakt {0}"}
 {"uk": "контактна особа", "en": "contact person", "de": "Ansprechpartner"}
 {"uk": "конфлікт", "en": "conflict", "de": "Konflikt"}
 {"uk": "копій", "en": "copies", "de": "Kopien"}
@@ -23912,6 +23922,7 @@
 {"uk": "першому рядку", "en": "the first row", "de": "der ersten Zeile"}
 {"uk": "перші колонки", "en": "the first columns", "de": "die ersten Spalten"}
 {"uk": "перші рядки", "en": "the first rows", "de": "die ersten Zeilen"}
+{"uk": "писав(ла) вам", "en": "has written to you", "de": "hat Ihnen geschrieben"}
 {"uk": "питання про ваш бізнес", "en": "questions about your business", "de": "Fragen zu Ihrem Geschäft"}
 {"uk": "питання про попередні домовленості", "en": "question about previous agreements", "de": "Frage zu früheren Vereinbarungen"}
 {"uk": "питання про роботу Minerva", "en": "question about how Minerva works", "de": "Frage zur Funktionsweise von Minerva"}
@@ -24560,6 +24571,7 @@
 {"uk": "разом", "en": "total", "de": "gesamt"}
 {"uk": "разом {0}", "en": "total {0}", "de": "gesamt {0}"}
 {"uk": "разом {0} {1}", "en": "total {0} {1}", "de": "gesamt {0} {1}"}
+{"uk": "разом з адресатом у листах: {0}", "en": "together with the recipient in e-mails: {0}", "de": "zusammen mit dem Empfänger in E-Mails: {0}"}
 {"uk": "разом з неактивними товарами ({0})", "en": "including inactive products ({0})", "de": "einschließlich inaktiver Artikel ({0})"}
 {"uk": "раніше", "en": "earlier", "de": "früher"}
 {"uk": "раніше {0} ({1})", "en": "previously {0} ({1})", "de": "zuvor {0} ({1})"}
@@ -24779,6 +24791,7 @@
 {"uk": "склала Minerva — вони складуться заново з нових даних після «💾 Зберегти» (новий номер, кількості, файли, дата).", "en": "was written by Minerva — it will be rebuilt from the new data after «💾 Save» (new number, quantities, files, date).", "de": "hat Minerva erstellt — es wird nach «💾 Speichern» aus den neuen Daten neu erstellt (neue Nummer, Mengen, Dateien, Datum)."}
 {"uk": "скопіюйте кнопкою вище, вставте в пошук на", "en": "copy it with the button above, paste it into the search on", "de": "kopieren Sie sie mit der Schaltfläche oben und fügen Sie sie ein in die Suche bei"}
 {"uk": "скоро", "en": "soon", "de": "bald"}
+{"uk": "скринька Minerva", "en": "Minerva mailbox", "de": "Minerva-Postfach"}
 {"uk": "скринька Minerva {0} ({1})", "en": "Minerva mailbox {0} ({1})", "de": "Minerva-Postfach {0} ({1})"}
 {"uk": "скринька vertrieb: власник anna, активна", "en": "mailbox vertrieb: owner anna, active", "de": "Postfach vertrieb: Eigentümer anna, aktiv"}
 {"uk": "скринька {0} не надіслала лист", "en": "mailbox {0} did not send the e-mail", "de": "Postfach {0} hat die E-Mail nicht gesendet"}
@@ -25024,6 +25037,7 @@
 {"uk": "та сама позиція, інша кількість", "en": "same line, different quantity", "de": "gleiche Position, andere Menge"}
 {"uk": "та сама тема й учасник проєкту", "en": "same subject and project participant", "de": "gleicher Betreff und Projektteilnehmer"}
 {"uk": "та сама фірма", "en": "same company", "de": "gleiche Firma"}
+{"uk": "та сама фірма, що адресат ({0})", "en": "same company as the recipient ({0})", "de": "dieselbe Firma wie der Empfänger ({0})"}
 {"uk": "та ще {0}", "en": "and {0} more", "de": "und {0} weitere"}
 {"uk": "таблиця кроків у PDF", "en": "step table in the PDF", "de": "Schritttabelle im PDF"}
 {"uk": "таблиці розділу «Інтернет-магазин»", "en": "tables of the “Web shop” section", "de": "Tabellen des Bereichs „Webshop“"}
@@ -25369,6 +25383,7 @@
 {"uk": "у файлі формату", "en": "in a file of the format", "de": "in einer Datei im Format"}
 {"uk": "у формі «{0}» немає полів {1} — є: {2}", "en": "the form «{0}» has no fields {1} — there are: {2}", "de": "das Formular „{0}“ hat keine Felder {1} – vorhanden: {2}"}
 {"uk": "у формі введено вручну", "en": "entered manually in the form", "de": "im Formular manuell eingegeben"}
+{"uk": "у цьому листуванні", "en": "in this conversation", "de": "in diesem Schriftverkehr"}
 {"uk": "у цьому проєкті без позначених частин", "en": "no marked parts in this project", "de": "in diesem Projekt keine markierten Teile"}
 {"uk": "у ціні", "en": "in the price", "de": "im Preis"}
 {"uk": "у ціні немає", "en": "not included in the price", "de": "im Preis fehlt"}
@@ -25477,6 +25492,7 @@
 {"uk": "уточніть назву (або #номер клієнта).", "en": "refine the name (or #customer number).", "de": "präzisieren Sie den Namen (oder #Nummer des Kunden)."}
 {"uk": "учасн.", "en": "attend.", "de": "Teiln."}
 {"uk": "учасник проєкту", "en": "project participant", "de": "Projektbeteiligter"}
+{"uk": "учасник проєкту {0} ({1})", "en": "project participant {0} ({1})", "de": "Projektbeteiligter {0} ({1})"}
 {"uk": "фаза", "en": "phase", "de": "Phase"}
 {"uk": "фаза {0}", "en": "phase {0}", "de": "Phase {0}"}
 {"uk": "фаза {0} → {1}", "en": "phase {0} → {1}", "de": "Phase {0} → {1}"}

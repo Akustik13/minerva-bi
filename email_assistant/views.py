@@ -2441,6 +2441,22 @@ def crm_contacts_view(request):
     return JsonResponse({'contacts': _crm_contacts(request.user)})
 
 
+@staff_member_required
+def address_suggest_view(request):
+    """Підказки адрес для «Копія (CC)» / «Кому» групами (email_assistant/address_suggest.py): ?q= — частина або
+    ціле слово, ?msg= — лист, до якого пишемо (лише з ваших скриньок), ?to= — адреси «Кому», ?exclude= — уже вписані."""
+    from email_assistant import address_suggest
+    from email_assistant.models import EmailMessage
+    message = None
+    pk = (request.GET.get('msg') or '').strip()
+    if pk.isdigit():
+        message = (EmailMessage.objects.filter(pk=int(pk), account__user=request.user)
+                   .select_related('account').first())
+    groups = address_suggest.suggest(request.user, request.GET.get('q', '')[:100], message,
+                                     request.GET.get('to', '')[:4000], request.GET.get('exclude', '')[:4000])
+    return JsonResponse({'groups': groups})
+
+
 def _search_contacts(request, q: str, limit: int = 15) -> list:
     """
     Адреси для підказки: адресна книга (кому вже писали), клієнти CRM (ім'я, email, компанія)

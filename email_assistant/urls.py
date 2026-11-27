@@ -75,6 +75,7 @@ urlpatterns = [
     path('ai-generate/',                                 views.ai_generate_email,       name='ai_generate'),
     path('ai-grammar/',                                  views.ai_grammar_check,        name='ai_grammar'),
     # CRM contacts for autocomplete
+    path('address-suggest/',                            views.address_suggest_view,    name='address_suggest'),
     path('crm-contacts/',                                views.crm_contacts_view,       name='crm_contacts'),
     # Mark read / unread
     path('message/<int:message_pk>/read/',               views.mark_read_api,           name='mark_read'),

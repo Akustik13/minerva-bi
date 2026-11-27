@@ -688,8 +688,11 @@ class AgentTaskForm(forms.ModelForm):
         widgets = {'instruction': forms.Textarea(attrs={
             'rows': 6, 'placeholder': 'Напр.: Знайди в даташитах вагу однієї штуки й країну виробника і внеси. '
                                       'Або: Знайди даташити цих антен і надішли їх на anna@kunde.de з коротким листом.'}),
-            'mail_to': forms.Textarea(attrs={'rows': 1, 'placeholder': 'anna@kunde.de'}),
-            'mail_cc': forms.Textarea(attrs={'rows': 1, 'placeholder': 'sergey@sevskiy.de'})}
+            # підказки адрес (static/admin/js/mv_addr.js): команда, учасники листа завдання, решта — пошуком
+            'mail_to': forms.Textarea(attrs={'rows': 1, 'placeholder': 'anna@kunde.de', 'data-mv-addr': '',
+                                             'data-mv-addr-msg-field': 'message'}),
+            'mail_cc': forms.Textarea(attrs={'rows': 1, 'placeholder': 'sergey@sevskiy.de', 'data-mv-addr': '',
+                                             'data-mv-addr-msg-field': 'message', 'data-mv-addr-to': 'mail_to'})}
 
     def clean(self):
         data = super().clean()
@@ -711,6 +714,9 @@ def mail_langs():
 @admin.register(AgentTask)
 class AgentTaskAdmin(admin.ModelAdmin):
     form = AgentTaskForm
+
+    class Media:
+        js = ('admin/js/mv_addr.js',)
     list_display = ('created_at', 'title', 'status_col', 'products_col', 'proposals_col', 'cost_col')
     list_filter = ('status',)
     search_fields = ('title', 'instruction')

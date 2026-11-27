@@ -143,8 +143,8 @@
       <label>Кому <span class="agt-muted">— лише адреси із завдання (текст або «Кому надсилати листи»)</span></label>
       {% endif %}
       <input type="text" name="to" value="{{ m.mail_to }}" {% if m.status != 'pending' %}readonly{% endif %} translate="no">
-      <label>Копія (CC) <span class="agt-muted">— адреси через кому, необов’язково</span></label>
-      <input type="text" name="cc" value="{{ m.data.cc|join:', ' }}" placeholder="sergey@sevskiy.de" {% if m.status != 'pending' %}readonly{% endif %} translate="no">
+      <label>Копія (CC) <span class="agt-muted">— адреси через кому, необов’язково · клікніть у поле: спершу команда, учасники листування, потім решта; пишіть частину імені чи адреси</span></label>
+      <input type="text" name="cc" value="{{ m.data.cc|join:', ' }}" placeholder="sergey@sevskiy.de" {% if m.status != 'pending' %}readonly{% else %}data-mv-addr data-mv-addr-to="to" data-mv-addr-msg="{% if m.data.reply_to %}{{ m.data.reply_to }}{% elif task.message_id %}{{ task.message_id }}{% endif %}"{% endif %} translate="no">
       <label>Тема</label>
       <input type="text" name="subject" value="{{ m.mail_subject }}" {% if m.status != 'pending' %}readonly{% endif %} translate="no">
       <label>Текст</label>
@@ -189,6 +189,7 @@
     </div>
   </details>
 </div>
+{% if mails %}<script src="/static/admin/js/mv_addr.js?v=1"></script>{% endif %}
 {% if running %}
 <script>
 (function () {
