@@ -15,6 +15,10 @@
   reply(...)                — лист у гілку (In-Reply-To), підпис скриньки, копія в Minerva (rfq.store_sent), подія;
   forward_plan / forward    — вибрані рядки: таблиця пропозицій, листування (лише ваші скриньки), файли
                               постачальників до rfq.ATTACH_MAX_MB (решта — назвами) → один лист колезі;
+  originals_plan / forward_originals — «📨 Листи як є»: кожен лист вибраних (лише ваші скриньки, і наші, і їхні)
+                              вкладенням .eml, як він на сервері пошти (email_assistant/originals.py: текст, картинки,
+                              файли), файли постачальників без такого листа — звичайними вкладеннями; понад
+                              rfq.ATTACH_MAX_MB разом — кількома листами «(1/2)» (_pack), у фоні (jobs);
   compose_each / send_each  — ✉️ «Написати кожному»: вибраним постачальникам — кожному свій лист відповіддю в його
                               гілці (target: автор останнього листа, копія — лише адреса цієї ж фірми), з вашої
                               скриньки; текст — AI за побажанням людини (ai.each_letter, мовою листування, на ім'я)
@@ -39,6 +43,8 @@ BRIEF_MAILS = 12             # найновіших листів у «🧭 Ко�
 LETTER_CHARS = 6000          # тексту одного листа у вікні / пересиланні
 FORWARD_MAILS = 30           # листів одного постачальника в пересиланні
 FORWARD_MAX_ROWS = 30
+ORIGINALS_MAX = 60           # листів одного постачальника «📨 Листи як є»
+ORIGINALS_PARTS_MAX = 8      # листів колезі за одне пересилання (кожен до rfq.ATTACH_MAX_MB)
 EACH_MAX = 30                # листів «✉️ Написати кожному» за раз
 EACH_PAUSE = 2               # с між листами: кожен лист — окремий вхід на SMTP, 13 підряд сервер може відкинути
 EACH_RETRY = (20, 60)        # тимчасова відмова сервера пошти (4xx, «too many», «try again») — повтор через N с
@@ -607,3 +613,264 @@ def forward(req, rids, user, to, cc, subject, note, parts) -> dict:
         SupplierEvent.objects.create(supplier=row["recipient"].supplier, request=req, kind=SupplierEvent.MAIL,
                                      user=user, text=f"↪ Переслано колезі → {', '.join(to_list)}")
     return {"ok": True, "to": to_list, "rows": len(rows), "files": len(blobs), "left": len(left), "hidden": hidden}
+
+
+# ── ↪ «📨 Листи як є» — кожен лист вкладенням .eml, як на сервері пошти ──
+
+def _short(name) -> str:
+    """Початок назви постачальника для назви файлу: «HongRong (shenzhen)» з «HongRong (shenzhen) Electronics…»."""
+    out = ""
+    for word in str(name or "").split():
+        if out and len(out) + 1 + len(word) > 20:
+            break
+        out = f"{out} {word}".strip()
+    return out[:24]
+
+
+def _mid(m) -> str:
+    return "".join((m.message_id or "").split()).lower()
+
+
+def _originals_items(rows, user):
+    """Що піде: [{kind mail | file, r, msg | obj, size}] — листи кожного рядка за датою (лише ваші скриньки; лист,
+    що є в кількох рядках або у двох скриньках, — раз), далі файли постачальника, яких немає в цих листах (додані
+    вручну, зі скриньок колег). → (items, {rid: листів у скриньках колег})."""
+    from email_assistant import originals
+    from suppliers.services import rfq_replies
+    seen_pk, seen_id, items, hidden = set(), set(), [], {}
+    for row in rows:
+        r = row["recipient"]
+        mails, mine = [], set()
+        for m in rfq_replies.mail(r):
+            if not rfq_replies.can_read(m, user):
+                hidden[r.pk] = hidden.get(r.pk, 0) + 1
+                continue
+            key = _mid(m)
+            if m.pk in seen_pk or (key and (key in seen_id or key in mine)):
+                continue
+            mails.append(m)
+            if key:
+                mine.add(key)
+        for m in mails[-ORIGINALS_MAX:]:
+            seen_pk.add(m.pk)
+            if _mid(m):
+                seen_id.add(_mid(m))
+            items.append({"kind": "mail", "r": r, "msg": m, "size": originals.estimate(m)})
+        for f in r.reply_files.order_by("received_at", "pk"):
+            if f.file and f.message_id not in seen_pk:
+                items.append({"kind": "file", "r": r, "obj": f, "size": f.size or 0})
+    return items, hidden
+
+
+def _pack(items, limit) -> list:
+    """Вкладення по листах колезі, кожен до limit байт, у тому самому порядку; більше за limit — окремим листом."""
+    parts, cur, used = [], [], 0
+    for it in items:
+        if cur and used + it["size"] > limit:
+            parts.append(cur)
+            cur, used = [], 0
+        cur.append(it)
+        used += it["size"]
+    if cur:
+        parts.append(cur)
+    return parts
+
+
+def _too_big(it, limit) -> bool:
+    """Файл постачальника понад ліміт не вкладається (він є в Minerva); лист — іде окремим листом колезі."""
+    return it["kind"] == "file" and it["size"] > limit
+
+
+def originals_plan(req, rids, user) -> dict:
+    """План «📨 Листи як є» без сервера пошти: листів і ≈ МБ від кожного, скількома листами колезі піде."""
+    from email_assistant import originals
+    from suppliers.services import rfq
+    _t, rows = _rows(req, rids)
+    items, hidden = _originals_items(rows, user)
+    limit = rfq.ATTACH_MAX_MB * 1024 * 1024
+    left = [it for it in items if _too_big(it, limit)]
+    items = [it for it in items if not _too_big(it, limit)]
+    out = []
+    for row in rows:
+        r = row["recipient"]
+        mine = [it for it in items if it["r"].pk == r.pk]
+        out.append({"rid": r.pk, "name": r.supplier.name, "hidden": hidden.get(r.pk, 0),
+                    "letters": sum(1 for it in mine if it["kind"] == "mail"),
+                    "files": sum(1 for it in mine if it["kind"] == "file"),
+                    "mb": round(sum(it["size"] for it in mine) / 1024 / 1024, 1)})
+    return {"rows": out, "parts": len(_pack(items, limit)), "parts_max": ORIGINALS_PARTS_MAX,
+            "mb": round(sum(it["size"] for it in items) / 1024 / 1024, 1), "limit_mb": rfq.ATTACH_MAX_MB,
+            "local": sum(1 for it in items if it["kind"] == "mail" and not originals.on_server(it["msg"])),
+            "big": [it["msg"].subject or "—" for it in items if it["kind"] == "mail" and it["size"] > limit],
+            "left": [f"{it['r'].supplier.name} · {it['obj'].name}" for it in left]}
+
+
+def _originals_body(req, t, rows, part, k, n, note, table, own, got, hidden, left) -> tuple:
+    """Текст листа колезі (HTML-шматки, рядки тексту): коментар, запит, таблиця — у першому; що в цьому листі
+    у вкладенні; у останньому — що не вкладено й скільки листів у скриньках колег."""
+    from suppliers.services import rfq, rfq_replies
+    html, text = ["<div style='font-family:Arial,Helvetica,sans-serif;font-size:14px'>"], []
+    if k == 1:
+        if (note or "").strip():
+            html.append(f"<p>{escape(note.strip()).replace(chr(10), '<br>')}</p>")
+            text.append(note.strip())
+        html.append(f"<p><b>{escape(req.code)} · {escape(req.title)}</b><br><small>Кількості: "
+                    f"{escape(req.quantities or '—')}"
+                    + (f" · надіслано {req.sent_at:%d.%m.%Y}" if req.sent_at else "") + "</small></p>")
+        text.append(f"{req.code} · {req.title}\nКількості: {req.quantities or '—'}")
+        if table:
+            html.append(_table_html(t, rows))
+    if n > 1:
+        html.append(f"<p><b>Лист {k} з {n}</b> — листів багато, тож пересилання розбито на частини "
+                    f"(кожна до {rfq.ATTACH_MAX_MB} МБ).</p>")
+        text.append(f"\nЛист {k} з {n} (кожна частина до {rfq.ATTACH_MAX_MB} МБ)")
+    mails = sum(1 for it in part if it["kind"] == "mail")
+    html.append(f"<p>📨 У вкладенні листів: {mails} — кожен відкривається як звичайний лист, з текстом, картинками "
+                f"і файлами.</p>")
+    text.append(f"\n📨 У вкладенні листів: {mails} — кожен відкривається як звичайний лист.")
+    supplier = None
+    for it in part:
+        r = it["r"]
+        if r.pk != supplier:
+            if supplier is not None:
+                html.append("</ul>")
+            supplier = r.pk
+            html.append(f"<div style='margin-top:10px'><b>{escape(r.supplier.name)}</b></div>"
+                        f"<ul style='margin:4px 0'>")
+            text.append(f"\n== {r.supplier.name} ==")
+        if it["kind"] == "file":
+            line = (f"   📎 файл цього листа (збережений у запиті): {it['obj'].name}" if it.get("of_mail")
+                    else f"📎 файл постачальника: {it['obj'].name}")
+        else:
+            m, o = it["msg"], got.get(it["msg"].pk)
+            arrow = "📥" if rfq_replies.theirs(m, own) else "📤"
+            when = f"{timezone.localtime(m.sent_at):%d.%m.%Y %H:%M} · " if m.sent_at else ""
+            files = [a.get("name") for a in m.attachments or [] if isinstance(a, dict) and a.get("name")
+                     and not a.get("is_inline")]
+            line = f"{arrow} {when}{m.from_name or m.from_email} · {m.subject or '—'}"
+            if files:
+                line += " · 📎 " + ", ".join(files)
+            if o is not None and o.rebuilt:
+                line += (" · ⚠️ копії немає на сервері пошти — зібрано з Minerva"
+                         + (", без файлів: " + ", ".join(o.missing) if o.missing else ""))
+        html.append(f"<li>{escape(line)}</li>")
+        text.append(f"- {line}")
+    if supplier is not None:
+        html.append("</ul>")
+    if k == n:
+        if left:
+            names = ", ".join(left)
+            html.append(f"<p><small>📎 Не вкладено (кожен понад {rfq.ATTACH_MAX_MB} МБ): {escape(names)} — є в "
+                        f"Minerva, запит {escape(req.code)}.</small></p>")
+            text.append(f"\n📎 Не вкладено (кожен понад {rfq.ATTACH_MAX_MB} МБ): {names}")
+        if hidden:
+            html.append(f"<p><small>🔒 Ще листів у скриньках колег: {hidden} — їх тут немає.</small></p>")
+            text.append(f"🔒 Ще листів у скриньках колег: {hidden} — їх тут немає.")
+    return html, text
+
+
+def forward_originals(req, rids, user, to, cc, subject, note, table=True, report=None) -> dict:
+    """«📨 Листи як є»: листування вибраних постачальників колезі — кожен лист вкладенням .eml (оригінал із сервера
+    пошти), файли без листа — звичайними вкладеннями; понад rfq.ATTACH_MAX_MB — кількома листами «(1/2)»."""
+    import mimetypes
+    from email_assistant import originals
+    from email_assistant.smtp_client import SMTPClient
+    from suppliers.models import SupplierEvent
+    from suppliers.services import rfq, rfq_replies
+    to_list, cc_list = rfq.addresses(to), rfq.addresses(cc)
+    if not to_list:
+        raise TalkError("Кому переслати — вкажіть адресу колеги.")
+    t, rows = _rows(req, rids)
+    account = rfq.account_for(user, req)
+    if account is None:
+        raise TalkError("У вас немає активної поштової скриньки в Minerva.")
+    items, hidden = _originals_items(rows, user)
+    limit = rfq.ATTACH_MAX_MB * 1024 * 1024
+    left = [f"{it['r'].supplier.name} · {it['obj'].name}" for it in items if _too_big(it, limit)]
+    items = [it for it in items if not _too_big(it, limit)]
+    if not items:
+        raise TalkError("Немає листів, які можна переслати: листування з цими постачальниками — у скриньках колег "
+                        "або його ще не було.")
+    got = originals.fetch([it["msg"] for it in items if it["kind"] == "mail"], report)
+    ready, taken = [], set()
+
+    def add_file(it, obj, of_mail=False):
+        r = it["r"]
+        try:
+            with obj.file.open("rb") as fh:
+                data = fh.read()
+        except (OSError, ValueError):
+            left.append(f"{r.supplier.name} · {obj.name}")
+            return False
+        ready.append({**it, "kind": "file", "obj": obj, "of_mail": of_mail, "size": len(data), "att": {
+            "name": f"{_short(r.supplier.name)} - {obj.name}", "content": data,
+            "content_type": mimetypes.guess_type(obj.name)[0] or "application/octet-stream"}})
+        return True
+
+    for it in items:
+        r = it["r"]
+        if it["kind"] == "file":
+            if it["obj"].pk not in taken:
+                add_file(it, it["obj"])
+            continue
+        m, o = it["msg"], got[it["msg"].pk]
+        ready.append({**it, "size": len(o.data),
+                      "att": originals.attachment(originals.filename(m, _short(r.supplier.name)), o.data)})
+        if o.rebuilt and o.missing:
+            # копії листа на сервері немає, а його файли вже в запиті (відповідь постачальника, файли самого
+            # запиту) — ідуть поруч, звичайними вкладеннями; у листі колезі — під цим листом
+            have = {f.name: f for f in list(req.files.all()) + list(r.reply_files.filter(message=m))
+                    if f.file and f.size <= limit}
+            found = [have[name] for name in dict.fromkeys(o.missing) if name in have]
+            for f in found:
+                if add_file(it, f, of_mail=True) and hasattr(f, "recipient_id"):
+                    taken.add(f.pk)
+            got[m.pk] = o._replace(missing=[x for x in o.missing if x not in {f.name for f in found}])
+    parts = _pack(ready, limit)
+    if not parts:
+        raise TalkError("Немає листів, які можна переслати.")
+    if len(parts) > ORIGINALS_PARTS_MAX:
+        raise TalkError(f"Разом {sum(x['size'] for x in ready) / 1024 / 1024:.0f} МБ — це {len(parts)} листів "
+                        f"колезі (за раз — до {ORIGINALS_PARTS_MAX}). Виберіть менше постачальників.")
+    own = rfq_replies._own()
+    base = ((subject or "").strip() or forward_plan(req, rids, user)["subject"])[:230]
+    sig = rfq.signature(account)
+    sig_html = (f"<div>-- <br>{sig['html']}</div>" if sig["html"] else
+                f"<div>-- <br>{escape(sig['text']).replace(chr(10), '<br>')}</div>" if sig["text"] else "")
+    n, total_hidden = len(parts), sum(hidden.values())
+    for k, part in enumerate(parts, 1):
+        if report:
+            report(f"📤 Надсилаю колезі: {k} / {n}")
+        html, text = _originals_body(req, t, rows, part, k, n, note, table, own, got, total_hidden, left)
+        subj = base + (f" ({k}/{n})" if n > 1 else "")
+        body_text, _html = rfq.letter(account, "\n".join(text))
+        full_html = "".join(html) + sig_html + "</div>"
+        attachments = [it["att"] for it in part]
+        try:
+            result = SMTPClient(account).send(to_emails=to_list, cc_emails=cc_list, subject=subj, body_text=body_text,
+                                              body_html=full_html, attachments=attachments, signature=False)
+        except Exception as e:  # noqa: BLE001
+            result = {"ok": False, "error": str(e)}
+        if not result.get("ok"):
+            done = f"Надіслано листів колезі: {k - 1} з {n}. " if n > 1 else ""
+            raise TalkError(done + f"Лист {k} не надіслано: " + str(result.get("error") or "помилка SMTP")[:400])
+        try:
+            from django.db import transaction
+            with transaction.atomic():
+                rfq.store_sent(account, result, to_list, cc_list, subj, body_text, attachments, body_html=full_html,
+                               keep_files=True)
+        except Exception:  # noqa: BLE001
+            logger.warning("rfq talk: store forward originals failed", exc_info=True)
+        if k < n and EACH_PAUSE:
+            time.sleep(EACH_PAUSE)
+    mails = sum(1 for it in ready if it["kind"] == "mail")
+    files = sum(1 for it in ready if it["kind"] == "file")
+    for row in rows:
+        r = row["recipient"]
+        count = sum(1 for it in ready if it["r"].pk == r.pk and it["kind"] == "mail")
+        SupplierEvent.objects.create(supplier=r.supplier, request=req, kind=SupplierEvent.MAIL, user=user,
+                                     text=f"↪ Переслано колезі листи як є ({count}) → {', '.join(to_list)}")
+    message = (f"✓ Переслано → {', '.join(to_list)}: листів {mails}" + (f", файлів {files}" if files else "")
+               + (f" · {n} листами" if n > 1 else ""))
+    return {"ok": True, "to": to_list, "letters": mails, "files": files, "parts": n, "left": len(left),
+            "hidden": total_hidden, "rebuilt": sum(1 for o in got.values() if o.rebuilt), "message": message}

@@ -166,11 +166,14 @@ class SMTPClient:
             for att in attachments:
                 ct = att.get('content_type', 'application/octet-stream')
                 maintype, subtype = ct.split('/', 1)
+                # cte — вкладений лист (message/rfc822, email_assistant/originals.py) іде як є, не base64
+                extra = {'cte': att['cte']} if att.get('cte') else {}
                 msg.add_attachment(
                     att['content'],
                     maintype=maintype,
                     subtype=subtype,
                     filename=att['name'],
+                    **extra,
                 )
 
             all_recipients = to_emails + cc_emails + bcc_emails

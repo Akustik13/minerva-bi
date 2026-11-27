@@ -259,6 +259,13 @@ def _get_attachments_raw(msg) -> list:
             filename = _decode_str(part.get_filename(''))
             if filename:
                 data = part.get_payload(decode=True) or b''
+                if not data and part.get_content_type() == 'message/rfc822' and part.is_multipart():
+                    # вкладений лист (.eml, «переслати як вкладення») — get_payload(decode) для нього None;
+                    # його вкладення й далі видно окремо (walk іде всередину), номери вкладень не зсуваються
+                    try:
+                        data = part.get_payload(0).as_bytes()
+                    except Exception:  # noqa: BLE001
+                        data = b''
                 attachments.append({
                     'name':         filename,
                     'content_type': attachment_type(part.get_content_type(), data),

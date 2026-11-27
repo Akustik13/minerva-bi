@@ -13,7 +13,7 @@
   <b id="rw-sel-n"></b>
   <button type="button" class="button default" id="rw-cmp-btn" title="Що скільки коштує в кожного з вибраних: плата, монтаж, компоненти, разові, доставка, разом — поруч, для кожної кількості">⚖ Порівняти</button>
   <button type="button" class="button default" id="rw-each-btn" title="Кожному вибраному — свій лист, відповіддю в його гілці листування, з вашої скриньки; інші постачальники його не бачать">✉️ Написати кожному</button>
-  <button type="button" class="button default" id="rw-fwd-btn" title="Таблиця пропозицій, листування й файли вибраних постачальників — одним листом колезі">↪ Переслати колезі</button>
+  <button type="button" class="button default" id="rw-fwd-btn" title="Листи вибраних постачальників колезі — як вони є, з вкладеннями (або зведення: таблиця, листування й файли одним листом)">↪ Переслати колезі</button>
   <button type="button" class="button" id="rw-sel-none">✕ Зняти вибір</button>
 </div>
 
@@ -65,10 +65,16 @@
     </div>
     <label class="rwc-subjf">Тема <input name="subject" translate="no"></label>
     <label class="rwc-subjf">Коментар <textarea name="note" rows="3" placeholder="Напр.: Глянь, будь ласка, пропозиції — кого беремо?"></textarea></label>
+    <div class="rw-fwd-mode" role="radiogroup" aria-label="Як переслати">
+      <label><input type="radio" name="mode" value="mails" checked> <b>📨 Листи як є</b>
+        <small class="spf-muted">кожен лист — вкладенням, як він прийшов чи пішов: текст, картинки, файли</small></label>
+      <label><input type="radio" name="mode" value="digest"> <b>📊 Зведення</b>
+        <small class="spf-muted">таблиця, текст листування й файли в одному листі</small></label>
+    </div>
     <div class="rw-fwd-parts">
       <label><input type="checkbox" name="part" value="table" checked> 📊 Таблиця пропозицій (ціни за кількістю, умови)</label>
-      <label><input type="checkbox" name="part" value="mail" checked> ✉️ Листування з кожним (лише з ваших скриньок)</label>
-      <label><input type="checkbox" name="part" value="files" checked> 📎 Файли постачальників <span class="spf-muted" id="rw-fwd-mb"></span></label>
+      <label data-fwd-digest><input type="checkbox" name="part" value="mail" checked> ✉️ Листування з кожним (лише з ваших скриньок)</label>
+      <label data-fwd-digest><input type="checkbox" name="part" value="files" checked> 📎 Файли постачальників <span class="spf-muted" id="rw-fwd-mb"></span></label>
     </div>
     <div id="rw-fwd-plan" class="rw-fwd-plan"></div>
   </form>
@@ -191,6 +197,12 @@
   .rwc-small { font-size: 11px; margin-top: 6px; }
   .rwc-hist { margin: 3px 0; }
   .rw-fwd-parts { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+  .rw-fwd-mode { display: flex; gap: 8px; margin: 10px 0 2px; flex-wrap: wrap; }
+  .rw-fwd-mode label { flex: 1 1 240px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; padding: 8px 10px;
+    border: 1px solid var(--border-strong, #ccc); border-radius: 8px; cursor: pointer; }
+  .rw-fwd-mode label:has(input:checked) { border-color: var(--primary, #417690); box-shadow: inset 0 0 0 1px var(--primary, #417690); }
+  .rw-fwd-mode small { flex-basis: 100%; padding-left: 22px; }
+  #rw-fwd[data-mode="mails"] [data-fwd-digest] { display: none; }
   .rw-fwd-plan { font-size: 13px; }
   .rw-fwd-plan table { width: 100%; }
   @media (max-width: 860px) {
@@ -1004,39 +1016,104 @@
   var form = document.getElementById('rw-fwd-form'), plan = document.getElementById('rw-fwd-plan'),
       note = document.getElementById('rw-fwd-note'), send = document.getElementById('rw-fwd-send');
   function ids() { return picked().map(function(c){ return c.value; }); }
+  // 📨 Листи як є (кожен лист — .eml, rfq_talk.forward_originals) / 📊 Зведення (rfq_talk.forward); вибір — localStorage
+  var lastPlan = null;
+  function mode() { var c = form.querySelector('input[name=mode]:checked'); return c ? c.value : 'mails'; }
+  try { var keptMode = localStorage.getItem('rw-fwd-mode');
+    form.querySelectorAll('input[name=mode]').forEach(function(c){ if (c.value === keptMode) c.checked = true; }); } catch (e) {}
+  function table(head, rows) {
+    var t = el('table', 'spf-table'), h = el('tr');
+    head.forEach(function(x){ h.appendChild(el('th', null, x)); }); t.appendChild(h);
+    rows.forEach(function(cells){
+      var tr = el('tr');
+      cells.forEach(function(x, i){ var td = el('td', null, x); if (!i) td.setAttribute('translate', 'no'); tr.appendChild(td); });
+      t.appendChild(tr);
+    });
+    return t;
+  }
+  function render() {
+    var j = lastPlan, m = mode();
+    fwd.setAttribute('data-mode', m);
+    if (!j) return;
+    plan.innerHTML = ''; send.disabled = false;
+    if (m === 'mails') {
+      var o = j.originals;
+      plan.appendChild(table(['Постачальник', 'Листів', '≈ МБ'], o.rows.map(function(r){
+        return [r.name, r.letters + (r.files ? ' + 📎 ' + r.files : '') + (r.hidden ? ' + 🔒 ' + r.hidden : ''),
+                r.mb ? String(r.mb) : (r.letters || r.files ? '< 0.1' : '—')];
+      })));
+      if (o.rows.some(function(r){ return r.files; })) plan.appendChild(el('div', 'spf-muted', '📎 — файли постачальника, яких немає в цих листах: підуть звичайними вкладеннями.'));
+      if (o.rows.some(function(r){ return r.hidden; })) plan.appendChild(el('div', 'spf-muted', '🔒 Листи зі скриньок колег не пересилаються.'));
+      if (o.local) plan.appendChild(el('div', 'spf-muted', 'ℹ️ Копії на сервері пошти немає в листів: ' + o.local + ' — їх буде зібрано з Minerva (текст і файли, що є).'));
+      if (o.big.length) plan.appendChild(el('div', 'spf-warn', '⚠️ Понад ' + o.limit_mb + ' МБ — піде окремим листом, сервер колеги може не прийняти: ' + o.big.join(', ')));
+      if (o.left.length) plan.appendChild(el('div', 'spf-warn', '📎 Не вкладено (кожен понад ' + o.limit_mb + ' МБ): ' + o.left.join(', ')));
+      var total = o.rows.reduce(function(s, r){ return s + r.letters + r.files; }, 0);
+      if (!total) { note.textContent = '⚠️ Немає листів, які можна переслати.'; send.disabled = true; return; }
+      if (o.parts > o.parts_max) { note.textContent = '⚠️ Разом ≈ ' + o.mb + ' МБ — це ' + o.parts + ' листів колезі (за раз — до ' + o.parts_max + '). Виберіть менше постачальників.'; send.disabled = true; return; }
+      var mb = o.mb || '< 0.1';
+      note.textContent = o.parts > 1 ? 'Піде ' + o.parts + ' листами з вашої скриньки — кожен до ' + o.limit_mb + ' МБ (разом ≈ ' + mb + ' МБ).'
+                                     : 'Піде одним листом з вашої скриньки, з підписом (≈ ' + mb + ' МБ).';
+      return;
+    }
+    document.getElementById('rw-fwd-mb').textContent = j.files.length ? '(' + j.files.length + ' · ' + j.attach_mb + ' MB)' : '—';
+    plan.appendChild(table(['Постачальник', 'Листів', 'Файлів'], j.rows.map(function(r){
+      return [r.name, r.letters + (r.hidden ? ' + 🔒 ' + r.hidden : ''), String(r.files)];
+    })));
+    if (j.rows.some(function(r){ return r.hidden; })) plan.appendChild(el('div', 'spf-muted', '🔒 Листи зі скриньок колег не пересилаються.'));
+    var left = j.files.filter(function(f){ return !f.attach; });
+    if (left.length) plan.appendChild(el('div', 'spf-warn', '📎 Не влізуть у лист (разом понад ліміт) — підуть лише назвами: ' + left.map(function(f){ return f.name; }).join(', ')));
+    note.textContent = 'Піде одним листом з вашої скриньки, з підписом.';
+  }
+  form.querySelectorAll('input[name=mode]').forEach(function(c){ c.addEventListener('change', function(){
+    try { localStorage.setItem('rw-fwd-mode', mode()); } catch (e) {}
+    render();
+  }); });
+  fwd.setAttribute('data-mode', mode());
   fbtn.addEventListener('click', function(){
-    plan.innerHTML = ''; note.textContent = '⏳ Складаю…'; send.disabled = true;
+    plan.innerHTML = ''; note.textContent = '⏳ Складаю…'; send.disabled = true; lastPlan = null;
     fwd.showModal();
     post({do: 'forward_plan', rid: ids()}).then(function(j){
       if (j.error) { note.textContent = '⚠️ ' + j.error; return; }
       if (!form.elements.subject.value) form.elements.subject.value = j.subject;
-      document.getElementById('rw-fwd-mb').textContent = j.files.length ? '(' + j.files.length + ' · ' + j.attach_mb + ' MB)' : '—';
-      var t = el('table', 'spf-table'), h = el('tr');
-      ['Постачальник', 'Листів', 'Файлів'].forEach(function(x){ h.appendChild(el('th', null, x)); }); t.appendChild(h);
-      j.rows.forEach(function(r){
-        var tr = el('tr'), n = el('td', null, r.name); n.setAttribute('translate', 'no'); tr.appendChild(n);
-        tr.appendChild(el('td', null, r.letters + (r.hidden ? ' + 🔒 ' + r.hidden : '')));
-        tr.appendChild(el('td', null, String(r.files))); t.appendChild(tr);
-      });
-      plan.appendChild(t);
-      if (j.rows.some(function(r){ return r.hidden; })) plan.appendChild(el('div', 'spf-muted', '🔒 Листи зі скриньок колег не пересилаються.'));
-      var left = j.files.filter(function(f){ return !f.attach; });
-      if (left.length) plan.appendChild(el('div', 'spf-warn', '📎 Не влізуть у лист (разом понад ліміт) — підуть лише назвами: ' + left.map(function(f){ return f.name; }).join(', ')));
-      note.textContent = 'Піде одним листом з вашої скриньки, з підписом.'; send.disabled = false;
+      lastPlan = j; render();
       form.elements.to.focus();
     }).catch(function(){ note.textContent = '⚠️ Немає зв’язку'; });
   });
   fwd.querySelectorAll('[data-fwd-close]').forEach(function(b){ b.addEventListener('click', function(){ fwd.close(); }); });
+  function sent(text) {
+    note.textContent = text;
+    try { sessionStorage.removeItem('rw-pick-{{ req.pk }}'); } catch (e) {}      // переслано — вибір знято
+    setTimeout(function(){ fwd.close(); location.reload(); }, 1800);
+  }
+  function poll(job, t0) {               // листи з пошти й SMTP — у фоні (suppliers/services/jobs.py)
+    fetch((window.SP_JOB_URL || '/admin/inventory/supplier/job/') + job + '/', {credentials: 'same-origin'})
+      .then(function(r){ return r.json(); }).then(function(s){
+        if (s.status === 'running') {
+          note.textContent = '⏳ ' + (s.progress || 'Надсилаю…') + ' · ' + Math.round((Date.now() - t0) / 1000) + ' с';
+          return setTimeout(function(){ poll(job, t0); }, 2000);
+        }
+        if (s.status === 'done') return sent((s.result || {}).message || '✓');
+        note.textContent = '⚠️ ' + (s.error || 'Завдання не знайдено'); send.disabled = false;
+      }).catch(function(){ setTimeout(function(){ poll(job, t0); }, 4000); });
+  }
   send.addEventListener('click', function(){
     if (!form.reportValidity()) return;
     send.disabled = true; note.textContent = '⏳ Надсилаю…';
     var parts = Array.prototype.filter.call(form.querySelectorAll('input[name=part]'), function(c){ return c.checked; }).map(function(c){ return c.value; });
-    post({do: 'forward_send', rid: ids(), to: form.elements.to.value, cc: form.elements.cc.value,
-          subject: form.elements.subject.value, note: form.elements.note.value, part: parts}).then(function(j){
+    var data = {rid: ids(), to: form.elements.to.value, cc: form.elements.cc.value,
+                subject: form.elements.subject.value, note: form.elements.note.value};
+    if (mode() === 'mails') {
+      data.do = 'forward_mails'; data.table = parts.indexOf('table') >= 0 ? '1' : '';
+      post(data).then(function(j){
+        if (j.error || !j.job) { note.textContent = '⚠️ ' + (j.error || 'не вдалося'); send.disabled = false; return; }
+        poll(j.job, Date.now());
+      }).catch(function(){ note.textContent = '⚠️ Немає зв’язку'; send.disabled = false; });
+      return;
+    }
+    data.do = 'forward_send'; data.part = parts;
+    post(data).then(function(j){
       if (j.error) { note.textContent = '⚠️ ' + j.error; send.disabled = false; return; }
-      note.textContent = '✓ Переслано → ' + j.to.join(', ');
-      try { sessionStorage.removeItem('rw-pick-{{ req.pk }}'); } catch (e) {}      // переслано — вибір знято
-      setTimeout(function(){ fwd.close(); location.reload(); }, 1400);
+      sent('✓ Переслано → ' + j.to.join(', '));
     }).catch(function(){ note.textContent = '⚠️ Немає зв’язку'; send.disabled = false; });
   });
 })();

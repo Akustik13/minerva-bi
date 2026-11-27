@@ -230,6 +230,123 @@ class ForwardTests(TalkBase):
         self.assertEqual(empty.status_code, 400)
 
 
+class ForwardMailsTests(TalkBase):
+    """↪ «📨 Листи як є»: кожен лист — вкладенням .eml (оригінал із сервера пошти або зібраний з Minerva), файли
+    постачальника без листа — звичайними вкладеннями, понад ліміт — кількома листами колезі."""
+
+    def setUp(self):
+        super().setUp()
+        from email_assistant.tests_originals import FakeIMAP, raw_letter
+        self.FakeIMAP = FakeIMAP
+        FakeIMAP.store, FakeIMAP.calls = {}, []
+        self.raw = raw_letter(message_id=self.ans.message_id, subject="Re: RFQ")
+        FakeIMAP.store[("INBOX", self.ans.imap_uid)] = self.raw          # відповідь JY — є на сервері
+        SupplierReplyFile.objects.create(recipient=self.r, message=self.ans, index=0, name="JY Quotation.pdf",
+                                         size=8, sha256="a" * 64, received_at=timezone.now(),
+                                         file=ContentFile(b"%PDF-1.4", name="JY Quotation.pdf"))
+        SupplierReplyFile.objects.create(recipient=self.r, index=-1, name="Datasheet.pdf", size=9, sha256="b" * 64,
+                                         received_at=timezone.now(), file=ContentFile(b"%PDF data", name="Datasheet.pdf"))
+        oth = EmailThread.objects.create(account=self.other_account, subject="JY private")
+        self.mail(frm="charles@jypcba.com", body="SECRET 99", thread=oth, account=self.other_account)
+        self.r.extra_threads.add(oth)
+        self.calls = []
+        rfq_talk.EACH_PAUSE, pause = 0, rfq_talk.EACH_PAUSE
+        self.addCleanup(setattr, rfq_talk, "EACH_PAUSE", pause)
+
+    def record(self, to_emails, subject, body_text, body_html="", **kw):
+        self.calls.append({"to": to_emails, "cc": kw.get("cc_emails"), "subject": subject, "text": body_text,
+                           "html": body_html, "atts": kw.get("attachments") or []})
+        return {"ok": True, "message_id": f"<fwd{len(self.calls)}@sevskiy.de>"}
+
+    def send(self, **extra):
+        from suppliers.services import jobs
+        data = {"do": "forward_mails", "rid": [self.r.pk, self.r2.pk], "to": "olga@sevskiy.de",
+                "cc": "boss@sevskiy.de", "note": "Глянь, кого беремо?", "table": "1", **extra}
+
+        def fake_send(client, *args, **kw):
+            return self.record(*args, **kw)
+        with mock.patch("email_assistant.imap_client.IMAPClient", self.FakeIMAP), \
+                mock.patch("email_assistant.smtp_client.SMTPClient.send", fake_send):
+            j = self.client.post(self.act, data).json()
+        return j if "job" not in j else jobs.state(j["job"], self.user)
+
+    def test_plan_counts_letters_files_and_hidden(self):
+        o = self.client.post(self.act, {"do": "forward_plan", "rid": [self.r.pk, self.r2.pk]}).json()["originals"]
+        jy = o["rows"][0]
+        self.assertEqual((jy["name"], jy["letters"], jy["files"], jy["hidden"]), ("JY Electronics", 2, 1, 1))
+        self.assertEqual(o["rows"][1]["letters"], 0)
+        self.assertEqual((o["parts"], o["local"]), (1, 0))
+
+    def test_every_letter_as_eml_in_one_mail(self):
+        s = self.send()
+        self.assertEqual(s["status"], "done", s)
+        self.assertEqual(len(self.calls), 1)
+        c = self.calls[0]
+        self.assertEqual((c["to"], c["cc"]), (["olga@sevskiy.de"], ["boss@sevskiy.de"]))
+        names = [a["name"] for a in c["atts"]]
+        self.assertEqual(len(names), 3, names)
+        self.assertRegex(names[0], rf"^JY Electronics - \d{{4}}-\d\d-\d\d \d\d-\d\d Anna Li - \[{self.req.code}\] RFQ\.eml$")
+        self.assertRegex(names[1], r"^JY Electronics - \d{4}-\d\d-\d\d \d\d-\d\d Charles - Re RFQ\.eml$")
+        self.assertEqual(names[2], "JY Electronics - Datasheet.pdf")         # файл без листа; з листа — у .eml
+        ans = c["atts"][1]
+        self.assertEqual((ans["content"], ans["content_type"]), (self.raw, "message/rfc822"))   # як на сервері
+        self.assertIn(b"Please quote PCBA.", c["atts"][0]["content"])         # на сервері немає — з Minerva
+        self.assertIn("Глянь, кого беремо?", c["html"])
+        self.assertIn("136,00 EUR", c["html"])                                # таблиця
+        self.assertIn("📨 У вкладенні листів: 2", c["html"])
+        self.assertIn("🔒 Ще листів у скриньках колег: 1", c["html"])
+        self.assertIn("копії немає на сервері пошти", c["html"])
+        self.assertNotIn(b"SECRET 99", b"".join(a["content"] for a in c["atts"]))
+        self.assertNotIn("SECRET 99", c["html"] + c["text"])
+        self.assertIn("листів 2, файлів 1", s["result"]["message"])
+        self.assertEqual(SupplierEvent.objects.filter(request=self.req, text__contains="листи як є (2)").count(), 1)
+        copy = type(self.ans).objects.get(message_id="<fwd1@sevskiy.de>")
+        self.assertTrue(all(a.get("file_path") for a in copy.attachments))    # копія — з файлами на диску
+
+    def test_without_table_and_too_big_splits_into_parts(self):
+        from suppliers.services import rfq
+        with mock.patch.object(rfq, "ATTACH_MAX_MB", 0.0005):                # ~ 500 байт — кожне вкладення окремо
+            s = self.send(table="")
+        self.assertEqual(s["status"], "done", s)
+        self.assertEqual([c["subject"][-5:] for c in self.calls], ["(1/3)", "(2/3)", "(3/3)"])
+        self.assertNotIn("136,00 EUR", self.calls[0]["html"])
+        self.assertIn("Глянь, кого беремо?", self.calls[0]["html"])
+        self.assertNotIn("Глянь, кого беремо?", self.calls[1]["html"])
+        self.assertIn("Лист 2 з 3", self.calls[1]["html"])
+        self.assertIn("🔒 Ще листів у скриньках колег: 1", self.calls[2]["html"])
+        self.calls.clear()
+        with mock.patch.object(rfq, "ATTACH_MAX_MB", 0.0005), mock.patch.object(rfq_talk, "ORIGINALS_PARTS_MAX", 2):
+            s = self.send()
+        self.assertEqual(s["status"], "failed")
+        self.assertIn("за раз — до 2", s["error"])
+        self.assertEqual(self.calls, [])
+
+    def test_letter_without_server_copy_takes_its_files_from_the_request(self):
+        from suppliers.models import SupplierRequestFile
+        SupplierRequestFile.objects.create(request=self.req, name="Gerber.zip", size=5,
+                                           file=ContentFile(b"PK\x03\x04z", name="Gerber.zip"))
+        type(self.sent).objects.filter(pk=self.sent.pk).update(attachments=[{"name": "Gerber.zip", "size": 5}])
+        type(self.ans).objects.filter(pk=self.ans.pk).update(attachments=[
+            {"name": "JY Quotation.pdf", "size": 8}, {"name": "lost.step", "size": 3}])
+        self.FakeIMAP.store.clear()                                          # на сервері пошти — нічого
+        s = self.send()
+        self.assertEqual(s["status"], "done", s)
+        c = self.calls[0]
+        names = [a["name"] for a in c["atts"]]
+        self.assertEqual(names[1], "JY Electronics - Gerber.zip")            # файл запиту — під листом запиту
+        self.assertEqual(names[3], "JY Electronics - JY Quotation.pdf")      # файл відповіді — під відповіддю
+        self.assertEqual(names[4], "JY Electronics - Datasheet.pdf")
+        self.assertEqual(len(names), 5, names)
+        self.assertIn("файл цього листа (збережений у запиті): JY Quotation.pdf", c["html"])
+        self.assertIn("без файлів: lost.step", c["html"])
+        self.assertNotIn("без файлів: JY Quotation.pdf", c["html"])
+
+    def test_needs_address_and_a_row(self):
+        self.assertEqual(self.client.post(self.act, {"do": "forward_mails", "rid": [self.r.pk]}).status_code, 400)
+        self.assertEqual(self.client.post(self.act, {"do": "forward_mails", "to": "olga@sevskiy.de"}).status_code,
+                         400)
+
+
 class MailPreviewTests(TalkBase):
     def test_supplier_and_rfq_shown_for_linked_thread(self):
         from suppliers.services import mail_link

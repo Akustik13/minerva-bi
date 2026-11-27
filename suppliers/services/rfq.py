@@ -434,22 +434,31 @@ def send_test(req, recipient, user, to, attachments=()) -> dict:
             "cc": cc_for(req, recipient) if real else addresses(req.cc), "files": [a["name"] for a in attachments]}
 
 
-def store_sent(account, result, to, cc, subject, body, attachments, reply_to=None, body_html=""):
-    """Копія надісланого листа в Minerva й гілка (так само, як лист з «Написати»), щоб відповідь лягла поруч."""
+def store_sent(account, result, to, cc, subject, body, attachments, reply_to=None, body_html="", keep_files=False):
+    """Копія надісланого листа в Minerva й гілка (так само, як лист з «Написати»), щоб відповідь лягла поруч.
+    keep_files — вкладення ще й на диск (file_path): пересланий лист «як вкладення» (.eml) на сервері розбирається
+    інакше (вкладення всередині .eml теж окремо), тож файл копії береться з диска, а не з IMAP за номером."""
     from email_assistant.models import EmailMessage
     from email_assistant.sync import get_or_create_thread
     now = timezone.now()
     thread = reply_to.thread if reply_to is not None and reply_to.thread_id else get_or_create_thread(account, {
         "subject": subject, "from_email": account.email_address, "to_emails": to, "cc_emails": cc, "sent_at": now,
         "message_id": result.get("message_id", ""), "in_reply_to": reply_to.message_id if reply_to else ""})
+    folder_name = ("minerva:" + result.get("message_id", ""))[:200]
+    if keep_files:
+        from email_assistant.imap_client import persist_attachments
+        files = persist_attachments(account.pk, 0, folder_name, [
+            {"name": a["name"], "content_type": a["content_type"], "size": len(a["content"]), "_data": a["content"]}
+            for a in attachments])
+    else:
+        files = [{"name": a["name"], "content_type": a["content_type"], "size": len(a["content"])} for a in attachments]
     msg = EmailMessage.objects.create(
         account=account, thread=thread, folder="sent",
-        imap_folder_name=("minerva:" + result.get("message_id", ""))[:200],
+        imap_folder_name=folder_name,
         in_reply_to=(reply_to.message_id if reply_to else "")[:500], message_id=result.get("message_id", ""),
         subject=subject, from_email=account.email_address, from_name=account.display_name, to_emails=to,
         cc_emails=cc, body_text=body, body_html=body_html or "", is_read=True, sent_at=now,
-        attachments=[{"name": a["name"], "content_type": a["content_type"], "size": len(a["content"])}
-                     for a in attachments])
+        attachments=files)
     thread.message_count = thread.messages.count()
     thread.last_message_at = now
     thread.save(update_fields=["message_count", "last_message_at"])
