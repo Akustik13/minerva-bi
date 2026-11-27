@@ -151,6 +151,10 @@ class Handler(BaseHTTPRequestHandler):
         headers = {k: v for k, v in self.headers.items() if k.lower() not in HOP}
         hub = not private and any(path == p or path.startswith(p + "/") for p in cfg.get("hub_prefixes") or [])
         if hub:
+            # позначка «через розподільник»: Центр ніколи не вважає такий запит консоллю самого ПК,
+            # навіть якщо DSM не передав адресу клієнта (X-Real-IP)
+            headers = {k: v for k, v in headers.items() if k.lower() != "x-rag-router"}
+            headers["X-RAG-Router"] = "1"
             return self._hub(body, headers)
         port = cfg["private_port"] if private else cfg["public_port"]
         conn = http.client.HTTPConnection("127.0.0.1", port, timeout=cfg["timeout_seconds"])

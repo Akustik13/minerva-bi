@@ -63,7 +63,8 @@ def hub_backend():
                 self.wfile.write(b"0\r\n\r\n")
                 return
             data = json.dumps({"backend": "hub", "path": self.path, "real_ip": self.headers.get("X-Real-IP"),
-                               "auth": bool(self.headers.get("Authorization"))}).encode()
+                               "auth": bool(self.headers.get("Authorization")),
+                               "router": self.headers.get_all("X-RAG-Router") or []}).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(data)))
@@ -136,6 +137,9 @@ def main():
         j = json.loads(d)
         check("/hub -> RAG Hub with client IP and key", s == 200 and j["backend"] == "hub" and j["auth"]
               and j["real_ip"] == "198.51.100.7")
+        check("/hub -> marked as coming through the router", j["router"] == ["1"])
+        s, _, _, _, d = call(port, "GET", "/hub/api/session", {"X-RAG-Router": "0"})
+        check("client X-RAG-Router replaced, not doubled", json.loads(d)["router"] == ["1"])
         for path in ("/mcp", "/oauth/token", "/.well-known/oauth-authorization-server", "/llm/v1/models", "/hub"):
             s, _, _, _, d = call(port, "GET", path)
             check(f"{path} -> RAG Hub", s == 200 and json.loads(d)["backend"] == "hub")
