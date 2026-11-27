@@ -1750,6 +1750,10 @@ document.addEventListener('DOMContentLoaded', function() {
         <table style="width:100%;border-collapse:collapse;font-size:13px" id="pkg-table">
           <thead>
             <tr style="background:var(--bg-input);color:var(--text-muted)">
+              {% if pkg_catalog %}
+              <th style="padding:6px 10px;text-align:left;font-weight:500;cursor:help;width:30%"
+                  title="Коробка з «Пакувальних матеріалів» — підставить розміри. Розміри, введені вручну, Minerva впізнає сама (±1 см)">📦 Коробка</th>
+              {% endif %}
               <th style="padding:6px 10px;text-align:left;font-weight:500">Вага (кг)</th>
               <th style="padding:6px 10px;text-align:left;font-weight:500">Довж. (см)</th>
               <th style="padding:6px 10px;text-align:left;font-weight:500">Шир. (см)</th>
@@ -1767,9 +1771,12 @@ document.addEventListener('DOMContentLoaded', function() {
                        cursor:pointer;font-size:12px;font-weight:700">
           ＋ Додати коробку
         </button>
+        <a href="{% url 'admin:shipping_packagingmaterial_changelist' %}" target="_blank"
+           style="margin-left:10px;font-size:12px;color:var(--accent)">📦 Пакувальні матеріали →</a>
       </div>
 
       {{ pkg_folds|default_if_none:""|json_script:"pkg-folds" }}
+      {{ pkg_catalog|default_if_none:""|json_script:"pkg-catalog" }}
       <script>
       (function(){
         var _PKG_PRESET = {{ pkg_rows_json|default:"[]"|safe }};
@@ -1820,9 +1827,87 @@ document.addEventListener('DOMContentLoaded', function() {
             box.appendChild(b);
           });
         }
+        // «📦 Коробка» — вибір з «Пакувальних матеріалів» підставляє розміри; розміри, введені вручну, впізнаються
+        // (±1 см, будь-яка орієнтація, і складена до однієї з висот — як services.packaging.material_for)
+        var _PKG_CAT = [];
+        try { _PKG_CAT = JSON.parse(document.getElementById('pkg-catalog').textContent) || []; } catch (e) {}
+
+        function _pkgDims(tr) {
+          var v = function(n) { return parseFloat(tr.querySelector('[name="' + n + '"]')?.value || 0) || 0; };
+          return [v('pkg_length[]'), v('pkg_width[]'), v('pkg_height[]')];
+        }
+        function _pkgBoxDist(b, dims) {   // відстань до коробки b (найближча з її висот) або null — не вона
+          var got = dims.slice().sort(function(a, c) { return a - c; }), best = null;
+          (b.heights && b.heights.length ? b.heights : [b.h]).forEach(function(h, i) {
+            var want = [b.l, b.w, h].sort(function(a, c) { return a - c; }), d = 0, ok = true;
+            for (var k = 0; k < 3; k++) { var x = Math.abs(want[k] - got[k]); if (x > 1.0001) ok = false; d += x; }
+            var score = d + (i ? 0.001 : 0);                                   // рівні — не складена
+            if (ok && (best === null || score < best)) best = score;
+          });
+          return best;
+        }
+        function _pkgBoxNote(tr, b) {
+          var note = tr.querySelector('.pkg-box-note');
+          if (!note) return;
+          note.textContent = b && b.tare > 0 ? 'тара ' + String(b.tare).replace('.', ',') + ' кг' : '';
+          note.title = b && b.tare > 0 ? '«Вага порожньої» цієї коробки — вона входить у вагу посилки' : '';
+        }
+        function _pkgBoxSync(tr) {        // розміри → вибрана коробка (поточна лишається, поки розміри її)
+          var sel = tr && tr.querySelector('select.pkg-box');
+          if (!sel) return;
+          var dims = _pkgDims(tr), cur = _PKG_CAT.find(function(b) { return String(b.pk) === sel.value; });
+          if (!cur || _pkgBoxDist(cur, dims) === null) {
+            cur = null;
+            var best = null;
+            _PKG_CAT.forEach(function(b) {
+              var d = _pkgBoxDist(b, dims);
+              if (d !== null && (best === null || d < best)) { best = d; cur = b; }
+            });
+          }
+          sel.value = cur ? String(cur.pk) : '';
+          _pkgBoxNote(tr, cur);
+        }
+        function _pkgBoxSelect() {
+          var sel = document.createElement('select');
+          sel.className = 'pkg-box';
+          sel.title = 'Коробка з «Пакувальних матеріалів» — підставить розміри';
+          sel.style.cssText = 'width:100%;background:var(--bg-input);border:1px solid var(--border-strong);'
+            + 'color:var(--text);border-radius:3px;padding:4px 6px;font-size:13px';
+          var none = document.createElement('option');
+          none.value = '';
+          none.textContent = '— свої розміри —';
+          sel.appendChild(none);
+          var groups = {};
+          _PKG_CAT.forEach(function(b) {
+            var g = groups[b.type];
+            if (!g) { g = groups[b.type] = document.createElement('optgroup'); g.label = b.type; sel.appendChild(g); }
+            var o = document.createElement('option');
+            o.value = String(b.pk);
+            o.textContent = b.label + (b.tare > 0 ? ' · ' + String(b.tare).replace('.', ',') + ' кг' : '');
+            o.setAttribute('translate', 'no');
+            g.appendChild(o);
+          });
+          sel.addEventListener('change', function() {
+            var tr = sel.closest('tr'), b = _PKG_CAT.find(function(x) { return String(x.pk) === sel.value; });
+            _pkgBoxNote(tr, b);
+            if (!b) return;
+            [['pkg_length[]', b.l], ['pkg_width[]', b.w], ['pkg_height[]', b.h]].forEach(function(p) {
+              var inp = tr.querySelector('[name="' + p[0] + '"]');
+              if (!inp) return;
+              inp.value = p[1];
+              inp.dispatchEvent(new Event('input', {bubbles: true}));
+              inp.dispatchEvent(new Event('change', {bubbles: true}));
+            });
+          });
+          return sel;
+        }
+
         document.addEventListener('input', function(e) {
           var n = e.target && e.target.name;
-          if (n === 'pkg_length[]' || n === 'pkg_width[]' || n === 'pkg_height[]') _pkgFoldHint(e.target.closest('tr'));
+          if (n === 'pkg_length[]' || n === 'pkg_width[]' || n === 'pkg_height[]') {
+            _pkgFoldHint(e.target.closest('tr'));
+            _pkgBoxSync(e.target.closest('tr'));
+          }
         });
 
         window.addPkgRow = function(w, l, wd, h, q) {
@@ -1861,8 +1946,19 @@ document.addEventListener('DOMContentLoaded', function() {
           +   '<button type="button" onclick="this.closest(\'tr\').remove()"'
           +   ' style="color:var(--err);background:none;border:none;cursor:pointer;font-size:16px;padding:0 4px">'
           +   '✕</button></td>';
+          if (_PKG_CAT.length) {
+            var td = document.createElement('td');
+            td.style.padding = '4px 6px';
+            td.appendChild(_pkgBoxSelect());
+            var note = document.createElement('div');
+            note.className = 'pkg-box-note';
+            note.style.cssText = 'color:var(--text-muted);font-size:11px;margin-top:2px';
+            td.appendChild(note);
+            tr.insertBefore(td, tr.firstChild);
+          }
           document.getElementById('pkg-tbody').appendChild(tr);
           _pkgFoldHint(tr);
+          _pkgBoxSync(tr);
         };
 
         document.addEventListener('DOMContentLoaded', function() {

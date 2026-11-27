@@ -30,6 +30,7 @@
 from __future__ import annotations
 
 import math
+import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -124,6 +125,39 @@ def fold_boxes(pool=None) -> list:
     pool = materials() if pool is None else pool
     return [{"name": str(m), "l": float(m.length_cm), "w": float(m.width_cm),
              "heights": [float(h) for h in m.heights]} for m in pool if len(m.heights) > 1]
+
+
+def _num(d):
+    """Decimal → коротке число для підпису: 30.0 → «30», 15.5 → «15.5»."""
+    return format(Decimal(d or 0).normalize(), "f")
+
+
+def _plain_dims(text):
+    return re.sub(r"(\d)\.0+(?!\d)", r"\1", str(text)).replace(" ", "").replace("x", "×").lower()
+
+
+def catalog_boxes(pool=None) -> list:
+    """Активні пакувальні матеріали для вибору «📦 Коробка» в рядках «Коробки» форми відправлення:
+    [{pk, label, type, l, w, h, heights, tare}] — за типом (коробки, конверти…) і розмірами. Вибір підставляє
+    розміри; введені вручну розміри форма сама впізнає (як `material_for`: ±1 см, будь-яка орієнтація, складена)."""
+    from shipping.models import PackagingMaterial as PM
+    pool = materials() if pool is None else pool
+    order = {v: i for i, v in enumerate(PM.BoxType.values)}
+    types = dict(PM.BoxType.choices)
+    out = []
+    for m in sorted(pool, key=lambda m: (order.get(m.box_type, 99), _volume(m), m.pk)):
+        dims = f"{_num(m.length_cm)}×{_num(m.width_cm)}×{_num(m.height_cm)} см"
+        name = (m.name or "").strip()
+        parts = [m.code] if m.code else []
+        own = name and _plain_dims(name) != _plain_dims(dims)     # назва = розміри («30.0×22.0×15.0 см») — без повтору
+        if own:
+            parts.append(name)
+        if not own or _plain_dims(dims[:-3]) not in _plain_dims(name):   # розміри вже в назві («M 30×22×15») — не вдруге
+            parts.append(dims)
+        out.append({"pk": m.pk, "label": " · ".join(parts), "type": str(types.get(m.box_type, m.box_type)),
+                    "l": float(m.length_cm), "w": float(m.width_cm), "h": float(m.height_cm),
+                    "heights": [float(h) for h in m.heights], "tare": float(m.tare_weight_kg or 0)})
+    return out
 
 
 def fill_height(m, fill):

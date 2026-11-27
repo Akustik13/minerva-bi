@@ -378,3 +378,35 @@ class WeightCheckTests(Base):
         self.assertIsNone(packaging.weight_check(s, 0.2))
         s = self.ship(self.order((self.a, 1)), kg="0.3")
         self.assertIsNone(packaging.weight_check(s, 0))
+
+
+class CatalogBoxesTests(ViewTests):
+    """«📦 Коробка» в рядках «Коробки» форми відправлення — вибір з «Пакувальних матеріалів»."""
+
+    def test_list_types_order_labels_and_archive(self):
+        env = PackagingMaterial.objects.create(box_type="envelope", length_cm=25, width_cm=18, height_cm=1)
+        big = PackagingMaterial.objects.create(name="Karton M", code="BX-M-02", length_cm=30, width_cm=22,
+                                               height_cm=15, fold_heights="10", tare_weight_kg=Decimal("0.12"))
+        PackagingMaterial.objects.create(length_cm=50, width_cm=40, height_cm=40, is_active=False)
+        rows = packaging.catalog_boxes()
+        self.assertEqual([r["pk"] for r in rows], [self.x.pk, big.pk, env.pk])     # коробки за об'ємом, потім конверти
+        r = rows[1]
+        self.assertEqual(r["label"], "BX-M-02 · Karton M · 30×22×15 см")
+        self.assertEqual((r["l"], r["w"], r["h"], r["heights"], r["tare"]), (30.0, 22.0, 15.0, [15.0, 10.0], 0.12))
+        self.assertEqual(rows[0]["label"], "20×15×5 см")                           # назва = розміри — без повтору
+        self.assertEqual(rows[2]["type"], "✉️ Конверт")
+        PackagingMaterial.objects.filter(pk=big.pk).update(name="M 30×22×15")      # розміри вже в назві
+        self.assertEqual(packaging.catalog_boxes()[1]["label"], "BX-M-02 · M 30×22×15")
+
+    def test_every_create_page_has_the_list(self):
+        PackagingMaterial.objects.create(name="Karton M", length_cm=30, width_cm=22, height_cm=15)
+        from django.urls import reverse
+        pages = [reverse("admin:shipping_shipment_create_blank"),
+                 reverse("admin:shipping_shipment_create", args=[self.order((self.a, 1)).pk]),
+                 reverse("admin:shipping_shipment_edit_draft",
+                         args=[self.ship(self.order((self.a, 1)), status=Shipment.Status.DRAFT).pk])]
+        for url in pages:
+            html = self.client.get(url).content.decode()
+            self.assertIn('id="pkg-catalog"', html, url)
+            self.assertIn(r"Karton M \u00b7 30\u00d722\u00d715", html, url)      # json_script \u043a\u043e\u0434\u0443\u0454 \u043d\u0435-ASCII
+            self.assertIn("📦 Коробка</th>", html, url)

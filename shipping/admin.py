@@ -2463,6 +2463,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'default_ca_weight':    None,
             'title':                'Нове відправлення',
             'pkg_rows_json':        '[]',
+            'pkg_folds':            self._fold_boxes(),
+            'pkg_catalog':          self._catalog_boxes(),
             'pkg_auto':             False,
             'addr_book_json':       addr_book_json,
             'cancel_url':           reverse('admin:shipping_shipment_changelist'),
@@ -2581,6 +2583,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "title":               f"Нове відправлення — {order.order_number}",
             "pkg_rows_json":       _json.dumps(pkg_rows),
             "pkg_folds":           self._fold_boxes(),
+            "pkg_catalog":         self._catalog_boxes(),
             "pkg_auto":            pkg_auto,
             "recent_recipients_json": _json.dumps(unique_recipients),
             "agent_checks":        self._ship_checks(order),
@@ -2598,6 +2601,16 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             return fold_boxes()
         except Exception as e:  # noqa: BLE001 — без підказки форма однаково працює
             logger.warning("fold boxes: %s", e)
+            return []
+
+    @staticmethod
+    def _catalog_boxes():
+        """«📦 Коробка» в рядках «Коробки» форми — вибір з «Пакувальних матеріалів» (services.packaging)."""
+        try:
+            from .services.packaging import catalog_boxes
+            return catalog_boxes()
+        except Exception as e:  # noqa: BLE001 — без списку розміри вводяться вручну, як раніше
+            logger.warning("catalog boxes: %s", e)
             return []
 
     @staticmethod
@@ -3158,6 +3171,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "title":                f"{'Виправити помилку' if is_error else 'Редагувати чернетку'} #{shipment.pk}",
             "pkg_rows_json":        _json2.dumps(pkg_rows_edit),
             "pkg_folds":            self._fold_boxes(),
+            "pkg_catalog":          self._catalog_boxes(),
             "pkg_auto":             len(pkg_rows_edit) > 1 or (len(pkg_rows_edit) == 1 and pkg_rows_edit[0]["quantity"] > 1),
             "pkg_items_dist_json":  _json2.dumps(pkg_items_dist_edit),
             "addr_book_json":       self._build_addr_book_json(request),
