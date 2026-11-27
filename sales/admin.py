@@ -266,7 +266,8 @@ class SalesOrderLineInline(admin.TabularInline):
             return format_html('<span style="background:#2e7d32;color:#fff;padding:2px 8px;border-radius:8px;'
                                'font-size:11px">📦 ✓ {} відправлено</span>', int(sent))
         # товару на всі незакриті замовлення не вистачає — місце в черзі (кому вже є, а кому чекати)
-        return format_html('{}{}', self._stock_badge(stock, needed, sent, wait), _queue_html(cover.get("queue")))
+        return format_html('{}{}{}', self._stock_badge(stock, needed, sent, wait), _queue_html(cover.get("queue")),
+                           _bom_html(cover.get("bom")))
     stock_status.short_description = "На складі"
 
     @staticmethod
@@ -305,6 +306,23 @@ def _queue_html(q, wait_text=True):
         parts.append(format_html('<b style="color:#4caf50">✅ можна відправляти</b>'))
     return format_html('<div style="font-size:11px;color:var(--text-muted);margin-top:3px" title="{}">{}</div>',
                        _queue_title(q), mark_safe(" · ".join(parts)))
+
+
+def _bom_html(bom):
+    """«🔧 CA-SMAM-…: бракує 2 (черга 3/3)» — виробу бракує компонента BOM за чергою на компонент (stock.lines_cover)."""
+    if not bom:
+        return ""
+    return format_html_join(
+        "", '<div style="font-size:11px;margin-top:3px;color:#ff9800" title="{}">🔧 {}: <b>бракує {}</b> '
+            '<span style="color:var(--text-muted)">(черга {}/{}){}</span></div>',
+        (("Компонент BOM: без нього виріб не зібрати й не відправити. Черга на компонент — разом з його "
+          "прямими продажами: 📌 → дедлайн → дата замовлення.", b["sku"], _qty(b["short"]), b["rank"], b["of"],
+          f" · ⚠️ дозамовити {_qty(b['wait'])}" if b["wait"] > 0 else "") for b in bom))
+
+
+def _qty(q):
+    q = Decimal(str(q or 0))
+    return f"{q.normalize():f}" if q != q.to_integral() else str(int(q))
 
 
 def _line_cover(line):
@@ -972,6 +990,10 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
                             # 🔢 черга: на всі незакриті замовлення товару не вистачає
                             row['q'] = {'r': q['rank'], 'n': q['of'], 'pin': q['pinned'], 'pool': int(q['pool']),
                                         'total': int(q['total']), 'short': int(q['short']), 'wait': int(q['wait'])}
+                        if c.get('bom'):
+                            # 🔧 виробу бракує компонента BOM за чергою на компонент (кабель для антени)
+                            row['bom'] = [{'sku': b['sku'], 'short': _qty(b['short']), 'r': b['rank'], 'n': b['of'],
+                                           'wait': _qty(b['wait'])} for b in c['bom']]
                         line_rows.append(row)
                         order_stock.setdefault(str(l.order_id), []).append(row)
                     response.context_data['sv_order_stock_json'] = _json.dumps(order_stock)
@@ -3118,6 +3140,10 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
                 if c.get("queue"):
                     queued = True
                     qnote = _queue_html(c["queue"])
+                if c.get("bom"):
+                    # виріб є, але бракує компонента BOM (кабель для антени) — зібрати / відправити не вийде
+                    queued = has_problems = True
+                    qnote += _bom_html(c["bom"])
                 if stock <= 0:
                     s = "🚫 НЕМАЄ"
                     row_style = "border-left:4px solid #f44336"

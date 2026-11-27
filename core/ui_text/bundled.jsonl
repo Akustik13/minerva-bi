@@ -506,6 +506,7 @@
 {"uk": "(ціни — у {0}, дані Minerva без запиту до DigiKey)", "en": "(prices in {0}, Minerva data without a request to DigiKey)", "de": "(Preise in {0}, Minerva-Daten ohne Anfrage an DigiKey)"}
 {"uk": "(чекаємо вже {0})", "en": "(waiting for {0} already)", "de": "(wir warten schon {0})"}
 {"uk": "(червоних", "en": "(red", "de": "(rot"}
+{"uk": "(черга {0}/{1}){2}", "en": "(queue {0}/{1}){2}", "de": "(Warteschlange {0}/{1}){2}"}
 {"uk": "(черга {0}/{1}: товар спершу іде замовленням вище в черзі)", "en": "(queue {0}/{1}: stock goes first to orders higher in the queue)", "de": "(Warteschlange {0}/{1}: Ware geht zuerst an Bestellungen weiter oben in der Warteschlange)"}
 {"uk": "(через RAG API помічника Minerva)", "en": "(via the RAG API of the Minerva assistant)", "de": "(über die RAG-API des Minerva-Assistenten)"}
 {"uk": "(числа з запасом зручніші — легше вставити між ними).", "en": "(numbers with gaps are more convenient — easier to insert between them).", "de": "(Zahlen mit Abstand sind praktischer — so lässt sich leichter etwas dazwischen einfügen)."}
@@ -3598,6 +3599,7 @@
 {"uk": "{0}: базові ціни змінено (записано в історію).", "en": "{0}: base prices changed (recorded in history).", "de": "{0}: Basispreise geändert (in der Historie erfasst)."}
 {"uk": "{0}: без ліміту", "en": "{0}: unlimited", "de": "{0}: unbegrenzt"}
 {"uk": "{0}: бракує", "en": "{0}: missing", "de": "{0}: fehlt"}
+{"uk": "{0}: бракує {1} (черга {2}/{3}{4})", "en": "{0}: short {1} (queue {2}/{3}{4})", "de": "{0}: fehlt {1} (Warteschlange {2}/{3}{4})"}
 {"uk": "{0}: бракує {1} шт (разом з {2})", "en": "{0}: {1} pcs short (together with {2})", "de": "{0}: es fehlen {1} Stk. (zusammen mit {2})"}
 {"uk": "{0}: бракує прав {1}", "en": "{0}: missing permissions {1}", "de": "{0}: fehlende Berechtigungen {1}"}
 {"uk": "{0}: більше {1} адрес", "en": "{0}: more than {1} addresses", "de": "{0}: mehr als {1} Adressen"}
@@ -10205,6 +10207,8 @@
 {"uk": "Компонент", "en": "Component", "de": "Komponente"}
 {"uk": "Компонент \"{0}\" не може бути розміщений на складі готової продукції \"{1}\". Використайте склад компонентів.", "en": "Component \"{0}\" cannot be placed in the finished goods warehouse \"{1}\". Use the components warehouse.", "de": "Die Komponente \"{0}\" darf nicht im Fertigproduktlager \"{1}\" liegen. Verwenden Sie das Komponentenlager."}
 {"uk": "Компонент (для складання)", "en": "Component (for assembly)", "de": "Komponente (für die Montage)"}
+{"uk": "Компонент BOM: без нього виріб не зібрати й не відправити", "en": "BOM component: without it the product cannot be assembled or shipped", "de": "Stücklistenkomponente: ohne sie lässt sich das Produkt weder montieren noch versenden"}
+{"uk": "Компонент BOM: без нього виріб не зібрати й не відправити. Черга на компонент — разом з його прямими продажами: 📌 → дедлайн → дата замовлення.", "en": "BOM component: without it the product cannot be assembled or shipped. The queue for the component includes its direct sales: 📌 → deadline → order date.", "de": "Stücklistenkomponente: ohne sie lässt sich das Produkt weder montieren noch versenden. Die Warteschlange für die Komponente umfasst auch ihre Direktverkäufe: 📌 → Frist → Bestelldatum."}
 {"uk": "Компонент «{0}» не можна розміщувати на складі готової продукції «{1}».", "en": "Component “{0}” cannot be placed in the finished goods warehouse “{1}”.", "de": "Komponente „{0}“ darf nicht im Fertigwarenlager „{1}“ eingelagert werden."}
 {"uk": "Компонент списується (продаж, BOM виробу) і приходить туди, де його найбільше.", "en": "A component is taken (sale, product BOM) from and received into the location that holds most of it.", "de": "Eine Komponente wird (Verkauf, Stückliste) dort entnommen und eingebucht, wo am meisten davon liegt."}
 {"uk": "Компоненти", "en": "Components", "de": "Komponenten"}
@@ -13200,6 +13204,7 @@
 {"uk": "Обіцянка", "en": "Promise", "de": "Zusage"}
 {"uk": "Обіцянки", "en": "Promises", "de": "Zusagen"}
 {"uk": "Обіцяно відкритим замовленням і ще не списано (резерви й незаписані замовлення)", "en": "Promised to open orders and not yet written off (reservations and unrecorded orders)", "de": "Offenen Aufträgen zugesagt und noch nicht ausgebucht (Reservierungen und nicht erfasste Aufträge)"}
+{"uk": "Обіцяно відкритим замовленням і ще не списано (резерви, незаписані замовлення й компонент для ще не списаних виробів з BOM)", "en": "Promised to open orders and not yet written off (reservations, unrecorded orders and components for BOM products not yet written off)", "de": "Offenen Bestellungen zugesagt und noch nicht ausgebucht (Reservierungen, noch nicht erfasste Bestellungen und Komponenten für noch nicht ausgebuchte Stücklistenprodukte)"}
 {"uk": "Об’єм", "en": "Volume", "de": "Volumen"}
 {"uk": "Огляд", "en": "Overview", "de": "Übersicht"}
 {"uk": "Огляд (AI)", "en": "Overview (AI)", "de": "Übersicht (KI)"}
@@ -18832,6 +18837,7 @@
 {"uk": "У «Асортимент і ціни» відфільтруйте наявний магазин → «Скопіювати в інший магазин…» з коефіцієнтом (напр. 1,15 для маркетплейсу) разом зі ступенями.", "en": "In “Range and prices” filter by an existing shop → “Copy to another shop…” with a factor (e.g. 1,15 for a marketplace), including the price breaks.", "de": "In „Sortiment und Preise“ den vorhandenen Shop filtern → „In anderen Shop kopieren…“ mit Faktor (z. B. 1,15 für einen Marktplatz) samt Staffeln."}
 {"uk": "У «Мої»", "en": "To “My”", "de": "In „Meine“"}
 {"uk": "У «Мої» вже", "en": "Already in “My”", "de": "In „Meine“ bereits"}
+{"uk": "У «Резерв» рахуються 🔒 резерви, ⏳ ще не списані замовлення й 🔧 компонент для ще не списаних виробів з BOM; ✓ уже списані вже відняті від «На складі».", "en": "«Reserved» counts 🔒 reservations, ⏳ orders not yet written off and 🔧 components for BOM products not yet written off; ✓ already written off are already subtracted from «On hand».", "de": "In «Reserviert» zählen 🔒 Reservierungen, ⏳ noch nicht ausgebuchte Bestellungen und 🔧 Komponenten für noch nicht ausgebuchte Stücklistenprodukte; ✓ bereits ausgebuchte sind schon von «Am Lager» abgezogen."}
 {"uk": "У «⚙️ Налаштування помічника» (Minerva AI) не задано адресу або ключ.", "en": "The “⚙️ Assistant settings” (Minerva AI) have no address or key set.", "de": "In den „⚙️ Assistenteneinstellungen“ (Minerva AI) sind Adresse oder Schlüssel nicht festgelegt."}
 {"uk": "У «⚙️ Налаштування» видно, до кого підключено. «🚪 Забути Minerva на цьому телефоні» — від'єднати.", "en": "«⚙️ Налаштування» shows who it is connected to. «🚪 Забути Minerva на цьому телефоні» — disconnect.", "de": "In «⚙️ Налаштування» sieht man, mit wem verbunden ist. «🚪 Забути Minerva на цьому телефоні» — trennen."}
 {"uk": "У ЄЦБ немає", "en": "Not available at the ECB", "de": "Bei der EZB nicht vorhanden"}
@@ -21002,6 +21008,7 @@
 {"uk": "бракує {0}: потрібно {1}, вільно {2}", "en": "{0} is short: need {1}, available {2}", "de": "{0} fehlt: benötigt {1}, verfügbar {2}"}
 {"uk": "бракує {0}: потрібно {1}, вільно {2}{3}", "en": "{0} is short: needed {1}, free {2}{3}", "de": "{0} fehlt: benötigt {1}, frei {2}{3}"}
 {"uk": "бракує даних чи погодження. probability і impact — 1 (мало) … 3 (дуже).", "en": "missing data or approval. probability and impact — 1 (low) … 3 (high).", "de": "fehlende Daten oder Freigabe. probability und impact — 1 (gering) … 3 (hoch)."}
+{"uk": "бракує компонента BOM {0} для {1}: {2} (черга {3}/{4})", "en": "BOM component {0} for {1} is short: {2} (queue {3}/{4})", "de": "Stücklistenkomponente {0} für {1} fehlt: {2} (Warteschlange {3}/{4})"}
 {"uk": "бракує прав", "en": "missing rights", "de": "fehlende Rechte"}
 {"uk": "браузер", "en": "browser", "de": "Browser"}
 {"uk": "браузер не дозволив Minerva доступ до локальної мережі, де RAG-ПК: 🔒 ліворуч від адреси сайту", "en": "the browser did not allow Minerva to access the local network where the RAG PC is: 🔒 left of the site address", "de": "der Browser hat Minerva den Zugriff auf das lokale Netzwerk mit dem RAG-PC nicht erlaubt: 🔒 links neben der Adresse"}
@@ -25281,6 +25288,7 @@
 {"uk": "тільки в Minerva", "en": "only in Minerva", "de": "nur in Minerva"}
 {"uk": "тільки в першому рядку.", "en": "only in the first row.", "de": "nur in der ersten Zeile."}
 {"uk": "тільки латинські літери та цифри", "en": "Latin letters and digits only", "de": "nur lateinische Buchstaben und Ziffern"}
+{"uk": "у BOM {0} × {1}", "en": "in BOM {0} × {1}", "de": "in Stückliste {0} × {1}"}
 {"uk": "у CRM", "en": "in CRM", "de": "im CRM"}
 {"uk": "у CRM з {0}", "en": "in CRM since {0}", "de": "im CRM seit {0}"}
 {"uk": "у DigiKey немає розмов цього замовлення", "en": "DigiKey has no conversations for this order", "de": "bei DigiKey gibt es keine Gespräche zu diesem Auftrag"}

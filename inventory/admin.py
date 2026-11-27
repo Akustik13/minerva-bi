@@ -45,6 +45,12 @@ logger = logging.getLogger(__name__)
 
 # ── Утиліти ────────────────────────────────────────────────────────────────────
 
+def _qty_text(q):
+    """Кількість без зайвих нулів: 4 → «4», 0.5 → «0.5»."""
+    q = Decimal(str(q or 0))
+    return f"{q.normalize():f}" if q != q.to_integral() else str(int(q))
+
+
 def _get_stock(product, for_sale=True):
     """
     Physical on-hand stock — excludes RESERVED transactions.
@@ -351,6 +357,24 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 'state_label':  STATE_LABELS[state],
                 'in_reserved':  state != 'deducted',
             })
+        # 🔧 компонент для ще не списаних виробів з BOM (кабель для антен, які чекають відправки) — теж у «Резерв»
+        for e in stock_service.bom_open_lines(product_pks):
+            o = e['order']
+            reservations_detail[e['component_id']].append({
+                'line_pk':          e['line'].pk,
+                'bom':              True,
+                'order_number':     o.order_number,
+                'order_pk':         o.pk,
+                'qty':              float(e['need']),
+                'client':           o.client or o.ship_name or o.email or f'#{o.order_number}',
+                'status':           o.get_status_display(),
+                'shipping_deadline': o.shipping_deadline,
+                'status_raw':   o.status,
+                'order_date':   o.order_date,
+                'state':        'bom',
+                'state_label':  _('🔧 у BOM %(sku)s × %(open)s') % {'sku': e['kit_sku'], 'open': _qty_text(e['open'])},
+                'in_reserved':  True,
+            })
 
         # 🔢 Черга: товару на всі незакриті замовлення не вистачає (доступно < 0) — рядки в порядку черги
         # (stock.queue_key) і кому товар уже є, а кому чекати (stock.stock_queue — те саме, що картка замовлення)
@@ -361,9 +385,15 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 continue
             queue_short.add(pid)
             for res in reservations_detail[pid]:
-                entry = q['by_line'].get(res['line_pk'])
+                entry = q['by_bom' if res.get('bom') else 'by_line'].get(res['line_pk'])
                 res['queue'] = stock_service.queue_place(entry, q) if entry else None
+                if res['queue']:
+                    res['queue']['short_txt'] = _qty_text(res['queue']['short'])
+                    res['queue']['wait_txt'] = _qty_text(res['queue']['wait'])
             reservations_detail[pid].sort(key=lambda r: (r['queue'] is None, r['queue']['rank'] if r['queue'] else 0))
+        for rows_ in reservations_detail.values():     # 0,5 кабелю на одну антену — без округлення до 1
+            for res in rows_:
+                res['qty_txt'] = _qty_text(res['qty'])
 
         # Incoming PO qty + details (split: draft=cart, ordered/partial=confirmed)
         incoming_map = defaultdict(float)
@@ -2848,7 +2878,8 @@ class ProductAdmin(GroupedActionsMixin, ProjectsBlockMixin, AuditableMixin, admi
                 val = int(val)
             return format_html(
                 '<span style="color:#FFB300;font-weight:700" title="{}">🔒 {}</span>',
-                _("Обіцяно відкритим замовленням і ще не списано (резерви й незаписані замовлення)"), val,
+                _("Обіцяно відкритим замовленням і ще не списано (резерви, незаписані замовлення й компонент "
+                  "для ще не списаних виробів з BOM)"), val,
             )
         return format_html('<span style="color:var(--text-dim);font-size:11px">—</span>')
     reserved_qty.short_description = _("🔒 Резерв")

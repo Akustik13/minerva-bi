@@ -221,6 +221,10 @@ def get_order(ctx, args):
                 row['queue'] = {'place': q['rank'], 'of': q['of'], 'pinned_first': q['pinned'],
                                 'can_ship_now': q['short'] <= 0, 'short': _n(q['short']),
                                 'covered_by_purchase_orders': _n(q['inc']), 'reorder': _n(q['wait'])}
+            if c.get('bom'):
+                # виробу бракує компонента BOM (за чергою на компонент) — зібрати / відправити не вийде
+                row['bom_short'] = [{'component': b['sku'], 'short': _n(b['short']), 'place': b['rank'],
+                                     'of': b['of'], 'reorder': _n(b['wait'])} for b in c['bom']]
         lines.append(row)
     to = _ship_to(o)
     pack = _packaging(to)

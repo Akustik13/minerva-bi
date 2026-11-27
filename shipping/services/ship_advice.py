@@ -119,6 +119,10 @@ def checks(order, stock=None, shipments=None) -> list:
             place = f' (черга {q["rank"]}/{q["of"]}: товар спершу іде замовленням вище в черзі)' if q else ''
             add('warn', f'бракує {line.product.sku}: потрібно {num(c.get("need", line.qty))}, '
                         f'вільно {num(max(c["free"], 0))}{place}')
+        for b in (c or {}).get('bom') or ():
+            # виріб є, а компонента BOM (кабель для антени) за чергою на нього бракує
+            add('warn', f'бракує компонента BOM {b["sku"]} для {line.product.sku}: {num(b["short"])} '
+                        f'(черга {b["rank"]}/{b["of"]})')
     if code and code not in eu():
         no_hs = [l.product.sku for l in lines if l.product_id and not hs(l.product)]
         if no_hs:

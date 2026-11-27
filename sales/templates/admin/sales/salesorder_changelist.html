@@ -1281,6 +1281,15 @@ function _svQueue(q) {
   }
   return '<div style="font-size:10px;color:var(--text-dim);white-space:nowrap" title="' + _svEsc(title) + '">' + html + '</div>';
 }
+// 🔧 Виробу бракує компонента BOM за чергою на компонент (кабель для антени): виріб є, а зібрати не вийде
+function _svBom(bom) {
+  if (!bom || !bom.length) return '';
+  return bom.map(function(b) {
+    return '<div style="font-size:10px;color:var(--warn,#ff9800);white-space:nowrap" title="{% trans "Компонент BOM: без нього виріб не зібрати й не відправити" %}">🔧 '
+      + _svEsc(b.sku) + ': <b>{% trans "бракує" %} ' + _svEsc(b.short) + '</b> (' + b.r + '/' + b.n + ')'
+      + (b.wait !== '0' ? ' · ⚠️ {% trans "дозамовити" %} ' + _svEsc(b.wait) : '') + '</div>';
+  }).join('');
+}
 (function() {
   var stockData = {{ sv_order_stock_json|default:"{}"|safe }};
 
@@ -1289,7 +1298,7 @@ function _svQueue(q) {
     var oid   = String(chip.dataset.orderId || '');
     var lines = stockData[oid];
     if (!lines || !lines.length) return;
-    var allOk = lines.every(function(l) { return l.stock >= l.need; });
+    var allOk = lines.every(function(l) { return l.stock >= l.need && !(l.bom && l.bom.length); });
     var txt   = chip.querySelector('.sv-stock-txt');
     if (!txt) return;
     // відправлено посилками повністю — «✓», решта рядків — як завжди (лише залишок)
@@ -1378,7 +1387,7 @@ function _svQueue(q) {
         sentLine += '<div style="font-size:10px;color:var(--link-fg,#58a6ff)" title="{% trans "Чекаємо поставку від постачальника" %}">📥 +'
           + l.inc + ' ' + _svEsc(l.inc_po) + (l.inc_date ? ' · ' + _svEsc(l.inc_date) : '') + '</div>';
       }
-      sentLine += _svQueue(l.q);
+      sentLine += _svQueue(l.q) + _svBom(l.bom);
 
       if (l.sent && !l.need) {
         // усе з позиції вже відправлено посилками: на складі зараз — l.stock

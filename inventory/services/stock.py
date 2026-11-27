@@ -46,7 +46,7 @@ from decimal import Decimal
 
 from django.db import transaction
 from django.db.models import (
-    CharField, DecimalField, Exists, F, Func, Max, Min, OuterRef, Q, Subquery, Sum, Value,
+    CharField, DecimalField, Exists, ExpressionWrapper, F, Func, Max, Min, OuterRef, Q, Subquery, Sum, Value,
 )
 from django.db.models.functions import Cast, Coalesce, Greatest
 from django.utils import timezone
@@ -220,6 +220,72 @@ def incoming_qty(product, statuses=OPEN_PO_STATUSES):
             .aggregate(t=Sum(po_open_qty()))["t"]) or Decimal("0")
 
 
+# ── Компоненти для ще не списаних виробів (BOM) ─────────────────────────────────
+#
+# Компоненти BOM списуються разом із виробом (sync_order, _bom_plan) — лише коли сама позиція виробу списується.
+# Поки виріб ще не списано (режим «при відправці / доставці», бронювання, відправлено частинами — залишок),
+# його компоненти потрібні, але раніше ніде не бронювались: кабель, потрібний для антен, що чекають відправки,
+# показувався вільним і міг піти окремим продажем. «Відкрито» з позиції виробу: незаписана позиція
+# (pending_order_lines) — уся кількість, позиція з резервом — те, що зарезервовано (решта вже списана разом
+# з компонентами). Необов'язкові компоненти — ні (їх і не списує _bom_plan).
+
+def _sum(expr):
+    """SUM(expr) по всіх рядках підзапиту без GROUP BY (Django не вважає Func агрегатом)."""
+    return Func(ExpressionWrapper(expr, output_field=_DEC), function="SUM", output_field=_DEC)
+
+
+def _bom_demand_subqueries():
+    """Два Subquery для annotate (OuterRef — Product-компонент), разом — скільки компонента потрібно для ще не
+    списаних позицій виробів з BOM «Ключові компоненти»: незаписані позиції виробу × кількість на 1 виріб і
+    резерви so: виробу × кількість на 1 виріб. Пласкі (кожен — один рівень, з'єднання з BOM у тому самому запиті):
+    вкладені підзапити переповнювали парсер SQLite. Те саме рахує bom_open_lines для черги й огляду складу."""
+    in_bom = dict(product__components__component=OuterRef("pk"), product__components__optional=False,
+                  product__bom_type=Product.BomType.KEY)
+    pending = (pending_order_lines().filter(**in_bom).order_by()
+               .annotate(t=_sum(F("qty") * F("product__components__qty_per"))).values("t")[:1])
+    reserved = (InventoryTransaction.objects
+                .filter(tx_type=TX.RESERVED, external_key__startswith="so:", **in_bom).order_by()
+                .annotate(t=_sum(-F("qty") * F("product__components__qty_per"))).values("t")[:1])
+    return pending, reserved
+
+
+def bom_open_lines(component_ids, settings=None) -> list:
+    """Позиції виробів, яким ще потрібні ці компоненти: [{component_id, sku, line, order, kit_sku, per, open,
+    need}] — open — скільки виробів позиції ще не списано (незаписана — уся кількість, з резервом — резерв),
+    need = open × кількість на 1 виріб. Сума need = те, що _bom_demand_subquery додає в «Резерв» компонента."""
+    from sales.models import SalesOrderLine
+    ids = {int(pk) for pk in component_ids if pk}
+    if not ids:
+        return []
+    by_kit = {}
+    for pc in (ProductComponent.objects
+               .filter(component_id__in=ids, optional=False, parent__bom_type=Product.BomType.KEY)
+               .select_related("component", "parent")):
+        by_kit.setdefault(pc.parent_id, []).append(pc)
+    if not by_kit:
+        return []
+    s = settings or InventorySettings.get()
+    pending = set(pending_order_lines(s).filter(product_id__in=list(by_kit)).values_list("pk", flat=True))
+    reserved = (_line_held_txs().filter(tx_type=TX.RESERVED)
+                .values("product").annotate(t=Sum("qty")).values("t"))
+    lines = (SalesOrderLine.objects
+             .filter(product_id__in=list(by_kit), qty__gt=0)
+             .annotate(_res=-Coalesce(Subquery(reserved, output_field=_DEC), _ZERO))
+             .filter(Q(pk__in=pending) | Q(_res__gt=0))
+             .select_related("order").order_by("pk"))
+    out = []
+    for line in lines:
+        open_qty = line.qty if line.pk in pending else line._res
+        if open_qty <= 0:
+            continue
+        for pc in by_kit[line.product_id]:
+            per = Decimal(str(pc.qty_per))
+            out.append({"component_id": pc.component_id, "sku": pc.component.sku, "line": line,
+                        "order": line.order, "kit_sku": pc.parent.sku, "per": per, "open": open_qty,
+                        "need": open_qty * per})
+    return out
+
+
 # ── Читання залишків ──────────────────────────────────────────────────────────
 
 def annotate_stock(qs, location=None):
@@ -240,6 +306,12 @@ def annotate_stock(qs, location=None):
         pending = (pending_order_lines().filter(product=OuterRef("pk"))
                    .values("product").annotate(t=Sum("qty")).values("t"))
         reserved_expr = reserved_expr + Coalesce(Subquery(pending, output_field=_DEC), _ZERO)
+    if location is None:
+        # 🔧 компонент для ще не списаних виробів з BOM (кабель для антен, які ще не відправили) — теж бронь;
+        # по локаціях — location_breakdown (там, де компонент лежить)
+        bom_pending, bom_reserved = _bom_demand_subqueries()
+        reserved_expr = (reserved_expr + Coalesce(Subquery(bom_pending, output_field=_DEC), _ZERO)
+                         + Coalesce(Subquery(bom_reserved, output_field=_DEC), _ZERO))
 
     return qs.annotate(
         _on_hand=Coalesce(Subquery(on_hand, output_field=_DEC), _ZERO),
@@ -268,17 +340,24 @@ def location_breakdown(product):
                 .order_by("location__code"))
     pending = (pending_order_lines().filter(product=product)
                .aggregate(t=Sum("qty"))["t"]) or Decimal("0")
-    default = _default_location_code()
-    if pending and product.kind == Product.Kind.COMPONENT:
-        default = home_location(product.pk).code
-    if pending and not any(r["location__code"] == default for r in rows):
-        loc = Location.objects.filter(code=default).values("name").first()
-        rows.append({"location__code": default, "location__name": loc["name"] if loc else default,
-                     "on_hand": Decimal("0"), "reserved_neg": Decimal("0")})
-        rows.sort(key=lambda r: r["location__code"] or "")
+    # 🔧 компонент для ще не списаних виробів — бронь там, звідки його спише BOM (home_location)
+    bom = sum((e["need"] for e in bom_open_lines([product.pk])), Decimal("0"))
+    extra = {}
+    if pending:
+        code = home_location(product.pk).code if product.kind == Product.Kind.COMPONENT else _default_location_code()
+        extra[code] = extra.get(code, Decimal("0")) + pending
+    if bom:
+        code = home_location(product.pk).code
+        extra[code] = extra.get(code, Decimal("0")) + bom
+    for code in extra:
+        if not any(r["location__code"] == code for r in rows):
+            loc = Location.objects.filter(code=code).values("name").first()
+            rows.append({"location__code": code, "location__name": loc["name"] if loc else code,
+                         "on_hand": Decimal("0"), "reserved_neg": Decimal("0")})
+    rows.sort(key=lambda r: r["location__code"] or "")
     out = []
     for r in rows:
-        reserved = -r["reserved_neg"] + (pending if r["location__code"] == default else Decimal("0"))
+        reserved = -r["reserved_neg"] + extra.get(r["location__code"], Decimal("0"))
         out.append({
             "location": r["location__code"],
             "location_name": r["location__name"],
@@ -426,7 +505,11 @@ def stock_queue(product_ids, settings=None) -> dict:
     {line, order, need, ahead, free, give, short, inc, wait, rank, of, pinned}: free = pool − що бере черга перед
     нею (скільки лишилось для неї), give — скільки з цього її (0…need), short — чого бракує; inc — скільки з
     бракованого покриють уже замовлені закупівлі (incoming_info, у тій самій черзі), wait — чого бракує навіть з
-    ними (треба дозамовити). by_line — те саме за pk позиції."""
+    ними (треба дозамовити). by_line — те саме за pk позиції.
+
+    Компонент стоїть у черзі ще й за ще не списаними виробами з BOM (bom_open_lines: кабель для антен, які
+    чекають відправки) — за дедлайном замовлення виробу, як і прямі продажі: у записі bom = артикул виробу, need —
+    скільки компонента; такі записи — у by_bom за pk позиції виробу."""
     from sales.models import SalesOrderLine
     ids = {int(pk) for pk in product_ids if pk}
     if not ids:
@@ -445,7 +528,9 @@ def stock_queue(product_ids, settings=None) -> dict:
             continue      # без руху й не бронь (відправлене до обліку складу) — товару не тримає
         h = line_cover_held(line, late)
         if h > 0:
-            held.setdefault(line.product_id, []).append((line, h))
+            held.setdefault(line.product_id, []).append((line, h, None))
+    for e in bom_open_lines(ids, s):
+        held.setdefault(e["component_id"], []).append((e["line"], e["need"], e["kit_sku"]))
     short_ids = {pid for pid in ids if stock.get(pid) is not None and stock[pid]._available < 0}
     incoming = incoming_info(short_ids) if short_ids else {}
     out = {}
@@ -453,13 +538,13 @@ def stock_queue(product_ids, settings=None) -> dict:
         p = stock.get(pid)
         available = p._available if p is not None else Decimal("0")
         rows = sorted(held.get(pid, ()), key=lambda r: queue_key(r[0].order))
-        need = sum((h for _, h in rows), Decimal("0"))
+        need = sum((h for _, h, _ in rows), Decimal("0"))
         pool = available + need
         left = max(pool, Decimal("0"))
         inc_left = (incoming.get(pid) or {}).get("qty") or Decimal("0")
         ahead = Decimal("0")
         entries = []
-        for rank, (line, h) in enumerate(rows, 1):
+        for rank, (line, h, kit) in enumerate(rows, 1):
             give = min(h, left)
             left -= give
             short = h - give
@@ -467,11 +552,12 @@ def stock_queue(product_ids, settings=None) -> dict:
             inc_left -= inc
             entries.append({"line": line, "order": line.order, "need": h, "ahead": ahead, "free": pool - ahead,
                             "give": give, "short": short, "inc": inc, "wait": short - inc,
-                            "rank": rank, "of": len(rows),
+                            "rank": rank, "of": len(rows), "bom": kit,
                             "pinned": bool(getattr(line.order, "stock_first_at", None))})
             ahead += h
         out[pid] = {"available": available, "pool": pool, "need": need, "short": available < 0 and bool(rows),
-                    "lines": entries, "by_line": {e["line"].pk: e for e in entries}}
+                    "lines": entries, "by_line": {e["line"].pk: e for e in entries if not e["bom"]},
+                    "by_bom": {e["line"].pk: e for e in entries if e["bom"]}}
     return out
 
 
@@ -486,9 +572,15 @@ def lines_cover(lines, ships_late=None) -> dict:
     """{pk позиції: {available, held, free, sent, need, queue}} — order_lines_cover для будь-яких позицій
     (annotate_line_held + select_related("order")): картка й список замовлень. Товару вистачає на всі незакриті
     замовлення — free = доступно + своє, queue = None. Не вистачає — free = скільки лишилось для цієї позиції після
-    черги перед нею (stock_queue), queue — її місце (queue_place): кому товар уже є, а кому чекати."""
+    черги перед нею (stock_queue), queue — її місце (queue_place): кому товар уже є, а кому чекати.
+
+    bom — позиція виробу, якому бракує компонента BOM за чергою на компонент (кабель для антени): [{sku, short,
+    inc, wait, rank, of}]; виріб є, а зібрати / відправити без компонента не вийде."""
     lines = list(lines)
-    queue = stock_queue({l.product_id for l in lines if l.product_id})
+    pids = {l.product_id for l in lines if l.product_id}
+    kits = _kit_boms(pids)
+    comp_ids = {c for comps in kits.values() for c in comps}
+    queue = stock_queue(pids | comp_ids)
     out = {}
     for line in lines:
         q = queue.get(line.product_id) or {}
@@ -499,8 +591,15 @@ def lines_cover(lines, ships_late=None) -> dict:
         entry = q.get("by_line", {}).get(line.pk) if q.get("short") else None
         if entry is not None:
             free, place = entry["free"], queue_place(entry, q)
+        bom = []
+        for comp, (_per, sku) in kits.get(line.product_id, {}).items():
+            cq = queue.get(comp) or {}
+            ce = cq.get("by_bom", {}).get(line.pk) if cq.get("short") else None
+            if ce is not None and ce["short"] > 0:
+                bom.append({"sku": sku, "short": ce["short"], "inc": ce["inc"], "wait": ce["wait"],
+                            "rank": ce["rank"], "of": ce["of"]})
         out[line.pk] = {"available": a, "held": h, "free": free, "sent": sent,
-                        "need": max((line.qty or Decimal("0")) - sent, Decimal("0")), "queue": place}
+                        "need": max((line.qty or Decimal("0")) - sent, Decimal("0")), "queue": place, "bom": bom}
     return out
 
 
