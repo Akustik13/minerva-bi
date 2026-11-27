@@ -66,27 +66,16 @@ document.addEventListener('DOMContentLoaded', function () {
 .field-tech_attributes textarea { display: none !important; }
 .field-tech_attributes { display: block !important; }
 
-/* BOM inline — переміщення одразу після bom_type + show/hide */
-#productcomponent_set-group {
-  margin-top: 24px; border-top: 2px solid var(--border-strong, #243347); padding-top: 12px;
-  order: 4; /* позиціонування після bom_type */
+/* «Components (BOM)» — одразу під полем «BOM (комплектація)», лише коли вибрано «Ключові компоненти»
+   (#components-group: зв'язок ProductComponent.parent має related_name="components") */
+#components-group.inv-bom-here {
+  margin: 4px 0 12px; padding: 10px 12px; border: 1px solid var(--border-strong, #243347);
+  border-left: 4px solid var(--primary, #1976d2); border-radius: 6px;
 }
-#productcomponent_set-group.bom-hidden {
-  display: none !important;
-}
-#productcomponent_set-group h2 {
-  font-size: 14px; color: var(--text, #c9d8e4); margin-bottom: 8px; margin-top: 0;
-}
-/* Переміщення inline у форму одразу після bom_type */
-.form-row:has(#id_bom_type) {
-  position: relative;
-}
-.form-row:has(#id_bom_type)::after {
-  content: '';
-  display: block;
-  height: 0;
-  overflow: hidden;
-}
+#components-group.inv-bom-here h2 { font-size: 13px; margin: 0 0 8px; border-radius: 4px; }
+#components-group.bom-hidden, .form-row.inv-bom-off { display: none !important; }
+.inv-bom-open { display: inline-block; margin: 6px 0 0; font-size: 12px; cursor: pointer;
+  color: var(--link-fg, #58a6ff); background: none; border: 0; padding: 0; }
 
 /* Attrs table */
 .inv-attrs-wrap { margin: 4px 0 8px; width: 100%; }
@@ -209,32 +198,50 @@ function _invEsc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-/* ── BOM inline visibility toggle + переміщення ──────────────────────────── */
+/* ── BOM: компоненти одразу під полем «BOM (комплектація)» ─────────────────
+   «Ключові компоненти» — форма «Components (BOM)» розкривається тут же (порожня — з першим рядком),
+   «Без BOM» — закрита. Компонент без BOM — закрите й саме поле BOM, замість нього «🔧 Додати BOM…».
+   Рядки форми лишаються у формі картки: «Зберегти» зберігає їх як і раніше. */
 document.addEventListener('DOMContentLoaded', function() {
-  var bomTypeSelect = document.querySelector('[name="bom_type"]');
-  var bomInline = document.getElementById('productcomponent_set-group');
-
-  if (bomTypeSelect && bomInline) {
-    // Перенести inline одразу після bom_type поля
-    var bomTypeRow = bomTypeSelect.closest('.form-row');
-    if (bomTypeRow && bomTypeRow.parentNode) {
-      bomTypeRow.parentNode.insertBefore(bomInline, bomTypeRow.nextSibling);
-    }
-
-    function toggleBomInline() {
-      if (bomTypeSelect.value === 'key') {
-        bomInline.classList.remove('bom-hidden');
-      } else {
-        bomInline.classList.add('bom-hidden');
-      }
-    }
-
-    // На вибір bom_type
-    bomTypeSelect.addEventListener('change', toggleBomInline);
-
-    // При завантаженні сторінки
-    toggleBomInline();
+  var bomType = document.querySelector('[name="bom_type"]');
+  var kind = document.querySelector('[name="kind"]');
+  var group = document.getElementById('components-group');
+  if (!bomType || !group) return;
+  var bomRow = bomType.closest('.form-row');
+  if (bomRow && bomRow.parentNode) {
+    bomRow.parentNode.insertBefore(group, bomRow.nextSibling);
+    group.classList.add('inv-bom-here');
   }
+  var open = null;
+  if (kind) {
+    open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'inv-bom-open';
+    open.textContent = '🔧 {% trans "Додати BOM (у компонента теж є свої компоненти)…" %}';
+    open.addEventListener('click', function() {
+      bomType.value = 'key';
+      bomType.dispatchEvent(new Event('change', {bubbles: true}));
+    });
+    (kind.closest('.form-row') || kind.parentNode).appendChild(open);
+  }
+  function rows() {
+    return group.querySelectorAll('.form-row.has_original, tr.form-row:not(.empty-form):not(.add-row)').length;
+  }
+  function sync(user) {
+    var on = bomType.value === 'key';
+    var component = kind && kind.value === 'component';
+    group.classList.toggle('bom-hidden', !on);
+    if (bomRow) bomRow.classList.toggle('inv-bom-off', component && !on);
+    if (open) open.style.display = component && !on ? '' : 'none';
+    if (on && user && !rows()) {
+      var add = group.querySelector('.add-row a');
+      if (add) add.click();          // порожня форма — одразу рядок для першого компонента
+    }
+    if (on && user) group.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+  }
+  bomType.addEventListener('change', function() { sync(true); });
+  if (kind) kind.addEventListener('change', function() { sync(false); });
+  sync(false);
 });
 
 /* ── Sync from DigiKey listing ─────────────────────────────────────────── */
@@ -852,46 +859,6 @@ document.addEventListener('DOMContentLoaded', function () {
   redoInit();
   sync();
   loadEcb();
-});
-</script>
-{% endblock %}
-
-{% block after_field_sets %}
-{{ block.super }}
-<script>
-// Перенести inline одразу ПІСЛЯ Availability fieldset
-document.addEventListener('DOMContentLoaded', function(e) {
-  var bomInline = document.getElementById('productcomponent_set-group');
-
-  // Знайти Availability fieldset - шукати по полю id_buildable_qty або id_stock_qty
-  var buildableField = document.getElementById('id_buildable_qty');
-  var stockField = document.getElementById('id_stock_qty');
-  var targetField = buildableField || stockField;
-  var availabilityFieldset = null;
-
-  if (targetField) {
-    // Піднятися вгору до найближчого fieldset
-    availabilityFieldset = targetField.closest('fieldset');
-  }
-
-  if (bomInline && availabilityFieldset) {
-    // Вставити inline одразу після Availability fieldset
-    availabilityFieldset.parentNode.insertBefore(bomInline, availabilityFieldset.nextSibling);
-  }
-
-  // Ховати/показувати inline залежно від bom_type
-  var bomTypeSelect = document.querySelector('[name="bom_type"]');
-  if (bomTypeSelect && bomInline) {
-    function toggleBomInline() {
-      if (bomTypeSelect.value === 'key') {
-        bomInline.classList.remove('bom-hidden');
-      } else {
-        bomInline.classList.add('bom-hidden');
-      }
-    }
-    bomTypeSelect.addEventListener('change', toggleBomInline);
-    toggleBomInline();
-  }
 });
 </script>
 {% endblock %}

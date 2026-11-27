@@ -7299,6 +7299,7 @@
 {"uk": "Додані нові замовлення ({0})", "en": "New orders added ({0})", "de": "Neu hinzugefügte Aufträge ({0})"}
 {"uk": "Додати", "en": "Add", "de": "Hinzufügen"}
 {"uk": "Додати (ще не надсилати)", "en": "Add (do not send yet)", "de": "Hinzufügen (noch nicht senden)"}
+{"uk": "Додати BOM (у компонента теж є свої компоненти)…", "en": "Add BOM (this component has its own components too)…", "de": "Stückliste hinzufügen (auch diese Komponente hat eigene Komponenten)…"}
 {"uk": "Додати Expense", "en": "Add Expense", "de": "Expense hinzufügen"}
 {"uk": "Додати staged лістинг | DigiKey | Minerva", "en": "Add staged listing | DigiKey | Minerva", "de": "Staged-Listing hinzufügen | DigiKey | Minerva"}
 {"uk": "Додати staged лістинг вручну", "en": "Add a staged listing manually", "de": "Staged-Listing manuell hinzufügen"}
