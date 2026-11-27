@@ -27,17 +27,37 @@ def _num(q):
     return f"{q.normalize():f}" if q != q.to_integral() else str(int(q))
 
 
+# Склад, що приймає лише один тип товару (stock._check_location_kind): «Компоненти & Матеріали» — компоненти,
+# «Готова продукція» — готові товари; «Інше» — будь-що.
+KIND_FOR = {Location.LocationType.COMPONENTS: Product.Kind.COMPONENT,
+            Location.LocationType.FINISHED: Product.Kind.FINISHED}
+
+
+def fit_kind(product, location):
+    """Тип, якого вимагає склад, якщо теперішній тип товару йому не підходить; None — підходить."""
+    want = KIND_FOR.get(location.location_type)
+    return want if want and product.kind != want else None
+
+
+def _kind_label(kind):
+    return dict(Product.Kind.choices).get(kind, kind)
+
+
+def set_kind(ma, request, product, kind, location):
+    """Змінити тип товару, щоб він підходив складу (переміщення з «змінити тип»); запис в історію товару."""
+    old = product.get_kind_display()
+    product.kind = kind
+    product.save(update_fields=["kind"])
+    ma.log_change(request, product, f"Тип товару: {old} → {_kind_label(kind)} (переміщення на склад {location.code})")
+
+
 def _targets(product=None):
-    """Активні склади для «Куди»: ok — чи підходить товару (компонент — не на склад готової продукції й навпаки)."""
+    """Активні склади для «Куди»: fix — на який тип треба змінити товар, щоб він туди підходив (компонент — не на
+    склад готової продукції й навпаки); None — підходить і так."""
     out = []
     for loc in Location.objects.filter(is_active=True).order_by("location_type", "code"):
-        ok, why = True, ""
-        if product is not None:
-            try:
-                stock._check_location_kind(product, loc)
-            except stock.StockError as e:
-                ok, why = False, str(e)
-        out.append({"loc": loc, "ok": ok, "why": why})
+        fix = fit_kind(product, loc) if product is not None else None
+        out.append({"loc": loc, "fix": fix, "fix_label": _kind_label(fix) if fix else ""})
     return out
 
 
@@ -66,6 +86,10 @@ def move_view(ma, request, pk):
         try:
             if source is None or target is None:
                 raise stock.StockError("Виберіть, з якого складу й на який.", code="no_location")
+            fix = fit_kind(product, target)
+            if fix and not request.POST.get("set_kind"):
+                raise stock.StockError(f"Склад «{target.code}» — для типу «{_kind_label(fix)}». Позначте «змінити тип "
+                                       f"товару» або виберіть інший склад.", code="wrong_location_type")
             qty = form["qty"].replace(",", ".")
             if not qty:
                 there = {r["location_id"]: r["qty"] for r in stock.on_hand_by_location([product.pk]).get(product.pk, [])}
@@ -76,11 +100,17 @@ def move_view(ma, request, pk):
                 qty = Decimal(str(qty))
             except Exception:  # noqa: BLE001 — не число
                 raise stock.StockError("Кількість — число, напр. 5 або 2,5.", code="bad_qty")
-            stock.move_stock(product=product, source=source, target=target, qty=qty, performed_by=request.user)
+            from django.db import transaction
+            with transaction.atomic():      # тип змінюється лише разом із переміщенням
+                if fix:
+                    set_kind(ma, request, product, fix, target)
+                stock.move_stock(product=product, source=source, target=target, qty=qty, performed_by=request.user)
         except stock.StockError as e:
+            product.refresh_from_db(fields=["kind"])
             messages.error(request, str(e))
         else:
-            messages.success(request, f"🔀 {product.sku}: {_num(qty)} перенесено {source.code} → {target.code}.")
+            kind = f" Тип товару — «{_kind_label(fix)}»." if fix else ""
+            messages.success(request, f"🔀 {product.sku}: {_num(qty)} перенесено {source.code} → {target.code}.{kind}")
             return redirect(url)
     ctx = {
         **ma.admin_site.each_context(request),
@@ -105,36 +135,132 @@ def bulk_move_view(ma, request):
         raise PermissionDenied
     ids = _ids(request)
     products = list(Product.objects.filter(pk__in=ids).order_by("sku"))
-    results = []
+    results, refused, target = [], [], None
     if request.method == "POST":
         raw = (request.POST.get("target") or "").strip()
         target = Location.objects.filter(pk=raw, is_active=True).first() if raw.isdigit() else None
+        change_kind = bool(request.POST.get("set_kind"))
         if target is None:
             messages.error(request, "Виберіть склад, на який переносити.")
         else:
+            before = stock.on_hand_by_location([p.pk for p in products])
             moved = 0
             for p in products:
+                fix = fit_kind(p, target)
+                if fix and not change_kind:
+                    # тип не підходить складу — не переносимо, а пропонуємо «🔧 Змінити тип і перенести»
+                    refused.append(p.pk)
+                    results.append({"product": p, "ok": False,
+                                    "text": f"{p.get_kind_display()} — склад «{target.code}» для типу "
+                                            f"«{_kind_label(fix)}»" + ("" if before.get(p.pk) else
+                                                                     " (переносити нічого)")})
+                    continue
                 try:
-                    stock._check_location_kind(p, target)
-                    done = stock.move_all(p, target, performed_by=request.user)
+                    from django.db import transaction
+                    with transaction.atomic():
+                        if fix:
+                            set_kind(ma, request, p, fix, target)
+                        done = stock.move_all(p, target, performed_by=request.user)
                 except stock.StockError as e:
+                    p.refresh_from_db(fields=["kind"])      # тип змінюється лише разом із переміщенням
                     results.append({"product": p, "ok": False, "text": str(e)})
                     continue
                 moved += bool(done)
-                text = ", ".join(f"{src.code} → {target.code}: {_num(q)}" for src, q in done) or "уже там"
+                text = ", ".join(f"{src.code} → {target.code}: {_num(q)}" for src, q in done)
+                text = text or ("уже там" if before.get(p.pk) else "переносити нічого — ніде немає")
+                if fix:
+                    text = f"тип → «{_kind_label(fix)}» · {text}"
                 results.append({"product": p, "ok": True, "text": text})
             messages.success(request, f"🔀 Перенесено на «{target.code}»: товарів {moved} з {len(products)}.")
     where = stock.on_hand_by_location([p.pk for p in products])
     rows = [{"product": p, "where": where.get(p.pk, [])} for p in products]
+    fix_to = KIND_FOR.get(target.location_type) if target is not None else None
     ctx = {
         **ma.admin_site.each_context(request),
         "title": "🔀 Перемістити на склад",
         "opts": Product._meta, "bulk": True, "rows": rows, "results": results,
+        # «🔧 Змінити тип і перенести» — лише товари, яким склад не підійшов за типом
+        "refused_ids": ",".join(str(pk) for pk in refused), "refused_n": len(refused), "target": target,
+        "fix_label": _kind_label(fix_to) if fix_to else "",
         "ids": ",".join(str(p.pk) for p in products), "targets": _targets(), "can": True,
         "changelist_url": reverse("admin:inventory_product_changelist"),
         "new_location_url": reverse("admin:inventory_location_add"),
     }
     return TemplateResponse(request, TEMPLATE, ctx)
+
+
+# ── Що лежить на складі (список «📍 Локації складу» і сторінка складу) ──────────
+
+def location_totals() -> dict:
+    """{pk локації: {products, units, minus}} — товарів з плюсом, одиниць разом, товарів у мінусі (фізичний
+    залишок без резервів). Один запит на всі локації — колонка «На складі» списку локацій."""
+    from django.db.models import Sum
+    from .models import InventoryTransaction
+    out = {}
+    rows = (InventoryTransaction.objects.exclude(tx_type=InventoryTransaction.TxType.RESERVED)
+            .order_by().values("location_id", "product_id").annotate(t=Sum("qty")))
+    for r in rows:
+        t = r["t"] or Decimal("0")
+        if t == 0:
+            continue
+        d = out.setdefault(r["location_id"], {"products": 0, "units": Decimal("0"), "minus": 0})
+        if t > 0:
+            d["products"] += 1
+            d["units"] += t
+        else:
+            d["minus"] += 1
+    return out
+
+
+def totals_html(location, totals):
+    """«📦 12 товарів · 340 шт →» (+ «⚠️ 2 у мінусі») — посилання на сторінку складу."""
+    t = totals.get(location.pk) or {"products": 0, "units": Decimal("0"), "minus": 0}
+    url = reverse("admin:inventory_location_stock", args=[location.pk])
+    minus = (format_html(' <span style="color:var(--err,#ef5350)" title="{}">⚠️ у мінусі: {}</span>',
+                         "Списали більше, ніж там лежало (рухи з іншого складу)", t["minus"]) if t["minus"] else "")
+    if not t["products"] and not t["minus"]:
+        return format_html('<a href="{}" style="color:var(--text-dim)">{}</a>', url, "порожньо")
+    return format_html('<a href="{}">📦 <b>{}</b> шт · товарів: <b>{}</b> →</a>{}', url, _num(t["units"]),
+                       t["products"], minus)
+
+
+def location_stock_view(ma, request, pk):
+    """Сторінка складу: що на ньому лежить (і в мінусі), скільки цього ж товару на інших складах, «🔀»."""
+    location = get_object_or_404(Location, pk=pk)
+    if not ma.has_view_or_change_permission(request, location):
+        raise PermissionDenied
+    from django.db.models import Q, Sum
+    from .models import InventoryTransaction
+    q = (request.GET.get("q") or "").strip()
+    qs = (InventoryTransaction.objects.filter(location=location)
+          .exclude(tx_type=InventoryTransaction.TxType.RESERVED))
+    if q:
+        qs = qs.filter(Q(product__sku__icontains=q) | Q(product__name__icontains=q))
+    sums = {r["product_id"]: r["t"] for r in qs.order_by().values("product_id").annotate(t=Sum("qty")) if r["t"]}
+    products = {p.pk: p for p in Product.objects.filter(pk__in=list(sums))}
+    where = stock.on_hand_by_location(list(sums))
+    rows = []
+    for pid, qty in sums.items():
+        p = products.get(pid)
+        if p is None:
+            continue
+        others = [w for w in where.get(pid, []) if w["location_id"] != location.pk]
+        rows.append({"product": p, "qty": qty, "qty_txt": _num(qty), "minus": qty < 0,
+                     "others": [{"code": w["code"], "qty": _num(w["qty"])} for w in others],
+                     "home": bool(where.get(pid)) and where[pid][0]["location_id"] == location.pk})
+    rows.sort(key=lambda r: (r["minus"], -r["qty"] if not r["minus"] else r["qty"], r["product"].sku))
+    plus = [r for r in rows if not r["minus"]]
+    ctx = {
+        **ma.admin_site.each_context(request),
+        "title": f"📍 {location.code} · {location.name}".strip(" ·"),
+        "opts": Location._meta, "original": location, "location": location, "rows": rows, "q": q,
+        "products": len(plus), "units": _num(sum((r["qty"] for r in plus), Decimal("0"))),
+        "minus": len(rows) - len(plus),
+        "can_move": request.user.has_perm("inventory.change_product"),
+        "change_url": reverse("admin:inventory_location_change", args=[location.pk]),
+        "list_url": reverse("admin:inventory_location_changelist"),
+    }
+    return TemplateResponse(request, "admin/inventory/location/stock.html", ctx)
 
 
 # ── HTML для картки товару ────────────────────────────────────────────────────

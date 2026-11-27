@@ -1,0 +1,65 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+{# 📍 Що лежить на складі — inventory/admin_locations.location_stock_view #}
+
+{% block extrastyle %}{{ block.super }}
+<style>
+.ls-box { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 8px;
+  padding: 14px 16px; margin: 12px 0; color: var(--text); max-width: 1000px; }
+.ls-sum { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; font-size: 13px; }
+.ls-sum b { font-size: 18px; }
+.ls-t { border-collapse: collapse; width: 100%; font-size: 13px; }
+.ls-t th { text-align: left; font-size: 11px; color: var(--text-dim); padding: 4px 8px;
+  border-bottom: 1px solid var(--border-strong); }
+.ls-t td { padding: 6px 8px; border-bottom: 1px solid var(--border-color, rgba(128,128,128,.15)); }
+.ls-t td.n { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ls-minus td { background: rgba(239,83,80,.08); }
+.ls-muted { color: var(--text-muted); font-size: 12px; }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans "Домівка" %}</a> ›
+  <a href="{{ list_url }}">{% trans "Локації складу" %}</a> ›
+  <span translate="no">{{ location.code }}</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="ls-box">
+  <div class="ls-sum">
+    <span>{{ location.get_location_type_display }}{% if not location.is_active %} · <b style="font-size:13px;color:var(--err)">{% trans "неактивна" %}</b>{% endif %}</span>
+    <span><b>{{ units }}</b> {% trans "шт" %}</span>
+    <span>{% trans "Товарів:" %} <b>{{ products }}</b></span>
+    {% if minus %}<span style="color:var(--err,#ef5350)" title="{% trans "Списали більше, ніж там лежало (рухи з іншого складу)" %}">⚠️ {% trans "у мінусі:" %} <b>{{ minus }}</b></span>{% endif %}
+    <form method="get" style="margin-left:auto">
+      <input type="search" name="q" value="{{ q }}" placeholder="{% trans "Артикул або назва" %}">
+      <button type="submit" class="button">🔍</button>
+    </form>
+    <a href="{{ change_url }}">✏️ {% trans "Налаштування складу" %}</a>
+  </div>
+</div>
+
+<div class="ls-box">
+  {% if rows %}
+  <table class="ls-t">
+    <tr><th>{% trans "Артикул" %}</th><th>{% trans "Назва" %}</th><th>{% trans "Тип" %}</th>
+        <th style="text-align:right">{% trans "Тут" %}</th><th>{% trans "На інших складах" %}</th><th></th></tr>
+    {% for r in rows %}
+    <tr{% if r.minus %} class="ls-minus"{% endif %}>
+      <td translate="no"><a href="{% url 'admin:inventory_product_change' r.product.pk %}"><b>{{ r.product.sku }}</b></a></td>
+      <td class="ls-muted">{{ r.product.name|truncatechars:50 }}</td>
+      <td class="ls-muted">{{ r.product.get_kind_display }}{% if r.home and r.product.kind == "component" %} · <span title="{% trans "Звідси списують продаж і BOM" %}">{% trans "списується звідси" %}</span>{% endif %}</td>
+      <td class="n" {% if r.minus %}style="color:var(--err,#ef5350)" title="{% trans "Списали більше, ніж тут лежало" %}"{% endif %}>{% if r.minus %}⚠️ {% endif %}{{ r.qty_txt }}</td>
+      <td class="ls-muted" translate="no">{% for o in r.others %}{{ o.code }} {{ o.qty }}{% if not forloop.last %} · {% endif %}{% empty %}—{% endfor %}</td>
+      <td style="white-space:nowrap">{% if can_move %}<a href="{% url 'admin:inventory_product_move_stock' r.product.pk %}{% if not r.minus %}?from={{ location.pk }}{% endif %}">🔀 {% trans "Перемістити" %}</a>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p style="color:var(--text-dim)">{% if q %}{% trans "Нічого не знайдено." %}{% else %}{% trans "На цьому складі нічого не лежить." %}{% endif %}</p>
+  {% endif %}
+</div>
+<p><a href="{{ list_url }}">← {% trans "Усі склади" %}</a></p>
+{% endblock %}

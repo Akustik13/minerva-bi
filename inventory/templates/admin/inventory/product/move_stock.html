@@ -15,6 +15,7 @@
 .mvs-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
 .mvs-form label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 3px; }
 .mvs-form select, .mvs-form input { min-width: 180px; }
+.mvs-form input[type=checkbox] { min-width: 0; margin: 0 6px 0 0; vertical-align: middle; }
 .mvs-hint { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
 .mvs-ok { color: var(--ok, #4caf50); } .mvs-bad { color: var(--err, #ef5350); }
 </style>
@@ -65,13 +66,27 @@
     <div><label for="mvs-dst">{% trans "На який склад" %}</label>
       <select name="target" id="mvs-dst" required>
         <option value="">—</option>
-        {% for t in targets %}<option value="{{ t.loc.pk }}" {% if not t.ok %}disabled title="{{ t.why }}"{% endif %}
-          {% if form.target == t.loc.pk|stringformat:'s' %}selected{% endif %}>{{ t.loc.code }} · {{ t.loc.name }}{% if not t.ok %} ✕{% endif %}</option>{% endfor %}
+        {% for t in targets %}<option value="{{ t.loc.pk }}" data-fix="{{ t.fix_label }}"
+          {% if form.target == t.loc.pk|stringformat:'s' %}selected{% endif %}>{{ t.loc.code }} · {{ t.loc.name }}{% if t.fix %} — {% trans "змінить тип" %}{% endif %}</option>{% endfor %}
       </select></div>
     <div><label for="mvs-qty">{% trans "Скільки (порожньо — усе)" %}</label>
       <input type="text" name="qty" id="mvs-qty" value="{{ form.qty }}" inputmode="decimal" placeholder="{% trans "усе" %}"></div>
     <div><button type="submit" class="button default">🔀 {% trans "Перемістити" %}</button></div>
+    <label id="mvs-kind" style="display:none;flex-basis:100%;font-size:13px">
+      <input type="checkbox" name="set_kind" value="1" checked>
+      🔧 {% trans "Склад для іншого типу — змінити тип товару на" %} «<b id="mvs-kind-to"></b>»</label>
   </form>
+  <script>
+  (function () {   // склад не підходить за типом — одразу пропонуємо змінити тип товару
+    var dst = document.getElementById('mvs-dst'), box = document.getElementById('mvs-kind');
+    function sync() {
+      var o = dst.options[dst.selectedIndex], fix = o ? o.getAttribute('data-fix') : '';
+      box.style.display = fix ? '' : 'none';
+      document.getElementById('mvs-kind-to').textContent = fix || '';
+    }
+    dst.addEventListener('change', sync); sync();
+  })();
+  </script>
   <p class="mvs-hint">{% trans "Два рухи «Коригування» (мінус там, плюс тут) — загальний залишок не змінюється, історія лишається. Перемістили все — броні замовлень переходять разом з товаром." %}
     <a href="{{ new_location_url }}" target="_blank">＋ {% trans "Створити склад" %}</a></p>
 </div>
@@ -86,6 +101,15 @@
     {% for r in results %}<tr><td translate="no"><b>{{ r.product.sku }}</b></td>
       <td class="{% if r.ok %}mvs-ok{% else %}mvs-bad{% endif %}">{% if r.ok %}✓{% else %}✕{% endif %} {{ r.text }}</td></tr>{% endfor %}
   </table>
+  {% if refused_n %}
+  <form method="post" style="margin-top:12px">{% csrf_token %}
+    <input type="hidden" name="ids" value="{{ refused_ids }}">
+    <input type="hidden" name="target" value="{{ target.pk }}">
+    <input type="hidden" name="set_kind" value="1">
+    <button type="submit" class="button default">🔧 {% trans "Змінити тип на" %} «{{ fix_label }}» {% trans "і перенести" %} ({{ refused_n }})</button>
+    <span class="mvs-hint">{% trans "Лише товари з ✕ через тип; тип зміниться в їхніх картках (запис в історії)." %}</span>
+  </form>
+  {% endif %}
 </div>
 {% endif %}
 <div class="mvs-box">
@@ -110,8 +134,10 @@
       </select></div>
     <div><button type="submit" class="button default"
       onclick="return confirm('{% trans "Перемістити все, що лежить, на вибраний склад?" %}')">🔀 {% trans "Перемістити" %}</button></div>
+    <label style="flex-basis:100%;font-size:13px"><input type="checkbox" name="set_kind" value="1">
+      🔧 {% trans "Якщо склад для іншого типу — змінити тип товару (готовий ↔ компонент) і перенести" %}</label>
   </form>
-  <p class="mvs-hint">{% trans "Товар, якому склад не підходить (компонент — на склад готової продукції й навпаки), пропускається з поясненням." %}
+  <p class="mvs-hint">{% trans "Без галочки товар, якому склад не підходить за типом, пропускається — і з’явиться кнопка «Змінити тип і перенести»." %}
     <a href="{{ new_location_url }}" target="_blank">＋ {% trans "Створити склад" %}</a></p>
 </div>
 <p><a href="{{ changelist_url }}">← {% trans "До списку товарів" %}</a></p>

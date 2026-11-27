@@ -161,3 +161,85 @@ class MovePagesTests(LocationsBase):
         r = self.client.post("/admin/inventory/product/move-stock/", {"ids": str(self.cable.pk), "target": self.comp.pk})
         self.assertIn(r.status_code, (302, 403))
         self.assertEqual(self.where(self.cable), {"MAIN": 14})
+
+
+class LocationListTests(LocationsBase):
+    def test_list_column_and_location_page(self):
+        stock.move_stock(product=self.cable, source=self.loc, target=self.comp, qty=10)
+        InventoryTransaction.objects.create(tx_type=TX.OUTGOING, qty=-2, product=self.q, location=self.comp,
+                                            external_key="t:minus")      # мінус на складі компонентів
+        c = self.admin_client()
+        r = c.get("/admin/inventory/location/")
+        self.assertContains(r, f'/admin/inventory/location/{self.comp.pk}/stock/')
+        self.assertContains(r, "📦 <b>10</b> шт · товарів: <b>1</b>")
+        self.assertContains(r, "⚠️ у мінусі: 1")
+        self.assertContains(r, "порожньо")                               # BOARDS
+        r = c.get(f"/admin/inventory/location/{self.comp.pk}/stock/")
+        self.assertEqual(r.status_code, 200)
+        rows = [(x["product"].sku, x["qty_txt"], x["minus"]) for x in r.context["rows"]]
+        self.assertEqual(rows, [("CA-SMAM-RG316-1000-SMAM", "10", False), ("AN220213", "-2", True)])
+        self.assertEqual((r.context["products"], r.context["units"], r.context["minus"]), (1, "10", 1))
+        self.assertContains(r, f"/admin/inventory/product/{self.cable.pk}/move-stock/?from={self.comp.pk}")
+        r = c.get(f"/admin/inventory/location/{self.comp.pk}/stock/?q=CA-SMAM")
+        self.assertEqual(len(r.context["rows"]), 1)
+        r = c.get(f"/admin/inventory/location/{self.comp.pk}/change/")
+        self.assertContains(r, "📦 На складі")
+
+
+class ChangeKindOnMoveTests(LocationsBase):
+    """Склад для іншого типу — одразу пропонуємо змінити тип товару (готовий ↔ компонент) і перенести."""
+
+    def test_single_page_needs_consent_then_changes_kind(self):
+        c = self.admin_client()
+        url = f"/admin/inventory/product/{self.antenna.pk}/move-stock/"
+        self.assertContains(c.get(url), 'data-fix="Компонент (для складання)"')
+        r = c.post(url, {"source": self.loc.pk, "target": self.comp.pk, "qty": ""}, follow=True)
+        self.assertContains(r, "Позначте «змінити тип")
+        self.antenna.refresh_from_db()
+        self.assertEqual(self.antenna.kind, Product.Kind.FINISHED)
+        self.assertEqual(self.where(self.antenna), {"MAIN": 14})
+        r = c.post(url, {"source": self.loc.pk, "target": self.comp.pk, "qty": "", "set_kind": "1"})
+        self.assertEqual(r.status_code, 302)
+        self.antenna.refresh_from_db()
+        self.assertEqual(self.antenna.kind, Product.Kind.COMPONENT)
+        self.assertEqual(self.where(self.antenna), {"COMPONENTS": 14})
+        from django.contrib.admin.models import LogEntry
+        self.assertTrue(LogEntry.objects.filter(object_id=str(self.antenna.pk),
+                                                change_message__contains="Тип товару").exists())
+
+    def test_failed_move_keeps_the_kind(self):
+        c = self.admin_client()
+        c.post(f"/admin/inventory/product/{self.antenna.pk}/move-stock/",
+               {"source": self.loc.pk, "target": self.comp.pk, "qty": "99", "set_kind": "1"})
+        self.antenna.refresh_from_db()
+        self.assertEqual(self.antenna.kind, Product.Kind.FINISHED)
+
+    def test_bulk_offers_retry_with_kind_change(self):
+        empty = Product.objects.create(sku="SMA-Stecker 36UNS")             # ніде немає
+        ids = f"{self.cable.pk},{self.antenna.pk},{empty.pk}"
+        c = self.admin_client()
+        r = c.post("/admin/inventory/product/move-stock/", {"ids": ids, "target": self.comp.pk})
+        texts = {x["product"].sku: (x["ok"], x["text"]) for x in r.context["results"]}
+        self.assertTrue(texts["CA-SMAM-RG316-1000-SMAM"][0])
+        self.assertFalse(texts["AN220208-01C"][0])
+        self.assertIn("переносити нічого", texts["SMA-Stecker 36UNS"][1])
+        self.assertEqual(r.context["refused_n"], 2)
+        self.assertContains(r, "Змінити тип на")
+        r = c.post("/admin/inventory/product/move-stock/",
+                   {"ids": r.context["refused_ids"], "target": self.comp.pk, "set_kind": "1"})
+        texts = {x["product"].sku: (x["ok"], x["text"]) for x in r.context["results"]}
+        self.assertEqual(texts["AN220208-01C"], (True, "тип → «Компонент (для складання)» · MAIN → COMPONENTS: 14"))
+        self.assertTrue(texts["SMA-Stecker 36UNS"][0])
+        for p in (self.antenna, empty):
+            p.refresh_from_db()
+            self.assertEqual(p.kind, Product.Kind.COMPONENT)
+        self.assertEqual(r.context["refused_n"], 0)
+
+    def test_component_to_finished_goods_location(self):
+        products = Location.objects.create(code="PRODUCTS", location_type=Location.LocationType.FINISHED)
+        c = self.admin_client()
+        c.post("/admin/inventory/product/move-stock/", {"ids": str(self.cable.pk), "target": products.pk,
+                                                        "set_kind": "1"})
+        self.cable.refresh_from_db()
+        self.assertEqual(self.cable.kind, Product.Kind.FINISHED)
+        self.assertEqual(self.where(self.cable), {"PRODUCTS": 14})

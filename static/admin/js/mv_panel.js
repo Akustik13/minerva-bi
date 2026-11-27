@@ -41,10 +41,10 @@
   var COL = /^[a-z_][a-z0-9_]*$/, KEY = /^[A-Za-z][A-Za-z0-9_-]{0,47}$/, PK = /^\d+$/;
   var HASH = /^#mvp=(\d+)(?:\/([A-Za-z][A-Za-z0-9_-]{0,47}))?$/;
   var LEAD = /^\s*([^\s\p{L}\p{N}]+)\s+(\S[\s\S]*)$/u;           // «🏷 Етикетка» → значок + підпис
-  var LIST_KEYS = ['on', 'blocks', 'collapsed', 'actions', 'bar', 'width', 'hide_cols', 'start'];
+  var LIST_KEYS = ['on', 'blocks', 'collapsed', 'actions', 'bar', 'width', 'hide_cols', 'cols_off', 'start'];
   var SHARED = cfg.shared || ['nav', 'view', 'chips', 'density', 'actions_at', 'place', 'helpers', 'empty'];
   var RESETS = { blocks: ['blocks', 'collapsed', 'start'], actions: ['actions', 'bar'],
-                 layout: ['width', 'hide_cols'].concat(SHARED), list: LIST_KEYS, all: LIST_KEYS.concat(SHARED) };
+                 layout: ['width', 'hide_cols', 'cols_off'].concat(SHARED), list: LIST_KEYS, all: LIST_KEYS.concat(SHARED) };
   var RESET_MSG = { blocks: 'Розділи — як було', actions: 'Швидкі дії — як було',
                     layout: 'Вигляд для всіх списків — як було', list: 'Панель у цьому списку — як було',
                     all: 'Панель — як було' };
@@ -148,6 +148,10 @@
   function hideCols() {
     var h = Array.isArray(prefs.hide_cols) ? prefs.hide_cols : (cfg.hideDefault || []);
     return h.filter(function (n) { return typeof n === 'string' && COL.test(n); });
+  }
+  // колонки, сховані завжди (не лише поки панель відкрита): правий клік на заголовку → «🙈 Сховати колонку»
+  function offCols() {
+    return list('cols_off').filter(function (n) { return typeof n === 'string' && COL.test(n); });
   }
   function viewMode() { return prefs.nav !== 'none' && prefs.view === 'tabs' ? 'tabs' : 'scroll'; }
   function navMode() {
@@ -692,16 +696,21 @@
     if (!colStyle) return;
     var css = hideCols().map(function (n) {
       return 'body.mvp-open #result_list .column-' + n + ', body.mvp-open #result_list .field-' + n;
-    });
+    }).concat(offCols().map(function (n) {
+      return '#result_list .column-' + n + ', #result_list .field-' + n;
+    }));
     colStyle.textContent = css.length ? css.join(',\n') + ' { display: none !important; }' : '';
     colNoteUpdate();
   }
   function colNoteUpdate() {
     if (!colNote) return;
-    var n = hiddenCount(), tbl = document.getElementById('result_list');
-    var on = S.open && n > 0 && !!tbl && tbl.getClientRects().length > 0;
+    var tbl = document.getElementById('result_list');
+    var panelCols = S.open ? hideCols().filter(colExists) : [];
+    var names = panelCols.concat(offCols().filter(function (c) { return colExists(c) && panelCols.indexOf(c) < 0; }));
+    var on = names.length > 0 && !!tbl && tbl.getClientRects().length > 0;
     colNote.hidden = !on;
-    if (on) colNote.firstChild.textContent = fmt('🙈 Сховано колонок: {0} — вони є в панелі', n);
+    if (on) colNote.firstChild.textContent = panelCols.length
+      ? fmt('🙈 Сховано колонок: {0} — вони є в панелі', names.length) : fmt('🙈 Сховано колонок: {0}', names.length);
   }
   function colName(th) { var m = /(?:^|\s)column-([a-z_][a-z0-9_]*)(?:\s|$)/.exec(th.className || ''); return m ? m[1] : ''; }
   function colLabel(n) {
@@ -712,6 +721,16 @@
     var h = hideCols(), i = h.indexOf(name);
     if (on && i < 0) h.push(name); else if (!on && i >= 0) h.splice(i, 1); else return;
     change({ hide_cols: h });
+  }
+  function setColOff(name, on) {                     // сховати / показати колонку назавжди (для себе, на всіх пристроях)
+    var h = offCols(), i = h.indexOf(name);
+    if (on && i < 0) h.push(name); else if (!on && i >= 0) h.splice(i, 1); else return;
+    change({ cols_off: h });
+  }
+  function showAllCols() {
+    var set = { cols_off: [] };
+    if (S.open) set.hide_cols = [];
+    change(set);
   }
 
   /* ── прикрасити оболонку з сервера ── */
@@ -1697,7 +1716,7 @@
         if (has('width')) emit('mv:panel', { open: true, width: wantWidth(), model: cfg.model, pk: S.pk });
       });
     }
-    if (has('hide_cols')) applyCols();
+    if (has('hide_cols') || has('cols_off')) applyCols();
     if (S.sheet && (!o.fromSheet || has('start'))) refreshSheet();
   }
   function syncOn() {
@@ -2066,14 +2085,30 @@
     items.push({ type: 'submenu', icon: '⚙', label: 'Панель', items: gearItems });
     menu(e, items, { title: title, titleData: true });
   }
+  function offItems() {                             // «📋 Колонки списку»: галочка — колонку видно
+    var items = columns.map(function (c) {
+      return { type: 'check', label: c.label, checked: function () { return offCols().indexOf(c.name) < 0; },
+               onToggle: function (next) { setColOff(c.name, !next); } };
+    });
+    items.push({ type: 'separator' });
+    items.push({ icon: '👁', label: 'Показати всі колонки', close: false, onSelect: function () { change({ cols_off: [] }); } });
+    return items;
+  }
   function colMenu(th, e) {
     var name = colName(th), hidden = hideCols().indexOf(name) >= 0;
-    menu(e, [
-      hidden ? { icon: '👁', label: 'Показувати', onSelect: function () { setColHidden(name, false); } }
-             : { icon: '🙈', label: 'Ховати, поки панель відкрита', onSelect: function () { setColHidden(name, true); } },
-      { type: 'submenu', icon: '📋', label: 'Колонки списку, поки панель відкрита', items: colItems, hidden: !columns.length },
-      { icon: '↺', label: 'Як у Minerva', onSelect: function () { change({ hide_cols: null }); } }
-    ], { title: fmt('Колонка «{0}»', colLabel(name) || th.textContent.replace(/\s+/g, ' ').trim()) });
+    var items = [
+      { icon: '🙈', label: 'Сховати колонку', onSelect: function () { setColOff(name, true); } },
+      { type: 'submenu', icon: '📋', label: 'Колонки списку', items: offItems, hidden: !columns.length },
+      { icon: '👁', label: 'Показати всі колонки', hidden: !offCols().length, onSelect: showAllCols }
+    ];
+    if (S.open) {
+      items.push({ type: 'separator' });
+      items.push(hidden ? { icon: '👁', label: 'Показувати, поки панель відкрита', onSelect: function () { setColHidden(name, false); } }
+                        : { icon: '🙈', label: 'Ховати, поки панель відкрита', onSelect: function () { setColHidden(name, true); } });
+      items.push({ type: 'submenu', icon: '📋', label: 'Колонки списку, поки панель відкрита', items: colItems, hidden: !columns.length });
+    }
+    items.push({ icon: '↺', label: 'Як у Minerva', onSelect: function () { change({ hide_cols: null, cols_off: [] }); } });
+    menu(e, items, { title: fmt('Колонка «{0}»', colLabel(name) || th.textContent.replace(/\s+/g, ' ').trim()) });
   }
   function pillMenu(at) {
     menu(at, [
@@ -2689,8 +2724,8 @@
     if (!t || !t.closest || t.closest('.mvm')) return;
     var sel = window.getSelection && getSelection();       // виділений текст — меню браузера («Копіювати»)
     if (sel && !sel.isCollapsed && String(sel).trim() && sel.containsNode && sel.containsNode(t, true)) return;
-    // заголовок колонки, поки панель відкрита: своє меню й на посиланні сортування (Shift — меню браузера)
-    var th = S.open && wide() ? t.closest('#result_list thead th[class*="column-"]') : null;
+    // заголовок колонки: своє меню (сховати / повернути колонки) і на посиланні сортування (Shift — меню браузера)
+    var th = wide() ? t.closest('#result_list thead th[class*="column-"]') : null;
     if (th && colName(th) && !t.closest('input, select, textarea, [data-own-menu]')) {
       e.preventDefault(); colMenu(th, e); return;
     }
@@ -2834,8 +2869,8 @@
     dot.setAttribute('aria-hidden', 'true');
     colNote.appendChild(dot);
     var show = button('mvp-colnote-b', 'показати');
-    show.title = 'Показувати всі колонки, поки панель відкрита';
-    show.addEventListener('click', function () { change({ hide_cols: [] }); });
+    show.title = 'Показати всі сховані колонки';
+    show.addEventListener('click', showAllCols);
     colNote.appendChild(show);
     host.appendChild(colNote);
     pill.addEventListener('click', function () { setOn(!prefs.on); });

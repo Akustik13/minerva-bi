@@ -1885,11 +1885,12 @@ class ProductAliasAdmin(admin.ModelAdmin):
 
 @admin.register(Location)
 class LocationAdmin(admin.ModelAdmin):
-    list_display  = ("code", "name", "location_type", "is_active")
+    list_display  = ("code", "name", "location_type", "stock_col", "is_active")
     list_filter   = ("location_type", "is_active")
     search_fields = ("code", "name")
+    readonly_fields = ("stock_col",)
     fieldsets = (
-        (None, {"fields": ("code", "name", "location_type", "is_active")}),
+        (None, {"fields": ("code", "name", "location_type", "is_active", "stock_col")}),
         ("📝 Інформація", {
             "fields": (),
             "description": "Типи складів: Готова продукція (finished) — для готових товарів; "
@@ -1898,6 +1899,33 @@ class LocationAdmin(admin.ModelAdmin):
             "classes": ("collapse",),
         }),
     )
+
+    def changelist_view(self, request, extra_context=None):
+        self._totals = None          # підсумки — раз на сторінку списку (admin_locations.location_totals)
+        return super().changelist_view(request, extra_context)
+
+    def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
+        self._totals = None          # картка — свіжі підсумки, не з попереднього списку
+        return super().changeform_view(request, object_id, form_url, extra_context)
+
+    @admin.display(description="📦 На складі")
+    def stock_col(self, obj):
+        """Скільки товарів і одиниць лежить на складі → сторінка «що на ньому лежить»."""
+        from .admin_locations import location_totals, totals_html
+        if obj is None or not obj.pk:
+            return "—"
+        if getattr(self, "_totals", None) is None:
+            self._totals = location_totals()
+        return totals_html(obj, self._totals)
+
+    def get_urls(self):
+        from django.urls import path
+        return [path("<int:pk>/stock/", self.admin_site.admin_view(self._stock_view),
+                     name="inventory_location_stock")] + super().get_urls()
+
+    def _stock_view(self, request, pk):
+        from .admin_locations import location_stock_view
+        return location_stock_view(self, request, pk)
 
 
 @admin.register(InventoryTransaction)

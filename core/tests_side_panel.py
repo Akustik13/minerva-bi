@@ -255,7 +255,7 @@ class ConfigTests(PanelTestBase):
     def test_list_page_has_config_and_v2_assets(self):
         html = self.client.get("/admin/inventory/supplier/").content.decode()
         self.assertIn('id="mv-panel-config"', html)
-        self.assertIn("/static/admin/js/mv_panel.js?v=6", html)
+        self.assertIn("/static/admin/js/mv_panel.js?v=8", html)
         self.assertIn("/static/admin/css/mv_panel.css?v=6", html)
         cfg = cfg_of(html)
         self.assertEqual((cfg["v"], cfg["model"], cfg["url"], cfg["prefsUrl"]),
@@ -266,7 +266,7 @@ class ConfigTests(PanelTestBase):
 
     def test_config_contents_follow_permissions(self):
         cfg, out = self.tag_config(self.root)
-        self.assertIn("mv_panel.js?v=6", out)
+        self.assertIn("mv_panel.js?v=8", out)
         self.assertEqual([b["key"] for b in cfg["blocks"]],
                          ["info", "secret", "lazy", "folded", "na", "boom", "blank", "extra"])
         info = cfg["blocks"][0]

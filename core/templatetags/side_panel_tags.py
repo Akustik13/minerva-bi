@@ -12,7 +12,7 @@ register = template.Library()
 logger = logging.getLogger(__name__)
 
 ASSETS = ('<link rel="stylesheet" href="/static/admin/css/mv_panel.css?v=6">'
-          '<script src="/static/admin/js/mv_panel.js?v=6" defer></script>')
+          '<script src="/static/admin/js/mv_panel.js?v=8" defer></script>')
 
 
 @register.simple_tag(takes_context=True)

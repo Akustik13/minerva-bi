@@ -74,7 +74,7 @@ TONES = ("", "ok", "warn", "err", "info")
 EDIT_KINDS = ("choice", "bool", "text", "textarea", "date", "number")
 PLACES = ("head", "bar", "memo", "block")
 BADGE_TONES = ("new", "work", "ship", "done", "off", "ok", "warn", "err", "info")
-LIST_KEYS = ("on", "blocks", "collapsed", "actions", "bar", "width", "hide_cols", "start")
+LIST_KEYS = ("on", "blocks", "collapsed", "actions", "bar", "width", "hide_cols", "cols_off", "start")
 RESETS = ("blocks", "actions", "layout", "list", "all")
 
 EMPTY_TEXT = "Немає даних."
@@ -876,7 +876,7 @@ def defaults(panel: Panel) -> dict:
         "blocks": [b.key for b in panel.blocks if b.default],
         "collapsed": [b.key for b in panel.blocks if b.default and b.collapsed],
         "actions": _default_actions(panel),
-        "bar": BAR_DEFAULT, "width": DEFAULT_WIDTH, "hide_cols": None, "start": "last",
+        "bar": BAR_DEFAULT, "width": DEFAULT_WIDTH, "hide_cols": None, "cols_off": [], "start": "last",
         "seen": _all_keys(panel),
     }
 
@@ -905,7 +905,7 @@ def _clean_value(panel: Panel, key: str, value):
         return _key_list(value, known={b.key for b in panel.blocks})
     if key == "actions":
         return _key_list(value, known=set(_action_keys(panel)), pattern=_ADMIN)
-    if key == "hide_cols":
+    if key in ("hide_cols", "cols_off"):        # cols_off — сховані завжди (правий клік на заголовку колонки)
         return _key_list(value, pattern=_COL)
     if key == "bar":
         if isinstance(value, bool) or not isinstance(value, int):
@@ -1042,7 +1042,7 @@ def save_prefs(user, panel: Panel, data) -> dict:
             for key in ("actions", "bar"):
                 stored.pop(key, None)
         elif reset == "layout":
-            for key in ("width", "hide_cols"):
+            for key in ("width", "hide_cols", "cols_off"):
                 stored.pop(key, None)
             star = {}
         elif reset == "list":
