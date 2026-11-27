@@ -71,7 +71,7 @@
           {% empty %}<li class="mt-muted">Підказок немає — додайте учасників нижче.</li>{% endfor %}
         </ul>
         <div data-mt-people-extra>
-          <div class="mt-person"><input type="text" name="x_name" placeholder="Ім’я" maxlength="200"><input type="email" name="x_email" placeholder="Email (необов’язково)" maxlength="254"></div>
+          <div class="mt-person"><input type="text" name="x_name" placeholder="Ім’я" maxlength="200"><input type="email" name="x_email" placeholder="Email (необов’язково)" maxlength="254" data-mv-addr="one" translate="no"></div>
         </div>
         <button type="button" class="button" data-mt-add-person>＋ Ще хтось</button>
         <label>Примітка до протоколу <textarea name="consent_note" rows="2">{{ state.consent_note }}</textarea></label>
@@ -110,7 +110,7 @@
     </div>
     <p class="mt-hint">🔒 Нараду, розшифровку й ключові моменти бачите лише ви. Прийняті вами пункти (назва й цитата) побачать усі, хто бачить проєкт.</p>
   </form>
-  <template id="mt-person-tpl"><div class="mt-person"><input type="text" name="x_name" placeholder="Ім’я" maxlength="200"><input type="email" name="x_email" placeholder="Email (необов’язково)" maxlength="254"></div></template>
+  <template id="mt-person-tpl"><div class="mt-person"><input type="text" name="x_name" placeholder="Ім’я" maxlength="200"><input type="email" name="x_email" placeholder="Email (необов’язково)" maxlength="254" data-mv-addr="one" translate="no"></div></template>
   {% endif %}
 </div>
 <script src="{% static 'meetings/meetings.js' %}?v=12" defer></script>

@@ -334,6 +334,22 @@ def _mv_readonly_contents(self):
     return _mv_orig_readonly_contents(self)
 
 
+_mv_orig_formfield_for_dbfield = admin.options.BaseModelAdmin.formfield_for_dbfield
+
+
+def _mv_formfield_for_dbfield(self, db_field, request, **kwargs):
+    """Поля «кому надсилати» (email_to, cc, forward_to, send_to…) — з підказками адрес (email_assistant/address_suggest)."""
+    formfield = _mv_orig_formfield_for_dbfield(self, db_field, request, **kwargs)
+    if formfield is not None:
+        try:
+            from email_assistant.address_suggest import tag_field
+            tag_field(db_field.name, formfield)
+        except Exception:                        # підказки — зручність: форма відкривається й без них
+            pass
+    return formfield
+
+
+admin.options.BaseModelAdmin.formfield_for_dbfield = _mv_formfield_for_dbfield
 admin.ModelAdmin.render_change_form = _mv_render_change_form
 admin.ModelAdmin.save_form = _mv_save_form
 _helpers.AdminReadonlyField.contents = _mv_readonly_contents

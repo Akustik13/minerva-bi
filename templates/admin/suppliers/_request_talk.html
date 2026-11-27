@@ -1,6 +1,5 @@
 {# 💬 Вікно листування з постачальником і ↪ пересилання вибраних колезі — suppliers/services/rfq_talk.py #}
 {# Підключено внизу request_work.html (після spJob) #}
-<datalist id="rwc-colleagues">{% for c in colleagues %}<option value="{{ c.email }}">{{ c.name }}</option>{% endfor %}</datalist>
 
 <dialog id="rw-chat" class="rw-pv rwc-dlg" aria-labelledby="rw-chat-h">
   <div class="rw-pv-head"><b id="rw-chat-h" translate="no">💬</b>
@@ -60,8 +59,8 @@
   <div class="rw-pv-head"><b id="rw-fwd-h">↪ Переслати колезі</b><button type="button" class="button" data-fwd-close aria-label="Закрити">✕</button></div>
   <form id="rw-fwd-form" class="rw-pv-mail" autocomplete="off">
     <div class="rwc-to">
-      <label>Кому <input name="to" list="rwc-colleagues" placeholder="колега@фірма" required></label>
-      <label>Копія <input name="cc" list="rwc-colleagues"></label>
+      <label>Кому <input name="to" placeholder="колега@фірма" required translate="no" data-mv-addr></label>
+      <label>Копія <input name="cc" translate="no" data-mv-addr data-mv-addr-to="to"></label>
     </div>
     <label class="rwc-subjf" data-fwd-subject>Тема <input name="subject" translate="no"></label>
     <label class="rwc-subjf">Коментар <textarea name="note" rows="3" placeholder="Напр.: Глянь, будь ласка, пропозиції — кого беремо?"></textarea></label>
@@ -101,7 +100,7 @@
   </div>
   <div id="rwe-step2" hidden>
     <div class="rwe-ccall">
-      <label class="rwc-subjf">👥 Копія всім листам <input id="rwe-ccall" list="rwc-colleagues" placeholder="колега@фірма — кожен лист піде і йому" translate="no"></label>
+      <label class="rwc-subjf">👥 Копія всім листам <input id="rwe-ccall" placeholder="колега@фірма — кожен лист піде і йому" translate="no" data-mv-addr></label>
       <button type="button" class="button" id="rwe-ccall-add" title="Дописати ці адреси в «Копія» кожного листа (ще не надісланого)">＋ Додати всім</button>
       <button type="button" class="button" id="rwe-ccall-del" title="Прибрати ці адреси з «Копія» кожного листа">－ Прибрати з усіх</button>
     </div>
@@ -410,7 +409,7 @@
     function field(label, key, L) {
       var lab = el('label', 'rwc-subjf'); lab.appendChild(document.createTextNode(label + ' '));
       var inp = el('input'); inp.value = L[key] || ''; inp.setAttribute('translate', 'no');
-      if (key === 'cc') inp.setAttribute('list', 'rwc-colleagues');
+      if (key === 'to' || key === 'cc') inp.setAttribute('data-mv-addr', '');   // підказки адрес (mv_addr.js)
       inp.addEventListener('input', function(){ L[key] = inp.value; autosave(); });
       lab.appendChild(inp); return lab;
     }

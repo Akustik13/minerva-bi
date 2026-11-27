@@ -51,7 +51,7 @@
   {% for c in chosen %}<input type="hidden" name="u" value="{{ c }}">{% endfor %}
   <b>✉️ {% trans "Надіслати цей звіт" %}</b>
   <div class="rp-form" style="margin-top:8px">
-    <label style="flex:1;min-width:240px">{% trans "Кому (через кому)" %}<input name="to" value="{{ me }}" required></label>
+    <label style="flex:1;min-width:240px">{% trans "Кому (через кому)" %}<input name="to" value="{{ me }}" required translate="no" data-mv-addr></label>
     {% if accounts %}<label>{% trans "З якої скриньки" %}<select name="sender"><option value="">{% trans "SMTP сповіщень Minerva" %}</option>{% for a in accounts %}<option value="{{ a.pk }}">{{ a.email_address }}</option>{% endfor %}</select></label>{% endif %}
     <button class="button" name="send" value="1" onclick="return confirm('{% trans "Надіслати звіт поштою?" %}')">✉️ {% trans "Надіслати" %}</button>
   </div>

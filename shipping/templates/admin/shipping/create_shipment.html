@@ -1072,7 +1072,7 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <div class="sh-field">
           <label class="sh-label">Email</label>
-          <input class="sh-input" type="email" name="sender_email"
+          <input class="sh-input" type="email" name="sender_email" data-mv-addr="one" translate="no"
             value="{{ shipment.sender_email|default:shipment.carrier.sender_email|default:'' }}"
             {% if shipment.sender_email %}data-edited="1"{% endif %}
             oninput="_markEdited(this)">
@@ -1589,7 +1589,7 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <div class="sh-field">
           <label class="sh-label">Email</label>
-          <input class="sh-input" type="email" name="recipient_email"
+          <input class="sh-input" type="email" name="recipient_email" data-mv-addr="one" translate="no"
             value="{{ shipment.recipient_email }}">
         </div>
       </div>

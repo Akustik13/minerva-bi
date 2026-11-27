@@ -261,11 +261,6 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
 .invd-add{position:relative;display:flex;gap:6px}
 .invd-add input{flex:1}
 .invd-add button{border:1px solid var(--border-strong);border-radius:6px;background:none;color:var(--text);cursor:pointer;padding:0 10px}
-.invd-sugg{position:absolute;left:0;right:40px;top:100%;z-index:3;background:var(--bg-card);border:1px solid var(--border-strong);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.25);max-height:220px;overflow:auto}
-.invd-sugg[hidden]{display:none}
-.invd-sugg div{padding:5px 8px;cursor:pointer;font-size:12px}
-.invd-sugg div:hover,.invd-sugg div.on{background:rgba(26,115,232,.12)}
-.invd-sugg small{color:var(--text-muted)}
 .invd-hint{font-size:11px;color:var(--text-muted);margin-top:-5px}
 .invd-msg{font-size:12px;margin:10px 0;min-height:16px}
 .invd-msg.err{color:#e53935}
@@ -626,9 +621,9 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
         <div class="invd-lbl">Учасники</div>
         <div id="invd-people" class="invd-people" translate="no"></div>
         <div class="invd-add">
-          <input id="invd-addr" autocomplete="off" placeholder="email або ім'я — підказки з адресної книги й CRM" aria-label="Додати учасника">
+          <input id="invd-addr" autocomplete="off" placeholder="email або ім'я — клікніть: команда, учасники листа, решта" aria-label="Додати учасника"
+                 data-mv-addr="pick" translate="no">
           <button type="button" onclick="invAddTyped()" title="Додати">＋</button>
-          <div id="invd-sugg" class="invd-sugg" hidden translate="no"></div>
         </div>
       </div>
       <label>Посилання на зустріч (Teams / Zoom / Google Meet)<input id="invd-url" type="url" maxlength="1000" placeholder="https://teams.live.com/meet/…" translate="no"></label>
@@ -1504,6 +1499,7 @@ async function invOpen(pk) {
 function invRender(st, fields) {
   _inv.st = st;
   if (st.event) _inv.pk = st.event;
+  _invEl('invd-addr').dataset.mvAddrMsg = st.message || '';   // підказки адрес: учасники листа зустрічі
   if (fields) {
     _invEl('invd-name').value = st.title || '';
     _invEl('invd-allday').checked = !!st.all_day;
@@ -1557,6 +1553,8 @@ function invRender(st, fields) {
 function invPeople() {
   var box = _invEl('invd-people');
   box.innerHTML = '';
+  _invEl('invd-addr').dataset.mvAddrTaken = _inv.people.filter(function(p){ return !p.removed; })
+    .map(function(p){ return p.email; }).join(', ');   // уже в зустрічі — не пропонуємо
   if (!_inv.people.length) { box.innerHTML = '<div class="invd-hint">' + _blkEsc('Ще нікого — додайте email нижче.') + '</div>'; return; }
   _inv.people.forEach(function(p, i){
     var row = document.createElement('div');
@@ -1602,48 +1600,13 @@ function invAddTyped() {
   invSuggHide();
   _invMsg(bad.length ? '⚠️ Незрозуміла адреса: ' + bad.join(', ') : '', bad.length > 0);
 }
-var _invSuggT = null;
-function invSuggHide() { var s = _invEl('invd-sugg'); if (s) s.hidden = true; }
-(function(){
+function invSuggHide() { if (window.MVAddr) MVAddr.close(); }
+(function(){   // підказки — static/admin/js/mv_addr.js (data-mv-addr="pick"): вибір → «mv:addr-pick» → учасник
   var inp = _invEl('invd-addr');
+  inp.addEventListener('mv:addr-pick', function(e){ _invAdd(e.detail.email, e.detail.name); _invMsg(''); });
   inp.addEventListener('keydown', function(e){
-    if (e.key === 'Enter' || e.key === ',' || e.key === ';') {
-      e.preventDefault();
-      var on = document.querySelector('#invd-sugg div.on');
-      if (on && !_invEl('invd-sugg').hidden) on.click(); else invAddTyped();
-    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      var items = Array.from(document.querySelectorAll('#invd-sugg div'));
-      if (!items.length) return;
-      e.preventDefault();
-      var i = items.findIndex(function(x){ return x.classList.contains('on'); });
-      items.forEach(function(x){ x.classList.remove('on'); });
-      i = e.key === 'ArrowDown' ? Math.min(i + 1, items.length - 1) : Math.max(i - 1, 0);
-      items[i].classList.add('on');
-    } else if (e.key === 'Escape') {
-      invSuggHide();
-    }
+    if (e.key === 'Enter' || e.key === ',' || e.key === ';') { e.preventDefault(); invAddTyped(); }
   });
-  inp.addEventListener('input', function(){
-    clearTimeout(_invSuggT);
-    var q = inp.value.trim();
-    if (q.length < 2 || /[,;]/.test(q)) { invSuggHide(); return; }
-    _invSuggT = setTimeout(async function(){
-      try {
-        var d = await (await fetch('/email/crm-contacts/?q=' + encodeURIComponent(q), {credentials: 'same-origin'})).json();
-        var box = _invEl('invd-sugg');
-        box.innerHTML = '';
-        (d.contacts || []).slice(0, 8).forEach(function(c){
-          var row = document.createElement('div');
-          row.innerHTML = _blkEsc(c.name ? c.name + ' <' + c.email + '>' : c.email) + ' <small>' + _blkEsc(c.source || '') + '</small>';
-          row.onmousedown = function(e){ e.preventDefault(); };
-          row.onclick = function(){ _invAdd(c.email, c.name); inp.value = ''; invSuggHide(); inp.focus(); };
-          box.appendChild(row);
-        });
-        box.hidden = !box.children.length;
-      } catch (e) { invSuggHide(); }
-    }, 200);
-  });
-  inp.addEventListener('blur', function(){ setTimeout(invSuggHide, 150); });
 })();
 function invAllDay(keep) {
   var on = _invEl('invd-allday').checked;
@@ -1747,7 +1710,7 @@ function invClose() {
   if (_inv.dirty) location.reload();
 }
 document.addEventListener('keydown', function(e){
-  if (e.key === 'Escape' && !_invEl('cal-invd').hidden && _invEl('invd-sugg').hidden) invClose();
+  if (e.key === 'Escape' && !_invEl('cal-invd').hidden && !(window.MVAddr && MVAddr.isOpen())) invClose();
 });
 async function ocxDo(btn, pk, action) {
   if (action === 'retry' && !confirm('Надіслати лист «Скасовано»:\n' + (btn.dataset.to || '') + '?')) return;

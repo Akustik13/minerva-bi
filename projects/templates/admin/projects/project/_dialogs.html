@@ -103,7 +103,7 @@
       <label class="pjp-wide">Назва <input type="text" data-y="name" maxlength="200" autocomplete="off" placeholder="Fa. Müller Elektronik"></label>
       <label class="pjp-wide">Що постачає / робить <input type="text" data-y="what" maxlength="255" placeholder="Друковані плати, корпуси, модулі U3 / U101, складання й тест"></label>
       <label class="pjp-wide">Кому віддає <select data-y="delivers_to"></select></label>
-      <label class="pjp-wide">Email контакту <input type="email" data-y="email" maxlength="254" autocomplete="off"></label>
+      <label class="pjp-wide">Email контакту <input type="email" data-y="email" maxlength="254" autocomplete="off" data-mv-addr="one" translate="no"></label>
       <label class="pjp-wide">Примітка <input type="text" data-y="note" maxlength="255"></label>
     </div>
     <p class="pjp-hint" data-y-steps></p>
@@ -242,7 +242,7 @@
     </fieldset>
     <label>Доручення агенту <textarea data-ag="instruction" rows="7"></textarea></label>
     <div class="pjp-grid">
-      <label class="pjp-wide">Кому писати листи (адреси) <input type="text" data-ag="mail_to" autocomplete="off"></label>
+      <label class="pjp-wide">Кому писати листи (адреси) <input type="text" data-ag="mail_to" autocomplete="off" data-mv-addr translate="no"></label>
       <label class="pjp-wide2">Модель AI <select data-ag="model"></select></label>
       <label>Найбільше витратити, $ <input type="number" min="0.05" max="10" step="0.05" data-ag="budget"></label>
     </div>

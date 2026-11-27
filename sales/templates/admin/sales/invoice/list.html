@@ -97,7 +97,7 @@
     {% if auto.can_change %}
     <form method="post" action="/rechnungen/test-mail/" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
       {% csrf_token %}
-      <input class="ri-input" type="email" name="to" value="{{ auto.test_to }}" placeholder="ваша адреса" required style="max-width:260px" translate="no">
+      <input class="ri-input" type="email" name="to" value="{{ auto.test_to }}" placeholder="ваша адреса" required style="max-width:260px" translate="no" data-mv-addr="one">
       <select class="ri-input" name="lang" style="width:auto">
         <option value="de">Deutsch</option><option value="en">English</option><option value="de_en">Deutsch + English</option>
       </select>

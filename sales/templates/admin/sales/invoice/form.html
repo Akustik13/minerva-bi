@@ -67,7 +67,7 @@
         <div class="ri-field"><label class="ri-label">Індекс, місто</label><input class="ri-input" name="bill_zip_city" value="{{ inv.bill_to.zip_city }}" translate="no"></div>
         <div class="ri-field"><label class="ri-label">Країна</label><input class="ri-input" name="bill_country" value="{{ inv.bill_to.country }}" translate="no"></div>
         <div class="ri-field"><label class="ri-label">USt-IdNr / VAT ID</label><input class="ri-input" name="bill_vat_id" value="{{ inv.bill_to.vat_id }}" translate="no"></div>
-        <div class="ri-field"><label class="ri-label">Email (сюди надсилається рахунок)</label><input class="ri-input" type="email" name="bill_email" value="{{ inv.bill_to.email }}" translate="no"></div>
+        <div class="ri-field"><label class="ri-label">Email (сюди надсилається рахунок)</label><input class="ri-input" type="email" name="bill_email" value="{{ inv.bill_to.email }}" translate="no" data-mv-addr="one"></div>
       </div>
       <details {% if inv.ship_to %}open{% endif %} style="margin-top:12px">
         <summary style="cursor:pointer;color:var(--link-fg);font-size:13px">🚚 Доставка на іншу адресу (Lieferadresse)</summary>

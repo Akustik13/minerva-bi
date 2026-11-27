@@ -115,3 +115,46 @@ class AddressSuggestTests(TestCase):
         add = self.client.get('/admin/agent/agenttask/add/').content.decode()
         self.assertIn('data-mv-addr-to="mail_to"', add)
         self.assertIn('admin/js/mv_addr.js', add)
+
+
+class AddressFieldsEverywhereTests(TestCase):
+    """Підказки адрес у всіх полях «Кому» / «Копія»: скрипт на кожній сторінці, поля форм адмінки — самі."""
+
+    def setUp(self):
+        from config.models import SystemSettings
+        from email_assistant.models import EmailAccount
+        SystemSettings.objects.update_or_create(pk=1, defaults={'is_onboarding_complete': True})
+        self.me = User.objects.create_superuser('slava', 'slava@firma.example', 'p')
+        self.acc = EmailAccount.objects.create(user=self.me, email_address='slava@firma.example', is_primary=True)
+        self.client.force_login(self.me)
+
+    def test_tag_field_rules(self):
+        from django import forms
+        f = S.tag_field('email_to', forms.CharField(widget=forms.Textarea))
+        self.assertEqual(f.widget.attrs['data-mv-addr'], '')
+        self.assertEqual(S.tag_field('mail_reply_to', forms.EmailField()).widget.attrs['data-mv-addr'], 'one')
+        self.assertEqual(S.tag_field('team_emails', forms.CharField()).widget.attrs['data-mv-addr'], '')
+        self.assertEqual(S.tag_field('customer_notify_cc', forms.CharField()).widget.attrs['data-mv-addr'], '')
+        for name, field in (('in_reply_to', forms.CharField()), ('email', forms.EmailField()),   # власна адреса — ні
+                            ('email_address', forms.CharField()), ('cc', forms.BooleanField()),
+                            ('reply_to', forms.ModelChoiceField(queryset=User.objects.none()))):
+            self.assertNotIn('data-mv-addr', S.tag_field(name, field).widget.attrs, name)
+
+    def test_admin_settings_forms_are_tagged(self):
+        from config.models import NotificationSettings
+        ns, _ = NotificationSettings.objects.get_or_create(pk=1)
+        page = self.client.get(f'/admin/config/notificationsettings/{ns.pk}/change/').content.decode()
+        self.assertRegex(page, r'<textarea name="email_to"[^>]*data-mv-addr=""')
+        self.assertIn('/static/admin/js/mv_addr.js', page)                     # скрипт — у base_site, на кожній сторінці
+        page = self.client.get('/admin/agent/agentrule/add/').content.decode()
+        self.assertRegex(page, r'name="cc"[^>]*data-mv-addr=""|data-mv-addr=""[^>]*name="cc"')
+        self.assertRegex(page, r'name="forward_to"[^>]*data-mv-addr=""|data-mv-addr=""[^>]*name="forward_to"')
+
+    def test_compose_and_calendar_fields(self):
+        page = self.client.get('/email/compose/').content.decode()
+        self.assertIn('data-mv-addr data-mv-addr-msg=""', page)                     # «Кому»
+        self.assertIn('data-mv-addr data-mv-addr-to="to"', page)                    # CC
+        self.assertNotIn('em-compose-contacts', page)                               # старі підказки прибрано
+        page = self.client.get('/calendar/').content.decode()
+        self.assertIn('id="invd-addr"', page)
+        self.assertIn('data-mv-addr="pick"', page)                                  # учасник зустрічі — вибором

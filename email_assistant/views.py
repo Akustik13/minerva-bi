@@ -1492,7 +1492,7 @@ def compose_view(request):
         'remind_choices': _FU_DAYS,
         'remind_sel':   (initial.get('opts') or {}).get('remind_days') or _FU_DEFAULT_DAYS,
         'signature':    sig,
-        'crm_contacts': _crm_contacts(request.user),   # json_script у шаблоні — ім'я з CRM не «вийде» зі <script>
+        'addr_msg':     (reply_to or fwd).pk if (reply_to or fwd) else '',   # підказки адрес: учасники цього листа
     }))
 
 

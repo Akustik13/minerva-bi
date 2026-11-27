@@ -224,13 +224,6 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         return super().change_view(request, object_id, form_url, extra_context)
 
     # ── допоміжне ──
-    @staticmethod
-    def _colleagues() -> list:
-        """Колеги (активні співробітники з email) — підказки в «Копія (CC)» разом з адресною книгою пошти."""
-        from django.contrib.auth.models import User
-        return [{"email": u.email, "name": u.get_full_name() or u.username, "source": "колега"}
-                for u in User.objects.filter(is_active=True, is_staff=True).exclude(email="").order_by("first_name")[:200]]
-
     def _draft(self, request):
         """(запит або None, чернетка з того, що зараз у формі — ще не збережене теж, отримувач або None) — для
         👁 перегляду й ✉️ тестового листа. Отримувач — позначений постачальник (supplier) і його контакт (contact)."""
@@ -522,7 +515,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             categories=SupplierCategory.objects.filter(is_active=True), projects=projects, groups=groups,
             picked=picked, sent=sent, accounts=accounts, placeholders=rfq.PLACEHOLDERS, **rcp,
             examples={k: {"subject": v[0], "body": v[1]} for k, v in rfq.EXAMPLES.items()},
-            colleagues=self._colleagues(), test_to=accounts[0].email_address if accounts else request.user.email,
+            test_to=accounts[0].email_address if accounts else request.user.email,
             example_body=rfq.EXAMPLES.get(req.language, rfq.EXAMPLES["en"])[1],
             langs=SupplierRequest.LANGS, files=files, notes=(req.specs or {}).get("_notes", ""),
             src=src, copy=copy, copy_src=copy_src, review_items=review_items,
@@ -714,7 +707,6 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                             "text_max": rfq_marks.TEXT_MAX}),
             letters_pending=SupplierRequestLetter.objects.filter(request=req, user=request.user, sent_at=None).count(),
             chat_url_json=_js(reverse("admin:suppliers_supplierrequest_chat", args=[req.pk, 0])),
-            colleagues=self._colleagues(),
             analysis_at=analysis_at, by_agent=by_agent, advice_task=advice_task,
             reparse=len(self._to_parse(req, False)), scope_choices=rfq_compare.SCOPE,
             planned=sum(1 for row in rows if row["recipient"].state in (SupplierRequestRecipient.PLANNED,

@@ -120,22 +120,6 @@
 }
 
 /* Autocomplete */
-#se-suggestions {
-  display:none; position:fixed;
-  background:var(--bg-card,#161b22);
-  border:1px solid var(--border-strong,#2a3f52);
-  border-radius:8px; max-height:220px; overflow-y:auto;
-  z-index:9999; min-width:280px;
-  box-shadow:0 8px 24px rgba(0,0,0,.4);
-}
-.se-sugg-item {
-  padding:9px 14px; cursor:pointer;
-  font-size:13px;
-  border-bottom:1px solid var(--border,rgba(255,255,255,.07));
-}
-.se-sugg-item:hover { background:var(--bg-hover,#1e2d40); }
-.se-sugg-item strong { color:var(--text,#e6edf3); }
-.se-sugg-item span   { color:var(--text-muted,#9aafbe); font-size:12px; }
 
 /* Errors */
 .se-errors {
@@ -273,10 +257,8 @@
 </div>{# .se-wrap #}
 {% endwith %}
 
-<div id="se-suggestions"></div>
 
 {# дані — json_script, не «{{ …|safe }}» у <script>: ім'я з CRM чи текст листа з «</script>» не виконається #}
-{{ crm_contacts|json_script:"se-contacts-data" }}
 {{ account_sigs|json_script:"se-sigs-data" }}
 {% if original %}{{ existing_body_html|json_script:"se-existing-html" }}{{ existing_body_text|json_script:"se-existing-text" }}{% endif %}
 <script>
@@ -286,15 +268,12 @@
     try { return el ? JSON.parse(el.textContent) : dflt; } catch (e) { return dflt; }
   }
   var CSRF     = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
-  var CONTACTS = _seData('se-contacts-data', []);
   var ACC_SIGS = _seData('se-sigs-data', {});
 
   var editor   = document.getElementById('se-body-editor');
   var toField  = document.getElementById('se-to');
   var ccField  = document.getElementById('se-cc');
   var accSel   = document.querySelector('[name="account"]');
-  var suggBox  = document.getElementById('se-suggestions');
-  var _suggTarget = null;
 
   /* ── Auto-signature on load ── */
   function injectSig(sig) {
@@ -344,53 +323,7 @@
     document.execCommand(cmd, false, val); editor.focus();
   };
 
-  /* ── Autocomplete (To + CC) ── */
-  function setupAC(field) {
-    field.addEventListener('input', function(){
-      var q = field.value.split(',').pop().trim().toLowerCase();
-      if (q.length < 1) { suggBox.style.display = 'none'; return; }
-      var hits = CONTACTS.filter(function(c){
-        return c.email.toLowerCase().includes(q) || (c.name||'').toLowerCase().includes(q);
-      }).slice(0,10);
-      if (!hits.length) { suggBox.style.display='none'; return; }
-      _suggTarget = field;
-      suggBox.innerHTML = '';
-      hits.forEach(function(c){   // елементами: лапки в імені / адресі CRM не стануть атрибутом
-        var item = document.createElement('div');
-        item.className = 'se-sugg-item';
-        var b = document.createElement('strong');
-        b.textContent = c.name || c.email;
-        item.appendChild(b);
-        if (c.name) {
-          var sp = document.createElement('span');
-          sp.textContent = c.email;
-          item.appendChild(document.createTextNode(' '));
-          item.appendChild(sp);
-        }
-        item.addEventListener('click', function(){ window.seSelectContact(c.email); });
-        suggBox.appendChild(item);
-      });
-      var rect = field.getBoundingClientRect();
-      suggBox.style.top  = (rect.bottom + window.scrollY + 4) + 'px';
-      suggBox.style.left = rect.left + 'px';
-      suggBox.style.width = Math.max(280, rect.width) + 'px';
-      suggBox.style.display = 'block';
-    });
-  }
-  if (toField) setupAC(toField);
-  if (ccField) setupAC(ccField);
-
-  window.seSelectContact = function(email) {
-    if (!_suggTarget) return;
-    var parts = _suggTarget.value.split(',');
-    parts[parts.length-1] = email;
-    _suggTarget.value = parts.join(', ') + ', ';
-    suggBox.style.display = 'none'; _suggTarget.focus();
-  };
-  document.addEventListener('click', function(e){
-    if (!suggBox.contains(e.target) && e.target !== toField && e.target !== ccField)
-      suggBox.style.display = 'none';
-  });
+  /* ── Підказки адрес (To + CC) — static/admin/js/mv_addr.js (data-mv-addr у віджетах форми) ── */
   function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
   /* ── Sync editor → hidden fields before submit ── */

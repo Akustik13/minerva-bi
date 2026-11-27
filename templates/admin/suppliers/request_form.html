@@ -58,12 +58,6 @@
   #rq-ai-wish { resize: vertical; min-height: 58px; max-height: 320px; overflow-y: auto; line-height: 1.4; }
   .rq-test-in { position: relative; display: inline-block; }
   .rq-test-in input { width: 340px; max-width: 70vw; }
-  .rq-test-in .rq-sug { position: absolute; left: 0; top: 100%; margin-top: 2px; width: 420px; max-width: 80vw; }
-  .rq-sug { position: relative; z-index: 40; margin-top: -4px; max-width: 520px; background: var(--body-bg, #fff);
-    border: 1px solid var(--border-strong, #ccc); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.18); max-height: 260px; overflow-y: auto; }
-  .rq-sug div { padding: 4px 10px; cursor: pointer; font-size: 13px; }
-  .rq-sug div.on, .rq-sug div:hover { background: var(--selected-bg, rgba(91,141,239,.15)); }
-  .rq-sug small { color: var(--text-muted, #888); }
   .rq-who { margin-top: 8px; border: 1px solid var(--border-strong, #ccc); border-radius: 8px; padding: 6px 10px; }
   .rq-who-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center;
     padding: 3px 0; border-bottom: 1px solid var(--hairline-color, rgba(127,127,127,.15)); font-size: 13px; }
@@ -227,9 +221,7 @@
     <div class="spf-row"><button type="button" class="button" id="rq-example" title="Готовий лист зі змінними мовою запиту — допишіть деталі">✍️ Приклад зі змінними</button>
       <button type="submit" name="regen" value="1" class="button" formnovalidate onclick="return !this.form.body.value || confirm('Скласти текст наново з параметрів? Ваші правки тексту зникнуть.')">🔄 Скласти текст з параметрів</button></div>
     {{ examples|json_script:"rq-examples" }}
-    <label class="spf-wide">Копія (CC) кожному листу <span class="spf-muted">— адреси через кому, напр. колега</span><input name="cc" id="rq-cc" value="{{ req.cc }}" maxlength="500" placeholder="почніть вводити ім'я чи email — підкажемо з адресної книги" autocomplete="off"></label>
-    <div class="rq-sug" id="rq-cc-sug" hidden></div>
-    {{ colleagues|json_script:"rq-colleagues" }}
+    <label class="spf-wide">Копія (CC) кожному листу <span class="spf-muted">— адреси через кому, напр. колега</span><input name="cc" id="rq-cc" value="{{ req.cc }}" maxlength="500" placeholder="почніть вводити ім'я чи email — підкажемо з адресної книги" autocomplete="off" translate="no" data-mv-addr></label>
     <label class="spf-muted" style="width:auto;float:none;padding:0"><input type="checkbox" name="cc_contacts" value="1" {% if req.cc_contacts %}checked{% endif %}> копія й іншим контактним особам того самого постачальника</label>
     <div class="spf-row">👁 Як виглядатиме лист:
       <select id="rq-pv-sup"></select>
@@ -238,8 +230,7 @@
     </div>
     <div class="rq-pv" id="rq-pv" hidden></div>
     {% if accounts %}<div class="spf-row rq-test">✉️ Тестовий лист на:
-      <span class="rq-test-in"><input id="rq-test-to" value="{{ test_to }}" placeholder="ваш email або колеги" autocomplete="off" translate="no">
-      <span class="rq-sug" id="rq-test-sug" hidden></span></span>
+      <span class="rq-test-in"><input id="rq-test-to" value="{{ test_to }}" placeholder="ваш email або колеги" autocomplete="off" translate="no" data-mv-addr></span>
       <button type="button" class="button" id="rq-test-go">✉️ Надіслати тест</button>
       <span class="spf-job" id="rq-test-msg"></span>
     </div>
@@ -391,53 +382,7 @@
     l.querySelector('input[name=rcp]').addEventListener('change', function(e){
       if (e.target.checked && pAuto.checked) openPanel(l.dataset.pk); });
   });
-  // «Копія (CC)»: підказки — колеги й адресна книга пошти (/email/crm-contacts/), за останнім словом після коми
-  var mates = JSON.parse(document.getElementById('rq-colleagues').textContent || '[]');
-  function addrSuggest(ccIn, ccSug){
-  var ccT = null, ccPick = -1;
-  function ccToken(){ var parts = ccIn.value.split(/[,;]/); return parts[parts.length - 1].trim(); }
-  function ccShow(list){
-    ccSug.innerHTML = ''; ccPick = -1;
-    list.slice(0, 12).forEach(function(c){
-      var d = document.createElement('div'), b = document.createElement('b'), s = document.createElement('small');
-      b.textContent = c.name || c.email; s.textContent = '  ' + c.email + (c.source ? ' · ' + c.source : '');
-      d.setAttribute('translate', 'no'); d.appendChild(b); d.appendChild(s);
-      d.addEventListener('mousedown', function(e){ e.preventDefault(); ccTake(c.email); });
-      ccSug.appendChild(d);
-    });
-    ccSug.hidden = !list.length;
-  }
-  function ccTake(email){
-    var parts = ccIn.value.split(/[,;]/).map(function(x){ return x.trim(); }).filter(Boolean); parts.pop();
-    if (parts.indexOf(email) < 0) parts.push(email);
-    ccIn.value = parts.join(', ') + ', '; ccSug.hidden = true; ccIn.focus(); ccIn.dispatchEvent(new Event('input'));
-  }
-  ccIn.addEventListener('input', function(){
-    var t = ccToken().toLowerCase(); clearTimeout(ccT);
-    if (t.length < 2) { ccSug.hidden = true; return; }
-    var local = mates.filter(function(c){ return (c.email + ' ' + c.name).toLowerCase().indexOf(t) >= 0; });
-    ccShow(local);
-    ccT = setTimeout(function(){
-      fetch('/email/crm-contacts/?q=' + encodeURIComponent(t), {credentials: 'same-origin'})
-        .then(function(r){ return r.ok ? r.json() : {contacts: []}; }).then(function(j){
-          if (ccToken().toLowerCase() !== t) return;
-          var seen = {}; ccShow(local.concat(j.contacts || []).filter(function(c){
-            var k = (c.email || '').toLowerCase(); if (!k || seen[k]) return false; seen[k] = 1; return true; }));
-        }).catch(function(){});
-    }, 250);
-  });
-  ccIn.addEventListener('keydown', function(e){
-    var items = ccSug.querySelectorAll('div'); if (ccSug.hidden || !items.length) return;
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault();
-      ccPick = (ccPick + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length;
-      items.forEach(function(d, i){ d.classList.toggle('on', i === ccPick); }); }
-    else if (e.key === 'Enter') { e.preventDefault(); if (ccPick >= 0) items[ccPick].dispatchEvent(new Event('mousedown')); }
-    else if (e.key === 'Escape') ccSug.hidden = true;
-  });
-  ccIn.addEventListener('blur', function(){ setTimeout(function(){ ccSug.hidden = true; }, 150); });
-  }
-  addrSuggest(document.getElementById('rq-cc'), document.getElementById('rq-cc-sug'));
-  if (document.getElementById('rq-test-to')) addrSuggest(document.getElementById('rq-test-to'), document.getElementById('rq-test-sug'));
+  // «Копія (CC)» і «Тестовий лист на»: підказки адрес — static/admin/js/mv_addr.js (data-mv-addr)
   // «🧠 Що врахувати AI» росте разом з текстом (до max-height, далі — прокрутка)
   var wish = document.getElementById('rq-ai-wish');
   function wishFit(){ wish.style.height = 'auto'; wish.style.height = Math.min(wish.scrollHeight + 2, 320) + 'px'; }

@@ -1218,7 +1218,7 @@ class RequestRecipientFiltersTests(Base):
         self.assertContains(page, '<input type="checkbox" value="electronica 2026"> <span translate="no">Electronica 2026</span>')
         self.assertContains(page, '<input type="checkbox" value="CN">')
         self.assertContains(page, 'id="rq-who"')                                           # 📤 Отримають лист
-        self.assertContains(page, 'id="rq-colleagues"')                                    # підказки «Копія (CC)»
+        self.assertContains(page, 'translate="no" data-mv-addr>')                          # підказки «Копія (CC)»
         self.assertContains(page, 'name="ai_wish"')
         self.assertNotContains(page, "Never Again Ltd")                            # ⛔ не працювати — не пропонуємо
         self.assertNotContains(page, 'value="blocked"')

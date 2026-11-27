@@ -73,10 +73,11 @@ class EmailCategoryRuleAdmin(OwnMailboxAdminMixin, admin.ModelAdmin):
 class ScheduledEmailComposeForm(forms.ModelForm):
     to_raw = forms.CharField(
         required=True, label='Кому',
-        widget=forms.TextInput(attrs={'autocomplete': 'off', 'id': 'se-to'}))
+        widget=forms.TextInput(attrs={'autocomplete': 'off', 'id': 'se-to', 'data-mv-addr': '', 'translate': 'no'}))
     cc_raw = forms.CharField(
         required=False, label='CC',
-        widget=forms.TextInput(attrs={'autocomplete': 'off', 'id': 'se-cc'}))
+        widget=forms.TextInput(attrs={'autocomplete': 'off', 'id': 'se-cc', 'data-mv-addr': '', 'data-mv-addr-to': '#se-to',
+                                      'translate': 'no'}))
     # Явне поле: інакше адмінка підставляє розділене «дата + час», а шаблон шле одне значення datetime-local
     scheduled_at = forms.DateTimeField(
         label='Час відправки',
@@ -843,13 +844,11 @@ class ScheduledEmailAdmin(OwnMailboxAdminMixin, admin.ModelAdmin):
 
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
         from email_assistant.html_clean import clean_html
-        from email_assistant.views import _crm_contacts
         extra_context = extra_context or {}
 
         accounts = EmailAccount.objects.filter(is_active=True, user=request.user)   # лише свої — як вибір у формі
 
         # Python-об'єкти: у шаблоні — json_script (ім'я з CRM чи текст листа не «вийдуть» зі <script>)
-        extra_context['crm_contacts'] = _crm_contacts(request.user)
         extra_context['account_sigs'] = {
             str(a.pk): {
                 'signature':    a.signature or '',

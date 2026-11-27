@@ -350,9 +350,10 @@ function dkmOpenTopic(topicId) {
 
 // ── ✉️ Чат на пошту: уся розмова з DigiKey наживо → лист (bots/services/dk_message_watch.forward) ──
 
-function dkmForward() {
+async function dkmForward() {
   if (!_currentTopicId) return;
-  const to = prompt('Кому переслати весь чат цієї теми? Адреси через кому:', FORWARD_TO);
+  const ask = 'Кому переслати весь чат цієї теми? Адреси через кому:';   // вікно з підказками адрес (mv_addr.js)
+  const to = window.MVAddr ? await MVAddr.ask({title: ask, value: FORWARD_TO, okText: '✉️ Переслати'}) : prompt(ask, FORWARD_TO);
   if (to === null) return;
   const btn = document.getElementById('dkm-fwd-btn'), st = document.getElementById('dkm-status');
   btn.disabled = true; st.textContent = '⏳ Читаю розмову з DigiKey і надсилаю лист…';

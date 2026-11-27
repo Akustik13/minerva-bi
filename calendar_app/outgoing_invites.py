@@ -752,6 +752,7 @@ def state(user, event) -> dict:
     local_end = timezone.localtime(event.end_at) if event.end_at else None
     out.update({
         "event": event.pk, "title": event.title, "all_day": event.all_day,
+        "message": event.email_message_id or "",             # підказки адрес: учасники листа (лише своя скринька)
         "start": local_start.strftime("%Y-%m-%d" if event.all_day else "%Y-%m-%dT%H:%M"),
         "end": (local_end.strftime("%Y-%m-%d" if event.all_day else "%Y-%m-%dT%H:%M") if local_end else ""),
         "can": bool(mine) and not org,

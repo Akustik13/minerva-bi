@@ -275,13 +275,6 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
 .em-reply-cc{display:none}
 /* Підказки адрес (Кому / Копія) */
 .em-ac-wrap{position:relative;flex:1;min-width:0}
-.em-ac-list{display:none;position:absolute;left:0;right:0;top:100%;z-index:60;margin-top:2px;max-height:240px;overflow-y:auto;
-  background:var(--bg-card);border:1px solid var(--border-strong);border-radius:7px;box-shadow:0 6px 18px rgba(0,0,0,.3)}
-.em-ac-list.open{display:block}
-.em-ac-opt{display:flex;gap:8px;align-items:baseline;padding:6px 9px;font-size:12px;cursor:pointer}
-.em-ac-opt .em{color:var(--text)} .em-ac-opt .nm{color:var(--text-muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.em-ac-opt .src{color:var(--text-dim);font-size:10px;flex-shrink:0}
-.em-ac-opt.active,.em-ac-opt:hover{background:var(--bg-hover,#1e2d40)}
 /* Вкладення відповіді */
 .em-reply-atts{margin-top:8px}
 .em-att-chips{display:flex;flex-wrap:wrap;gap:6px}
@@ -760,16 +753,16 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
         <label for="pv-reply-to">{% trans "Кому" %}</label>
         <div class="em-reply-to-row">
           <div class="em-ac-wrap">
-            <input id="pv-reply-to" class="em-reply-inp" type="text" autocomplete="off" placeholder="email@example.com">
-            <div class="em-ac-list" id="pv-reply-to-ac"></div>
+            <input id="pv-reply-to" class="em-reply-inp" type="text" autocomplete="off" placeholder="email@example.com"
+                   translate="no" data-mv-addr data-mv-addr-msg="{{ last_msg.pk }}">
           </div>
           <button type="button" class="em-reply-cc-btn" id="pv-reply-cc-btn" onclick="pvShowCc()">+ {% trans "Копія" %}</button>
         </div>
         <label for="pv-reply-cc" class="em-reply-cc">{% trans "Копія" %}</label>
         <div class="em-ac-wrap em-reply-cc">
           <input id="pv-reply-cc" class="em-reply-inp" type="text" autocomplete="off"
-                 placeholder="{% trans "адреси через кому" %}">
-          <div class="em-ac-list" id="pv-reply-cc-ac"></div>
+                 placeholder="{% trans "адреси через кому" %}" translate="no"
+                 data-mv-addr data-mv-addr-to="#pv-reply-to" data-mv-addr-msg="{{ last_msg.pk }}">
         </div>
         <label for="pv-reply-subj">{% trans "Тема" %}</label>
         <input id="pv-reply-subj" class="em-reply-inp" type="text" autocomplete="off">
@@ -1130,55 +1123,7 @@ function _pvAttMentioned() {   // MVAttNames — static/admin/js/mv_att_names.js
   if (added) _pvAttRender();
 }
 
-// ── Підказки адрес у «Кому» / «Копія»: адресна книга, клієнти CRM, усі, з ким листувались ──
-function _pvAutocomplete(inputId, listId) {
-  var inp = document.getElementById(inputId), list = document.getElementById(listId);
-  if (!inp || !list) return;
-  var timer = null, active = -1, items = [];
-  function token() { var parts = inp.value.split(','); return parts[parts.length - 1].trim(); }
-  function close() { list.classList.remove('open'); active = -1; }
-  function pick(c) {
-    var parts = inp.value.split(',');
-    parts[parts.length - 1] = ' ' + c.email;
-    inp.value = parts.join(',').replace(/^\s+/, '') + ', ';
-    close(); inp.focus();
-  }
-  function render() {
-    list.innerHTML = '';
-    items.forEach(function(c, i) {
-      var o = document.createElement('div');
-      o.className = 'em-ac-opt' + (i === active ? ' active' : '');
-      o.innerHTML = '<span class="em"></span><span class="nm"></span><span class="src"></span>';
-      o.children[0].textContent = c.email; o.children[1].textContent = c.name || ''; o.children[2].textContent = c.source || '';
-      o.onmousedown = function(e) { e.preventDefault(); pick(c); };
-      list.appendChild(o);
-    });
-    list.classList.toggle('open', items.length > 0);
-  }
-  inp.addEventListener('input', function() {
-    clearTimeout(timer);
-    var q = token();
-    if (q.length < 2) { close(); return; }
-    timer = setTimeout(async function() {
-      try {
-        var d = await (await fetch('/email/crm-contacts/?q=' + encodeURIComponent(q), {credentials: 'same-origin'})).json();
-        items = d.contacts || []; active = items.length ? 0 : -1; render();
-      } catch(e) { close(); }
-    }, 150);
-  });
-  inp.addEventListener('keydown', function(e) {
-    if (!list.classList.contains('open')) return;
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      active = (active + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length; render();
-    } else if ((e.key === 'Enter' || e.key === 'Tab') && active >= 0) {
-      e.preventDefault(); pick(items[active]);
-    } else if (e.key === 'Escape') { close(); }
-  });
-  inp.addEventListener('blur', function() { setTimeout(close, 150); });
-}
-_pvAutocomplete('pv-reply-to', 'pv-reply-to-ac');
-_pvAutocomplete('pv-reply-cc', 'pv-reply-cc-ac');
+// ── Підказки адрес у «Кому» / «Копія» — static/admin/js/mv_addr.js (data-mv-addr), спільні для всієї Minerva ──
 
 window.pvShowCc = function(noFocus) {
   document.querySelectorAll('.em-reply-cc').forEach(function(el){ el.style.display = 'block'; });

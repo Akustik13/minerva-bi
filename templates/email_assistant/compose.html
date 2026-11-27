@@ -120,10 +120,6 @@
   display:flex; gap:10px; background:var(--bg-input);
 }
 /* Autocomplete */
-#suggestions { display:none; position:fixed; background:var(--bg-card); border:1px solid var(--border-strong); border-radius:8px; max-height:220px; overflow-y:auto; z-index:9000; min-width:280px; box-shadow:0 8px 24px rgba(0,0,0,.3); }
-.sugg-item { padding:9px 14px; cursor:pointer; font-size:13px; border-bottom:1px solid var(--border); }
-.sugg-item:hover { background:var(--bg-hover,#1e2d40); }
-.sugg-item strong { color:var(--text); } .sugg-item span { color:var(--text-muted); font-size:12px; }
 </style>
 {% endblock %}
 
@@ -153,13 +149,13 @@
       <div class="em-field">
         <span class="em-field-label">{% trans "Кому" %}</span>
         <input type="text" name="to" id="to-field"
-               value="{{ initial.to|default:'' }}"
-               placeholder="email@example.com, ..." autocomplete="off">
+               value="{{ initial.to|default:'' }}" translate="no"
+               placeholder="email@example.com, ..." autocomplete="off" data-mv-addr data-mv-addr-msg="{{ addr_msg }}">
       </div>
       <div class="em-field">
         <span class="em-field-label">CC</span>
         <input type="text" name="cc" id="cc-field" placeholder="{% trans "Копія..." %}" autocomplete="off"
-               value="{{ initial.cc|default:'' }}">
+               value="{{ initial.cc|default:'' }}" translate="no" data-mv-addr data-mv-addr-to="to" data-mv-addr-msg="{{ addr_msg }}">
       </div>
       <div class="em-field">
         <span class="em-field-label">{% trans "Тема" %}</span>
@@ -311,16 +307,11 @@
     <span id="grammar-msg" style="font-size:12px;color:var(--text-muted);align-self:center"></span>
   </div>
 </div>
-<div id="suggestions"></div>
 
-{{ crm_contacts|json_script:"em-compose-contacts" }}
 <script>
 const CSRF     = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
-const CONTACTS = JSON.parse(document.getElementById('em-compose-contacts').textContent || '[]');
 const toField  = document.getElementById('to-field');
 const ccField  = document.getElementById('cc-field');
-const suggBox  = document.getElementById('suggestions');
-var _suggTarget = null;
 
 document.addEventListener('DOMContentLoaded', function(){
   var ed = document.getElementById('body-editor');
@@ -345,53 +336,7 @@ function fmtVal(cmd, val) {
   document.getElementById('body-editor').focus();
 }
 
-/* ── CRM / Address-book autocomplete ── */
-function _setupAutocomplete(field) {
-  field.addEventListener('input', function() {
-    var q = field.value.split(',').pop().trim().toLowerCase();
-    if (q.length < 1) { suggBox.style.display = 'none'; return; }
-    var hits = CONTACTS.filter(function(c){
-      return c.email.toLowerCase().includes(q) || (c.name||'').toLowerCase().includes(q);
-    }).slice(0, 10);
-    if (!hits.length) { suggBox.style.display = 'none'; return; }
-    _suggTarget = field;
-    suggBox.innerHTML = '';
-    hits.forEach(function(c){   // елементами, не рядком HTML: ім'я з CRM (лапки, <…>) — лише текст
-      var item = document.createElement('div');
-      item.className = 'sugg-item';
-      var b = document.createElement('strong');
-      b.textContent = c.name || c.email;
-      item.appendChild(b);
-      if (c.name) {
-        var sp = document.createElement('span');
-        sp.textContent = c.email;
-        item.appendChild(document.createTextNode(' '));
-        item.appendChild(sp);
-      }
-      item.addEventListener('click', function(){ selectContact(c.email, c.name || ''); });
-      suggBox.appendChild(item);
-    });
-    var rect = field.getBoundingClientRect();
-    suggBox.style.top  = (rect.bottom + window.scrollY + 4) + 'px';
-    suggBox.style.left = rect.left + 'px';
-    suggBox.style.width = Math.max(280, rect.width) + 'px';
-    suggBox.style.display = 'block';
-  });
-}
-_setupAutocomplete(toField);
-_setupAutocomplete(ccField);
-
-function selectContact(email, name) {
-  if (!_suggTarget) return;
-  var parts = _suggTarget.value.split(',');
-  parts[parts.length - 1] = email;
-  _suggTarget.value = parts.join(', ') + ', ';
-  suggBox.style.display = 'none'; _suggTarget.focus();
-}
-document.addEventListener('click', function(e){
-  if (!suggBox.contains(e.target) && e.target !== toField && e.target !== ccField)
-    suggBox.style.display = 'none';
-});
+/* ── Підказки адрес у «Кому» / CC — static/admin/js/mv_addr.js (data-mv-addr), спільні для всієї Minerva ── */
 function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 /* ── Attachments ── */

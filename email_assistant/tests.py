@@ -1198,7 +1198,7 @@ class ReplyAttachmentsAndContactsTests(MailLinksTests):
         fwd = self._em(from_email='sergey@sevskiy.de', subject='WG: UPS', body_text=UPS_TEXT)
         r = self.client.get(f'/email/message/{fwd.pk}/preview/')
         self.assertContains(r, f'data-ref="order:{self.order.pk}:Invoice_102037400.pdf"')
-        self.assertContains(r, 'id="pv-reply-to-ac"')
+        self.assertContains(r, f'data-mv-addr data-mv-addr-msg="{fwd.pk}"')               # підказки адрес у «Кому»
 
     def test_contact_suggestions(self):
         from email_assistant.models import EmailContact

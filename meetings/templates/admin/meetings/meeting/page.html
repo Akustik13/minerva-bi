@@ -140,7 +140,7 @@
           {% empty %}
             <p class="mt-muted">У нараді немає учасників з адресою — впишіть адреси нижче (або додасте в листі).</p>
           {% endfor %}
-          <input name="extra" placeholder="Ще адреси — через кому" aria-label="Ще адреси" autocomplete="off" translate="no">
+          <input name="extra" placeholder="Ще адреси — через кому" aria-label="Ще адреси" autocomplete="off" translate="no" data-mv-addr>
         </fieldset>
         <fieldset class="mt-ag-to">
           <legend>Що в листі</legend>
@@ -459,7 +459,7 @@
     {% endif %}
   </section>
 
-  <template id="mt-person-tpl"><div class="mt-person"><input type="text" name="x_name" placeholder="Ім’я" maxlength="200"><input type="email" name="x_email" placeholder="Email (необов’язково)" maxlength="254"></div></template>
+  <template id="mt-person-tpl"><div class="mt-person"><input type="text" name="x_name" placeholder="Ім’я" maxlength="200"><input type="email" name="x_email" placeholder="Email (необов’язково)" maxlength="254" data-mv-addr="one" translate="no"></div></template>
 
   <dialog id="mt-del" class="mt-dialog" aria-labelledby="mt-del-h">
     <form method="post" action="{% url 'admin:meetings_meeting_remove' m.pk %}">{% csrf_token %}

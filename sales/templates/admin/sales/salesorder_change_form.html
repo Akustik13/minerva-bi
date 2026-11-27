@@ -1216,8 +1216,9 @@ document.addEventListener('DOMContentLoaded',function(){
   let _topics = [], _curTopicId = null, _loaded = false;
 
   // ✉️ Чат на пошту — усі теми замовлення з DigiKey наживо → один лист (bots/services/dk_message_watch.forward_order)
-  window.dkmForwardChat = function() {
-    const to = prompt('Кому переслати чат замовлення (усі теми)? Адреси через кому:', FORWARD_TO);
+  window.dkmForwardChat = async function() {
+    const ask = 'Кому переслати чат замовлення (усі теми)? Адреси через кому:';   // вікно з підказками адрес (mv_addr.js)
+    const to = window.MVAddr ? await MVAddr.ask({title: ask, value: FORWARD_TO, okText: '✉️ Переслати'}) : prompt(ask, FORWARD_TO);
     if (to === null) return;
     const btn = document.getElementById('dkm-fwd-btn'), st = document.getElementById('dkm-fwd-state');
     btn.disabled = true; st.textContent = '⏳ Читаю чат з DigiKey і надсилаю…';
@@ -1464,13 +1465,13 @@ document.addEventListener('DOMContentLoaded',function(){
       </div>
       <div style="margin-bottom:12px">
         <label style="font-size:12px;color:var(--text-muted,#607d8b);display:block;margin-bottom:4px">{% trans "Кому" %} *</label>
-        <input id="nco-to" type="email"
+        <input id="nco-to" type="email" data-mv-addr="one" translate="no"
                style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border-strong,#243347);
                       background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);font-size:13px;box-sizing:border-box">
       </div>
       <div style="margin-bottom:12px">
         <label style="font-size:12px;color:var(--text-muted,#607d8b);display:block;margin-bottom:4px">{% trans "Копія (CC)" %}</label>
-        <input id="nco-cc"
+        <input id="nco-cc" data-mv-addr data-mv-addr-to="#nco-to" translate="no"
                style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border-strong,#243347);
                       background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);font-size:13px;box-sizing:border-box">
       </div>

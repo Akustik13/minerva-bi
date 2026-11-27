@@ -176,7 +176,10 @@ class ScriptDataTests(Base):
         for url in ('/email/compose/', '/admin/email_assistant/scheduledemail/add/'):
             html = self.client.get(url).content.decode()
             self.assertNotIn('<script>alert("crm")', html, url)
-            self.assertIn('evil@client.example', html, url)          # але контакт є — у json_script
+            self.assertIn('data-mv-addr', html, url)                  # підказки адрес — з сервера, не в сторінці
+        r = self.client.get('/email/address-suggest/', {'q': 'evil'})   # JSON; mv_addr.js показує ім'я лише текстом
+        self.assertEqual(r['Content-Type'], 'application/json')
+        self.assertIn('evil@client.example', r.content.decode())
 
     def test_scheduled_body_is_sanitized_and_json_script(self):
         mail = ScheduledEmail.objects.create(account=self.account, subject='S', to_emails=['a@b.c'],

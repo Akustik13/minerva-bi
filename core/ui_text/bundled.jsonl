@@ -2829,6 +2829,7 @@
 {"uk": "el.textContent = '⚠️ ' + (d.error||'Помилка')", "en": "el.textContent = '⚠️ ' + (d.error||'Error')", "de": "el.textContent = '⚠️ ' + (d.error||'Fehler')"}
 {"uk": "else alert('Помилка: '+(d.results?d.results[0].msg:d.error))", "en": "else alert('Error: '+(d.results?d.results[0].msg:d.error))", "de": "else alert('Fehler: '+(d.results?d.results[0].msg:d.error))"}
 {"uk": "else{btn.disabled=false;btn.textContent=\"❌ Помилка\";if(d.error)btn.title=d.error;}", "en": "else{btn.disabled=false;btn.textContent=\"❌ Error\";if(d.error)btn.title=d.error;}", "de": "else{btn.disabled=false;btn.textContent=\"❌ Fehler\";if(d.error)btn.title=d.error;}"}
+{"uk": "email або ім'я — клікніть: команда, учасники листа, решта", "en": "e-mail or name — click: the team, the e-mail's participants, everyone else", "de": "E-Mail oder Name — klicken: das Team, die Beteiligten der E-Mail, alle anderen"}
 {"uk": "email або ім'я — підказки з адресної книги й CRM", "en": "email or name — suggestions from the address book and CRM", "de": "E-Mail oder Name — Vorschläge aus Adressbuch und CRM"}
 {"uk": "email для відповіді", "en": "e-mail for reply", "de": "E-Mail für die Antwort"}
 {"uk": "email доставки", "en": "shipping email", "de": "E-Mail (Lieferung)"}
@@ -10248,6 +10249,7 @@
 {"uk": "Кому надсилати листи", "en": "Send emails to", "de": "E-Mails senden an"}
 {"uk": "Кому надсилати? Впишіть адресу або виберіть Telegram.", "en": "Who should it be sent to? Enter an address or choose Telegram.", "de": "An wen soll gesendet werden? Geben Sie eine Adresse ein oder wählen Sie Telegram."}
 {"uk": "Кому надіслано", "en": "Sent to", "de": "Gesendet an"}
+{"uk": "Кому надіслати? Адреси через кому", "en": "Send to whom? Addresses separated by commas", "de": "An wen senden? Adressen durch Komma getrennt"}
 {"uk": "Кому переслати", "en": "Forward to", "de": "Weiterleiten an"}
 {"uk": "Кому переслати весь чат цієї теми? Адреси через кому", "en": "Forward the whole chat of this topic to whom? Addresses separated by commas", "de": "An wen den ganzen Chat dieses Themas weiterleiten? Adressen durch Komma getrennt"}
 {"uk": "Кому переслати чат замовлення (усі теми)? Адреси через кому", "en": "Forward the order chat (all topics) to whom? Addresses separated by commas", "de": "An wen den Auftragschat (alle Themen) weiterleiten? Adressen durch Komma getrennt"}

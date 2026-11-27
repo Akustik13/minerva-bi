@@ -20,7 +20,7 @@
   {% if preview %}<div class="sn-muted" style="margin-top:6px">{{ preview }}</div>{% endif %}
 
   <label for="sn-to">Кому (email)</label>
-  <textarea id="sn-to" name="to" placeholder="адреса@фірма.de, ще@адреса.com">{{ to }}</textarea>
+  <textarea id="sn-to" name="to" placeholder="адреса@фірма.de, ще@адреса.com" translate="no" data-mv-addr>{{ to }}</textarea>
   <div class="sn-row">
     {% if my_email %}<button type="button" class="button" data-sn-set="{{ my_email }}">👤 Лише мені ({{ my_email }})</button>{% endif %}
     {% if configured %}<button type="button" class="button" data-sn-set="{{ configured }}">↺ Як у налаштуваннях</button>{% endif %}

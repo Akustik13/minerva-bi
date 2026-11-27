@@ -28,13 +28,13 @@
       </div>
       <div style="margin-bottom:12px">
         <label style="font-size:12px;color:var(--text-muted,#607d8b);display:block;margin-bottom:4px">{% trans "Кому" %} *</label>
-        <input id="nc-to" type="email"
+        <input id="nc-to" type="email" data-mv-addr="one" translate="no"
                style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border-strong,#243347);
                       background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);font-size:13px;box-sizing:border-box">
       </div>
       <div style="margin-bottom:12px">
         <label style="font-size:12px;color:var(--text-muted,#607d8b);display:block;margin-bottom:4px">{% trans "Копія (CC)" %}</label>
-        <input id="nc-cc" type="email"
+        <input id="nc-cc" type="text" data-mv-addr data-mv-addr-to="#nc-to" translate="no"
                style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border-strong,#243347);
                       background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);font-size:13px;box-sizing:border-box">
       </div>

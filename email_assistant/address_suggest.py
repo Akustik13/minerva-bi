@@ -11,7 +11,9 @@
 найуживаніших з адресної книги. Клієнти CRM, контакти постачальників і учасники проєктів — лише з правом бачити їх.
 
 Використання: `suggest(user, q, message, to, exclude)`; HTTP — `views.address_suggest_view`
-(`/email/address-suggest/`), поле — `static/admin/js/mv_addr.js` (атрибут `data-mv-addr`).
+(`/email/address-suggest/`), поле — `static/admin/js/mv_addr.js` (атрибут `data-mv-addr`, скрипт підключено в
+base_site.html для всіх сторінок). Поля адрес у формах адмінки (налаштування сповіщень, «Копія» доручень і магазину,
+«Кому» звітів…) позначаються самі — `tag_field` з `BaseModelAdmin.formfield_for_dbfield` (tabele/admin.py).
 """
 import re
 from collections import Counter
@@ -37,6 +39,26 @@ DB_LIMIT = 40               # кандидатів з бази на одне д�
 NOREPLY_RE = re.compile(r'(^|[._+-])(no-?reply|do-?not-?reply|donotreply|mailer-daemon|postmaster|bounces?|'
                         r'notifications?|notify)([._+-]|@)', re.I)
 _WORD_SPLIT = re.compile(r'[^\w]+', re.U)
+
+# Поля моделей, у які вписують, КОМУ надсилати (не власна адреса людини чи фірми): назва поля закінчується так.
+ADMIN_FIELD_RE = re.compile(r'(^|_)(email_to|emails_to|to_emails|cc_emails|bcc_emails|emails|recipients|cc|bcc|'
+                            r'email_cc|forward_to|send_to|mail_to|mail_cc|mail_bcc|report_email|reply_to|to_raw|cc_raw)$')
+ADMIN_FIELD_SKIP = re.compile(r'in_reply_to|message_id', re.I)
+
+
+def tag_field(name: str, formfield):
+    """Поле форми адмінки, у яке вписують адресатів, — з підказками адрес (атрибут `data-mv-addr`).
+    Одна адреса (EmailField, «Reply-To», «Email для звіту») — `data-mv-addr="one"`. Повертає formfield."""
+    from django import forms
+    widget = getattr(formfield, 'widget', None)
+    if (widget is None or not ADMIN_FIELD_RE.search(name or '') or ADMIN_FIELD_SKIP.search(name or '')
+            or not isinstance(widget, (forms.TextInput, forms.Textarea, forms.EmailInput))
+            or 'data-mv-addr' in widget.attrs):
+        return formfield
+    single = isinstance(formfield, forms.EmailField) or name.endswith(('reply_to', 'report_email'))
+    widget.attrs['data-mv-addr'] = 'one' if single else ''
+    widget.attrs.setdefault('translate', 'no')
+    return formfield
 
 
 def addr(value) -> str:

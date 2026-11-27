@@ -714,9 +714,6 @@ def mail_langs():
 @admin.register(AgentTask)
 class AgentTaskAdmin(admin.ModelAdmin):
     form = AgentTaskForm
-
-    class Media:
-        js = ('admin/js/mv_addr.js',)
     list_display = ('created_at', 'title', 'status_col', 'products_col', 'proposals_col', 'cost_col')
     list_filter = ('status',)
     search_fields = ('title', 'instruction')

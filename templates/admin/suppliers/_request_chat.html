@@ -18,8 +18,8 @@
     {% if can_change and r.state != "planned" %}
     <form class="rwc-reply" id="rwc-reply" autocomplete="off">
       <div class="rwc-to">
-        <label>Кому <input name="to" value="{{ target.to }}" translate="no"></label>
-        <label>Копія <input name="cc" value="{{ target.cc }}" translate="no" list="rwc-colleagues"></label>
+        <label>Кому <input name="to" value="{{ target.to }}" translate="no" data-mv-addr data-mv-addr-msg="{{ target.reply_pk|default:'' }}"></label>
+        <label>Копія <input name="cc" value="{{ target.cc }}" translate="no" data-mv-addr data-mv-addr-to="to" data-mv-addr-msg="{{ target.reply_pk|default:'' }}"></label>
       </div>
       <label class="rwc-subjf">Тема <input name="subject" value="{{ target.subject }}" translate="no"></label>
       {% if draft and draft.body %}<div class="spf-warn">📝 Ваш збережений лист «Написати кожному» (ще не надіслано) — перевірте й надішліть.</div>{% endif %}
