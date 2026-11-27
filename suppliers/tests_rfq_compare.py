@@ -154,6 +154,99 @@ class CompareTests(Base):
         self.assertIn("Порада складена до теперішніх цін", page)
 
 
+class CountTests(Base):
+    """⚖ «Рахувати в сумі»: вимкнена складова віднімається від ціни за шт. (як назвав постачальник), разові й
+    доставка додаються чи ні; «Freight cost» серед разових — доставка, а не NRE."""
+
+    def setUp(self):
+        super().setUp()
+        self.home = home_currency()
+        self.req = SupplierRequest.objects.create(title="PCBA", template="pcba", quantities="100", owner=self.user,
+                                                  account=self.account, status=SupplierRequest.ANSWERED)
+        self.a = R.objects.create(
+            request=self.req, supplier=self.supplier, email="a@pcbway.com", state=R.QUOTED, currency=self.home,
+            includes=["pcb", "assembly", "components"],
+            tiers=[{"qty": 100, "unit_price": "10", "total": "1130", "total_ot": True,
+                    "parts": {"pcb": "2", "assembly": "3", "components": "5"}}],
+            one_time=[{"name": "Stencil", "amount": "50", "qty": None},
+                      {"name": "Freight cost", "amount": "80", "qty": None}])
+        self.b = R.objects.create(
+            request=self.req, supplier=Supplier.objects.create(name="JY", email="c@jy.com"), email="c@jy.com",
+            state=R.QUOTED, currency=self.home, includes=["pcb", "assembly", "components"],
+            tiers=[{"qty": 100, "unit_price": "9"}], shipping=Decimal("30"))
+
+    def cells(self, count=None):
+        t = rfq_compare.table(self.req, count=count)
+        return t, {x["recipient"].pk: x["cells"][0] for x in t["rows"]}
+
+    def test_default_counts_nre_and_not_shipping_freight_is_shipping(self):
+        t, c = self.cells()
+        a, b = c[self.a.pk], c[self.b.pk]
+        self.assertEqual((a["total"], b["total"]), (Decimal("1050.00"), Decimal("900.00")))   # Freight 80 — не NRE
+        self.assertFalse(a["sum_mismatch"])               # сума постачальника (з Freight) — з його «як є»
+        ship = {f["key"]: f for f in a["flags"]}["shipping"]
+        self.assertEqual((ship["state"], ship["on"]), ("y", False))
+        self.assertIn("Freight cost", ship["title"])
+        self.assertTrue(b["best"])
+        self.assertTrue(t["count_default"])
+        self.assertEqual(t["sum_sub"], "з разовими")
+
+    def test_with_shipping_and_without_components(self):
+        t, c = self.cells("pcb,assembly,components,one_time,shipping")
+        self.assertEqual((c[self.a.pk]["total"], c[self.b.pk]["total"]), (Decimal("1130.00"), Decimal("930.00")))
+        self.assertEqual(c[self.b.pk]["ship_in_text"], "30,00")
+        self.assertEqual(t["sum_sub"], "з разовими і доставкою")
+        t, c = self.cells(["pcb", "assembly", "one_time"])
+        a, b = c[self.a.pk], c[self.b.pk]
+        self.assertEqual((a["unit"], a["total"]), (Decimal("5"), Decimal("550.00")))        # 10 − 🔩 5
+        self.assertIn("−🔩 5", a["minus_text"])
+        self.assertEqual(b["cant"], ["компоненти"])        # скільки компоненти — JY не назвав
+        self.assertFalse(b["ok"])
+        self.assertTrue(a["best"])
+        row_b = next(x for x in t["rows"] if x["recipient"].pk == self.b.pk)
+        self.assertIn("не можна відняти: компоненти — постачальник не назвав, скільки це", row_b["gaps"])
+        self.assertEqual(t["unit_sub"], "без разових, без: компоненти")
+        _t, c = self.cells(["pcb", "assembly", "components"])
+        self.assertEqual(c[self.a.pk]["total"], Decimal("1000.00"))                       # без разових
+
+    def test_what_was_asked_only_from_what_counts(self):
+        R.objects.filter(pk=self.b.pk).update(includes=["pcb"])
+        _t, c = self.cells()
+        self.assertEqual(c[self.b.pk]["lacks"], ["монтаж"])
+        _t, c = self.cells(["pcb", "components", "one_time"])     # монтаж не рахуємо — і не вимагаємо
+        self.assertEqual(c[self.b.pk]["lacks"], [])
+
+    def test_clean_count(self):
+        self.assertEqual(rfq_compare.clean_count(None), rfq_compare.COUNT_DEFAULT)
+        self.assertEqual(rfq_compare.clean_count("shipping,pcb,evil"), ("pcb", "shipping"))
+        self.assertEqual(rfq_compare.clean_count("none"), ())
+        self.assertEqual(rfq_compare.clean_count("zzz"), rfq_compare.COUNT_DEFAULT)
+
+    def test_breakdown_does_not_add_shipping_twice(self):
+        t = rfq_compare.table(self.req, count="pcb,assembly,components,one_time,shipping")
+        b = next(x for x in rfq_compare.breakdown(t) if x["rid"] == self.b.pk)["cells"][0]
+        self.assertEqual(b["total"]["v"], b["total_ship"]["v"])
+        t = rfq_compare.table(self.req)
+        a = next(x for x in rfq_compare.breakdown(t) if x["rid"] == self.a.pk)["cells"][0]
+        self.assertEqual((a["total"]["v"], a["total_ship"]["v"]), (1050.0, 1130.0))
+        self.assertEqual([x["name"] for x in a["one_time"]], ["Stencil"])
+
+    def test_work_page_takes_the_choice_from_cookie_and_link(self):
+        url = reverse("admin:suppliers_supplierrequest_work", args=[self.req.pk])
+        page = self.client.get(url).content.decode()
+        self.assertIn("⚖ Рахувати в сумі:", page)
+        self.assertNotIn("↺ Як завжди", page)
+        self.client.cookies["rw_sum"] = "pcb,assembly,one_time"
+        page = self.client.get(url).content.decode()
+        self.assertIn('data-rw-count-set="pcb,assembly,one_time"', page)
+        self.assertIn("↺ Як завжди", page)
+        self.assertIn("rw-chip y off", page)                        # 🔩 у рядку — закреслено
+        self.assertIn("550,00", page)
+        page = self.client.get(url + "?sum=pcb,assembly,components,one_time,shipping").content.decode()
+        self.assertIn('data-rw-count-set="pcb,assembly,components,one_time,shipping"', page)
+        self.assertIn("1\xa0130,00", page)
+
+
 class QuoteReadingTests(Base):
     def setUp(self):
         super().setUp()

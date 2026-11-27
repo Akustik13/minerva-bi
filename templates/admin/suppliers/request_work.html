@@ -120,6 +120,16 @@
   .rw-chip.y { background: rgba(76, 175, 80, .16); color: var(--success-fg, #2e7d32); }
   .rw-chip.n { background: rgba(229, 57, 53, .10); color: var(--error-fg, #c62828); border-color: currentColor; }
   .rw-chip.u { background: rgba(245, 165, 36, .12); color: var(--warning-fg, #b06d00); border: 1px dashed currentColor; }
+  /* ⚖ «Рахувати в сумі»: перемикачі над таблицею, чипи в рядках — клікаються, вимкнене закреслено */
+  .rw-chip[data-rw-count] { cursor: pointer; }
+  .rw-chip[data-rw-count]:hover, .rw-chip[data-rw-count]:focus-visible { outline: 2px solid var(--primary, #417690); outline-offset: 1px; }
+  .rw-chip.off { opacity: .55; text-decoration: line-through; }
+  .rw-countbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12.5px; flex-basis: 100%; }
+  .rw-cnt { border: 1px solid var(--border-strong, #ccc); border-radius: 999px; padding: 2px 10px; cursor: pointer;
+    background: transparent; color: var(--body-quiet-color, #666); font: inherit; text-decoration: line-through; }
+  .rw-cnt[aria-pressed="true"] { background: var(--primary, #417690); border-color: var(--primary, #417690);
+    color: var(--button-fg, #fff); text-decoration: none; }
+  .rw-minus { font-size: 11.5px; color: var(--primary, #417690); }
   .rw-pill { display: inline-block; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap;
     margin-top: 3px; }
   .rw-pill.best { background: rgba(76, 175, 80, .18); color: var(--success-fg, #2e7d32); }
@@ -213,7 +223,7 @@
     </div>
     {% if cmp.counts.priced or cmp.counts.unparsed or cmp.counts.no_price %}
     <div class="rw-legend">
-      <div>Ціни — <b>у {{ cmp.home }} за 1 шт. разом з разовими витратами</b> (оснастка, трафарет, NRE), окремо для кожної кількості; доставка — окремою колонкою.
+      <div>Ціни — <b>у {{ cmp.home }} за 1 шт., сума — {{ cmp.sum_sub }}</b>{% if cmp.count_default %} (оснастка, трафарет, NRE){% endif %}, окремо для кожної кількості; що рахувати — «⚖ Рахувати в сумі» над таблицею.
         <span class="rw-medal">🥇</span> — найдешевше для цієї кількості серед повних пропозицій, інші — на скільки дорожче.
         <b class="spf-warn">⚠️ неповна</b> — немає ціни на частину кількостей, у ціні немає того, що просили{% if cmp.needed %} ({{ cmp.needed }}){% endif %}, або немає курсу: у 🥇 не бере участі.</div>
       <div class="spf-muted">{% for f in cmp.fx %}Курс: 1 {{ f.cur }} = {{ f.rate }} {{ cmp.home }} — {{ f.source }}{% if not forloop.last %} · {% endif %}{% endfor %}{% if cmp.missing_fx %}{% if cmp.fx %} · {% endif %}<span class="spf-warn">немає курсу {{ cmp.missing_fx|join:", " }} → {{ cmp.home }} (ні в «Курсах валют», ні в ЄЦБ)</span>{% endif %}</div>
@@ -233,7 +243,12 @@
     {% if qtys or bank_count %}<div class="rw-viewbar">
       {% if bank_count %}<button type="button" class="button rw-bank-btn" data-rw-files="" title="Усі файли, які надіслали постачальники, і файли нашого запиту — список по постачальниках і перегляд поруч (PDF, Excel, Word, картинки, архіви)">📂 Файли ({{ bank_count }})</button>{% endif %}
       {% if qtys %}<div class="rw-seg" role="group" aria-label="Кількість">{% for q in qtys %}<button type="button" data-rw-qi="{{ forloop.counter }}" aria-pressed="{% if forloop.first %}true{% else %}false{% endif %}" title="Пропозиції на {{ q }} шт: ціна за шт., сума, що в неї входить, строк, умови">{{ q }} шт.</button>{% endfor %}{% if qtys|length > 1 %}<button type="button" data-rw-qi="all" aria-pressed="false" title="Ціни на всі кількості поруч, колонками — наочно порівняти 5 … 20000 шт">⇔ Усі кількості</button>{% endif %}</div>
-      <div class="rw-leg1 rw-m1"><span class="spf-muted">Позначки — що вже є в сумі постачальника:</span> <span class="rw-chip y">✓ враховано</span> <span class="rw-chip n">✗ не враховано, буде зверху</span> <span class="rw-chip u">? постачальник не уточнив</span></div>{% endif %}
+      <div class="rw-leg1 rw-m1"><span class="spf-muted">Позначки — що вже є в сумі постачальника:</span> <span class="rw-chip y">✓ враховано</span> <span class="rw-chip n">✗ не враховано, буде зверху</span> <span class="rw-chip u">? постачальник не уточнив</span> <span class="rw-chip y off">закреслено — не рахуємо</span></div>{% endif %}
+      {% if cmp.counts.priced %}<div class="rw-countbar" role="group" aria-label="Рахувати в сумі" data-rw-count-set="{{ cmp.count|join:',' }}">
+        <span class="spf-muted" title="Що з названого постачальником рахувати в суму таблиці: вимкнене віднімається від ціни за шт. (як назвав постачальник) або не додається. Перераховуються ціна, сума, 🥇, «+N %» і статистика. Вибір запам’ятовується; так само — клік по позначках у рядках.">⚖ Рахувати в сумі:</span>
+        {% for o in cmp.count_options %}<button type="button" class="rw-cnt" data-rw-count="{{ o.key }}" aria-pressed="{% if o.on %}true{% else %}false{% endif %}" title="{% if o.on %}Рахується в сумі — клік: не рахувати{% else %}Не рахується — клік: рахувати в сумі{% endif %}">{{ o.icon }} {{ o.label }}</button>{% endfor %}
+        {% if not cmp.count_default %}<button type="button" class="button rw-cnt-reset" data-rw-count-reset title="Повернути: плата, монтаж, компоненти й разові — у сумі, доставка — окремо">↺ Як завжди</button>{% endif %}
+      </div>{% endif %}
       {% if cur_toggle %}<div class="rw-seg rw-curseg" role="group" aria-label="Валюта цін"><button type="button" data-rw-cur="sup" aria-pressed="true" title="Ціни — як пише постачальник, у його валюті">💱 {{ sup_cur|default:"Як пишуть" }}</button><button type="button" data-rw-cur="home" aria-pressed="false" title="Ще й у валюті Minerva за курсом — зручно, коли постачальники пишуть у різних валютах">+ {{ cmp.home }}</button></div>{% endif %}
       <button type="button" class="button rw-notes-btn" id="rw-cols-btn" title="Які колонки показувати (запам’ятовується в цьому браузері); свої колонки — «Сума з ENIG», «Покриття»…">⚙ Колонки</button>
       <span class="spf-job" id="rw-cols-job"></span>
@@ -243,8 +258,8 @@
     <table class="spf-table rw-cmp" id="rw-cmp" data-mode="{% if qtys %}one{% else %}all{% endif %}" data-qi="1">
       <thead><tr class="rw-head"><th class="rw-n" data-col="n">{% if can_change and rows %}<label title="Вибрати всіх — переслати колезі"><input type="checkbox" id="rw-all"></label> {% endif %}<span class="rw-sorter" data-rw-sort="pos" title="Порядок як був (за ціною)">№</span></th>
         <th data-col="sup" data-rw-sort="name">Постачальник</th>
-        {% if qtys %}<th class="rw-m1 rw-r rw-col-unit" data-col="unit" data-rw-sort="unit" title="Ціна за 1 шт. без разових і без доставки — плата, монтаж, компоненти, як назвав постачальник">Ціна / шт.<div class="rw-th-sub"><span class="rw-cur-h">{{ cmp.home }}, </span><span class="rw-cur-s">{% if sup_cur %}{{ sup_cur }}, {% endif %}</span>без разових</div></th>
-        <th class="rw-m1 rw-r rw-col-total" data-col="total" data-rw-sort="total" title="Сума за кількість: ціна × кількість + разові витрати (оснастка, NRE), без доставки">Сума<div class="rw-th-sub"><span class="rw-cur-h">{{ cmp.home }}, </span><span class="rw-cur-s">{% if sup_cur %}{{ sup_cur }}, {% endif %}</span>з разовими</div></th>
+        {% if qtys %}<th class="rw-m1 rw-r rw-col-unit" data-col="unit" data-rw-sort="unit" title="Ціна за 1 шт. без разових і без доставки — плата, монтаж, компоненти, як назвав постачальник (без того, що вимкнено в «⚖ Рахувати в сумі»)">Ціна / шт.<div class="rw-th-sub"><span class="rw-cur-h">{{ cmp.home }}, </span><span class="rw-cur-s">{% if sup_cur %}{{ sup_cur }}, {% endif %}</span>{{ cmp.unit_sub }}</div></th>
+        <th class="rw-m1 rw-r rw-col-total" data-col="total" data-rw-sort="total" title="Сума за кількість: ціна × кількість + те, що ввімкнено в «⚖ Рахувати в сумі» (разові витрати, доставка)">Сума<div class="rw-th-sub"><span class="rw-cur-h">{{ cmp.home }}, </span><span class="rw-cur-s">{% if sup_cur %}{{ sup_cur }}, {% endif %}</span>{{ cmp.sum_sub }}</div></th>
         <th class="rw-m1 rw-col-incl" data-col="incl">Враховано в сумі</th>
         {% for c in xcolumns %}<th class="rw-m1{% if c.kind == 'price' %} rw-r{% endif %} rw-col-{{ c.key }} rw-xh" data-col="x{{ c.key }}"{% if c.kind == 'price' %} data-rw-sort="x:{{ c.key }}"{% endif %} title="Своя колонка{% if c.hint %}: {{ c.hint }}{% endif %} — ⚙ Колонки: перейменувати, заповнити з листів, прибрати"><span translate="no">{{ c.name }}</span><div class="rw-th-sub">{% if c.kind == 'price' %}<span class="rw-cur-h">{{ cmp.home }}</span><span class="rw-cur-s">{{ sup_cur|default:"як у постачальника" }}</span>{% else %}текст{% endif %}</div></th>{% endfor %}
         <th class="rw-m1 rw-r rw-col-lead1" data-col="lead1" data-rw-sort="lead">Строк, дн.</th>
@@ -280,16 +295,20 @@
             {% if c.unit_home_text and r.currency and r.currency|upper != cmp.home %}<div class="spf-muted rw-src rw-cur-h" translate="no" title="Як у постачальника">{{ c.unit_text }} {{ r.currency }}</div>{% endif %}
             {% if not c.exact %}<div class="spf-muted rw-src">≈ ціна на {{ c.tier_qty }} шт</div>{% endif %}
             {% if c.parts_text %}<div class="spf-muted rw-src" translate="no" title="Складові ціни за шт., як назвав постачальник (🟩 плата · 🔧 монтаж · 🔩 компоненти)">{{ c.parts_text }}</div>{% endif %}
+            {% if c.minus_text %}<div class="rw-minus rw-src" title="⚖ Не рахуємо в сумі — відняли від ціни постачальника {{ c.unit_sup_text }} {{ r.currency }}"><span translate="no">{{ c.unit_sup_text }}</span> <span translate="no">{{ c.minus_text }}</span></div>{% endif %}
+            {% if c.cant %}<div class="rw-gapc" title="⚖ Вимкнено в «Рахувати в сумі», а скільки це в ціні, постачальник не назвав — ціна як є, у 🥇 не бере участі">⚠️ не можна відняти: {{ c.cant|join:", " }}</div>{% endif %}
             {% if c.suspect %}<div class="rw-gapc" title="Ціна дуже далеко від медіани інших — часто це не та сама річ (лише плати замість PCBA). Перевірте лист і що входить; 🧠 — перечитати відповідь">⚠️ {{ c.suspect }}</div>{% endif %}
           {% endif %}</div>{% endfor %}</td>
         <td class="rw-m1 rw-r rw-total rw-col-total">{% for c in row.cells %}<div class="rw-qv rw-qi{{ forloop.counter }}">{% if c.missing %}—{% else %}
             <div class="rw-big"><span class="rw-cur-h">{% if c.total_home_text %}{{ c.total_home_text }}{% else %}{{ c.total_text }} <span class="spf-muted">{{ r.currency }}</span>{% endif %}</span><span class="rw-cur-s">{{ c.total_text }} <span class="spf-muted">{{ r.currency|default:cmp.home }}</span></span></div>
             {% if c.best %}<span class="rw-pill best" title="Найдешевше для {{ c.qty }} шт серед повних пропозицій">🥇 найнижча</span>{% elif c.over_text %}<span class="rw-over" title="Дорожче за найдешевше для {{ c.qty }} шт">{{ c.over_text }}</span>{% endif %}
-            {% if c.sup_total_text %}<div class="rw-sup{% if c.sum_mismatch %} bad{% else %} spf-muted{% endif %}" title="{% if c.sum_mismatch %}Наше «разом» (ціна за шт. × кількість + разові) не сходиться з сумою, яку написав постачальник — перевірте лист і ✏️ виправте{% else %}Сума постачальника сходиться з нашим «разом»{% endif %}{% if c.fixed %} · ціну за шт. Minerva перерахувала з цієї суми{% endif %}">у постачальника {{ c.sup_total_text }} {{ r.currency }}{% if c.sum_mismatch %} ⚠️ не сходиться{% else %} ✓{% endif %}</div>{% endif %}
+            {% if c.ship_in_text %}<div class="spf-muted rw-src" title="⚖ Доставка рахується в сумі">у т. ч. доставка <span translate="no">{{ c.ship_in_text }} {{ r.currency }}</span></div>{% endif %}
+            {% if c.sup_total_text %}<div class="rw-sup{% if c.sum_mismatch %} bad{% else %} spf-muted{% endif %}" title="{% if c.sum_mismatch %}Сума постачальника не сходиться з його ціною за шт. × кількість + разові — перевірте лист і ✏️ виправте{% else %}Сума постачальника сходиться з його ціною за шт. × кількість + разові{% endif %}{% if c.fixed %} · ціну за шт. Minerva перерахувала з цієї суми{% endif %}">у постачальника {{ c.sup_total_text }} {{ r.currency }}{% if c.sum_mismatch %} ⚠️ не сходиться{% else %} ✓{% endif %}</div>{% endif %}
           {% endif %}</div>{% endfor %}</td>
         <td class="rw-m1 rw-incl1 rw-col-incl">{% for c in row.cells %}<div class="rw-qv rw-qi{{ forloop.counter }}">{% if not c.missing %}
-            <div class="rw-chips">{% for f in c.flags %}<span class="rw-chip {{ f.state }}" title="{{ f.label }}: {{ f.title }}">{% if f.state == "y" %}✓{% elif f.state == "n" %}✗{% else %}?{% endif %} {{ f.short }}</span>{% endfor %}</div>
+            <div class="rw-chips">{% for f in c.flags %}<span class="rw-chip {{ f.state }}{% if not f.on %} off{% endif %}" role="button" tabindex="0" data-rw-count="{{ f.key }}" title="{{ f.label }}: {{ f.title }} · {% if f.on %}рахується в сумі таблиці — клік: не рахувати (для всіх){% else %}не рахується в сумі таблиці — клік: рахувати (для всіх){% endif %}">{% if f.state == "y" %}✓{% elif f.state == "n" %}✗{% else %}?{% endif %} {{ f.short }}</span>{% endfor %}</div>
             {% if c.detail %}<div class="spf-muted rw-detail" translate="no">{{ c.detail }}</div>{% endif %}
+            {% if c.cant %}<div class="rw-gapc" title="Вимкнено в «⚖ Рахувати в сумі», а скільки це в ціні, постачальник не назвав">⚠️ не можна відняти: {{ c.cant|join:", " }} — у 🥇 не бере участі</div>{% endif %}
             {% if c.lacks %}<div class="rw-gapc" title="Для цієї кількості в ціні немає того, що просили — у 🥇 і статистиці не бере участі">⚠️ немає: {{ c.lacks|join:", " }} — у 🥇 не бере участі</div>{% elif c.unknown %}<div class="rw-gapc" title="Не сказано, що входить у цю ціну — у 🥇 не бере участі">⚠️ не сказано, що в ціні</div>{% endif %}
           {% endif %}</div>{% endfor %}</td>
         {% else %}
@@ -314,8 +333,10 @@
             {% else %}
               <div class="rw-eff"><span class="rw-cur-h">{% if c.eff_home_text %}{{ c.eff_home_text }} {{ row.home }}{% else %}{{ c.eff_text }} {{ r.currency }}{% endif %}</span><span class="rw-cur-s">{{ c.eff_text }} {{ r.currency|default:row.home }}</span>{% if c.best %} <span class="rw-medal" title="Найдешевше для {{ c.qty }} шт серед повних пропозицій">🥇</span>{% elif c.over_text %} <span class="rw-over" title="Дорожче за найдешевше для {{ c.qty }} шт">{{ c.over_text }}</span>{% endif %}</div>
               <div class="spf-muted rw-tot">разом <span class="rw-cur-h">{% if c.total_home_text %}{{ c.total_home_text }} {{ row.home }}{% else %}{{ c.total_text }} {{ r.currency }}{% endif %}</span><span class="rw-cur-s">{{ c.total_text }} {{ r.currency|default:row.home }}</span></div>
-              <div class="spf-muted rw-src" translate="no" title="Як у постачальника">{{ c.unit_text }} {{ r.currency|default:row.home }}/шт{% if c.one_time_text %} + {{ c.one_time_text }} разово{% endif %}{% if not c.exact %} · ≈ ціна на {{ c.tier_qty }} шт{% endif %}{% if c.lead is not None %} · {{ c.lead }} дн.{% endif %}</div>
+              <div class="spf-muted rw-src" translate="no" title="Як у постачальника">{% if c.unit_sup_text %}{{ c.unit_sup_text }}{% else %}{{ c.unit_text }}{% endif %} {{ r.currency|default:row.home }}/шт{% if c.one_time_text %} + {{ c.one_time_text }} разово{% endif %}{% if c.ship_in_text %} + {{ c.ship_in_text }} 🚚{% endif %}{% if not c.exact %} · ≈ ціна на {{ c.tier_qty }} шт{% endif %}{% if c.lead is not None %} · {{ c.lead }} дн.{% endif %}</div>
               {% if c.parts_text %}<div class="spf-muted rw-src" translate="no" title="Складові ціни за шт., як назвав постачальник (🟩 плата · 🔧 монтаж · 🔩 компоненти) — Minerva їх додала">{{ c.parts_text }}</div>{% endif %}
+              {% if c.minus_text %}<div class="rw-minus rw-src" translate="no" title="⚖ Не рахуємо в сумі — відняли від ціни постачальника">{{ c.minus_text }}</div>{% endif %}
+              {% if c.cant %}<div class="rw-gapc" title="Вимкнено в «⚖ Рахувати в сумі», а скільки це в ціні, постачальник не назвав">⚠️ не можна відняти: {{ c.cant|join:", " }}</div>{% endif %}
               {% if c.suspect %}<div class="rw-gapc" title="Ціна дуже далеко від медіани інших — часто це не та сама річ (лише плати замість PCBA). Перевірте лист і що входить; 🧠 — перечитати відповідь">⚠️ {{ c.suspect }}</div>{% endif %}
               {% if c.lacks %}<div class="rw-gapc" title="Для цієї кількості в ціні немає того, що просили — у 🥇 і статистиці не бере участі">⚠️ немає: {{ c.lacks|join:", " }}{% if c.scope_text %} · лише {{ c.scope_text }}{% endif %}</div>{% elif c.unknown %}<div class="rw-gapc" title="Не сказано, що входить у цю ціну — у 🥇 не бере участі">⚠️ не сказано, що в ціні</div>{% elif c.scope_text %}<div class="spf-muted rw-src">у ціні: {{ c.scope_text }}</div>{% endif %}
               {% if c.sup_total_text %}<div class="rw-sup{% if c.sum_mismatch %} bad{% else %} spf-muted{% endif %}" title="{% if c.sum_mismatch %}Наше «разом» (ціна за шт. × кількість + разові) не сходиться з сумою, яку написав постачальник — перевірте лист і ✏️ виправте{% else %}Сума постачальника сходиться з нашим «разом»{% endif %}{% if c.fixed %} · ціну за шт. Minerva перерахувала з цієї суми{% endif %}">у постачальника {{ c.sup_total_text }} {{ r.currency }} {% if c.sup_total_ot %}з разовими{% else %}без разових{% endif %}{% if c.sum_mismatch %} ⚠️ не сходиться{% else %} ✓{% endif %}</div>{% endif %}
@@ -417,6 +438,35 @@
         document.dispatchEvent(new CustomEvent('rw:layout'));
       }
       segBtns.forEach(function(b){ b.addEventListener('click', function(){ view(b.getAttribute('data-rw-qi'), true); }); });
+      // ⚖ «Рахувати в сумі» (rfq_compare.table(count)): вибір — cookie rw_sum (для всіх запитів), сторінка
+      // перераховується на сервері; прокрутка лишається там само
+      var countBar = document.querySelector('[data-rw-count-set]');
+      function setCount(keys) {
+        var v = keys === null ? '' : (keys.length ? keys.join(',') : 'none');
+        document.cookie = 'rw_sum=' + v + '; path=/admin/suppliers/; SameSite=Lax; max-age=' + (keys === null ? 0 : 31536000);
+        try { sessionStorage.setItem('rw-scroll-{{ req.pk }}', String(window.scrollY)); } catch (e) {}
+        var u = new URL(location.href); u.searchParams.delete('sum');
+        if (u.href === location.href) location.reload(); else location.replace(u.href);
+      }
+      function toggleCount(key) {
+        if (!countBar) return;
+        var cur = (countBar.getAttribute('data-rw-count-set') || '').split(',').filter(Boolean);
+        setCount(cur.indexOf(key) >= 0 ? cur.filter(function(k){ return k !== key; }) : cur.concat([key]));
+      }
+      document.addEventListener('click', function(e){
+        var reset = e.target.closest('[data-rw-count-reset]');
+        if (reset) { setCount(null); return; }
+        var c = e.target.closest('[data-rw-count]');
+        if (!c) return;
+        e.preventDefault(); e.stopPropagation();          // чип у рядку — не відкривати панель праворуч
+        toggleCount(c.getAttribute('data-rw-count'));
+      }, true);
+      document.addEventListener('keydown', function(e){
+        var c = e.target.closest && e.target.closest('.rw-chip[data-rw-count]');
+        if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleCount(c.getAttribute('data-rw-count')); }
+      });
+      try { var sy = sessionStorage.getItem('rw-scroll-{{ req.pk }}');
+        if (sy) { sessionStorage.removeItem('rw-scroll-{{ req.pk }}'); window.scrollTo(0, +sy || 0); } } catch (e) {}
       // ↕ сортування: клік по назві колонки (не по краю ширини); вдруге — навпаки; «№» — як було
       var sortKey = '', sortDir = 1;
       function attrOf(k) {

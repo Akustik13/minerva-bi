@@ -416,6 +416,7 @@
 {"uk": "(обрізано)", "en": "(truncated)", "de": "(gekürzt)"}
 {"uk": "(оновити).", "en": "(update).", "de": "(aktualisieren)."}
 {"uk": "(оновлено)", "en": "(updated)", "de": "(aktualisiert)"}
+{"uk": "(оснастка, трафарет, NRE)", "en": "(tooling, stencil, NRE)", "de": "(Werkzeug, Schablone, NRE)"}
 {"uk": "(оснастка, трафарет, NRE), окремо для кожної кількості; доставка — окремою колонкою.", "en": "(tooling, stencil, NRE), separately for each quantity; shipping — in its own column.", "de": "(Vorrichtung, Schablone, NRE), getrennt für jede Menge; Versand — in eigener Spalte."}
 {"uk": "(останні 50)", "en": "(last 50)", "de": "(letzte 50)"}
 {"uk": "(останній збій {0})", "en": "(last failure {0})", "de": "(letzte Störung {0})"}
@@ -5715,6 +5716,8 @@
 {"uk": "Вимкнений користувач — прибрати розшифровки через, днів", "en": "Deactivated user — remove transcripts after, days", "de": "Deaktivierter Benutzer — Transkripte entfernen nach, Tagen"}
 {"uk": "Вимкнення — пауза: нові листи не додаються; видалення, зміни доступу й вмісту вже переданих листів надходять далі. Повне очищення індексу — окрема кнопка.", "en": "Disabling is a pause: new e-mails are not added; deletions and changes of access or content of e-mails already sent continue to be passed on. Clearing the whole index is a separate button.", "de": "Das Deaktivieren ist eine Pause: Neue E-Mails werden nicht hinzugefügt; Löschungen sowie Änderungen von Zugriff und Inhalt bereits übertragener E-Mails werden weiterhin übermittelt. Das vollständige Leeren des Index ist eine eigene Schaltfläche."}
 {"uk": "Вимкнено", "en": "Disabled", "de": "Deaktiviert"}
+{"uk": "Вимкнено в «Рахувати в сумі», а скільки це в ціні, постачальник не назвав — ціна як є, у 🥇 не бере участі", "en": "Switched off in «Count in the sum», but the supplier did not say how much it is in the price — price as is, not in 🥇", "de": "In „In der Summe zählen“ ausgeschaltet, aber der Lieferant hat nicht genannt, wie viel es im Preis ist — Preis wie angegeben, nicht bei 🥇"}
+{"uk": "Вимкнено в «⚖ Рахувати в сумі», а скільки це в ціні, постачальник не назвав", "en": "Switched off in «⚖ Count in the sum», but the supplier did not say how much it is in the price", "de": "In „⚖ In der Summe zählen“ ausgeschaltet, aber der Lieferant hat nicht genannt, wie viel es im Preis ist"}
 {"uk": "Вимкнено для всіх («Модулі»)", "en": "Disabled for everyone (“Modules”)", "de": "Für alle deaktiviert („Module“)"}
 {"uk": "Вимкнено ключів: {0}. Увімкнути особистий ключ може лише його власник.", "en": "Keys disabled: {0}. Only its owner can re-enable a personal key.", "de": "Deaktivierte Schlüssel: {0}. Einen persönlichen Schlüssel kann nur sein Inhaber wieder aktivieren."}
 {"uk": "Вимкнено — документи джерела прибираються з RAG (у Minerva лишаються)", "en": "Disabled — the source documents are removed from RAG (they stay in Minerva)", "de": "Deaktiviert – die Dokumente der Quelle werden aus RAG entfernt (in Minerva bleiben sie)"}
@@ -7539,9 +7542,11 @@
 {"uk": "Доставка (орієнтовно)", "en": "Delivery (approx.)", "de": "Lieferung (ca.)"}
 {"uk": "Доставка ETA", "en": "Delivery ETA", "de": "Voraussichtliche Lieferung"}
 {"uk": "Доставка {0} {1} — окремо, у суму не входить", "en": "Shipping {0} {1} — separately, not included in the total", "de": "Versand {0} {1} — separat, nicht in der Summe enthalten"}
+{"uk": "Доставка {0} {1} — окремо, у суму постачальника не входить", "en": "Shipping {0} {1} — separately, not in the supplier's sum", "de": "Versand {0} {1} — separat, nicht in der Summe des Lieferanten"}
 {"uk": "Доставка безкоштовна, коли сума товарів (нетто) досягає порогу. Діє в регіонах, де це дозволено.", "en": "Shipping is free when the goods total (net) reaches the threshold. Applies in the regions where it is allowed.", "de": "Der Versand ist kostenlos, wenn die Summe der Waren (netto) die Schwelle erreicht. Gilt in den Regionen, in denen dies erlaubt ist."}
 {"uk": "Доставка в замовленні: {0} {1}, а інвойс у {2} — перерахуйте і впишіть суму вручну.", "en": "Shipping in the order: {0} {1}, but the invoice is in {2} — convert and enter the amount manually.", "de": "Versand im Auftrag: {0} {1}, die Rechnung lautet jedoch auf {2} — rechnen Sie um und tragen Sie den Betrag manuell ein."}
 {"uk": "Доставка в країну «{0}» недоступна.", "en": "Delivery to “{0}” is not available.", "de": "Lieferung nach „{0}“ ist nicht möglich."}
+{"uk": "Доставка в сумі постачальника: {0} {1}", "en": "Shipping in the supplier's sum: {0} {1}", "de": "Versand in der Summe des Lieferanten: {0} {1}"}
 {"uk": "Доставка вебхука", "en": "Webhook delivery", "de": "Webhook-Zustellung"}
 {"uk": "Доставка від виробника", "en": "Delivery from the manufacturer", "de": "Lieferung vom Hersteller"}
 {"uk": "Доставка від, роб. днів", "en": "Delivery from, business days", "de": "Lieferung ab, Werktage"}
@@ -7550,6 +7555,7 @@
 {"uk": "Доставка на", "en": "Deliver to", "de": "Lieferung an"}
 {"uk": "Доставка на іншу адресу", "en": "Delivery to another address", "de": "Lieferung an eine andere Adresse"}
 {"uk": "Доставка на іншу адресу (Lieferadresse)", "en": "Delivery to another address (Lieferadresse)", "de": "Lieferung an andere Adresse (Lieferadresse)"}
+{"uk": "Доставка рахується в сумі", "en": "Shipping is counted in the sum", "de": "Versand wird in der Summe gezählt"}
 {"uk": "Доставка та оплата", "en": "Shipping and payment", "de": "Versand und Zahlung"}
 {"uk": "Доставка — відправлення і трекінг (читання)", "en": "Delivery — shipments and tracking (read)", "de": "Lieferung — Sendungen und Tracking (Lesen)"}
 {"uk": "Доставка — статус або трекінг-номер", "en": "Delivery — status or tracking number", "de": "Lieferung — Status oder Sendungsnummer"}
@@ -12444,6 +12450,9 @@
 {"uk": "Не рахувати", "en": "Do not count", "de": "Nicht zählen"}
 {"uk": "Не рахувати в часі на пошту", "en": "Do not count in time on mail", "de": "Nicht in der Zeit für E-Mails zählen"}
 {"uk": "Не рахувати: {0} ({1}). Повернути — фільтр «проігноровані» → «↺ Знову рахувати».", "en": "Not counted: {0} ({1}). To restore — filter “ignored” → “↺ Count again”.", "de": "Nicht zählen: {0} ({1}). Zurückholen – Filter „ignoriert“ → „↺ Wieder zählen“."}
+{"uk": "Не рахуємо в сумі — відняли від ціни постачальника", "en": "Not counted in the sum — subtracted from the supplier's price", "de": "Nicht in der Summe gezählt — vom Preis des Lieferanten abgezogen"}
+{"uk": "Не рахуємо в сумі — відняли від ціни постачальника {0} {1}", "en": "Not counted in the sum — subtracted from the supplier's price {0} {1}", "de": "Nicht in der Summe gezählt — vom Preis des Lieferanten {0} {1} abgezogen"}
+{"uk": "Не рахується — клік: рахувати в сумі", "en": "Not counted — click: count in the sum", "de": "Wird nicht gezählt — Klick: in der Summe zählen"}
 {"uk": "Не рекомендовано для нових розробок (NRND)", "en": "Not recommended for new designs (NRND)", "de": "Nicht für Neuentwicklungen empfohlen (NRND)"}
 {"uk": "Не розумію рядок «{0}». Формат: 100: 12", "en": "I don’t understand the line “{0}”. Format: 100: 12", "de": "Die Zeile „{0}“ wird nicht verstanden. Format: 100: 12"}
 {"uk": "Не сказано, що входить у цю ціну — у 🥇 не бере участі", "en": "It is not stated what this price includes — not part of 🥇", "de": "Nicht angegeben, was dieser Preis enthält — nimmt an 🥇 nicht teil"}
@@ -14509,6 +14518,7 @@
 {"uk": "Повернути № {0} у роботу («{1}»)? Товар знову забронюється або спишеться. {2}", "en": "Put № {0} back into work (“{1}”)? The product will be reserved or deducted again. {2}", "de": "Nr. {0} wieder in Bearbeitung setzen („{1}“)? Der Artikel wird erneut reserviert oder abgebucht. {2}"}
 {"uk": "Повернути, як розпізнав RAG-ПК", "en": "Restore what the RAG PC recognized", "de": "Wiederherstellen, wie der RAG-PC erkannt hat"}
 {"uk": "Повернути: обговорити", "en": "Back to: to discuss", "de": "Zurück: besprechen"}
+{"uk": "Повернути: плата, монтаж, компоненти й разові — у сумі, доставка — окремо", "en": "Restore: board, assembly, components and one-time costs in the sum, shipping separately", "de": "Zurücksetzen: Platine, Bestückung, Bauteile und Einmalkosten in der Summe, Versand separat"}
 {"uk": "Повернутись до адмін-панелі", "en": "Back to the admin panel", "de": "Zurück zum Admin-Panel"}
 {"uk": "Повернутись до входу", "en": "Back to sign-in", "de": "Zurück zur Anmeldung"}
 {"uk": "Повернутись до відправлення", "en": "Back to shipment", "de": "Zurück zur Sendung"}
@@ -16402,6 +16412,7 @@
 {"uk": "Раз на тиждень кожному відповідальному — його відкриті проєкти: колір, прогноз, нові й закриті ризики, кроки тижня", "en": "Once a week, each responsible person gets their open projects: color, forecast, new and closed risks, steps of the week", "de": "Einmal pro Woche erhält jede verantwortliche Person ihre offenen Projekte: Farbe, Prognose, neue und geschlossene Risiken, Schritte der Woche"}
 {"uk": "Разових витрат постачальник не назвав", "en": "The supplier stated no one-time costs", "de": "Der Lieferant hat keine Einmalkosten genannt"}
 {"uk": "Разово", "en": "One-time", "de": "Einmalig"}
+{"uk": "Разові (NRE)", "en": "One-time (NRE)", "de": "Einmalig (NRE)"}
 {"uk": "Разові витрати", "en": "One-time costs", "de": "Einmalkosten"}
 {"uk": "Разові витрати: «{0}» — напишіть «назва сума», напр. «Stencil 30».", "en": "One-time costs: «{0}» — write «name amount», e.g. «Stencil 30».", "de": "Einmalkosten: «{0}» — schreiben Sie «Name Betrag», z. B. «Stencil 30»."}
 {"uk": "Разові: оснащення, NRE", "en": "One-time: tooling, NRE", "de": "Einmalig: Werkzeug, NRE"}
@@ -16442,6 +16453,7 @@
 {"uk": "Раніше замовляв: {0}:{1} від {2} — {3}", "en": "Ordered earlier: {0}:{1} from {2} — {3}", "de": "Früher bestellt: {0}:{1} vom {2} — {3}"}
 {"uk": "Раніше: замовлення {0}:{1} ({2})", "en": "Earlier: order {0}:{1} ({2})", "de": "Früher: Auftrag {0}:{1} ({2})"}
 {"uk": "Раніші листи гілки — новий текст кожного, без процитованої історії", "en": "Earlier e-mails of the thread — the new text of each, without the quoted history", "de": "Frühere E-Mails des Verlaufs — jeweils der neue Text, ohne zitierten Verlauf"}
+{"uk": "Рахувати в сумі", "en": "Count in the sum", "de": "In der Summe zählen"}
 {"uk": "Рахувати час на пошту", "en": "Count time on mail", "de": "Zeit für E-Mails zählen"}
 {"uk": "Рахунки", "en": "Invoices", "de": "Rechnungen"}
 {"uk": "Рахунки (Rechnung)", "en": "Invoices (Rechnung)", "de": "Rechnungen"}
@@ -16504,6 +16516,7 @@
 {"uk": "Рахую темп — потрібна хвилина з відкритою сторінкою…", "en": "Calculating the rate — it takes a minute with the page open…", "de": "Ich berechne das Tempo – das dauert eine Minute bei geöffneter Seite…"}
 {"uk": "Рахую, що прибереться…", "en": "Calculating what will be removed…", "de": "Es wird berechnet, was entfernt wird…"}
 {"uk": "Рахує Minerva з закупівель, запитів і аналізу вашої пошти", "en": "Calculated by Minerva from purchases, requests and your mail analysis", "de": "Von Minerva aus Einkäufen, Anfragen und Ihrer Postanalyse berechnet"}
+{"uk": "Рахується в сумі — клік: не рахувати", "en": "Counted in the sum — click: do not count", "de": "Wird in der Summe gezählt — Klick: nicht zählen"}
 {"uk": "Реактивація", "en": "Reactivation", "de": "Reaktivierung"}
 {"uk": "Реактивація (At Risk / Lost)", "en": "Reactivation (At Risk / Lost)", "de": "Reaktivierung (At Risk / Lost)"}
 {"uk": "Реальні права", "en": "Actual permissions", "de": "Tatsächliche Berechtigungen"}
@@ -18044,6 +18057,7 @@
 {"uk": "Сума за всю кількість — ціна за 1 шт. порахується сама", "en": "Total for the whole quantity — the price per 1 pc is calculated", "de": "Summe für die ganze Menge — der Stückpreis wird berechnet"}
 {"uk": "Сума за кількість", "en": "Total for the quantity", "de": "Summe für die Menge"}
 {"uk": "Сума за кількість: ціна × кількість + разові витрати (оснастка, NRE), без доставки", "en": "Total for the quantity: price × quantity + one-time costs (tooling, NRE), without shipping", "de": "Summe für die Menge: Preis × Menge + Einmalkosten (Werkzeug, NRE), ohne Versand"}
+{"uk": "Сума за кількість: ціна × кількість + те, що ввімкнено в «⚖ Рахувати в сумі» (разові витрати, доставка)", "en": "Sum for the quantity: price × quantity + what is switched on in «⚖ Count in the sum» (one-time costs, shipping)", "de": "Summe für die Menge: Preis × Menge + das, was in „⚖ In der Summe zählen“ eingeschaltet ist (Einmalkosten, Versand)"}
 {"uk": "Сума замовлення", "en": "Order total", "de": "Auftragssumme"}
 {"uk": "Сума замовлення замала для онлайн-оплати.", "en": "The order amount is too small for an online payment.", "de": "Der Auftragsbetrag ist für eine Online-Zahlung zu gering."}
 {"uk": "Сума нетто", "en": "Net total", "de": "Summe netto"}
@@ -18051,6 +18065,8 @@
 {"uk": "Сума позицій", "en": "Items total", "de": "Summe der Positionen"}
 {"uk": "Сума позицій (перша кількість)", "en": "Lines total (first quantity)", "de": "Positionssumme (erste Menge)"}
 {"uk": "Сума позиції (ступені — рядками)", "en": "Line total (price breaks — as rows)", "de": "Positionssumme (Staffeln — zeilenweise)"}
+{"uk": "Сума постачальника не сходиться з його ціною за шт. × кількість + разові — перевірте лист і ✏️ виправте", "en": "The supplier's sum does not match their unit price × quantity + one-time costs — check the e-mail and ✏️ correct", "de": "Die Summe des Lieferanten passt nicht zu seinem Stückpreis × Menge + Einmalkosten — E-Mail prüfen und ✏️ korrigieren"}
+{"uk": "Сума постачальника сходиться з його ціною за шт. × кількість + разові", "en": "The supplier's sum matches their unit price × quantity + one-time costs", "de": "Die Summe des Lieferanten passt zu seinem Stückpreis × Menge + Einmalkosten"}
 {"uk": "Сума постачальника сходиться з нашим «разом»", "en": "The supplier's sum matches our «total»", "de": "Die Summe des Lieferanten stimmt mit unserem «gesamt» überein"}
 {"uk": "Сума рахунку без ПДВ (Net Invoice Amount)", "en": "Invoice amount excl. VAT (Net Invoice Amount)", "de": "Rechnungsbetrag ohne MwSt. (Net Invoice Amount)"}
 {"uk": "Сума рядка", "en": "Line total", "de": "Positionssumme"}
@@ -19807,6 +19823,7 @@
 {"uk": "Ціна за 1 шт.", "en": "Price per 1 pc.", "de": "Preis pro 1 Stk."}
 {"uk": "Ціна за 1 шт. = закупівельна × (1 + націнка); знижки ступенів зберігаються", "en": "Price per 1 pc. = purchase price × (1 + markup); tier discounts are kept", "de": "Preis pro 1 Stk. = Einkaufspreis × (1 + Aufschlag); Staffelrabatte bleiben erhalten"}
 {"uk": "Ціна за 1 шт. без разових і без доставки — плата, монтаж, компоненти, як назвав постачальник", "en": "Price per piece without one-time costs and shipping — PCB, assembly, components as the supplier stated", "de": "Stückpreis ohne Einmalkosten und Versand — Leiterplatte, Bestückung, Bauteile, wie vom Lieferanten angegeben"}
+{"uk": "Ціна за 1 шт. без разових і без доставки — плата, монтаж, компоненти, як назвав постачальник (без того, що вимкнено в «⚖ Рахувати в сумі»)", "en": "Price per piece without one-time costs and shipping — board, assembly, components as the supplier named them (without what is switched off in «⚖ Count in the sum»)", "de": "Preis pro Stück ohne Einmalkosten und Versand — Platine, Bestückung, Bauteile, wie vom Lieferanten genannt (ohne das, was in „⚖ In der Summe zählen“ ausgeschaltet ist)"}
 {"uk": "Ціна за 1 шт. разом з разовими витратами, у {0}; лише повні пропозиції (як 🥇), немає повних — з неповних.", "en": "Price per 1 pc including one-time costs, in {0}; complete offers only (as for 🥇), none complete — from incomplete ones.", "de": "Preis pro 1 Stk. inkl. Einmalkosten, in {0}; nur vollständige Angebote (wie bei 🥇), keine vollständigen — aus unvollständigen."}
 {"uk": "Ціна за 1 шт. разом з разовими витратами, у {0}; лише ціни з усім, що просили, для цієї кількості (як 🥇) — ціни лише за плати не порівнюються з PCBA; немає повних — з неповних.", "en": "Price per 1 pc including one-time costs, in {0}; only prices with everything asked for, for this quantity (as for 🥇) — board-only prices are not compared with PCBA; none complete — from incomplete ones.", "de": "Preis pro 1 Stk. inkl. Einmalkosten, in {0}; nur Preise mit allem Angefragten für diese Menge (wie bei 🥇) — reine Platinenpreise werden nicht mit PCBA verglichen; keine vollständigen — aus unvollständigen."}
 {"uk": "Ціна за ОДНУ штуку", "en": "Price of ONE piece", "de": "Preis für EIN Stück"}
@@ -20440,6 +20457,7 @@
 {"uk": "Що доручаємо — партія, кількість, строк", "en": "What we assign — batch, quantity, date", "de": "Was wir vergeben — Charge, Menge, Termin"}
 {"uk": "Що доручили", "en": "What was assigned", "de": "Was vergeben wurde"}
 {"uk": "Що доручити", "en": "What to delegate", "de": "Was übertragen wird"}
+{"uk": "Що з названого постачальником рахувати в суму таблиці: вимкнене віднімається від ціни за шт. (як назвав постачальник) або не додається. Перераховуються ціна, сума, 🥇, «+N %» і статистика. Вибір запам’ятовується; так само — клік по позначках у рядках.", "en": "What of the supplier's figures to count in the table sum: what is switched off is subtracted from the unit price (as the supplier named it) or not added. Price, sum, 🥇, «+N %» and statistics are recalculated. The choice is remembered; clicking the marks in the rows does the same.", "de": "Was von den Angaben des Lieferanten in die Summe der Tabelle zählt: Ausgeschaltetes wird vom Stückpreis abgezogen (wie vom Lieferanten genannt) oder nicht addiert. Preis, Summe, 🥇, „+N %“ und Statistik werden neu berechnet. Die Auswahl wird gespeichert; ein Klick auf die Markierungen in den Zeilen bewirkt dasselbe."}
 {"uk": "Що замовити", "en": "What to order", "de": "Was zu bestellen ist"}
 {"uk": "Що замовити: {0} (ціль — max(3 міс продажів × 1,2; точка дозамовлення) мінус доступно й уже замовлене)", "en": "What to order: {0} (target — max(3 months of sales × 1.2; reorder point) minus available and already ordered)", "de": "Was bestellen: {0} (Ziel — max(3 Monate Verkäufe × 1,2; Meldebestand) minus verfügbar und bereits bestellt)"}
 {"uk": "Що замовляли", "en": "Ordered items", "de": "Bestellte Artikel"}
@@ -20628,6 +20646,7 @@
 {"uk": "Як друкувати фото", "en": "How to print photos", "de": "Wie Fotos gedruckt werden"}
 {"uk": "Як друкувати фото на етикетці замовлення", "en": "How to print photos on the order label", "de": "Wie Fotos auf dem Auftragsetikett gedruckt werden"}
 {"uk": "Як з'явився", "en": "How it appeared", "de": "Wie es entstanden ist"}
+{"uk": "Як завжди", "en": "As usual", "de": "Wie immer"}
 {"uk": "Як запустити імпорт (3 кроки)", "en": "How to run the import (3 steps)", "de": "So starten Sie den Import (3 Schritte)"}
 {"uk": "Як зараз на DigiKey (ті самі кількості, ціни з Minerva)", "en": "As currently on DigiKey (same quantities, prices from Minerva)", "de": "Wie aktuell auf DigiKey (gleiche Mengen, Preise aus Minerva)"}
 {"uk": "Як зараз — розгорнуті розділи лишаються розгорнутими", "en": "As now — expanded sections stay expanded", "de": "Wie bisher — aufgeklappte Bereiche bleiben aufgeklappt"}
@@ -21052,6 +21071,7 @@
 {"uk": "без продажів", "en": "no sales", "de": "ohne Verkäufe"}
 {"uk": "без проєкту", "en": "without project", "de": "ohne Projekt"}
 {"uk": "без разових", "en": "without one-time costs", "de": "ohne Einmalkosten"}
+{"uk": "без разових, з доставкою", "en": "without one-time costs, with shipping", "de": "ohne Einmalkosten, mit Versand"}
 {"uk": "без реакції", "en": "no reaction", "de": "ohne Reaktion"}
 {"uk": "без розширення", "en": "no extension", "de": "ohne Endung"}
 {"uk": "без сесії, за {0}", "en": "without a session, for {0}", "de": "ohne Sitzung, für {0}"}
@@ -21935,6 +21955,7 @@
 {"uk": "з пропозиції агента", "en": "from an agent proposal", "de": "aus einem Agentenvorschlag"}
 {"uk": "з підписом HMAC. Невдалі доставки повторює cron.", "en": "with an HMAC signature. Failed deliveries are retried by cron.", "de": "mit HMAC-Signatur. Fehlgeschlagene Zustellungen wiederholt cron."}
 {"uk": "з разовими", "en": "with one-time costs", "de": "mit Einmalkosten"}
+{"uk": "з разовими і доставкою", "en": "with one-time costs and shipping", "de": "mit Einmalkosten und Versand"}
 {"uk": "з рамкою кольору акценту", "en": "with an accent-color border", "de": "mit Rahmen in der Akzentfarbe"}
 {"uk": "з рекомендацій.", "en": "from recommendations.", "de": "aus Empfehlungen."}
 {"uk": "з розбіжностями: {0}", "en": "with differences: {0}", "de": "mit Abweichungen: {0}"}
@@ -22075,6 +22096,7 @@
 {"uk": "зазвичай хвилина-дві — пропозиції з’являться тут і на діаграмах", "en": "usually a minute or two — suggestions will appear here and on the charts", "de": "meist ein bis zwei Minuten — Vorschläge erscheinen hier und in den Diagrammen"}
 {"uk": "зайвих рухів посилок: {0}", "en": "extra parcel movements: {0}", "de": "überzählige Paketbuchungen: {0}"}
 {"uk": "зайвих рухів: {0}", "en": "extra movements: {0}", "de": "überzählige Bewegungen: {0}"}
+{"uk": "закреслено — не рахуємо", "en": "struck through — not counted", "de": "durchgestrichen — wird nicht gezählt"}
 {"uk": "закреслені ({0}) — сховано, людина їх не бачить", "en": "struck through ({0}) — hidden, the person cannot see them", "de": "durchgestrichen ({0}) — ausgeblendet, die Person sieht sie nicht"}
 {"uk": "закрив сесію покупця", "en": "closed a buyer session", "de": "hat eine Käufersitzung beendet"}
 {"uk": "закрита вручну без результату", "en": "closed manually without a result", "de": "manuell ohne Ergebnis geschlossen"}
@@ -23372,6 +23394,9 @@
 {"uk": "не зроблено", "en": "not done", "de": "nicht erledigt"}
 {"uk": "не йде. Натисніть «🔍 Прочитати з DigiKey і перевірити» — Minerva візьме код поля з ваших товарів на DigiKey", "en": "is not sent. Click “🔍 Read from DigiKey and check” — Minerva will take the field code from your products on DigiKey", "de": "wird nicht gesendet. Klicken Sie auf „🔍 Von DigiKey lesen und prüfen“ — Minerva übernimmt den Feldcode aus Ihren Artikeln bei DigiKey"}
 {"uk": "не може увійти (неактивний або не співробітник)", "en": "cannot sign in (inactive or not an employee)", "de": "kann sich nicht anmelden (inaktiv oder kein Mitarbeiter)"}
+{"uk": "не можна відняти", "en": "cannot subtract", "de": "kann nicht abgezogen werden"}
+{"uk": "не можна відняти: {0}", "en": "cannot subtract: {0}", "de": "kann nicht abgezogen werden: {0}"}
+{"uk": "не можна відняти: {0} — у 🥇 не бере участі", "en": "cannot subtract: {0} — not in 🥇", "de": "kann nicht abgezogen werden: {0} — nicht bei 🥇"}
 {"uk": "не нагадувати", "en": "do not remind", "de": "nicht erinnern"}
 {"uk": "не надсилалась", "en": "not sent", "de": "nicht gesendet"}
 {"uk": "не надсилається", "en": "not sent", "de": "wird nicht gesendet"}
@@ -23405,6 +23430,7 @@
 {"uk": "не підключено", "en": "not connected", "de": "nicht verbunden"}
 {"uk": "не підтверджено прочитання й немає відповіді", "en": "no read receipt and no reply", "de": "keine Lesebestätigung und keine Antwort"}
 {"uk": "не підтримується (405)", "en": "not supported (405)", "de": "nicht unterstützt (405)"}
+{"uk": "не рахується в сумі таблиці — клік: рахувати (для всіх)", "en": "not counted in the table sum — click: count (for all)", "de": "wird nicht in der Summe der Tabelle gezählt — Klick: zählen (für alle)"}
 {"uk": "не рекомендовано для нових розробок", "en": "not recommended for new developments", "de": "für Neuentwicklungen nicht empfohlen"}
 {"uk": "не сказано", "en": "not stated", "de": "nicht angegeben"}
 {"uk": "не сказано, що в ціні", "en": "price scope not stated", "de": "Preisumfang nicht angegeben"}
@@ -23804,6 +23830,7 @@
 {"uk": "окремий запит AI на кожного постачальника; результат — у картці кожного.", "en": "a separate AI request for each supplier; the result is in each one's card.", "de": "eine eigene KI-Anfrage pro Lieferant; das Ergebnis steht in der jeweiligen Karte."}
 {"uk": "окремо", "en": "separately", "de": "separat"}
 {"uk": "окремо для DigiKey. Фото DigiKey приймає полем товару, даташит — лише додатковим полем DigiKey, якщо воно є.", "en": "separately for DigiKey. DigiKey accepts the photo as a product field, the datasheet only as an additional DigiKey field, if one exists.", "de": "separat für DigiKey. DigiKey nimmt das Foto als Artikelfeld an, das Datenblatt nur als zusätzliches DigiKey-Feld, sofern vorhanden."}
+{"uk": "окремо для кожної кількості; що рахувати — «⚖ Рахувати в сумі» над таблицею.", "en": "separately for each quantity; what to count — «⚖ Count in the sum» above the table.", "de": "für jede Menge separat; was gezählt wird — „⚖ In der Summe zählen“ über der Tabelle."}
 {"uk": "окремо, у «Разом» не входить", "en": "separately, not in «Total»", "de": "separat, nicht in «Gesamt»"}
 {"uk": "окремі абзаци; все між ними (заголовок, таблиця, розмір/вага) повторюється для кожної коробки.", "en": "separate paragraphs; everything between them (heading, table, size/weight) is repeated for each box.", "de": "eigene Absätze; alles dazwischen (Überschrift, Tabelle, Größe/Gewicht) wird für jeden Karton wiederholt."}
 {"uk": "окремі абзаци; все між ними (заголовок, таблиця, розмір/вага) повторюється для кожної коробки. У таблиці рядки з", "en": "separate paragraphs; everything between them (heading, table, size/weight) is repeated for each box. In the table, rows with", "de": "eigene Absätze; alles dazwischen (Überschrift, Tabelle, Größe/Gewicht) wird für jeden Karton wiederholt. In der Tabelle stehen Zeilen mit"}
@@ -24318,6 +24345,7 @@
 {"uk": "постачальник", "en": "supplier", "de": "Lieferant"}
 {"uk": "постачальник {0}", "en": "supplier {0}", "de": "Lieferant {0}"}
 {"uk": "постачальник закупівлі — учасник проєкту", "en": "the supplier of the purchase order is a project participant", "de": "der Lieferant der Bestellung ist Projektbeteiligter"}
+{"uk": "постачальник не назвав, скільки це", "en": "the supplier did not say how much it is", "de": "der Lieferant hat nicht genannt, wie viel es ist"}
 {"uk": "постачальник неактивний", "en": "supplier is inactive", "de": "Lieferant ist inaktiv"}
 {"uk": "постачальник питає", "en": "the supplier asks", "de": "der Lieferant fragt"}
 {"uk": "постачальник — «🏭 У постачальники», 👤 клієнт — «👤 У CRM»; не вказано — AI підкаже", "en": "supplier — «🏭 To suppliers», 👤 customer — «👤 To CRM»; not set — AI will suggest", "de": "Lieferant — «🏭 Zu Lieferanten», 👤 Kunde — «👤 Ins CRM»; nicht angegeben — AI schlägt vor"}
@@ -24724,6 +24752,7 @@
 {"uk": "рахунок — вручну", "en": "invoice — manually", "de": "Rechnung — manuell"}
 {"uk": "рахунок-лист на бланку Commercial Invoice — логотип і лінії бланка, дані фірми з налаштувань компанії", "en": "invoice letter on the Commercial Invoice letterhead — logo and lines from the letterhead, company data from the company settings", "de": "Rechnungsbrief auf dem Briefbogen der Commercial Invoice — Logo und Linien vom Briefbogen, Firmendaten aus den Firmeneinstellungen"}
 {"uk": "рахує", "en": "rated with", "de": "berechnet mit"}
+{"uk": "рахується в сумі таблиці — клік: не рахувати (для всіх)", "en": "counted in the table sum — click: do not count (for all)", "de": "wird in der Summe der Tabelle gezählt — Klick: nicht zählen (für alle)"}
 {"uk": "регіон", "en": "region", "de": "Region"}
 {"uk": "редагування", "en": "editing", "de": "Bearbeiten"}
 {"uk": "редактор плану", "en": "plan editor", "de": "Plan-Editor"}
@@ -25403,6 +25432,7 @@
 {"uk": "у {0}", "en": "in {0}", "de": "in {0}"}
 {"uk": "у {0} з {1} днів листування записано час сюди", "en": "on {0} of {1} days of correspondence, time was recorded here", "de": "an {0} von {1} Tagen mit Korrespondenz wurde hier Zeit eingetragen"}
 {"uk": "у {0} за 1 шт. разом з разовими витратами", "en": "in {0} per 1 pc including one-time costs", "de": "in {0} pro 1 Stk. inklusive Einmalkosten"}
+{"uk": "у {0} за 1 шт., сума — {1}", "en": "in {0} per piece, sum — {1}", "de": "in {0} pro Stück, Summe — {1}"}
 {"uk": "у {0} замовленнях", "en": "in {0} orders", "de": "in {0} Aufträgen"}
 {"uk": "у {0} немає контактної особи з email {1}", "en": "{0} has no contact person with e-mail {1}", "de": "{0} hat keinen Ansprechpartner mit E-Mail {1}"}
 {"uk": "у {0} немає лістингу DigiKey", "en": "{0} has no DigiKey listing", "de": "{0} hat kein DigiKey-Listing"}
@@ -25509,6 +25539,7 @@
 {"uk": "у списку адмінки", "en": "in the admin list", "de": "in der Admin-Liste"}
 {"uk": "у стрічці", "en": "in the feed", "de": "im Feed"}
 {"uk": "у стрічці лише вихідні листи", "en": "the feed contains only outgoing e-mails", "de": "der Feed enthält nur ausgehende E-Mails"}
+{"uk": "у т. ч. доставка", "en": "incl. shipping", "de": "inkl. Versand"}
 {"uk": "у таблиці: {0}", "en": "in the table: {0}", "de": "in der Tabelle: {0}"}
 {"uk": "у таблиці: цін ще немає", "en": "in the table: no prices yet", "de": "in der Tabelle: noch keine Preise"}
 {"uk": "у тексті адреса з листа перевізника ({0}) — вона для нас, не для клієнта; приберіть її.", "en": "the text contains an address from the carrier's email ({0}) — it is for us, not for the customer; remove it.", "de": "im Text steht eine Adresse aus der E-Mail des Versanddienstes ({0}) — sie ist für uns, nicht für den Kunden; bitte entfernen."}
@@ -26023,6 +26054,7 @@
 {"uk": "ще ніхто", "en": "nobody yet", "de": "noch niemand"}
 {"uk": "ще ніхто не дозволив", "en": "nobody has allowed it yet", "de": "noch niemand hat es erlaubt"}
 {"uk": "ще один проєкт…", "en": "another project…", "de": "weiteres Projekt…"}
+{"uk": "ще окремо {0} {1}", "en": "plus separately {0} {1}", "de": "zusätzlich separat {0} {1}"}
 {"uk": "ще подій {0}", "en": "{0} more events", "de": "noch {0} Ereignisse"}
 {"uk": "ще попереду", "en": "still ahead", "de": "noch offen"}
 {"uk": "ще потрібно: {0}", "en": "still needed: {0}", "de": "noch erforderlich: {0}"}

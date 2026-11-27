@@ -637,7 +637,8 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                 rfq_replies.collect(r)
             except Exception:  # noqa: BLE001
                 pass
-        cmp = rfq_compare.table(req)
+        # ⚖ «Рахувати в сумі» — вибір людини (cookie rw_sum, ?sum= — посилання на такий самий вигляд)
+        cmp = rfq_compare.table(req, count=request.GET.get("sum") or request.COOKIES.get("rw_sum"))
         rows = cmp["rows"]
         from suppliers.services import rfq_bank, rfq_columns
         bank = rfq_bank.bank(req, [row["recipient"] for row in rows])      # 📂 усі файли — вікно «📂 Файли»

@@ -8,6 +8,13 @@
     `includes` проти `needed`), немає курсу валюти — у 🥇 не беруть участі; «не вказано» (notes) — строк,
     доставка, термін дії — видно, але порівнянню не заважає;
     курс — «Курси валют» Minerva, немає — довідковий ЄЦБ (core/fx_online.py), джерело видно над таблицею.
+  table(req, count) — ⚖ «Рахувати в сумі» (перемикачі над таблицею й чипи «Враховано в сумі» на сторінці запиту):
+    що з названого постачальником рахувати в суму — COUNT_KEYS (плата, монтаж, компоненти, разові NRE, доставка),
+    за замовчуванням COUNT_DEFAULT (усе, крім доставки). Складова, яку не рахуємо, віднімається від ціни за шт.
+    (`parts` — скільки це за шт., як назвав постачальник; не назвав — `cant`, у 🥇 не бере участі); разові й доставка
+    додаються чи ні; доставка — `shipping` рядка і разові витрати з назвою доставки (FREIGHT_RE: «Freight cost 810»),
+    тож вона ніде не сховається в NRE. «Що просили» (`needed`) — лише з того, що рахуємо. Перевірка суми
+    постачальника — завжди з його «як є».
   comparison(req) — лише рядки (старі ключі price_home / total_home / all_in / cheapest / fastest теж є).
   fingerprint(req), stale(req) — чи «🏆 Порада AI» складена до теперішніх цін.
   money(d) / price(d) — числа однаково по всій сторінці.
@@ -15,6 +22,7 @@
 import datetime
 import hashlib
 import json
+import re
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.utils.formats import number_format
@@ -214,24 +222,57 @@ PART_NAMES = {"pcb": "Плата", "assembly": "Монтаж", "components": "К
 SHORT = {"pcb": "Плата", "assembly": "Монтаж", "components": "Компон.", "one_time": "NRE", "shipping": "Дост."}   # чипи вузько
 
 
-def flags(tin, items, q, shipping, currency) -> tuple:
-    """([{key, label, state, title}], деталь) для кількості q: складові ціни, разові витрати, доставка."""
+# ⚖ «Рахувати в сумі»: ключ → (значок, назва перемикача)
+COUNT_KEYS = ("pcb", "assembly", "components", "one_time", "shipping")
+COUNT_DEFAULT = ("pcb", "assembly", "components", "one_time")
+COUNT_NAMES = {"pcb": ("🟩", "Плата"), "assembly": ("🔧", "Монтаж"), "components": ("🔩", "Компоненти"),
+               "one_time": ("🧰", "Разові (NRE)"), "shipping": ("🚚", "Доставка")}
+# разові витрати, які насправді доставка («Freight cost», «Shipping DHL», «Versandkosten», «доставка»)
+FREIGHT_RE = re.compile(r"freight|shipping|shipment|deliver|courier|carriage|postage|fracht|versand|porto\b|"
+                        r"lieferkost|transport|доставк|перевез|пересил|\b(?:dhl|ups|fedex|tnt|ems)\b", re.I)
+
+
+def clean_count(value) -> tuple:
+    """Що рахувати в сумі: «pcb,one_time» / список → ключі в порядку COUNT_KEYS; «none» — нічого; None, порожньо
+    чи лише невідоме — як завжди (COUNT_DEFAULT)."""
+    if value is None:
+        return COUNT_DEFAULT
+    keys = {str(v).strip() for v in (value.split(",") if isinstance(value, str) else value)}
+    out = tuple(k for k in COUNT_KEYS if k in keys)
+    return out if out or "none" in keys else COUNT_DEFAULT
+
+
+def is_freight(item) -> bool:
+    return bool(FREIGHT_RE.search(str(item.get("name") or "")))
+
+
+def flags(tin, items, q, shipping, currency, freight=(), count=COUNT_DEFAULT) -> tuple:
+    """([{key, label, state, title, on}], деталь) для кількості q: складові ціни, разові витрати, доставка.
+    state — що в сумі постачальника (y / n / u), on — чи рахуємо в сумі таблиці (⚖ «Рахувати в сумі»)."""
     out = []
     for k, _i, _n in SCOPE:
         state = ("y" if k in tin else "n") if tin else "u"
-        out.append({"key": k, "label": PART_NAMES[k], "short": SHORT[k], "state": state,
+        out.append({"key": k, "label": PART_NAMES[k], "short": SHORT[k], "state": state, "on": k in count,
                     "title": {"y": "У ціні", "n": "У ціні немає — буде зверху або окремо",
                               "u": "Постачальник не сказав, чи входить"}[state]})
     its = [it for it in items if not it.get("qty") or it["qty"] == q]
+    frs = [it for it in freight if not it.get("qty") or it["qty"] == q]
     cur = (currency or "").upper()
     ot = "; ".join(f"{it['name']} {money(dec(it['amount']))}" for it in its)
     out.append({"key": "one_time", "label": "Оснащення / NRE", "short": SHORT["one_time"], "state": "y" if its else "u",
+                "on": "one_time" in count,
                 "title": f"У сумі: {ot} {cur}".strip() if its else "Разових витрат постачальник не назвав"})
     ship = money(shipping) if shipping is not None else ""
-    out.append({"key": "shipping", "label": "Доставка", "short": SHORT["shipping"], "state": "n" if ship else "u",
-                "title": f"Доставка {ship} {cur} — окремо, у суму не входить" if ship else
-                "Вартість доставки не назвали"})
-    detail = [f"{it['name']} {money(dec(it['amount']))}" for it in its]
+    fr = "; ".join(f"{it['name']} {money(dec(it['amount']))}" for it in frs)
+    if frs:
+        title = f"Доставка в сумі постачальника: {fr} {cur}".strip() + (f"; ще окремо {ship} {cur}" if ship else "")
+    elif ship:
+        title = f"Доставка {ship} {cur} — окремо, у суму постачальника не входить"
+    else:
+        title = "Вартість доставки не назвали"
+    out.append({"key": "shipping", "label": "Доставка", "short": SHORT["shipping"], "on": "shipping" in count,
+                "state": "y" if frs else ("n" if ship else "u"), "title": title})
+    detail = [f"{it['name']} {money(dec(it['amount']))}" for it in its + frs]
     if ship:
         detail.append(f"доставка {ship} окремо")
     return out, ("; ".join(detail) + (f" {cur}" if detail and cur else ""))
@@ -256,14 +297,16 @@ def _key(d) -> str:
     return "" if d is None else f"{float(d):.6f}"
 
 
-def table(req) -> dict:
+def table(req, count=None) -> dict:
     from sales.revenue import home_currency
     from suppliers.models import SupplierRequestRecipient as R
     from suppliers.services.overview import purchases, requests_stats, score
     from suppliers.services.rfq import parse_quantities
     home = home_currency()
     fx = FX(home)
+    count = clean_count(count)
     need = needed(req)
+    need_eff = tuple(k for k in need if k in count)         # не рахуємо монтаж — і не вимагаємо його в ціні
     recips = list(req.recipients.select_related("supplier", "contact", "reply_message").order_by("pk"))
     qtys = parse_quantities(req.quantities)
     if not qtys:                     # кількостей у запиті немає — колонки з того, що назвали постачальники
@@ -273,6 +316,8 @@ def table(req) -> dict:
     for r in recips:
         tiers = _tiers(r, qtys)
         items = clean_one_time(r.one_time)
+        freight = [it for it in items if is_freight(it)]       # «Freight cost 810» — доставка, не NRE
+        nre = [it for it in items if not is_freight(it)]
         priced = bool(tiers) and r.state != R.DECLINED
         rate = fx.rate(r.currency) if priced else None
         includes = clean_includes(r.includes)
@@ -283,32 +328,52 @@ def table(req) -> dict:
                 cells.append({"qty": q, "missing": True})
                 missing.append(q)
                 continue
-            ot = _one_time_sum(items, q)
-            total = (t["unit"] * q + ot).quantize(CENT, ROUND_HALF_UP)
+            # 🧩 що входить саме в цю ціну (лише плати для 2500 шт, PCBA — для 5 шт) — у 🥇 і статистиці лише повні
+            tin = t["includes"] if t.get("includes") is not None else includes
+            # ⚖ складова, яку не рахуємо, — геть з ціни за шт. (скільки — як назвав постачальник)
+            parts, minus, cut, cant = t.get("parts") or {}, Decimal(0), [], []
+            for k, icon, name in SCOPE:
+                if k in count:
+                    continue
+                if k in parts:
+                    minus += parts[k]
+                    cut.append(f"−{icon} {price(parts[k])}")
+                elif not tin or k in tin:
+                    cant.append(name)
+            unit = max(t["unit"] - minus, Decimal(0))
+            ot = _one_time_sum(nre, q) if "one_time" in count else Decimal(0)
+            fr = _one_time_sum(freight, q)
+            ship_in = (fr + (r.shipping or Decimal(0))) if "shipping" in count else Decimal(0)
+            ship_out = Decimal(0) if "shipping" in count else fr + (r.shipping or Decimal(0))
+            total = (unit * q + ot + ship_in).quantize(CENT, ROUND_HALF_UP)
             eff = total / q
-            cell = {"qty": q, "tier_qty": t["qty"], "exact": t["qty"] == q, "unit": t["unit"], "one_time": ot,
+            cell = {"qty": q, "tier_qty": t["qty"], "exact": t["qty"] == q, "unit": unit, "one_time": ot,
                     "total": total, "eff": eff, "lead": t["lead"] if t["lead"] is not None else r.lead_days,
-                    "unit_text": price(t["unit"]), "total_text": money(total), "one_time_text": money(ot) if ot else "",
-                    "eff_text": price(eff)}
+                    "unit_text": price(unit), "total_text": money(total), "one_time_text": money(ot) if ot else "",
+                    "eff_text": price(eff), "unit_sup": t["unit"], "minus": minus,
+                    "minus_text": " ".join(cut), "unit_sup_text": price(t["unit"]) if minus else "",
+                    "ship_in": ship_in, "ship_in_text": money(ship_in) if ship_in else "", "ship_out": ship_out,
+                    "cant": cant}
             if rate is not None:
                 cell["eff_home"] = eff * rate
                 cell["total_home"] = (total * rate).quantize(CENT, ROUND_HALF_UP)
                 cell["eff_home_text"] = price(cell["eff_home"])
                 cell["total_home_text"] = money(cell["total_home"])
-                cell["unit_home"] = t["unit"] * rate
+                cell["unit_home"] = unit * rate
                 cell["unit_home_text"] = price(cell["unit_home"])
             if t.get("total") is not None and cell["exact"]:
-                # у постачальника «разом» — з разовими чи без; наше «разом» — завжди з ними
-                theirs = t["total"] if t["total_ot"] else t["total"] + ot
+                # у постачальника «разом» — з разовими чи без; перевіряємо з його «як є» (усе, що він назвав),
+                # хоч би що зараз рахувалось у таблиці
+                ot_all = _one_time_sum(items, q)
+                base = (t["unit"] * q + ot_all).quantize(CENT, ROUND_HALF_UP)
+                theirs = t["total"] if t["total_ot"] else t["total"] + ot_all
                 cell["sup_total_text"] = money(t["total"])
                 cell["sup_total_ot"] = t["total_ot"]
-                cell["sum_mismatch"] = abs(theirs - total) > max(CENT, total * Decimal("0.01"))
+                cell["sum_mismatch"] = abs(theirs - base) > max(CENT, base * Decimal("0.01"))
                 cell["fixed"] = t["fixed"]
-            # 🧩 що входить саме в цю ціну (лише плати для 2500 шт, PCBA — для 5 шт) — у 🥇 і статистиці лише повні
-            tin = t["includes"] if t.get("includes") is not None else includes
-            cell["lacks"] = [n for k, _i, n in SCOPE if k in need and tin and k not in tin]
-            cell["unknown"] = bool(need) and not tin
-            cell["ok"] = not cell["lacks"] and not cell["unknown"] and rate is not None
+            cell["lacks"] = [n for k, _i, n in SCOPE if k in need_eff and tin and k not in tin]
+            cell["unknown"] = bool(need_eff) and not tin
+            cell["ok"] = not cell["lacks"] and not cell["unknown"] and not cant and rate is not None
             cell["incl"] = list(tin or [])
             cell["incl_text"] = scope_text(tin) or "не сказано"
             if t.get("includes") is not None and tin != includes:
@@ -317,9 +382,10 @@ def table(req) -> dict:
                 cell["parts_text"] = " + ".join(f"{i} {price(t['parts'][k])}" for k, i, _n in SCOPE if k in t["parts"])
             if not cell["exact"]:
                 approx.append(f"ціна на {t['qty']} шт замість {q}")
-            cell["flags"], cell["detail"] = flags(tin or [], items, q, r.shipping, r.currency)
+            cell["flags"], cell["detail"] = flags(tin or [], nre, q, r.shipping, r.currency, freight, count)
             cell["parts"] = dict(t.get("parts") or {})          # ⚖ складові за 1 шт., як назвав постачальник
-            cell["items"] = [it for it in items if not it.get("qty") or it["qty"] == q]
+            cell["items"] = [it for it in nre if not it.get("qty") or it["qty"] == q]
+            cell["freight"] = [it for it in freight if not it.get("qty") or it["qty"] == q]
             cell["sort_unit"] = _key(cell.get("unit_home"))
             cell["sort_total"] = _key(cell.get("total_home"))
             cell["sort_lead"] = "" if cell["lead"] is None else str(cell["lead"])
@@ -339,9 +405,13 @@ def table(req) -> dict:
                         part.setdefault(n, []).append(c["qty"])
             for n, qs in part.items():
                 gaps.append(f"у ціні немає: {n} — для " + ", ".join(f"{q:,}".replace(",", " ") for q in qs) + " шт")
-            if not lacks and need and any(c["unknown"] for c in priced_cells):
+            if not lacks and need_eff and any(c["unknown"] for c in priced_cells):
                 # не знаємо, чи це те саме — у 🥇 не беремо (голі плати проти PCBA)
-                gaps.append("не сказано, що входить у ціну (просили: " + scope_text(need) + ")")
+                gaps.append("не сказано, що входить у ціну (просили: " + scope_text(need_eff) + ")")
+            cant = list(dict.fromkeys(n for c in priced_cells for n in c["cant"]))
+            if cant:
+                # ⚖ «не рахувати компоненти», а скільки вони — постачальник не назвав
+                gaps.append("не можна відняти: " + ", ".join(cant) + " — постачальник не назвав, скільки це")
             if rate is None:
                 gaps.append(f"немає курсу {(r.currency or home).upper()} → {home}")
             notes += approx
@@ -352,8 +422,10 @@ def table(req) -> dict:
             if r.valid_until is None:
                 notes.append("термін дії")
         comparable = priced and rate is not None and any(c.get("ok") for c in priced_cells)
-        ship_home = (r.shipping * rate).quantize(CENT) if r.shipping is not None and rate is not None else None
         first = next((c for c in cells if not c.get("missing")), None)
+        # «з доставкою» (старий ключ all_in) — доставку, яку зараз не рахуємо в сумі, додати
+        ship_home = (first["ship_out"] * rate).quantize(CENT) if first and first["ship_out"] and rate is not None \
+            else None
         try:
             sc = score(purchases(r.supplier), None, requests_stats(r.supplier)).get("value")
         except Exception:  # noqa: BLE001
@@ -441,7 +513,19 @@ def table(req) -> dict:
               "waiting": sum(1 for x in rows if x["recipient"].state in (R.SENT, R.SILENT))}
     return {"rows": rows, "qtys": qtys, "home": home, "fx": fx.notes(), "missing_fx": fx.missing(),
             "needed": scope_text(need), "counts": counts,
-            "unparsed": [x["recipient"].pk for x in rows if x["unparsed"]]}
+            "unparsed": [x["recipient"].pk for x in rows if x["unparsed"]], **count_info(count)}
+
+
+def count_info(count) -> dict:
+    """⚖ «Рахувати в сумі» для сторінки: перемикачі й підписи колонок «Ціна / шт.» і «Сума»."""
+    off = [COUNT_NAMES[k][1].lower() for k in ("pcb", "assembly", "components") if k not in count]
+    sub = {(True, False): "з разовими", (True, True): "з разовими і доставкою", (False, False): "без разових",
+           (False, True): "без разових, з доставкою"}[("one_time" in count, "shipping" in count)]
+    return {"count": list(count), "count_default": tuple(count) == COUNT_DEFAULT,
+            "count_options": [{"key": k, "icon": COUNT_NAMES[k][0], "label": COUNT_NAMES[k][1], "on": k in count}
+                              for k in COUNT_KEYS],
+            "sum_sub": sub + (", без: " + ", ".join(off) if off else ""),
+            "unit_sub": "без разових" + (", без: " + ", ".join(off) if off else "")}
 
 
 def _amount(d, rate, cur, home) -> dict:
@@ -478,14 +562,18 @@ def breakdown(cmp) -> list:
                 v = c.get("parts", {}).get(k)
                 parts[k] = {"state": state.get(k, "u"), **(_amount(v * q, rate, cur, home) or {})} if v is not None \
                     else {"state": state.get(k, "u")}
-            ship = _amount(r.shipping, rate, cur, home)
+            # доставка — окремо названа й разові з назвою доставки; уже в сумі (⚖ «Рахувати в сумі») — не вдруге
+            fr = sum((dec(it["amount"]) for it in c.get("freight", [])), Decimal(0))
+            ship_all = (r.shipping or Decimal(0)) + fr if (r.shipping is not None or fr) else None
+            ship = _amount(ship_all, rate, cur, home)
             total = _amount(c["total"], rate, cur, home)
             cells.append({
                 "qty": q, "missing": False, "exact": c["exact"], "tier_qty": c["tier_qty"], "parts": parts,
                 "one_time": [{"name": it["name"], **_amount(dec(it["amount"]), rate, cur, home)} for it in c.get("items", [])],
                 "one_time_sum": _amount(c["one_time"], rate, cur, home) if c["one_time"] else None,
                 "ship": ship, "total": total,
-                "total_ship": _amount(c["total"] + r.shipping, rate, cur, home) if r.shipping is not None else None,
+                "total_ship": (_amount(c["total"] + c.get("ship_out", Decimal(0)), rate, cur, home)
+                               if ship_all is not None else None),
                 # за 1 шт. з разовими — 4 знаки (як у таблиці), не до центів
                 "unit": {"v": float(c["eff_home"]) if c.get("eff_home") is not None else None,
                          "t": f"{c['eff_text']} {cur}",

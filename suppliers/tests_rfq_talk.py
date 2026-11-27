@@ -903,7 +903,8 @@ class CompareViewTests(TalkBase):
         page = self.client.get(reverse("admin:suppliers_supplierrequest_work", args=[self.req.pk])).content.decode()
         self.assertIn('data-rw-qi="all"', page)                                              # ⇔ Усі кількості
         self.assertIn('data-rw-qi="2"', page)
-        self.assertIn('class="rw-chip n" title="Плата: У ціні немає', page)
+        self.assertIn('class="rw-chip n" role="button" tabindex="0" data-rw-count="pcb" title="Плата: У ціні немає',
+                      page)                                                                    # ⚖ клік — рахувати чи ні
         self.assertIn('class="rw-note"', page)                                                # коментар під рядком
         self.assertIn('data-rw-sort="total"', page)
         self.assertIn("rw-qv rw-qi2", page)
