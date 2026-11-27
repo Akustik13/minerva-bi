@@ -3649,7 +3649,12 @@ class ProductAdmin(GroupedActionsMixin, ProjectsBlockMixin, AuditableMixin, admi
                 if delta == 0:
                     messages.info(request, _("Залишок вже такий — нічого не змінюю."))
                     return redirect(reverse("admin:inventory_product_change", args=[product.pk]))
-                location = Location.objects.filter(code="MAIN").first()
+                if product.kind == Product.Kind.COMPONENT:
+                    # компонент — там, де він лежить (так само списують продаж і BOM)
+                    from inventory.services.stock import home_location
+                    location = home_location(product.pk)
+                else:
+                    location = Location.objects.filter(code="MAIN").first()
                 if not location:
                     messages.error(request, _("Нема локації MAIN."))
                     return redirect(reverse("admin:inventory_product_change", args=[product.pk]))

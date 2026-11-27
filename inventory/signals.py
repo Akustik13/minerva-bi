@@ -55,23 +55,27 @@ def update_inventory_on_purchase_receipt(sender, instance, created, **kwargs):
     if delta == 0:
         return
 
-    loc_code = settings.default_location or "MAIN"
-    # При надходженні товару - тип залежить від Product.kind
     product = instance.product
-    location_type = Location.LocationType.COMPONENTS if product and product.kind == product.Kind.COMPONENT else Location.LocationType.FINISHED
-
-    location, created = Location.objects.get_or_create(
-        code=loc_code,
-        defaults={
-            "name": "Основний склад",
-            "location_type": location_type,
-            "is_active": True,
-        }
-    )
-    # Оновлюємо тип якщо локація вже існує але має неправильний
-    if not created and location.location_type != location_type:
-        location.location_type = location_type
-        location.save(update_fields=['location_type'])
+    if product.kind == product.Kind.COMPONENT:
+        # компонент — туди, де він уже лежить (stock.home_location; так само його списують продаж і BOM).
+        # Раніше прихід компонента перемикав тип основного складу на «Компоненти», а продаж — назад
+        from inventory.services.stock import home_location
+        location = home_location(product.pk, settings)
+    else:
+        loc_code = settings.default_location or "MAIN"
+        location_type = Location.LocationType.FINISHED
+        location, created = Location.objects.get_or_create(
+            code=loc_code,
+            defaults={
+                "name": "Основний склад",
+                "location_type": location_type,
+                "is_active": True,
+            }
+        )
+        # Оновлюємо тип якщо локація вже існує але має неправильний
+        if not created and location.location_type != location_type:
+            location.location_type = location_type
+            location.save(update_fields=['location_type'])
 
     # delta > 0 = receipt → INCOMING with positive qty
     # delta < 0 = return/correction → OUTGOING with negative qty (reduces stock)

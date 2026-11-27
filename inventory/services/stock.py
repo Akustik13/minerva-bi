@@ -851,10 +851,35 @@ def _kit_boms(product_ids):
     return out
 
 
-def _component_location():
-    """Звідки списуються компоненти: активний склад компонентів, інакше будь-яка активна локація."""
-    return (Location.objects.filter(location_type=Location.LocationType.COMPONENTS, is_active=True).first()
-            or Location.objects.filter(is_active=True).first())
+def home_location(product_id, settings=None):
+    """Де товар лежить: активна локація, де його найбільше (без резервів). Ніде немає — локація за
+    замовчуванням («Налаштування складу», як прихід і ⚖️), тип локації не змінюється.
+
+    Компонент рухається лише туди: продаж самого компонента, списання BOM, ⚖️ інвентаризація, прихід закупівлі.
+    Раніше кабель лежав на MAIN (прихід, ⚖️), а продаж антени списував його зі складу компонентів — загальний
+    залишок правильний, а по локаціях COMPONENTS у мінусі й MAIN у плюсі."""
+    row = (InventoryTransaction.objects
+           .filter(product_id=product_id, location__is_active=True)
+           .exclude(tx_type=TX.RESERVED)
+           .order_by().values("location_id").annotate(t=Sum("qty")).filter(t__gt=0)
+           .order_by("-t", "location_id").first())
+    if row:
+        loc = Location.objects.filter(pk=row["location_id"]).first()
+        if loc is not None:
+            return loc
+    s = settings or InventorySettings.get()
+    return (Location.objects.filter(code=(s.default_location or "MAIN").strip(), is_active=True).first()
+            or order_location(s))
+
+
+def _move_location(product, settings, cache):
+    """Локація нового руху позиції замовлення: компонент — там, де лежить (home_location), готовий товар —
+    локація замовлень (order_location), як і раніше. cache — {ключ: локація} на одне збереження."""
+    component = product is not None and product.kind == Product.Kind.COMPONENT
+    key = product.pk if component else None
+    if key not in cache:
+        cache[key] = home_location(product.pk, settings) if component else order_location(settings)
+    return cache[key]
 
 
 def _bom_plan(order, lines, target, sent=None):
@@ -935,7 +960,6 @@ def _apply_bom_plan(order, steps, comps, performer):
                 tx.save(update_fields=["qty"])
         else:
             creating.setdefault(st["line"].pk, []).append(st)
-    location = None
     for group in creating.values():
         line = group[0]["line"]
         kit_sku = line.product.sku
@@ -948,16 +972,11 @@ def _apply_bom_plan(order, steps, comps, performer):
             _note(order, text, once=head)
             changes.append(text)
             continue
-        location = location or _component_location()
-        if location is None:
-            text = f"⚠️ БОМ {kit_sku}: компоненти не списано — немає активної локації складу"
-            _note(order, text)
-            changes.append(text)
-            continue
         for st in group:
+            # компонент списується там, де лежить (home_location), а не завжди зі складу компонентів
             InventoryTransaction.objects.create(
                 external_key=f"{_bom_prefix(order.pk, line.pk)}{line.product_id}:{st['comp']}:{uuid.uuid4()}",
-                tx_type=TX.OUTGOING, qty=-st["need"], product_id=st["comp"], location=location,
+                tx_type=TX.OUTGOING, qty=-st["need"], product_id=st["comp"], location=home_location(st["comp"]),
                 ref_doc=_order_ref(order), tx_date=timezone.now(), performed_by=performer)
         summary = ", ".join(f"{st['sku']}: {_num(on_hand.get(st['comp'], Decimal('0')))}→"
                             f"{_num(on_hand.get(st['comp'], Decimal('0')) - st['need'])}" for st in group)
@@ -1040,7 +1059,7 @@ def _uses_parcels(sent_txs, target, sent_now):
 def _apply_parcel_split(order, line, sku, plan, sent_txs, main_txs, comps, performer, settings):
     """Привести рухи позиції до _parcel_split. Повертає список змін."""
     changes = []
-    location = None
+    locs = {}
     sent, rest, rest_type = plan["sent"], plan["rest"], plan["rest_type"]
     if sent > 0:
         tx = sent_txs[0] if sent_txs else None
@@ -1048,7 +1067,7 @@ def _apply_parcel_split(order, line, sku, plan, sent_txs, main_txs, comps, perfo
             _drop(extra, comps)
             changes.append(f"{sku}: зайвий рух посилок прибрано")
         if tx is None:
-            location = order_location(settings)
+            location = _move_location(line.product, settings, locs)
             InventoryTransaction.objects.create(
                 external_key=f"{order_prefix(order, line.pk)}{_SENT_KEY}{uuid.uuid4()}",
                 tx_type=TX.OUTGOING, qty=-sent, product_id=line.product_id, location=location,
@@ -1094,7 +1113,7 @@ def _apply_parcel_split(order, line, sku, plan, sent_txs, main_txs, comps, perfo
         _drop(extra, comps)
         changes.append(f"{sku}: зайвий рух прибрано")
     if tx is None:
-        location = location or order_location(settings)
+        location = _move_location(line.product, settings, locs)
         InventoryTransaction.objects.create(
             external_key=f"{order_prefix(order, line.pk)}{uuid.uuid4()}",
             tx_type=rest_type, qty=-rest, product_id=line.product_id, location=location,
@@ -1176,7 +1195,7 @@ def sync_order(order, *, settings=None, performed_by=None, shipping_now=False):
         comps = _cancel_comps([tx.pk for txs in by_line.values() for tx in txs])
         sent_map = _parcels_sent(order, s) if target != TX.OUTGOING else {}
         bom_sent = {}
-        location = None
+        locs = {}
         for line in lines:
             txs = [tx for tx in by_line.get(line.pk, [])
                    if tx.tx_type in (TX.OUTGOING, TX.RESERVED) and tx.pk not in comps]
@@ -1198,7 +1217,7 @@ def sync_order(order, *, settings=None, performed_by=None, shipping_now=False):
             if not txs:
                 if target is None or (not shipping_now and shipped_before_tracking(order, line.product_id)):
                     continue
-                location = location or order_location(s)
+                location = _move_location(line.product, s, locs)   # компонент — там, де лежить
                 InventoryTransaction.objects.create(
                     external_key=f"{order_prefix(order, line.pk)}{uuid.uuid4()}",
                     tx_type=target, qty=-want, product_id=line.product_id, location=location,
