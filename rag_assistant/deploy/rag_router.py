@@ -4,6 +4,8 @@
 
 DSM-проксі 192.168.2.142 → portproxy 192.168.2.68:8787 → цей розподільник 127.0.0.1:8786:
   /v2/…  → приватний RAG 127.0.0.1:8789 — лише з публічної адреси Minerva (DNS allow_hosts), інакше 403;
+  /hub, /llm, /mcp, /oauth, /.well-known → «RAG Центр» 127.0.0.1:8792 (API, MCP, OAuth, документи, моделі; потокові
+         відповіді моделей — без буферизації);
   решта  → публічний RAG 127.0.0.1:8787 без змін (код публічного RAG не чіпаємо).
 
 Адресу клієнта DSM передає в X-Real-IP / X-Forwarded-For (останній елемент — той, кого бачив DSM).
@@ -33,6 +35,9 @@ DEFAULTS = {
     "trusted_headers": ["x-real-ip", "x-forwarded-for"],
     "resolve_seconds": 300,
     "timeout_seconds": 120,
+    "hub_port": 8792,
+    "hub_prefixes": ["/hub", "/llm", "/mcp", "/oauth", "/.well-known"],
+    "hub_timeout_seconds": 600,
 }
 HOP = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailers",
        "transfer-encoding", "upgrade"}
@@ -144,6 +149,9 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length) if length else None
         headers = {k: v for k, v in self.headers.items() if k.lower() not in HOP}
+        hub = not private and any(path == p or path.startswith(p + "/") for p in cfg.get("hub_prefixes") or [])
+        if hub:
+            return self._hub(body, headers)
         port = cfg["private_port"] if private else cfg["public_port"]
         conn = http.client.HTTPConnection("127.0.0.1", port, timeout=cfg["timeout_seconds"])
         try:
@@ -163,6 +171,39 @@ class Handler(BaseHTTPRequestHandler):
                 f"real-ip={self.headers.get('X-Real-IP', '-')}")
         self._send(status, data, reason, [(k, v) for k, v in resp_headers if k.lower() not in SKIP_RESPONSE])
 
+    def _hub(self, body, headers):
+        """«RAG Центр»: відповідь з Content-Length — як є; без нього (потік моделі, SSE) — частинами одразу."""
+        cfg = self.config
+        conn = http.client.HTTPConnection("127.0.0.1", int(cfg.get("hub_port") or 8792),
+                                          timeout=cfg.get("hub_timeout_seconds") or 600)
+        try:
+            conn.request(self.command, self.path, body=body, headers=headers)
+            resp = conn.getresponse()
+            out_headers = [(k, v) for k, v in resp.getheaders() if k.lower() not in SKIP_RESPONSE]
+            if resp.getheader("Content-Length") is not None:
+                data = resp.read()
+                return self._send(resp.status, data, resp.reason, out_headers)
+            self.send_response(resp.status, resp.reason)
+            for key, value in out_headers:
+                self.send_header(key, value)
+            self.send_header("Transfer-Encoding", "chunked")
+            self.end_headers()
+            while True:
+                chunk = resp.read1(65536) if hasattr(resp, "read1") else resp.read(65536)
+                if not chunk:
+                    break
+                self.wfile.write(f"{len(chunk):x}\r\n".encode() + chunk + b"\r\n")
+                self.wfile.flush()
+            self.wfile.write(b"0\r\n\r\n")
+        except (OSError, http.client.HTTPException) as exc:
+            log(f"RAG Центр недоступний: {type(exc).__name__} {self.path.split('?', 1)[0]}")
+            try:
+                return self._send(503, {"error": "RAG Центр тимчасово недоступний"})
+            except OSError:
+                return None
+        finally:
+            conn.close()
+
     do_GET = do_POST = do_PUT = do_PATCH = do_DELETE = do_OPTIONS = do_HEAD = _proxy
 
 
@@ -176,7 +217,7 @@ def main():
             server = ThreadingHTTPServer(("127.0.0.1", int(config["listen_port"])), Handler)
             server.daemon_threads = True
             log(f"розподільник слухає 127.0.0.1:{config['listen_port']} (публічний → {config['public_port']}, "
-                f"{config['private_prefix']} → {config['private_port']})")
+                f"{config['private_prefix']} → {config['private_port']}, RAG Центр → {config.get('hub_port')})")
             server.serve_forever()
         except OSError as exc:
             log(f"не вдалося слухати порт {config['listen_port']}: {exc} — повтор через 15 с")

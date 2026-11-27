@@ -39,6 +39,42 @@ def backend(name):
     return srv
 
 
+def hub_backend():
+    """Підставний «RAG Центр»: JSON з Content-Length і потік частинами (як відповідь моделі stream:true)."""
+    class H(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def log_message(self, *a):
+            pass
+
+        def _reply(self):
+            n = int(self.headers.get("Content-Length") or 0)
+            if n:
+                self.rfile.read(n)
+            if self.path.startswith("/llm/v1/chat/completions"):
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.send_header("Transfer-Encoding", "chunked")
+                self.end_headers()
+                for part in (b"data: one\n\n", b"data: two\n\n", b"data: [DONE]\n\n"):
+                    self.wfile.write(f"{len(part):x}\r\n".encode() + part + b"\r\n")
+                    self.wfile.flush()
+                    time.sleep(0.05)
+                self.wfile.write(b"0\r\n\r\n")
+                return
+            data = json.dumps({"backend": "hub", "path": self.path, "real_ip": self.headers.get("X-Real-IP"),
+                               "auth": bool(self.headers.get("Authorization"))}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        do_GET = do_POST = do_DELETE = _reply
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
+
+
 def call(port, method, path, headers=None, body=None):
     c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
     c.request(method, path, body=body, headers=headers or {})
@@ -49,13 +85,13 @@ def call(port, method, path, headers=None, body=None):
 
 
 def main():
-    public, private = backend("public"), backend("private")
+    public, private, hub = backend("public"), backend("private"), hub_backend()
     tmp = Path(tempfile.mkdtemp())
     shutil.copy(HERE / "rag_router.py", tmp / "router.py")
     port = 18786
     (tmp / "router.json").write_text(json.dumps({
         "listen_port": port, "public_port": public.server_port, "private_port": private.server_port,
-        "allow_hosts": [], "allow_ips": ["203.0.113.5"]}), encoding="utf-8")
+        "allow_hosts": [], "allow_ips": ["203.0.113.5"], "hub_port": hub.server_port}), encoding="utf-8")
     proc = subprocess.Popen([sys.executable, str(tmp / "router.py")])
     ok = True
     try:
@@ -96,6 +132,22 @@ def main():
         check("only one trusted header -> 403", s == 403)
         s, _, _, _, _ = call(port, "GET", "/v2/capabilities", {"X-Real-IP": "198.51.100.9", "X-Forwarded-For": "203.0.113.5"})
         check("X-Real-IP not allowed -> 403", s == 403)
+        s, _, _, _, d = call(port, "GET", "/hub/v1/me", {"Authorization": "Bearer rh_x", "X-Real-IP": "198.51.100.7"})
+        j = json.loads(d)
+        check("/hub -> RAG Hub with client IP and key", s == 200 and j["backend"] == "hub" and j["auth"]
+              and j["real_ip"] == "198.51.100.7")
+        for path in ("/mcp", "/oauth/token", "/.well-known/oauth-authorization-server", "/llm/v1/models", "/hub"):
+            s, _, _, _, d = call(port, "GET", path)
+            check(f"{path} -> RAG Hub", s == 200 and json.loads(d)["backend"] == "hub")
+        s, _, _, _, d = call(port, "GET", "/hubx")
+        check("/hubx stays public", json.loads(d)["backend"] == "public")
+        s, h, _, _, d = call(port, "POST", "/llm/v1/chat/completions", {"Content-Type": "application/json"}, b"{}")
+        check("model stream passes through in parts", s == 200 and d == b"data: one\n\ndata: two\n\ndata: [DONE]\n\n"
+              and "event-stream" in h.get("Content-Type", ""))
+        hub.shutdown()
+        hub.server_close()
+        s, _, _, _, d = call(port, "GET", "/hub/v1/me")
+        check("hub down -> 503", s == 503 and "RAG" in json.loads(d)["error"])
         private.shutdown()
         private.server_close()
         s, _, _, _, d = call(port, "GET", "/v2/capabilities", good)
