@@ -13,7 +13,7 @@
   <b id="rw-sel-n"></b>
   <button type="button" class="button default" id="rw-cmp-btn" title="Що скільки коштує в кожного з вибраних: плата, монтаж, компоненти, разові, доставка, разом — поруч, для кожної кількості">⚖ Порівняти</button>
   <button type="button" class="button default" id="rw-each-btn" title="Кожному вибраному — свій лист, відповіддю в його гілці листування, з вашої скриньки; інші постачальники його не бачать">✉️ Написати кожному</button>
-  <button type="button" class="button default" id="rw-fwd-btn" title="Листи вибраних постачальників колезі — як вони є, з вкладеннями (або зведення: таблиця, листування й файли одним листом)">↪ Переслати колезі</button>
+  <button type="button" class="button default" id="rw-fwd-btn" title="Листування вибраних постачальників колезі — кожна гілка окремим листом з її файлами, як «Переслати» в пошті (або листи файлами .eml, або зведення одним листом)">↪ Переслати колезі</button>
   <button type="button" class="button" id="rw-sel-none">✕ Зняти вибір</button>
 </div>
 
@@ -63,11 +63,13 @@
       <label>Кому <input name="to" list="rwc-colleagues" placeholder="колега@фірма" required></label>
       <label>Копія <input name="cc" list="rwc-colleagues"></label>
     </div>
-    <label class="rwc-subjf">Тема <input name="subject" translate="no"></label>
+    <label class="rwc-subjf" data-fwd-subject>Тема <input name="subject" translate="no"></label>
     <label class="rwc-subjf">Коментар <textarea name="note" rows="3" placeholder="Напр.: Глянь, будь ласка, пропозиції — кого беремо?"></textarea></label>
     <div class="rw-fwd-mode" role="radiogroup" aria-label="Як переслати">
-      <label><input type="radio" name="mode" value="mails" checked> <b>📨 Листи як є</b>
-        <small class="spf-muted">кожен лист — вкладенням, як він прийшов чи пішов: текст, картинки, файли</small></label>
+      <label><input type="radio" name="mode" value="threads" checked> <b>↪ Переслати гілки</b>
+        <small class="spf-muted">кожна гілка листування — окремим листом, як «Переслати» в пошті: текст листів у листі, їхні файли — вкладеннями</small></label>
+      <label><input type="radio" name="mode" value="mails"> <b>📨 Листи файлами .eml</b>
+        <small class="spf-muted">кожен лист — вкладенням .eml, як він прийшов чи пішов: текст, картинки, файли</small></label>
       <label><input type="radio" name="mode" value="digest"> <b>📊 Зведення</b>
         <small class="spf-muted">таблиця, текст листування й файли в одному листі</small></label>
     </div>
@@ -198,11 +200,14 @@
   .rwc-hist { margin: 3px 0; }
   .rw-fwd-parts { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
   .rw-fwd-mode { display: flex; gap: 8px; margin: 10px 0 2px; flex-wrap: wrap; }
-  .rw-fwd-mode label { flex: 1 1 240px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; padding: 8px 10px;
+  .rw-fwd-mode label { flex: 1 1 190px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; padding: 8px 10px;
     border: 1px solid var(--border-strong, #ccc); border-radius: 8px; cursor: pointer; }
   .rw-fwd-mode label:has(input:checked) { border-color: var(--primary, #417690); box-shadow: inset 0 0 0 1px var(--primary, #417690); }
   .rw-fwd-mode small { flex-basis: 100%; padding-left: 22px; }
-  #rw-fwd[data-mode="mails"] [data-fwd-digest] { display: none; }
+  #rw-fwd[data-mode="mails"] [data-fwd-digest], #rw-fwd[data-mode="threads"] [data-fwd-digest],
+  #rw-fwd[data-mode="threads"] [data-fwd-subject] { display: none; }
+  .rw-fwd-subj { margin: 6px 0 0; padding-left: 18px; }
+  .rw-fwd-subj li { margin: 2px 0; }
   .rw-fwd-plan { font-size: 13px; }
   .rw-fwd-plan table { width: 100%; }
   @media (max-width: 860px) {
@@ -1018,7 +1023,7 @@
   function ids() { return picked().map(function(c){ return c.value; }); }
   // 📨 Листи як є (кожен лист — .eml, rfq_talk.forward_originals) / 📊 Зведення (rfq_talk.forward); вибір — localStorage
   var lastPlan = null;
-  function mode() { var c = form.querySelector('input[name=mode]:checked'); return c ? c.value : 'mails'; }
+  function mode() { var c = form.querySelector('input[name=mode]:checked'); return c ? c.value : 'threads'; }
   try { var keptMode = localStorage.getItem('rw-fwd-mode');
     form.querySelectorAll('input[name=mode]').forEach(function(c){ if (c.value === keptMode) c.checked = true; }); } catch (e) {}
   function table(head, rows) {
@@ -1036,6 +1041,30 @@
     fwd.setAttribute('data-mode', m);
     if (!j) return;
     plan.innerHTML = ''; send.disabled = false;
+    if (m === 'threads') {                // ↪ кожна гілка — окремим листом «Fwd: …» (rfq_talk.forward_threads)
+      var g = j.threads;
+      plan.appendChild(table(['Постачальник', 'Гілок', 'Листів', '≈ МБ'], g.rows.map(function(r){
+        return [r.name, String(r.threads), r.letters + (r.hidden ? ' + 🔒 ' + r.hidden : ''),
+                r.mb ? String(r.mb) : (r.threads ? '< 0.1' : '—')];
+      })));
+      if (g.subjects.length) {
+        var ul = el('ul', 'rw-fwd-subj');
+        g.subjects.forEach(function(s){
+          var li = el('li'), b = el('span', null, '✉️ ' + s.subject); b.setAttribute('translate', 'no'); li.appendChild(b);
+          li.appendChild(el('span', 'spf-muted', ' · ' + s.name + ' · листів ' + s.mails + (s.files ? ', ще файлів ' + s.files : '') + (s.parts > 1 ? ' · ' + s.parts + ' листами (файли понад ' + g.limit_mb + ' МБ)' : '')));
+          ul.appendChild(li);
+        });
+        plan.appendChild(ul);
+      }
+      if (g.rows.some(function(r){ return r.hidden; })) plan.appendChild(el('div', 'spf-muted', '🔒 Листи зі скриньок колег не пересилаються.'));
+      if (g.local) plan.appendChild(el('div', 'spf-muted', 'ℹ️ Копії на сервері пошти немає в листів: ' + g.local + ' — їх буде зібрано з Minerva (текст і файли, що є).'));
+      if (g.left.length) plan.appendChild(el('div', 'spf-warn', '📎 Не вкладено (кожен понад ' + g.limit_mb + ' МБ): ' + g.left.join(', ')));
+      if (!g.subjects.length) { note.textContent = '⚠️ Немає листів, які можна переслати.'; send.disabled = true; return; }
+      if (g.parts > g.parts_max) { note.textContent = '⚠️ Це ' + g.parts + ' листів колезі (за раз — до ' + g.parts_max + '). Виберіть менше постачальників.'; send.disabled = true; return; }
+      note.textContent = g.parts > 1 ? 'Піде ' + g.parts + ' листами з вашої скриньки — кожна гілка окремо, з підписом.'
+                                     : 'Піде одним листом з вашої скриньки, з підписом.';
+      return;
+    }
     if (m === 'mails') {
       var o = j.originals;
       plan.appendChild(table(['Постачальник', 'Листів', '≈ МБ'], o.rows.map(function(r){
@@ -1102,8 +1131,8 @@
     var parts = Array.prototype.filter.call(form.querySelectorAll('input[name=part]'), function(c){ return c.checked; }).map(function(c){ return c.value; });
     var data = {rid: ids(), to: form.elements.to.value, cc: form.elements.cc.value,
                 subject: form.elements.subject.value, note: form.elements.note.value};
-    if (mode() === 'mails') {
-      data.do = 'forward_mails'; data.table = parts.indexOf('table') >= 0 ? '1' : '';
+    if (mode() === 'mails' || mode() === 'threads') {
+      data.do = mode() === 'mails' ? 'forward_mails' : 'forward_threads'; data.table = parts.indexOf('table') >= 0 ? '1' : '';
       post(data).then(function(j){
         if (j.error || !j.job) { note.textContent = '⚠️ ' + (j.error || 'не вдалося'); send.disabled = false; return; }
         poll(j.job, Date.now());

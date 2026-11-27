@@ -795,8 +795,9 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                 return JsonResponse({"job": jobs.start(user, f"each-send {req.pk}", run, progress=True)})
             if do == "forward_plan":
                 return JsonResponse({**rfq_talk.forward_plan(req, rids, user),
-                                     "originals": rfq_talk.originals_plan(req, rids, user)})
-            if do == "forward_mails":                # 📨 листи як є (.eml) — пошта й SMTP у фоні
+                                     "originals": rfq_talk.originals_plan(req, rids, user),
+                                     "threads": rfq_talk.threads_plan(req, rids, user)})
+            if do in ("forward_mails", "forward_threads"):   # 📨 .eml / ↪ гілки — пошта й SMTP у фоні
                 rfq_talk.originals_plan(req, rids, user)              # нікого не вибрано — помилка одразу
                 to, cc, subject, note = P.get("to", ""), P.get("cc", ""), P.get("subject", ""), P.get("note", "")
                 if not rfq.addresses(to):
@@ -806,9 +807,11 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                 table = P.get("table") == "1"
 
                 def run(report):
+                    if do == "forward_threads":
+                        return rfq_talk.forward_threads(req, rids, user, to, cc, note, table=table, report=report)
                     return rfq_talk.forward_originals(req, rids, user, to, cc, subject, note, table=table,
                                                       report=report)
-                return JsonResponse({"job": jobs.start(user, f"forward-mails {req.pk}", run, progress=True)})
+                return JsonResponse({"job": jobs.start(user, f"{do} {req.pk}", run, progress=True)})
             out = rfq_talk.forward(req, rids, user, P.get("to", ""), P.get("cc", ""), P.get("subject", ""),
                                    P.get("note", ""), P.getlist("part"))
             return JsonResponse(out)
@@ -1022,7 +1025,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                     done = rfq_marks.apply(req, rids, request.user, op)
                 return JsonResponse({"labels": {str(k): v for k, v in done.items()}})
             elif do in ("chat_brief", "chat_send", "chat_ai", "forward_plan", "forward_send", "forward_mails",
-                        "each_compose", "each_send", "each_save", "each_load"):
+                        "forward_threads", "each_compose", "each_send", "each_save", "each_load"):
                 return self._talk(request, req, r, do)
             elif do == "compare_ai":
                 from suppliers.services import rfq_compare

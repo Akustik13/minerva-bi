@@ -501,6 +501,7 @@
 {"uk": "(усе заново)", "en": "(everything anew)", "de": "(alles neu)"}
 {"uk": "(усі люди)", "en": "(all people)", "de": "(alle Personen)"}
 {"uk": "(фаз немає)", "en": "(no phases)", "de": "(keine Phasen)"}
+{"uk": "(файли {0}/{1})", "en": "(files {0}/{1})", "de": "(Dateien {0}/{1})"}
 {"uk": "(формат", "en": "(format", "de": "(Format"}
 {"uk": "(це місце вже змінила інша правка)", "en": "(another correction already changed this spot)", "de": "(eine andere Korrektur hat diese Stelle bereits geändert)"}
 {"uk": "(ціни на DigiKey можуть змінитися на 1 цент)", "en": "(prices on DigiKey may change by 1 cent)", "de": "(die Preise auf DigiKey können sich um 1 Cent ändern)"}
@@ -1659,6 +1660,7 @@
 {"uk": "Frequency Range — діапазон частот", "en": "Frequency Range — frequency range", "de": "Frequency Range — Frequenzbereich"}
 {"uk": "Frequency — центральна частота", "en": "Frequency — center frequency", "de": "Frequency — Mittenfrequenz"}
 {"uk": "Front Door / Вхід", "en": "Front Door / Entrance", "de": "Front Door / Eingang"}
+{"uk": "Fwd: {0} · {1} — файли", "en": "Fwd: {0} · {1} — files", "de": "Fwd: {0} · {1} — Dateien"}
 {"uk": "F≥4 — Регулярні покупки.", "en": "F≥4 — Regular purchases.", "de": "F≥4 — Regelmäßige Käufe."}
 {"uk": "GBP — Фунт", "en": "GBP — Pound", "de": "GBP — Pfund"}
 {"uk": "GET /offers — свіжі ціни всіх оферів", "en": "GET /offers — fresh prices of all offers", "de": "GET /offers — aktuelle Preise aller Offers"}
@@ -3187,6 +3189,7 @@
 {"uk": "{0} · {1} · {2} · ціни в", "en": "{0} · {1} · {2} · prices in", "de": "{0} · {1} · {2} · Preise in"}
 {"uk": "{0} · {1} · {2} хв", "en": "{0} · {1} · {2} min", "de": "{0} · {1} · {2} Min."}
 {"uk": "{0} · {1} · {2} шт · {3}", "en": "{0} · {1} · {2} pcs · {3}", "de": "{0} · {1} · {2} Stk. · {3}"}
+{"uk": "{0} · {1} · {2} — гілка листування: листів {3}", "en": "{0} · {1} · {2} — conversation thread: e-mails {3}", "de": "{0} · {1} · {2} — Verlauf: E-Mails {3}"}
 {"uk": "{0} · {1} · від {2} · тема: {3}", "en": "{0} · {1} · from {2} · subject: {3}", "de": "{0} · {1} · von {2} · Betreff: {3}"}
 {"uk": "{0} · {1} · від {2} · тема: {3} {4}", "en": "{0} · {1} · from {2} · subject: {3} {4}", "de": "{0} · {1} · von {2} · Betreff: {3} {4}"}
 {"uk": "{0} · {1} · замовлено {2}, отримано {3}", "en": "{0} · {1} · ordered {2}, received {3}", "de": "{0} · {1} · bestellt {2}, erhalten {3}"}
@@ -10814,6 +10817,7 @@
 {"uk": "Листи скриньки з більшим номером агент ще не перевіряв (раніші — не чіпає)", "en": "The agent has not yet checked mailbox e-mails with a higher number (earlier ones — it does not touch)", "de": "E-Mails des Postfachs mit höherer Nummer hat der Agent noch nicht geprüft (frühere fasst er nicht an)"}
 {"uk": "Листи старіші цього терміну ігноруються.", "en": "E-mails older than this period are ignored.", "de": "E-Mails, die älter als dieser Zeitraum sind, werden ignoriert."}
 {"uk": "Листи у ваших скриньках", "en": "E-mails in your mailboxes", "de": "E-Mails in Ihren Postfächern"}
+{"uk": "Листи файлами .eml", "en": "E-mails as .eml files", "de": "E-Mails als .eml-Dateien"}
 {"uk": "Листи цього юзера будуть читатися з його особистого ящика. ionos: host=imap.ionos.de, port=993, SSL=✓, Sent=INBOX.Sent. Команда", "en": "This user’s e-mails will be read from their personal mailbox. ionos: host=imap.ionos.de, port=993, SSL=✓, Sent=INBOX.Sent. Command", "de": "Die E-Mails dieses Benutzers werden aus seinem persönlichen Postfach gelesen. ionos: host=imap.ionos.de, port=993, SSL=✓, Sent=INBOX.Sent. Befehl"}
 {"uk": "Листи як є", "en": "E-mails as they are", "de": "E-Mails wie sie sind"}
 {"uk": "Листи — з", "en": "E-mails — from", "de": "E-Mails — ab"}
@@ -10823,6 +10827,7 @@
 {"uk": "Листування", "en": "Correspondence", "de": "Korrespondenz"}
 {"uk": "Листування (CRM tool): {0}", "en": "Correspondence (CRM tool): {0}", "de": "Korrespondenz (CRM-Tool): {0}"}
 {"uk": "Листування (додати — у пошті: «📁 До проєкту» або «Розбір пошти»)", "en": "Correspondence (to add — in mail: “📁 To project” or “Mail triage”)", "de": "Korrespondenz (Hinzufügen — in der E-Mail: „📁 Zum Projekt“ oder „E-Mail-Sortierung“)"}
+{"uk": "Листування вибраних постачальників колезі — кожна гілка окремим листом з її файлами, як «Переслати» в пошті (або листи файлами .eml, або зведення одним листом)", "en": "The selected suppliers' correspondence to a colleague — each thread as a separate e-mail with its files, like «Forward» in mail (or e-mails as .eml files, or a summary in one e-mail)", "de": "Die Korrespondenz der ausgewählten Lieferanten an einen Kollegen — jeder Verlauf als eigene E-Mail mit seinen Dateien, wie „Weiterleiten“ in der Mail (oder E-Mails als .eml-Dateien, oder eine Übersicht in einer E-Mail)"}
 {"uk": "Листування всіх постачальників запиту (RFQ) за один виклик — для аналізу пропозицій: по кожному постачальнику — стан, пропозиція вже в таблиці, що розібрав AI, найновіші листи постачальника з текстом без цитати (лише з ваших скриньок; у скриньці колеги — без тексту), наші листи — рядком (ours=true — з текстом), вкладення з номерами (read_mail_attachment), збережені файли (read_rfq_file kind=reply). last — скільки листів постачальника на кожного (до 15); suppliers — лише ці. Обсяг ділиться порівну: багато постачальників — коротші листи (повністю — rfq_conversation).", "en": "Correspondence of all request (RFQ) suppliers in one call — for analysing offers: for each supplier — state, the offer already in the table, what AI parsed, the supplier's latest e-mails with text without the quote (only from your mailboxes; in a colleague's mailbox — without text), our e-mails — one line each (ours=true — with text), attachments with numbers (read_mail_attachment), saved files (read_rfq_file kind=reply). last — how many supplier e-mails per supplier (up to 15); suppliers — only these. The volume is split evenly: many suppliers — shorter e-mails (in full — rfq_conversation).", "de": "Korrespondenz aller Lieferanten einer Anfrage (RFQ) in einem Aufruf – zur Analyse der Angebote: je Lieferant – Status, das Angebot in der Tabelle, was die KI gelesen hat, die neuesten E-Mails des Lieferanten mit Text ohne Zitat (nur aus Ihren Postfächern; im Postfach eines Kollegen – ohne Text), unsere E-Mails – je eine Zeile (ours=true – mit Text), Anhänge mit Nummern (read_mail_attachment), gespeicherte Dateien (read_rfq_file kind=reply). last – wie viele E-Mails je Lieferant (bis 15); suppliers – nur diese. Der Umfang wird gleich aufgeteilt: viele Lieferanten – kürzere E-Mails (vollständig – rfq_conversation)."}
 {"uk": "Листування з кожним (лише з ваших скриньок)", "en": "Correspondence with each (only from your mailboxes)", "de": "Korrespondenz mit jedem (nur aus Ihren Postfächern)"}
 {"uk": "Листування з постачальником запиту (RFQ) — усі гілки рядка за датою: хто, коли, тема, новий текст без цитати (лише з ваших скриньок; лист у скриньці колеги — без тексту), вкладення з номерами (текст — read_mail_attachment: id листа й номер; збережені в запиті — read_rfq_file kind=reply); кому відповідати й на який лист (reply_to_id для propose_rfq_reply); коротка історія; збережене «🧭 Коротко». last — скільки найновіших листів (до 15).", "en": "Correspondence with a request (RFQ) supplier — all row threads by date: who, when, subject, new text without the quote (only from your mailboxes; an e-mail in a colleague's mailbox — without text), attachments with numbers (text — read_mail_attachment: e-mail id and number; saved in the request — read_rfq_file kind=reply); whom to reply to and to which e-mail (reply_to_id for propose_rfq_reply); a short history; the saved «🧭 In brief». last — how many latest e-mails (up to 15).", "de": "Korrespondenz mit dem Lieferanten einer Anfrage (RFQ) – alle Verläufe der Zeile nach Datum: wer, wann, Betreff, neuer Text ohne Zitat (nur aus Ihren Postfächern; E-Mail im Postfach eines Kollegen – ohne Text), Anhänge mit Nummern (Text – read_mail_attachment: E-Mail-ID und Nummer; in der Anfrage gespeichert – read_rfq_file kind=reply); wem und auf welche E-Mail antworten (reply_to_id für propose_rfq_reply); kurze Historie; gespeichertes „🧭 Kurz“. last – wie viele neueste E-Mails (bis 15)."}
@@ -14333,11 +14338,14 @@
 {"uk": "Переслано --- Від: {0} Кому: {1} {2}", "en": "Forwarded --- From: {0} To: {1} {2}", "de": "Weitergeleitet --- Von: {0} An: {1} {2}"}
 {"uk": "Переслано від {0} / Кому: {1}", "en": "Forwarded from {0} / To: {1}", "de": "Weitergeleitet von {0} / An: {1}"}
 {"uk": "Переслано колегою: лист від {0}", "en": "Forwarded by a colleague: email from {0}", "de": "Von einem Kollegen weitergeleitet: E-Mail von {0}"}
+{"uk": "Переслано колезі гілок листування: {0} → {1}", "en": "Conversation threads forwarded to a colleague: {0} → {1}", "de": "An einen Kollegen weitergeleitete Verläufe: {0} → {1}"}
 {"uk": "Переслано колезі листи як є ({0}) → {1}", "en": "E-mails forwarded to a colleague as they are ({0}) → {1}", "de": "E-Mails wie sie sind an einen Kollegen weitergeleitet ({0}) → {1}"}
 {"uk": "Переслано колезі → {0}", "en": "Forwarded to a colleague → {0}", "de": "An Kollegen weitergeleitet → {0}"}
 {"uk": "Переслано — оригінал від: {0}", "en": "Forwarded — original from: {0}", "de": "Weitergeleitet — Original von: {0}"}
+{"uk": "Переслано → {0}: гілок {1}", "en": "Forwarded → {0}: threads {1}", "de": "Weitergeleitet → {0}: Verläufe {1}"}
 {"uk": "Переслано → {0}: листів {1}", "en": "Forwarded → {0}: e-mails {1}", "de": "Weitergeleitet → {0}: E-Mails {1}"}
 {"uk": "Переслати", "en": "Forward", "de": "Weiterleiten"}
+{"uk": "Переслати гілки", "en": "Forward threads", "de": "Verläufe weiterleiten"}
 {"uk": "Переслати з усіма вкладеннями (без логотипів підпису); текст з «Що робити» — над пересланим листом. Без AI.", "en": "Forward with all attachments (without signature logos); the text from «What to do» goes above the forwarded email. No AI.", "de": "Mit allen Anhängen weiterleiten (ohne Signatur-Logos); der Text aus «Was tun» steht über der weitergeleiteten E-Mail. Ohne KI."}
 {"uk": "Переслати колезі", "en": "Forward to a colleague", "de": "An Kollegen weiterleiten"}
 {"uk": "Перестворити відправлення", "en": "Recreate shipment", "de": "Sendung neu anlegen"}
@@ -15895,6 +15903,7 @@
 {"uk": "Продається лотом", "en": "Sold in lots", "de": "Wird im Los verkauft"}
 {"uk": "Продовження наради", "en": "Continuation of the meeting", "de": "Fortsetzung der Besprechung"}
 {"uk": "Продовження наради «", "en": "Continuation of the meeting “", "de": "Fortsetzung der Besprechung „"}
+{"uk": "Продовження — файли гілки «{0}» ({1}/{2})", "en": "Continued — files of the thread «{0}» ({1}/{2})", "de": "Fortsetzung — Dateien des Verlaufs „{0}“ ({1}/{2})"}
 {"uk": "Продовжити", "en": "Continue", "de": "Fortsetzen"}
 {"uk": "Продовжити без збереження", "en": "Continue without saving", "de": "Ohne Speichern fortfahren"}
 {"uk": "Продовжити без фіксації упаковки?", "en": "Continue without fixing the packaging?", "de": "Ohne Festlegung der Verpackung fortfahren?"}
@@ -16430,6 +16439,7 @@
 {"uk": "Раніше в розмові", "en": "Earlier in the conversation", "de": "Früher im Gespräch"}
 {"uk": "Раніше замовляв: {0}:{1} від {2} — {3}", "en": "Ordered earlier: {0}:{1} from {2} — {3}", "de": "Früher bestellt: {0}:{1} vom {2} — {3}"}
 {"uk": "Раніше: замовлення {0}:{1} ({2})", "en": "Earlier: order {0}:{1} ({2})", "de": "Früher: Auftrag {0}:{1} ({2})"}
+{"uk": "Раніші листи гілки — новий текст кожного, без процитованої історії", "en": "Earlier e-mails of the thread — the new text of each, without the quoted history", "de": "Frühere E-Mails des Verlaufs — jeweils der neue Text, ohne zitierten Verlauf"}
 {"uk": "Рахувати час на пошту", "en": "Count time on mail", "de": "Zeit für E-Mails zählen"}
 {"uk": "Рахунки", "en": "Invoices", "de": "Rechnungen"}
 {"uk": "Рахунки (Rechnung)", "en": "Invoices (Rechnung)", "de": "Rechnungen"}
@@ -19399,6 +19409,7 @@
 {"uk": "Файли агенд нарад", "en": "Meeting agenda files", "de": "Dateien der Tagesordnungen"}
 {"uk": "Файли в картку", "en": "Files to the record", "de": "Dateien in den Artikel"}
 {"uk": "Файли від агента", "en": "Files from the agent", "de": "Dateien vom Agenten"}
+{"uk": "Файли гілки не влізли в один лист (до {0} МБ) — решта в наступних: (файли 2/{1})…", "en": "The thread's files did not fit into one e-mail (up to {0} MB) — the rest follow: (files 2/{1})…", "de": "Die Dateien des Verlaufs passten nicht in eine E-Mail (bis {0} MB) — der Rest folgt: (Dateien 2/{1})…"}
 {"uk": "Файли дня", "en": "Files of the day", "de": "Dateien des Tages"}
 {"uk": "Файли до запитів AI", "en": "Files for AI requests", "de": "Dateien zu KI-Anfragen"}
 {"uk": "Файли з ПК або телефона", "en": "Files from a PC or phone", "de": "Dateien vom PC oder Telefon"}
@@ -19644,6 +19655,7 @@
 {"uk": "ЦІЛЬ: картка товару для DigiKey Marketplace (ми — постачальник, продаємо на DigiKey). Поля (key)", "en": "GOAL: a product listing for DigiKey Marketplace (we are the supplier selling on DigiKey). Fields (key)", "de": "ZIEL: ein Produkteintrag für DigiKey Marketplace (wir sind Lieferant und verkaufen auf DigiKey). Felder (key)"}
 {"uk": "ЦІЛЬ: картка товару складу Minerva. Поля (key у submit_card)", "en": "GOAL: a Minerva stock product record. Fields (key in submit_card)", "de": "ZIEL: ein Minerva-Lagerartikel. Felder (key in submit_card)"}
 {"uk": "Це", "en": "This is", "de": "Das ist"}
+{"uk": "Це {0} листів колезі (за раз — до {1}). Виберіть менше постачальників.", "en": "That is {0} e-mails to the colleague (at most {1} at a time). Select fewer suppliers.", "de": "Das sind {0} E-Mails an den Kollegen (höchstens {1} auf einmal). Wählen Sie weniger Lieferanten."}
 {"uk": "Це автоматичний лист.", "en": "This is an automatic email.", "de": "Dies ist eine automatische E-Mail."}
 {"uk": "Це був dry-run. Запусти без --dry-run для реальних змін.", "en": "That was a dry run. Run without --dry-run for real changes.", "de": "Das war ein Probelauf (dry-run). Führen Sie den Befehl ohne --dry-run aus, um echte Änderungen vorzunehmen."}
 {"uk": "Це буде записано в лог.", "en": "This will be written to the log.", "de": "Dies wird im Protokoll festgehalten."}
@@ -20361,6 +20373,7 @@
 {"uk": "Ще рано — інтервал перевірки не минув.", "en": "Too early — the check interval has not passed.", "de": "Zu früh — das Prüfintervall ist noch nicht abgelaufen."}
 {"uk": "Ще розділи", "en": "More sections", "de": "Weitere Bereiche"}
 {"uk": "Ще тези наради: {0}", "en": "More meeting points: {0}", "de": "Weitere Punkte der Besprechung: {0}"}
+{"uk": "Ще файли постачальника (не з цих листів)", "en": "More supplier files (not from these e-mails)", "de": "Weitere Dateien des Lieferanten (nicht aus diesen E-Mails)"}
 {"uk": "Ще фото до візитки", "en": "Extra photo for a business card", "de": "Zusatzfoto zur Visitenkarte"}
 {"uk": "Ще фото до візиток", "en": "Extra photos for business cards", "de": "Zusatzfotos zu Visitenkarten"}
 {"uk": "Ще фото цієї групи ({0})", "en": "More photos in this group ({0})", "de": "Weitere Fotos dieser Gruppe ({0})"}
@@ -22580,7 +22593,9 @@
 {"uk": "код магазину", "en": "shop code", "de": "Shop-Code"}
 {"uk": "код проєкту", "en": "project code", "de": "Projektcode"}
 {"uk": "кожен запит пропозиції; «Відповісти» — пише покупцю", "en": "every quote request; «Reply» writes to the buyer", "de": "jede Angebotsanfrage; „Antworten“ schreibt dem Käufer"}
+{"uk": "кожен лист — вкладенням .eml, як він прийшов чи пішов: текст, картинки, файли", "en": "each e-mail as an .eml attachment, exactly as it was received or sent: text, images, files", "de": "jede E-Mail als .eml-Anhang, genau so, wie sie empfangen oder gesendet wurde: Text, Bilder, Dateien"}
 {"uk": "кожен лист — вкладенням, як він прийшов чи пішов: текст, картинки, файли", "en": "each e-mail as an attachment, exactly as it was received or sent: text, images, files", "de": "jede E-Mail als Anhang, genau so, wie sie empfangen oder gesendet wurde: Text, Bilder, Dateien"}
+{"uk": "кожна гілка листування — окремим листом, як «Переслати» в пошті: текст листів у листі, їхні файли — вкладеннями", "en": "each conversation thread as a separate e-mail, like «Forward» in mail: the text of the e-mails in the e-mail, their files as attachments", "de": "jeder Verlauf als eigene E-Mail, wie „Weiterleiten“ in der Mail: der Text der E-Mails in der E-Mail, ihre Dateien als Anhänge"}
 {"uk": "кожна кількість ступенів — окрема позиція, як на бланку Quotation (старі шаблони з", "en": "each price-break quantity is a separate line, as on the Quotation letterhead (old templates with", "de": "jede Staffelmenge ist eine eigene Position, wie auf dem Quotation-Briefbogen (alte Vorlagen mit"}
 {"uk": "кожна — рядок, ＋ ще одна", "en": "each is a row, ＋ for another", "de": "jede eine Zeile, ＋ für eine weitere"}
 {"uk": "кожне замовлення в кошику; «Відповісти» — пише покупцю", "en": "every cart order; «Reply» writes to the buyer", "de": "jede Bestellung im Warenkorb; „Antworten“ schreibt dem Käufer"}
@@ -22795,7 +22810,9 @@
 {"uk": "листа {0} немає у ваших скриньках", "en": "e-mail {0} is not in your mailboxes", "de": "E-Mail {0} ist nicht in Ihren Postfächern"}
 {"uk": "листа з таким id немає у ваших скриньках", "en": "листа з таким id немає у ваших скриньках", "de": "листа з таким id немає у ваших скриньках"}
 {"uk": "листа з трек-номером немає (вимкнено)", "en": "no letter with the tracking number (switched off)", "de": "kein Brief mit Sendungsnummer (ausgeschaltet)"}
+{"uk": "листами (файли понад", "en": "e-mails (files over", "de": "E-Mails (Dateien über"}
 {"uk": "листами з вашої скриньки — кожен до", "en": "e-mails from your mailbox — each up to", "de": "E-Mails aus Ihrem Postfach — jede bis"}
+{"uk": "листами з вашої скриньки — кожна гілка окремо, з підписом.", "en": "e-mails from your mailbox — each thread separately, with signature.", "de": "E-Mails aus Ihrem Postfach — jeder Verlauf einzeln, mit Signatur."}
 {"uk": "листи", "en": "emails", "de": "E-Mails"}
 {"uk": "листи з {0}", "en": "e-mails from {0}", "de": "E-Mails ab {0}"}
 {"uk": "листи покупцю від Minerva й сайту; у листах команді «Відповісти» пише покупцю", "en": "buyer e-mails from Minerva and the site; in team e-mails «Reply» writes to the buyer", "de": "E-Mails an Käufer von Minerva und der Website; in E-Mails an das Team schreibt „Antworten“ dem Käufer"}
@@ -25655,6 +25672,7 @@
 {"uk": "файл у картці Minerva", "en": "file on the Minerva card", "de": "Datei in der Minerva-Karte"}
 {"uk": "файл фото / даташита", "en": "photo / datasheet file", "de": "Foto-/Datenblattdatei"}
 {"uk": "файл фото чи даташита (не JSON)", "en": "photo or datasheet file (not JSON)", "de": "Foto- oder Datenblattdatei (kein JSON)"}
+{"uk": "файл цього листа (збережений у запиті): {0}", "en": "file of this e-mail (saved in the request): {0}", "de": "Datei dieser E-Mail (in der Anfrage gespeichert): {0}"}
 {"uk": "файл(ів)", "en": "file(s)", "de": "Datei(en)"}
 {"uk": "файл, завантажений у картку", "en": "a file uploaded to the card", "de": "eine in die Karte hochgeladene Datei"}
 {"uk": "файл: {0}", "en": "file: {0}", "de": "Datei: {0}"}
@@ -26009,6 +26027,7 @@
 {"uk": "ще раз", "en": "again", "de": "erneut"}
 {"uk": "ще раз — лише пропущений лист або лист з помилкою", "en": "again — only a skipped or failed email", "de": "erneut — nur eine übersprungene oder fehlerhafte E-Mail"}
 {"uk": "ще файли (read_rfq_file kind=reply)", "en": "more files (read_rfq_file kind=reply)", "de": "weitere Dateien (read_rfq_file kind=reply)"}
+{"uk": "ще файлів", "en": "more files", "de": "weitere Dateien"}
 {"uk": "ще файлів: {0} — у картці", "en": "{0} more files — in the card", "de": "weitere Dateien: {0} — in der Karte"}
 {"uk": "що в картці лістингу", "en": "what is in the listing card", "de": "was in der Listing-Karte steht"}
 {"uk": "що вже є в базі (можливо, виправлений вручну), замінюється тільки після підтвердження.", "en": "that is already in the database (possibly corrected manually) is replaced only after confirmation.", "de": "die bereits in der Datenbank vorhanden ist (möglicherweise manuell korrigiert), wird erst nach Bestätigung ersetzt."}

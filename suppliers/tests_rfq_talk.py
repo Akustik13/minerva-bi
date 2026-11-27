@@ -230,9 +230,9 @@ class ForwardTests(TalkBase):
         self.assertEqual(empty.status_code, 400)
 
 
-class ForwardMailsTests(TalkBase):
-    """↪ «📨 Листи як є»: кожен лист — вкладенням .eml (оригінал із сервера пошти або зібраний з Minerva), файли
-    постачальника без листа — звичайними вкладеннями, понад ліміт — кількома листами колезі."""
+class ForwardBase(TalkBase):
+    """Пересилання колезі з оригіналами з сервера пошти: відповідь JY є на сервері (FakeIMAP), запит — лише в
+    Minerva; файл відповіді, файл без листа, лист у скриньці колеги."""
 
     def setUp(self):
         super().setUp()
@@ -260,7 +260,7 @@ class ForwardMailsTests(TalkBase):
 
     def send(self, **extra):
         from suppliers.services import jobs
-        data = {"do": "forward_mails", "rid": [self.r.pk, self.r2.pk], "to": "olga@sevskiy.de",
+        data = {"do": self.DO, "rid": [self.r.pk, self.r2.pk], "to": "olga@sevskiy.de",
                 "cc": "boss@sevskiy.de", "note": "Глянь, кого беремо?", "table": "1", **extra}
 
         def fake_send(client, *args, **kw):
@@ -269,6 +269,71 @@ class ForwardMailsTests(TalkBase):
                 mock.patch("email_assistant.smtp_client.SMTPClient.send", fake_send):
             j = self.client.post(self.act, data).json()
         return j if "job" not in j else jobs.state(j["job"], self.user)
+
+
+class ForwardThreadsTests(ForwardBase):
+    """↪ «Переслати гілки» (Weiterleiten): кожна гілка — окремим листом «Fwd: …», текст листів у листі (найновіший —
+    повністю, раніші — новий текст), файли листів з оригіналів і файли без листа — вкладеннями."""
+    DO = "forward_threads"
+
+    def test_plan_lists_threads_with_subjects(self):
+        g = self.client.post(self.act, {"do": "forward_plan", "rid": [self.r.pk, self.r2.pk]}).json()["threads"]
+        jy = g["rows"][0]
+        self.assertEqual((jy["threads"], jy["letters"], jy["hidden"]), (1, 2, 1))
+        self.assertEqual(g["rows"][1]["threads"], 0)
+        self.assertEqual([s["subject"] for s in g["subjects"]], ["Fwd: Re: RFQ"])
+        self.assertEqual((g["subjects"][0]["files"], g["parts"], g["local"]), (1, 1, 0))
+
+    def test_thread_forwarded_inline_with_its_files(self):
+        type(self.ans).objects.filter(pk=self.ans.pk).update(
+            body_html='<p>Price <b>10 EUR</b><img src="cid:logo1"></p><script>alert(1)</script>')
+        s = self.send()
+        self.assertEqual(s["status"], "done", s)
+        self.assertEqual(len(self.calls), 1)
+        c = self.calls[0]
+        self.assertEqual((c["subject"], c["to"], c["cc"]), ("Fwd: Re: RFQ", ["olga@sevskiy.de"], ["boss@sevskiy.de"]))
+        self.assertEqual([a["name"] for a in c["atts"]], ["HR-031 Quotation.pdf", "Datasheet.pdf"])
+        self.assertEqual(c["atts"][0]["content"], b"%PDF-1.4 quote")           # файл з оригіналу на сервері
+        self.assertFalse(any(a["content_type"] == "message/rfc822" for a in c["atts"]))
+        html = c["html"]
+        self.assertIn("Глянь, кого беремо?", html)
+        self.assertIn("136,00 EUR", html)                                     # таблиця — у першому листі
+        self.assertEqual(html.count("-------- Forwarded Message --------"), 2)
+        self.assertIn("<b>10 EUR</b>", html)                                  # найновіший — з форматуванням
+        self.assertNotIn("cid:", html)
+        self.assertNotIn("<script", html)
+        self.assertLess(html.index("10 EUR"), html.index("Please quote PCBA."))   # найновіший — угорі
+        self.assertIn("Раніші листи гілки", html)
+        self.assertIn("<b>Attachments:</b> HR-031 Quotation.pdf", html)
+        self.assertIn("копії немає на сервері пошти", html)                   # запит — лише в Minerva
+        self.assertIn("Ще файли постачальника (не з цих листів): Datasheet.pdf", html)
+        self.assertIn("🔒 Ще листів у скриньках колег: 1", html)
+        self.assertNotIn("SECRET 99", html + c["text"])
+        self.assertIn("From: Charles <charles@jypcba.com>", c["text"])
+        self.assertIn("гілок 1", s["result"]["message"])
+        self.assertEqual(SupplierEvent.objects.filter(request=self.req, text__contains="гілок листування: 1").count(), 1)
+
+    def test_files_over_the_limit_go_in_next_letters(self):
+        from suppliers.services import rfq
+        with mock.patch.object(rfq, "ATTACH_MAX_MB", 0.0005):
+            s = self.send(table="")
+        self.assertEqual(s["status"], "done", s)
+        self.assertEqual([c["subject"] for c in self.calls], ["Fwd: Re: RFQ (файли 1/2)", "Fwd: Re: RFQ (файли 2/2)"])
+        self.assertEqual(self.calls[0]["atts"], [])
+        self.assertEqual([a["name"] for a in self.calls[1]["atts"]], ["HR-031 Quotation.pdf", "Datasheet.pdf"])
+        self.assertIn("Продовження — файли гілки", self.calls[1]["html"])
+        self.assertNotIn("136,00 EUR", self.calls[0]["html"])
+        self.calls.clear()
+        with mock.patch.object(rfq, "ATTACH_MAX_MB", 0.0005), mock.patch.object(rfq_talk, "THREADS_MAX", 1):
+            s = self.send()
+        self.assertEqual((s["status"], self.calls), ("failed", []))
+        self.assertIn("за раз — до 1", s["error"])
+
+
+class ForwardMailsTests(ForwardBase):
+    """↪ «📨 Листи файлами .eml»: кожен лист — вкладенням .eml (оригінал із сервера пошти або зібраний з Minerva),
+    файли постачальника без листа — звичайними вкладеннями, понад ліміт — кількома листами колезі."""
+    DO = "forward_mails"
 
     def test_plan_counts_letters_files_and_hidden(self):
         o = self.client.post(self.act, {"do": "forward_plan", "rid": [self.r.pk, self.r2.pk]}).json()["originals"]

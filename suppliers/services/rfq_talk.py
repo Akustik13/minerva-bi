@@ -19,6 +19,11 @@
                               вкладенням .eml, як він на сервері пошти (email_assistant/originals.py: текст, картинки,
                               файли), файли постачальників без такого листа — звичайними вкладеннями; понад
                               rfq.ATTACH_MAX_MB разом — кількома листами «(1/2)» (_pack), у фоні (jobs);
+  threads_plan / forward_threads — «↪ Переслати гілки» (Weiterleiten, за замовчуванням): кожна гілка (_threads:
+                              рядок × thread_id) — окремим листом «Fwd: …», найновіший лист повністю (clean_html,
+                              картинки з тексту — вкладеннями), раніші — новим текстом (quotes.new_text), заголовки —
+                              reply_quote.header_lines; файли листів — з оригіналів (_mail_files, без логотипів і
+                              повторів), понад ліміт — «(файли 2/2)»; до THREADS_MAX листів, у фоні (jobs);
   compose_each / send_each  — ✉️ «Написати кожному»: вибраним постачальникам — кожному свій лист відповіддю в його
                               гілці (target: автор останнього листа, копія — лише адреса цієї ж фірми), з вашої
                               скриньки; текст — AI за побажанням людини (ai.each_letter, мовою листування, на ім'я)
@@ -681,6 +686,14 @@ def _too_big(it, limit) -> bool:
     return it["kind"] == "file" and it["size"] > limit
 
 
+def _saved_files(req, r, m, names, limit) -> list:
+    """Файли листа без копії на сервері пошти, які вже збережені в запиті (файли самого запиту, файли відповіді
+    постачальника з цього листа), — за назвою, кожен до limit."""
+    have = {f.name: f for f in list(req.files.all()) + list(r.reply_files.filter(message=m))
+            if f.file and f.size <= limit}
+    return [have[name] for name in dict.fromkeys(names) if name in have]
+
+
 def originals_plan(req, rids, user) -> dict:
     """План «📨 Листи як є» без сервера пошти: листів і ≈ МБ від кожного, скількома листами колезі піде."""
     from email_assistant import originals
@@ -817,11 +830,8 @@ def forward_originals(req, rids, user, to, cc, subject, note, table=True, report
         ready.append({**it, "size": len(o.data),
                       "att": originals.attachment(originals.filename(m, _short(r.supplier.name)), o.data)})
         if o.rebuilt and o.missing:
-            # копії листа на сервері немає, а його файли вже в запиті (відповідь постачальника, файли самого
-            # запиту) — ідуть поруч, звичайними вкладеннями; у листі колезі — під цим листом
-            have = {f.name: f for f in list(req.files.all()) + list(r.reply_files.filter(message=m))
-                    if f.file and f.size <= limit}
-            found = [have[name] for name in dict.fromkeys(o.missing) if name in have]
+            # копії листа на сервері немає, а його файли вже в запиті — ідуть поруч, під цим листом
+            found = _saved_files(req, r, m, o.missing, limit)
             for f in found:
                 if add_file(it, f, of_mail=True) and hasattr(f, "recipient_id"):
                     taken.add(f.pk)
@@ -873,4 +883,286 @@ def forward_originals(req, rids, user, to, cc, subject, note, table=True, report
     message = (f"✓ Переслано → {', '.join(to_list)}: листів {mails}" + (f", файлів {files}" if files else "")
                + (f" · {n} листами" if n > 1 else ""))
     return {"ok": True, "to": to_list, "letters": mails, "files": files, "parts": n, "left": len(left),
+            "hidden": total_hidden, "rebuilt": sum(1 for o in got.values() if o.rebuilt), "message": message}
+
+
+# ── ↪ «Переслати гілки» (Weiterleiten) — кожна гілка окремим листом: текст листів у листі, їхні файли — вкладеннями ──
+
+THREADS_MAX = 30             # листів колезі за одне «↪ Переслати гілки»
+_CID_IMG_RE = re.compile(r"<img\b[^>]*\bsrc\s*=\s*['\"]?\s*cid:[^>]*>", re.I)
+
+
+def _threads(rows, user):
+    """Гілки вибраних рядків: [{r, mails (за датою), files (файли постачальника без листа — у його найновішій гілці;
+    без жодного листа у ваших скриньках — окремо)}] → (гілки, {rid: листів у скриньках колег})."""
+    items, hidden = _originals_items(rows, user)
+    out, by_key = [], {}
+    for it in items:
+        if it["kind"] == "mail":
+            m = it["msg"]
+            key = (it["r"].pk, m.thread_id or f"m{m.pk}")
+            if key not in by_key:
+                by_key[key] = {"r": it["r"], "mails": [], "files": []}
+                out.append(by_key[key])
+            by_key[key]["mails"].append(m)
+    for it in items:
+        if it["kind"] != "file":
+            continue
+        mine = [th for th in out if th["r"].pk == it["r"].pk and th["mails"]]
+        if mine:
+            newest = max(mine, key=lambda th: (th["mails"][-1].sent_at or timezone.now(), th["mails"][-1].pk))
+            newest["files"].append(it["obj"])
+            continue
+        alone = next((th for th in out if th["r"].pk == it["r"].pk and not th["mails"]), None)
+        if alone is None:
+            alone = {"r": it["r"], "mails": [], "files": []}
+            out.append(alone)
+        alone["files"].append(it["obj"])
+    return out, hidden
+
+
+def _thread_subject(req, th) -> str:
+    from email_assistant.smtp_client import one_line
+    if th["mails"]:
+        return ("Fwd: " + one_line(th["mails"][-1].subject or req.code))[:240]
+    return f"Fwd: {req.code} · {th['r'].supplier.name} — файли"[:240]
+
+
+def _mail_size(m) -> int:
+    from suppliers.services import rfq_replies
+    files = sum(int(a.get("size") or 0) for a in m.attachments or [] if isinstance(a, dict)
+                and not ((a.get("is_inline") or str(a.get("content_type") or "").startswith("image/"))
+                         and int(a.get("size") or 0) < rfq_replies.LOGO_MAX))
+    return files * 137 // 100
+
+
+def _body_size(th) -> int:
+    return sum(len((m.body_html or m.body_text or "").encode("utf-8")) for m in th["mails"]) + 8192
+
+
+def threads_plan(req, rids, user) -> dict:
+    """План «↪ Переслати гілки» без сервера пошти: гілки кожного постачальника, теми листів колезі, ≈ МБ."""
+    from email_assistant import originals
+    from suppliers.services import rfq
+    _t, rows = _rows(req, rids)
+    threads, hidden = _threads(rows, user)
+    limit = rfq.ATTACH_MAX_MB * 1024 * 1024
+    out, subjects, letters, left = [], [], 0, []
+    for row in rows:
+        r = row["recipient"]
+        mine = [th for th in threads if th["r"].pk == r.pk]
+        size = 0
+        for th in mine:
+            sizes = [_mail_size(m) for m in th["mails"]] + [f.size or 0 for f in th["files"] if (f.size or 0) <= limit]
+            left += [f"{r.supplier.name} · {f.name}" for f in th["files"] if (f.size or 0) > limit]
+            n = len(_pack([{"size": _body_size(th)}] + [{"size": s} for s in sizes], limit))
+            letters += n
+            size += sum(sizes) + _body_size(th)
+            subjects.append({"name": r.supplier.name, "subject": _thread_subject(req, th), "mails": len(th["mails"]),
+                             "files": len(th["files"]), "parts": n})
+        out.append({"rid": r.pk, "name": r.supplier.name, "threads": len(mine), "hidden": hidden.get(r.pk, 0),
+                    "letters": sum(len(th["mails"]) for th in mine), "mb": round(size / 1024 / 1024, 1)})
+    mails = [m for th in threads for m in th["mails"]]
+    return {"rows": out, "subjects": subjects, "parts": letters, "parts_max": THREADS_MAX,
+            "mb": round(sum(x["mb"] for x in out), 1), "limit_mb": rfq.ATTACH_MAX_MB, "left": left,
+            "local": sum(1 for m in mails if not originals.on_server(m))}
+
+
+def _mail_files(data) -> list:
+    """Файли листа з оригіналу (той самий розбір, що в пошті Minerva): вкладення й картинки в тексті, крім дрібних
+    логотипів підпису → [(назва, байти, тип)]."""
+    import email
+    from email_assistant.imap_client import _get_attachments_raw
+    from suppliers.services import rfq_replies
+    try:
+        parts = _get_attachments_raw(email.message_from_bytes(data))
+    except Exception:  # noqa: BLE001 — зіпсований лист: текст однаково піде
+        logger.info("rfq talk: attachments of a forwarded letter not parsed", exc_info=True)
+        return []
+    out = []
+    for a in parts:
+        blob = a.get("_data") or b""
+        image = str(a.get("content_type") or "").startswith("image/")
+        if not blob or ((a.get("is_inline") or image) and len(blob) < rfq_replies.LOGO_MAX):
+            continue
+        out.append((a.get("name") or "attachment", blob, a.get("content_type") or "application/octet-stream"))
+    return out
+
+
+def _fwd_block(m, full, names, warn="") -> tuple:
+    """Один лист у пересиланні (HTML, текст): заголовки, як у пошті, і текст — повністю (найновіший лист гілки,
+    з форматуванням; картинки з тексту — вкладеннями) або лише новий текст, без процитованої історії."""
+    from email_assistant import reply_quote
+    from email_assistant.html_clean import clean_html
+    from email_assistant.imap_client import html_to_text
+    from email_assistant.quotes import new_text
+    head = reply_quote.header_lines(m) + ([("Attachments", ", ".join(names))] if names else [])
+    text = m.body_text or (html_to_text(m.body_html) if m.body_html else "")
+    if not full:
+        text = new_text(text).strip() or text
+    text = text.strip()[:reply_quote.QUOTE_MAX]
+    body = _CID_IMG_RE.sub("", clean_html(m.body_html)) if full and m.body_html else ""
+    if not body.strip():
+        body = f"<div style='white-space:pre-wrap'>{escape(text)}</div>"
+    head_html = "<br>".join(f"<b>{escape(k)}:</b> {escape(v)}" for k, v in head)
+    html = ("<div style='margin-top:18px;padding-top:8px;border-top:1px solid #b5c4df;font-family:Arial,sans-serif;"
+            "font-size:13px;color:#333333'><div style='color:#666666'>-------- Forwarded Message --------</div>"
+            + head_html + (f"<br><span style='color:#a15c00'>{escape(warn)}</span>" if warn else "")
+            + f"</div><div style='margin-top:8px'>{body}</div>")
+    plain = ("\n\n-------- Forwarded Message --------\n" + "\n".join(f"{k}: {v}" for k, v in head)
+             + (f"\n{warn}" if warn else "") + f"\n\n{text}")
+    return html, plain
+
+
+def forward_threads(req, rids, user, to, cc, note, table=True, report=None) -> dict:
+    """«↪ Переслати гілки»: кожна гілка листування вибраних постачальників — окремим листом колезі «Fwd: …»:
+    найновіший лист повністю, раніші — новим текстом кожного; файли всіх листів гілки (з оригіналів на сервері
+    пошти, без повторів) і файли постачальника без листа — вкладеннями; не влізли в rfq.ATTACH_MAX_MB — наступними
+    листами «(файли 2/2)»."""
+    import hashlib as _hashlib
+    import mimetypes
+    from email_assistant import originals
+    from email_assistant.smtp_client import SMTPClient
+    from suppliers.models import SupplierEvent
+    from suppliers.services import rfq
+    to_list, cc_list = rfq.addresses(to), rfq.addresses(cc)
+    if not to_list:
+        raise TalkError("Кому переслати — вкажіть адресу колеги.")
+    t, rows = _rows(req, rids)
+    account = rfq.account_for(user, req)
+    if account is None:
+        raise TalkError("У вас немає активної поштової скриньки в Minerva.")
+    threads, hidden = _threads(rows, user)
+    if not threads:
+        raise TalkError("Немає листів, які можна переслати: листування з цими постачальниками — у скриньках колег "
+                        "або його ще не було.")
+    limit = rfq.ATTACH_MAX_MB * 1024 * 1024
+    got = originals.fetch([m for th in threads for m in th["mails"]], report)
+    letters, left = [], []
+    for th in threads:
+        r, seen, files, warns = th["r"], set(), [], {}
+
+        def add(name, blob, ctype, mail_pk=None):
+            digest = _hashlib.sha256(blob).hexdigest()
+            if digest in seen:                         # той самий файл у кількох листах гілки — раз
+                return
+            seen.add(digest)
+            if len(blob) > limit:
+                left.append(f"{r.supplier.name} · {name}")
+                return
+            files.append({"size": len(blob), "mail": mail_pk,
+                          "att": {"name": name, "content": blob, "content_type": ctype}})
+
+        for m in th["mails"]:
+            o = got[m.pk]
+            for name, blob, ctype in _mail_files(o.data):
+                add(name, blob, ctype, m.pk)
+            if o.rebuilt:
+                found = _saved_files(req, r, m, o.missing, limit)
+                for f in found:
+                    try:
+                        with f.file.open("rb") as fh:
+                            add(f.name, fh.read(), mimetypes.guess_type(f.name)[0] or "application/octet-stream", m.pk)
+                    except (OSError, ValueError):
+                        pass
+                still = [x for x in o.missing if x not in {f.name for f in found}]
+                warns[m.pk] = ("⚠️ копії немає на сервері пошти — зібрано з Minerva"
+                               + (", без файлів: " + ", ".join(still) if still else ""))
+        for f in th["files"]:
+            try:
+                with f.file.open("rb") as fh:
+                    add(f.name, fh.read(), mimetypes.guess_type(f.name)[0] or "application/octet-stream")
+            except (OSError, ValueError):
+                left.append(f"{r.supplier.name} · {f.name}")
+        parts = _pack([{"size": _body_size(th), "body": True}] + files, limit)
+        for k, part in enumerate(parts, 1):
+            letters.append({"th": th, "k": k, "n": len(parts), "files": [x for x in part if not x.get("body")],
+                            "all_files": files, "warns": warns})
+    if len(letters) > THREADS_MAX:
+        raise TalkError(f"Це {len(letters)} листів колезі (за раз — до {THREADS_MAX}). Виберіть менше постачальників.")
+    sig = rfq.signature(account)
+    sig_html = (f"<div>-- <br>{sig['html']}</div>" if sig["html"] else
+                f"<div>-- <br>{escape(sig['text']).replace(chr(10), '<br>')}</div>" if sig["text"] else "")
+    total_hidden = sum(hidden.values())
+    for i, L in enumerate(letters, 1):
+        th, k, n, r = L["th"], L["k"], L["n"], L["th"]["r"]
+        if report:
+            report(f"📤 Надсилаю колезі: {i} / {len(letters)}")
+        subject = _thread_subject(req, th) + (f" (файли {k}/{n})" if n > 1 else "")
+        html = ["<div style='font-family:Arial,Helvetica,sans-serif;font-size:14px'>"]
+        text = []
+        if k == 1:
+            if (note or "").strip():
+                html.append(f"<p>{escape(note.strip()).replace(chr(10), '<br>')}</p>")
+                text.append(note.strip())
+            info = (f"{req.code} · {req.title} · {r.supplier.name} — гілка листування: листів {len(th['mails'])}"
+                    + (f", файлів {len(L['all_files'])}" if L["all_files"] else ""))
+            html.append(f"<p><small>{escape(info)}</small></p>")
+            text.append(info)
+            if table and i == 1:
+                html.append(_table_html(t, rows))
+            mails = list(reversed(th["mails"]))          # найновіший — угорі, як у пошті
+            for j, m in enumerate(mails):
+                if j == 1:
+                    html.append("<p style='margin-top:18px;color:#666666'><small>Раніші листи гілки — новий текст "
+                                "кожного, без процитованої історії:</small></p>")
+                    text.append("\n\nРаніші листи гілки — новий текст кожного, без процитованої історії:")
+                names = [x["att"]["name"] for x in L["all_files"] if x["mail"] == m.pk]
+                h, p = _fwd_block(m, j == 0, names, L["warns"].get(m.pk, ""))
+                html.append(h)
+                text.append(p)
+            extra = [x["att"]["name"] for x in L["all_files"] if x["mail"] is None]
+            if extra:
+                line = "📎 Ще файли постачальника (не з цих листів): " + ", ".join(extra)
+                html.append(f"<p style='margin-top:18px'><small>{escape(line)}</small></p>")
+                text.append("\n" + line)
+        else:
+            line = f"Продовження — файли гілки «{_thread_subject(req, th)[5:]}» ({k}/{n}): " + \
+                ", ".join(x["att"]["name"] for x in L["files"])
+            html.append(f"<p>{escape(line)}</p>")
+            text.append(line)
+        if n > 1 and k == 1:
+            line = f"Файли гілки не влізли в один лист (до {rfq.ATTACH_MAX_MB} МБ) — решта в наступних: (файли 2/{n})…"
+            html.append(f"<p><small>{escape(line)}</small></p>")
+            text.append(line)
+        if i == len(letters):
+            if left:
+                names = ", ".join(left)
+                html.append(f"<p><small>📎 Не вкладено (кожен понад {rfq.ATTACH_MAX_MB} МБ): {escape(names)} — є в "
+                            f"Minerva, запит {escape(req.code)}.</small></p>")
+                text.append(f"\n📎 Не вкладено (кожен понад {rfq.ATTACH_MAX_MB} МБ): {names}")
+            if total_hidden:
+                html.append(f"<p><small>🔒 Ще листів у скриньках колег: {total_hidden} — їх тут немає.</small></p>")
+                text.append(f"🔒 Ще листів у скриньках колег: {total_hidden} — їх тут немає.")
+        body_text, _html = rfq.letter(account, "\n".join(text))
+        full_html = "".join(html) + sig_html + "</div>"
+        attachments = [x["att"] for x in L["files"]]
+        try:
+            result = SMTPClient(account).send(to_emails=to_list, cc_emails=cc_list, subject=subject,
+                                              body_text=body_text, body_html=full_html, attachments=attachments,
+                                              signature=False)
+        except Exception as e:  # noqa: BLE001
+            result = {"ok": False, "error": str(e)}
+        if not result.get("ok"):
+            done = f"Надіслано листів колезі: {i - 1} з {len(letters)}. " if len(letters) > 1 else ""
+            raise TalkError(done + f"Лист {i} не надіслано: " + str(result.get("error") or "помилка SMTP")[:400])
+        try:
+            from django.db import transaction
+            with transaction.atomic():
+                rfq.store_sent(account, result, to_list, cc_list, subject, body_text, attachments,
+                               body_html=full_html, keep_files=True)
+        except Exception:  # noqa: BLE001
+            logger.warning("rfq talk: store forward threads failed", exc_info=True)
+        if i < len(letters) and EACH_PAUSE:
+            time.sleep(EACH_PAUSE)
+    for row in rows:
+        r = row["recipient"]
+        count = sum(1 for th in threads if th["r"].pk == r.pk and th["mails"])
+        if count:
+            SupplierEvent.objects.create(supplier=r.supplier, request=req, kind=SupplierEvent.MAIL, user=user,
+                                         text=f"↪ Переслано колезі гілок листування: {count} → {', '.join(to_list)}")
+    count = sum(1 for th in threads if th["mails"])
+    message = f"✓ Переслано → {', '.join(to_list)}: гілок {count}" + (
+        f" · {len(letters)} листами" if len(letters) != count else "")
+    return {"ok": True, "to": to_list, "threads": count, "letters": len(letters), "left": len(left),
             "hidden": total_hidden, "rebuilt": sum(1 for o in got.values() if o.rebuilt), "message": message}
